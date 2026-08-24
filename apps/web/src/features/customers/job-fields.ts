@@ -31,7 +31,6 @@ export const JOB_FIELD_GROUPS: JobFieldGroup[] = [
     title: 'Basics',
     description: 'What the job is called and the form it is produced in.',
     fields: [
-      { name: 'jobCode', label: 'Job code', placeholder: 'YPP2605001', span: 3 },
       {
         name: 'jobName',
         label: 'Job name',
@@ -90,7 +89,6 @@ export const JOB_FIELD_GROUPS: JobFieldGroup[] = [
       { name: 'polyGsm', label: 'Poly', kind: 'number', span: 3 },
       { name: 'adhesiveGsm', label: 'Adhesive', kind: 'number', span: 4 },
       { name: 'coatingGsm', label: 'Coating', kind: 'number', span: 4 },
-      { name: 'compositeGsm', label: 'Composite (total)', kind: 'number', span: 4 },
     ],
   },
   {
@@ -103,7 +101,6 @@ export const JOB_FIELD_GROUPS: JobFieldGroup[] = [
       { name: 'viscosity', label: 'Viscosity', placeholder: '15-16', span: 3 },
       { name: 'pouchPlateSize', label: 'Pouch plate size', placeholder: '315', span: 4 },
       { name: 'singleRollWeight', label: 'Single roll weight', placeholder: '60-70', span: 4 },
-      { name: 'pouchesPerKg', label: 'Pouches per kg', placeholder: '31.97', span: 4 },
     ],
   },
   {

@@ -43,13 +43,16 @@ const EMPTY: CreateCustomerFormValues = {
   jobs: [],
 };
 
-const BLANK_JOB = { jobName: '', jobCode: '', jobType: 'NA' } as JobFormValues;
+const BLANK_JOB = { jobName: '', jobType: 'NA' } as JobFormValues;
+
+/** Fields the system owns: never sent back, never editable. */
+const DERIVED_FIELDS = new Set(['id', 'jobCode', 'compositeGsm', 'pouchesPerKg']);
 
 /** Maps an API job onto form values, blanking every 'NA' and null. */
 function toFormJob(job: CustomerJob): JobFormValues {
   const form: Record<string, unknown> = { id: job.id };
   for (const [key, value] of Object.entries(job)) {
-    if (key === 'id') continue;
+    if (DERIVED_FIELDS.has(key)) continue;
     form[key] = fromNA(value as string | null);
   }
   form['jobName'] = job.jobName;
@@ -90,8 +93,39 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
 
   const jobFields = useFieldArray({ control, name: 'jobs' });
 
-  // Drives each card's collapsed summary line as the user types.
+  // Drives each card's summary line and its calculated fields as the user types.
   const watchedJobs = useWatch({ control, name: 'jobs' });
+
+  /**
+   * Mirrors the server's formulas so the calculated fields update while typing.
+   * The server recomputes both on save and its value wins — this is feedback,
+   * not the source of truth.
+   */
+  function deriveFor(index: number) {
+    const job = watchedJobs?.[index];
+    const toNumber = (value: unknown) => {
+      const parsed = Number(value);
+      return value === '' || value === null || value === undefined || !Number.isFinite(parsed)
+        ? null
+        : parsed;
+    };
+
+    const layers = [job?.inkGsm, job?.petGsm, job?.metPetGsm, job?.polyGsm, job?.adhesiveGsm].map(
+      toNumber,
+    );
+    const compositeGsm = layers.some((value) => value !== null)
+      ? Number(layers.reduce<number>((total, value) => total + (value ?? 0), 0).toFixed(3))
+      : null;
+
+    const height = toNumber(job?.designHeight);
+    const width = toNumber(job?.designOpenWidth);
+    const pouchesPerKg =
+      compositeGsm && compositeGsm > 0 && height && height > 0 && width && width > 0
+        ? (1_000_000_000 / (height * width * compositeGsm)).toFixed(2)
+        : null;
+
+    return { compositeGsm: compositeGsm === null ? null : String(compositeGsm), pouchesPerKg };
+  }
 
   // Refill the form whenever a different row is opened, and again once that
   // customer's jobs have loaded.
@@ -319,6 +353,8 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
             <ul className="mt-4 flex flex-col gap-3">
               {jobFields.fields.map((field, index) => {
                 const watched = watchedJobs?.[index];
+                // The code belongs to the saved job, not to the form.
+                const savedJob = detail?.jobs.find((job) => job.id === watched?.id);
                 return (
                   <JobCard
                     key={field.id}
@@ -328,9 +364,10 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
                     onRemove={() => jobFields.remove(index)}
                     summary={{
                       jobName: String(watched?.jobName ?? ''),
-                      jobCode: String(watched?.jobCode ?? ''),
+                      jobCode: savedJob?.jobCode ?? '',
                       jobType: String(watched?.jobType ?? 'NA'),
                     }}
+                    derived={deriveFor(index)}
                   />
                 );
               })}

@@ -77,8 +77,8 @@ export const customerJobSchema = z.object({
   /** Present when editing a job that already exists. */
   id: z.string().min(1).optional(),
 
-  // Basics
-  jobCode: optionalText(40).default(NA),
+  // Basics. `jobCode` is NOT accepted from the client: it is generated on
+  // create and preserved on update, so it cannot be edited or forged.
   jobName: z.string().trim().min(1, 'Job name is required').max(200),
   jobType: z.enum(JOB_TYPES).or(z.literal(NA)).default(NA),
   pouchType: optionalText(80).default(NA),
@@ -108,8 +108,9 @@ export const customerJobSchema = z.object({
   metPetGsm: optionalNumber,
   polyGsm: optionalNumber,
   adhesiveGsm: optionalNumber,
-  compositeGsm: optionalNumber,
   coatingGsm: optionalNumber,
+  // `compositeGsm` is derived (the sum of the layers above) and computed
+  // server-side, so it is not accepted here either.
 
   // Tooling. The sheet stores several of these as ranges ("15-16", "60-70"),
   // so they stay text rather than being forced into a number.
@@ -119,7 +120,7 @@ export const customerJobSchema = z.object({
   viscosity: optionalText(40).default(NA),
   pouchPlateSize: optionalText(60).default(NA),
   singleRollWeight: optionalText(40).default(NA),
-  pouchesPerKg: optionalText(40).default(NA),
+  // `pouchesPerKg` is derived from the pouch size and composite GSM.
 
   // Pouch dimensions
   pouchHeight: optionalNumber,

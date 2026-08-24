@@ -134,3 +134,31 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
     />
   );
 });
+
+/**
+ * A value the system owns — generated or calculated — shown in the same visual
+ * rhythm as an input so the form still reads as one grid, but visibly not
+ * editable. Explaining WHY it cannot be typed into matters more than the
+ * styling: a greyed-out box with no reason reads like a bug.
+ */
+export function ReadOnlyValue({
+  value,
+  placeholder = 'Calculated on save',
+}: {
+  value: string | null | undefined;
+  placeholder?: string;
+}) {
+  const empty = value === null || value === undefined || value === '' || value === 'NA';
+  return (
+    <div
+      aria-readonly="true"
+      className={cn(
+        'border-ink-200 bg-ink-50 flex min-h-[46px] w-full items-center rounded-[var(--radius-md)]',
+        'border border-dashed px-3.5 py-2.5 text-[15px]',
+        empty ? 'text-ink-400 italic' : 'text-ink-700 font-medium',
+      )}
+    >
+      {empty ? placeholder : value}
+    </div>
+  );
+}
