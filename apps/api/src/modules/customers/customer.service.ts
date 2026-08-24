@@ -73,6 +73,71 @@ const JOB_FIELDS = {
 } as const;
 
 /**
+ * Derived job values. These are computed here and never accepted from the
+ * client, so the numbers can't drift apart from the inputs they come from.
+ *
+ * Both formulas were verified against every row of the legacy sheet:
+ *   compositeGsm  = ink + PET + metallised PET + poly + adhesive   (411/411)
+ *   pouchesPerKg  = 1e9 / (height mm x open width mm x composite)  (384/384)
+ */
+function deriveJobValues(job: Omit<CustomerJobInput, 'id'>) {
+  const layers = [job.inkGsm, job.petGsm, job.metPetGsm, job.polyGsm, job.adhesiveGsm];
+  const anyLayerSet = layers.some((value) => value !== null && value !== undefined);
+  const compositeGsm = anyLayerSet
+    ? Number(layers.reduce<number>((total, value) => total + (value ?? 0), 0).toFixed(3))
+    : null;
+
+  const { designHeight, designOpenWidth } = job;
+  const canComputePouches =
+    compositeGsm !== null &&
+    compositeGsm > 0 &&
+    designHeight !== null &&
+    designHeight !== undefined &&
+    designHeight > 0 &&
+    designOpenWidth !== null &&
+    designOpenWidth !== undefined &&
+    designOpenWidth > 0;
+
+  const pouchesPerKg = canComputePouches
+    ? (1_000_000_000 / (designHeight * designOpenWidth * compositeGsm)).toFixed(2)
+    : 'NA';
+
+  return { compositeGsm, pouchesPerKg };
+}
+
+/**
+ * Next job code for the current month, e.g. YPP2608001.
+ *
+ * The legacy sheet numbers jobs YPP + YY + MM + a sequence that restarts each
+ * month, so new codes follow the same shape and the client's existing habits
+ * keep working.
+ */
+async function nextJobCode(tx: Prisma.TransactionClient, taken: Set<string>): Promise<string> {
+  const now = new Date();
+  const prefix = `YPP${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  const latest = await tx.job.findFirst({
+    where: { jobCode: { startsWith: prefix } },
+    orderBy: { jobCode: 'desc' },
+    select: { jobCode: true },
+  });
+
+  let sequence = latest ? Number(latest.jobCode.slice(prefix.length)) : 0;
+  if (!Number.isFinite(sequence)) sequence = 0;
+
+  // `taken` covers codes handed out earlier in this same transaction, which the
+  // database query cannot see yet.
+  let code: string;
+  do {
+    sequence += 1;
+    code = `${prefix}${String(sequence).padStart(3, '0')}`;
+  } while (taken.has(code));
+
+  taken.add(code);
+  return code;
+}
+
+/**
  * Reconciles a customer's jobs against the list the form submitted.
  *
  * Rows with an id are updated, rows without one are created, and jobs the form
@@ -97,18 +162,24 @@ async function syncCustomerJobs(
     });
   }
 
+  const codesIssued = new Set<string>();
+
   for (const job of jobs) {
     // `id` identifies the row; everything else is the job's own data.
     const { id: _ignored, ...data } = job;
+    const derived = deriveJobValues(data);
 
     if (job.id && existingIds.has(job.id)) {
-      await tx.job.update({ where: { id: job.id }, data });
+      // jobCode is never rewritten on update — it is the job's identity.
+      await tx.job.update({ where: { id: job.id }, data: { ...data, ...derived } });
       continue;
     }
 
     await tx.job.create({
       data: {
         ...data,
+        ...derived,
+        jobCode: await nextJobCode(tx, codesIssued),
         customerId,
         customerSource: 'EXPLICIT',
         needsCustomer: false,

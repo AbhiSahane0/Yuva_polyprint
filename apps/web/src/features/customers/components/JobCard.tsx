@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import type { CreateCustomerFormValues } from '@yuva/shared';
-import { Field, FieldSection, Input, Select, Textarea } from '@/components/ui/Field';
+import { Field, FieldSection, Input, ReadOnlyValue, Select, Textarea } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 import { JOB_FIELD_GROUPS, SPAN_CLASS, type JobFieldDef } from '../job-fields';
@@ -14,9 +14,11 @@ interface Props {
   onRemove: () => void;
   /** Job name and code, for the collapsed summary line. */
   summary: { jobName: string; jobCode: string; jobType: string };
+  /** Derived, never typed: recomputed live as the GSM and size fields change. */
+  derived: { compositeGsm: string | null; pouchesPerKg: string | null };
 }
 
-export function JobCard({ index, register, errors, onRemove, summary }: Props) {
+export function JobCard({ index, register, errors, onRemove, summary, derived }: Props) {
   // A job with no name yet is one the user just added, so open it for them.
   const [open, setOpen] = useState(summary.jobName === '');
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -162,7 +164,46 @@ export function JobCard({ index, register, errors, onRemove, summary }: Props) {
                       {...(group.description ? { description: group.description } : {})}
                     >
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+                        {group.title === 'Basics' ? (
+                          <div className="col-span-1 sm:col-span-3">
+                            <Field
+                              label="Job code"
+                              htmlFor={`jobs.${index}.jobCode`}
+                              hint="Set by the system"
+                            >
+                              <ReadOnlyValue
+                                value={summary.jobCode}
+                                placeholder="Generated on save"
+                              />
+                            </Field>
+                          </div>
+                        ) : null}
+
                         {group.fields.map(renderField)}
+
+                        {group.title === 'Coating weights (GSM)' ? (
+                          <div className="col-span-1 sm:col-span-4">
+                            <Field
+                              label="Composite (total)"
+                              htmlFor={`jobs.${index}.compositeGsm`}
+                              hint="Ink + PET + Met PET + Poly + Adhesive"
+                            >
+                              <ReadOnlyValue value={derived.compositeGsm} />
+                            </Field>
+                          </div>
+                        ) : null}
+
+                        {group.title === 'Machine & tooling' ? (
+                          <div className="col-span-1 sm:col-span-4">
+                            <Field
+                              label="Pouches per kg"
+                              htmlFor={`jobs.${index}.pouchesPerKg`}
+                              hint="From design size and composite GSM"
+                            >
+                              <ReadOnlyValue value={derived.pouchesPerKg} />
+                            </Field>
+                          </div>
+                        ) : null}
                       </div>
                     </FieldSection>
                   )
