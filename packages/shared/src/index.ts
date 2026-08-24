@@ -14,5 +14,7 @@ export * from './constants/pagination.js';
 
 export * from './types/api.js';
 export * from './types/pagination.js';
+export * from './types/customer.js';
 
 export * from './schemas/common.js';
+export * from './schemas/customer.js';

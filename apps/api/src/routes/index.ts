@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import customerRoutes from '../modules/customers/customer.routes.js';
 
 /**
  * The /api router — the single, readable map of the API surface.
@@ -7,9 +8,10 @@ import { Router } from 'express';
  */
 const router = Router();
 
+router.use('/customers', customerRoutes);
+
 /* ---------------------------------------------------------------------------
- * Module routes are registered here as each module is scoped in and built.
- * Convention (see src/modules/README.md):
+ * Further module routes are registered here as each is scoped in and built:
  *
  *   import orderRoutes from '../modules/orders/order.routes.js';
  *   router.use('/orders', orderRoutes);
