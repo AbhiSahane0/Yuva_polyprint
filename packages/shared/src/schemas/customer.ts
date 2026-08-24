@@ -44,6 +44,26 @@ const altPhoneField = optionalText(120).refine(
 export const customerSourceSchema = z.enum(['SHEET', 'BRAND_INFERRED']);
 export type CustomerSource = z.infer<typeof customerSourceSchema>;
 
+/** The two forms every job in the legacy sheet takes. */
+export const JOB_TYPES = ['Pouch Form', 'Roll Form'] as const;
+
+/**
+ * A job captured alongside its customer. The client works customer-first —
+ * they open a customer and enter that customer's jobs — so this is the small
+ * identifying subset, not the full 40-column engineering spec.
+ */
+export const customerJobSchema = z.object({
+  /** Present when editing a job that already exists. */
+  id: z.string().min(1).optional(),
+  jobCode: optionalText(40).default(NA),
+  jobName: z.string().trim().min(1, 'Job name is required').max(200),
+  jobType: z.enum(JOB_TYPES).or(z.literal(NA)).default(NA),
+  pouchType: optionalText(80).default(NA),
+});
+
+export type CustomerJobInput = z.infer<typeof customerJobSchema>;
+export type CustomerJobFormValues = z.input<typeof customerJobSchema>;
+
 export const createCustomerSchema = z.object({
   companyName: z.string().trim().min(2, 'Company name is required').max(200),
   contactPerson: optionalText(120).default(NA),
@@ -55,6 +75,12 @@ export const createCustomerSchema = z.object({
   altPhone: altPhoneField.default(NA),
   email: emailField.default(NA),
   isVerified: z.boolean().default(false),
+
+  /**
+   * Optional. When omitted the customer's jobs are left untouched; when
+   * present the list is treated as the complete set for that customer.
+   */
+  jobs: z.array(customerJobSchema).max(200).optional(),
 });
 
 /** Every field is optional on update; only what is sent gets changed. */
@@ -68,8 +94,6 @@ export const listCustomersQuerySchema = paginationQuerySchema.extend({
     .union([z.boolean(), z.enum(['true', 'false'])])
     .transform((value) => (typeof value === 'boolean' ? value : value === 'true'))
     .optional(),
-  sortBy: z.enum(['companyName', 'city', 'createdAt', 'updatedAt']).default('companyName'),
-  sortOrder: z.enum(['asc', 'desc']).default('asc'),
 });
 
 /**

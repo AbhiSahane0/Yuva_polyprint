@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useFieldArray, useForm } from 'react-hook-form';
+import { Plus, Trash2 } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   createCustomerSchema,
+  JOB_TYPES,
   type CreateCustomerFormValues,
   type CreateCustomerInput,
   type Customer,
@@ -12,7 +14,7 @@ import { Button } from '@/components/ui/Button';
 import { Field, Input, Textarea } from '@/components/ui/Field';
 import { toast } from '@/lib/toast';
 import { ApiClientError } from '@/lib/api-client';
-import { useCreateCustomer, useUpdateCustomer } from '../api/customer-api';
+import { useCreateCustomer, useCustomer, useUpdateCustomer } from '../api/customer-api';
 
 /** 'NA' is the legacy placeholder — show an empty box instead of the word. */
 function fromNA(value: string | undefined): string {
@@ -35,7 +37,10 @@ const EMPTY: CreateCustomerFormValues = {
   altPhone: '',
   email: '',
   isVerified: false,
+  jobs: [],
 };
+
+const BLANK_JOB = { jobCode: '', jobName: '', jobType: 'NA' as const, pouchType: '' };
 
 interface Props {
   open: boolean;
@@ -49,11 +54,16 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
 
+  // Jobs live on the detail endpoint, so they are only fetched when a row is
+  // actually opened for editing.
+  const { data: detail, isPending: detailLoading } = useCustomer(customer?.id ?? null);
+
   const {
     register,
     handleSubmit,
     reset,
     setError,
+    control,
     formState: { errors, isSubmitting, isDirty },
     // TFieldValues is the pre-default shape; the resolver transforms it into
     // CreateCustomerInput before onSubmit sees it.
@@ -62,7 +72,10 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
     defaultValues: EMPTY,
   });
 
-  // Refill the form whenever a different row is opened.
+  const jobFields = useFieldArray({ control, name: 'jobs' });
+
+  // Refill the form whenever a different row is opened, and again once that
+  // customer's jobs have loaded.
   useEffect(() => {
     if (!open) return;
     reset(
@@ -78,10 +91,18 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
             altPhone: fromNA(customer.altPhone),
             email: fromNA(customer.email),
             isVerified: customer.isVerified,
+            jobs: (detail?.jobs ?? []).map((job) => ({
+              id: job.id,
+              jobCode: fromNA(job.jobCode),
+              jobName: job.jobName,
+              jobType:
+                job.jobType === 'Pouch Form' || job.jobType === 'Roll Form' ? job.jobType : 'NA',
+              pouchType: fromNA(job.pouchType),
+            })),
           }
         : EMPTY,
     );
-  }, [open, customer, reset]);
+  }, [open, customer, detail, reset]);
 
   async function onSubmit(values: CreateCustomerInput) {
     try {
@@ -224,6 +245,115 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
             {...register('pincode')}
           />
         </Field>
+
+        {/* ---- Jobs ------------------------------------------------------ */}
+        <div className="border-ink-200 mt-2 border-t pt-4 sm:col-span-2">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-ink-800 text-sm font-semibold">Jobs</h3>
+              <p className="text-ink-500 mt-0.5 text-xs">
+                The products this customer orders. Removing a row does not delete the job — it
+                returns to the &ldquo;needs a customer&rdquo; list.
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => jobFields.append(BLANK_JOB)}
+            >
+              <Plus className="size-4" />
+              Add job
+            </Button>
+          </div>
+
+          {isEdit && detailLoading ? (
+            <p className="text-ink-400 py-4 text-sm">Loading jobs…</p>
+          ) : jobFields.fields.length === 0 ? (
+            <p className="text-ink-400 border-ink-200 mt-3 rounded-[var(--radius-md)] border border-dashed px-3 py-6 text-center text-sm">
+              No jobs yet. Use &ldquo;Add job&rdquo; to record what this customer orders.
+            </p>
+          ) : (
+            <ul className="mt-3 flex flex-col gap-3">
+              {jobFields.fields.map((field, index) => (
+                <li
+                  key={field.id}
+                  className="border-ink-200 bg-ink-25 rounded-[var(--radius-md)] border p-3"
+                >
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
+                    <div className="sm:col-span-3">
+                      <Field label="Job code" htmlFor={`jobs.${index}.jobCode`}>
+                        <Input
+                          id={`jobs.${index}.jobCode`}
+                          autoComplete="off"
+                          placeholder="YPP2605001"
+                          {...register(`jobs.${index}.jobCode` as const)}
+                        />
+                      </Field>
+                    </div>
+
+                    <div className="sm:col-span-4">
+                      <Field
+                        label="Job name"
+                        htmlFor={`jobs.${index}.jobName`}
+                        required
+                        error={errors.jobs?.[index]?.jobName?.message}
+                      >
+                        <Input
+                          id={`jobs.${index}.jobName`}
+                          autoComplete="off"
+                          placeholder="e.g. Maharaja Atta 5kg."
+                          invalid={Boolean(errors.jobs?.[index]?.jobName)}
+                          {...register(`jobs.${index}.jobName` as const)}
+                        />
+                      </Field>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <Field label="Form" htmlFor={`jobs.${index}.jobType`}>
+                        <select
+                          id={`jobs.${index}.jobType`}
+                          className="border-ink-200 focus:border-brand-600 focus:ring-brand-600/30 h-[38px] w-full cursor-pointer rounded-[var(--radius-md)] border bg-white px-2 text-sm focus:ring-2 focus:outline-none"
+                          {...register(`jobs.${index}.jobType` as const)}
+                        >
+                          <option value="NA">Not set</option>
+                          {JOB_TYPES.map((type) => (
+                            <option key={type} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <Field label="Pouch type" htmlFor={`jobs.${index}.pouchType`}>
+                        <Input
+                          id={`jobs.${index}.pouchType`}
+                          autoComplete="off"
+                          placeholder="Top Seal"
+                          {...register(`jobs.${index}.pouchType` as const)}
+                        />
+                      </Field>
+                    </div>
+
+                    <div className="flex items-end justify-end sm:col-span-1">
+                      <button
+                        type="button"
+                        onClick={() => jobFields.remove(index)}
+                        aria-label={`Remove job ${index + 1}`}
+                        title="Remove job"
+                        className="text-ink-400 hover:bg-danger-50 hover:text-danger-600 mb-0.5 cursor-pointer rounded-[var(--radius-md)] p-2"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div className="flex items-end sm:col-span-2">
           <label className="flex cursor-pointer items-center gap-2.5 text-sm">

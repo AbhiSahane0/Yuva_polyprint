@@ -2,6 +2,9 @@ import type { Prisma } from '../../generated/prisma/client.js';
 import type {
   CreateCustomerInput,
   Customer,
+  CustomerDetail,
+  CustomerJob,
+  CustomerJobInput,
   ListCustomersQuery,
   UpdateCustomerInput,
 } from '@yuva/shared';
@@ -12,6 +15,65 @@ import { ApiError } from '../../utils/api-error.js';
 type CustomerRow = Prisma.CustomerGetPayload<{ include: { _count: { select: { jobs: true } } } }>;
 
 const withJobCount = { _count: { select: { jobs: true } } } as const;
+
+const JOB_FIELDS = {
+  id: true,
+  jobCode: true,
+  jobName: true,
+  jobType: true,
+  pouchType: true,
+} as const;
+
+/**
+ * Reconciles a customer's jobs against the list the form submitted.
+ *
+ * Rows with an id are updated, rows without one are created, and jobs the form
+ * no longer lists are UNLINKED rather than deleted — the same rule as deleting
+ * a customer. Removing a row from a form should never destroy production
+ * history; the job returns to the "needs a customer" worklist instead.
+ */
+async function syncCustomerJobs(
+  tx: Prisma.TransactionClient,
+  customerId: string,
+  jobs: CustomerJobInput[],
+) {
+  const existing = await tx.job.findMany({ where: { customerId }, select: { id: true } });
+  const existingIds = new Set(existing.map((job) => job.id));
+  const keptIds = new Set(jobs.map((job) => job.id).filter((id): id is string => Boolean(id)));
+
+  const removedIds = [...existingIds].filter((id) => !keptIds.has(id));
+  if (removedIds.length > 0) {
+    await tx.job.updateMany({
+      where: { id: { in: removedIds } },
+      data: { customerId: null, customerSource: 'NONE', needsCustomer: true },
+    });
+  }
+
+  for (const job of jobs) {
+    const data = {
+      jobCode: job.jobCode,
+      jobName: job.jobName,
+      jobType: job.jobType,
+      pouchType: job.pouchType,
+    };
+
+    if (job.id && existingIds.has(job.id)) {
+      await tx.job.update({ where: { id: job.id }, data });
+      continue;
+    }
+
+    await tx.job.create({
+      data: {
+        ...data,
+        customerId,
+        customerSource: 'EXPLICIT',
+        needsCustomer: false,
+        // Rows added in the app have no line in the source spreadsheet.
+        sourceRow: 0,
+      },
+    });
+  }
+}
 
 function toCustomer(row: CustomerRow): Customer {
   return {
@@ -69,7 +131,8 @@ export async function listCustomers(query: ListCustomersQuery) {
     prisma.customer.findMany({
       where,
       include: withJobCount,
-      orderBy: { [query.sortBy]: query.sortOrder },
+      // Fixed, alphabetical order — the list is not user-sortable.
+      orderBy: { companyName: 'asc' },
       skip,
       take: query.pageSize,
     }),
@@ -79,13 +142,16 @@ export async function listCustomers(query: ListCustomersQuery) {
   return { items: rows.map(toCustomer), total };
 }
 
-export async function getCustomerById(id: string): Promise<Customer> {
-  const row = await prisma.customer.findUnique({ where: { id }, include: withJobCount });
+export async function getCustomerById(id: string): Promise<CustomerDetail> {
+  const row = await prisma.customer.findUnique({
+    where: { id },
+    include: { ...withJobCount, jobs: { select: JOB_FIELDS, orderBy: { jobName: 'asc' } } },
+  });
   if (!row) throw ApiError.notFound('Customer not found');
-  return toCustomer(row);
+  return { ...toCustomer(row), jobs: row.jobs as CustomerJob[] };
 }
 
-export async function createCustomer(input: CreateCustomerInput): Promise<Customer> {
+export async function createCustomer(input: CreateCustomerInput): Promise<CustomerDetail> {
   const existing = await prisma.customer.findUnique({
     where: { companyName: input.companyName },
     select: { id: true },
@@ -94,19 +160,29 @@ export async function createCustomer(input: CreateCustomerInput): Promise<Custom
     throw ApiError.conflict(`A customer named "${input.companyName}" already exists`);
   }
 
-  const row = await prisma.customer.create({
-    data: {
-      ...input,
-      // Records created in the app are real entries, not spreadsheet imports.
-      source: 'SHEET',
-      sourceRaw: 'Added in the app',
-    },
-    include: withJobCount,
+  const { jobs, ...customerData } = input;
+
+  const id = await prisma.$transaction(async (tx) => {
+    const customer = await tx.customer.create({
+      data: {
+        ...customerData,
+        // Records created in the app are real entries, not spreadsheet imports.
+        source: 'SHEET',
+        sourceRaw: 'Added in the app',
+      },
+      select: { id: true },
+    });
+    if (jobs && jobs.length > 0) await syncCustomerJobs(tx, customer.id, jobs);
+    return customer.id;
   });
-  return toCustomer(row);
+
+  return getCustomerById(id);
 }
 
-export async function updateCustomer(id: string, input: UpdateCustomerInput): Promise<Customer> {
+export async function updateCustomer(
+  id: string,
+  input: UpdateCustomerInput,
+): Promise<CustomerDetail> {
   const current = await prisma.customer.findUnique({ where: { id }, select: { id: true } });
   if (!current) throw ApiError.notFound('Customer not found');
 
@@ -120,12 +196,16 @@ export async function updateCustomer(id: string, input: UpdateCustomerInput): Pr
     }
   }
 
-  const row = await prisma.customer.update({
-    where: { id },
-    data: input,
-    include: withJobCount,
+  const { jobs, ...customerData } = input;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.customer.update({ where: { id }, data: customerData });
+    // `jobs` omitted means "leave the jobs alone"; an empty array means
+    // "this customer has no jobs", which is a real instruction.
+    if (jobs) await syncCustomerJobs(tx, id, jobs);
   });
-  return toCustomer(row);
+
+  return getCustomerById(id);
 }
 
 /**

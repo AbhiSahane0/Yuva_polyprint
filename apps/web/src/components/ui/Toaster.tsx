@@ -33,7 +33,7 @@ export function Toaster() {
             type="button"
             onClick={() => dismiss(t.id)}
             aria-label="Dismiss"
-            className="text-ink-400 hover:text-ink-700"
+            className="text-ink-400 hover:text-ink-700 cursor-pointer"
           >
             <X className="size-4" />
           </button>

@@ -20,7 +20,11 @@ export const apiRateLimiter = rateLimit({
   },
 });
 
-/** Tighter limiter to mount on login / password endpoints once auth exists. */
+/**
+ * Tighter limiter for the future login endpoint. A username + password form is
+ * exactly what brute-force attempts target, so this stays even though the auth
+ * module is not built yet.
+ */
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
