@@ -1,0 +1,21 @@
+// Yuva Polyprint ERP — database schema
+//
+// Conventions for the models added here as modules are scoped in:
+//   - Model names PascalCase singular (Order, ProductionStage)
+//   - Table names snake_case plural via @@map("orders")
+//   - Column names snake_case via @map
+//   - Every table: id (cuid), createdAt, updatedAt
+//   - Money and material quantities use Decimal, never Float — this system
+//     computes costs and consumption, and Float will drift.
+//   - Enums for every status vocabulary rather than free-text strings.
+//
+// The datasource URL is supplied by prisma.config.ts from DATABASE_URL.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
