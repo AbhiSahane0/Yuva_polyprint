@@ -16,12 +16,60 @@ type CustomerRow = Prisma.CustomerGetPayload<{ include: { _count: { select: { jo
 
 const withJobCount = { _count: { select: { jobs: true } } } as const;
 
+/**
+ * Every job column the customer screen can edit. Decimal columns serialise as
+ * strings, which keeps the exact value the client typed.
+ */
 const JOB_FIELDS = {
   id: true,
   jobCode: true,
   jobName: true,
   jobType: true,
   pouchType: true,
+  pouchSubType: true,
+  petMicron: true,
+  metPetMicron: true,
+  polyMicron: true,
+  polyType: true,
+  layer: true,
+  jobFinalDirection: true,
+  printingType: true,
+  designHeight: true,
+  designOpenWidth: true,
+  ups: true,
+  design: true,
+  jobColours: true,
+  totalCylinders: true,
+  cylinderParty: true,
+  inkGsm: true,
+  petGsm: true,
+  metPetGsm: true,
+  polyGsm: true,
+  adhesiveGsm: true,
+  compositeGsm: true,
+  coatingGsm: true,
+  rubberSize: true,
+  cylinderCell: true,
+  cylinderDia: true,
+  viscosity: true,
+  pouchPlateSize: true,
+  singleRollWeight: true,
+  pouchesPerKg: true,
+  pouchHeight: true,
+  pouchOpenWidth: true,
+  dPunch: true,
+  dPunchTopSize: true,
+  gusset: true,
+  gussetSize: true,
+  vNotch: true,
+  up1: true,
+  up2: true,
+  up3: true,
+  up4: true,
+  up2OpenWidth: true,
+  up2Height: true,
+  up3OpenWidth: true,
+  notes: true,
 } as const;
 
 /**
@@ -50,12 +98,8 @@ async function syncCustomerJobs(
   }
 
   for (const job of jobs) {
-    const data = {
-      jobCode: job.jobCode,
-      jobName: job.jobName,
-      jobType: job.jobType,
-      pouchType: job.pouchType,
-    };
+    // `id` identifies the row; everything else is the job's own data.
+    const { id: _ignored, ...data } = job;
 
     if (job.id && existingIds.has(job.id)) {
       await tx.job.update({ where: { id: job.id }, data });
@@ -148,7 +192,16 @@ export async function getCustomerById(id: string): Promise<CustomerDetail> {
     include: { ...withJobCount, jobs: { select: JOB_FIELDS, orderBy: { jobName: 'asc' } } },
   });
   if (!row) throw ApiError.notFound('Customer not found');
-  return { ...toCustomer(row), jobs: row.jobs as CustomerJob[] };
+  // Prisma returns Decimal instances; the API contract is strings.
+  const jobs = row.jobs.map((job) => {
+    const serialised: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(job)) {
+      serialised[key] = value === null || value === undefined ? null : String(value);
+    }
+    return serialised as unknown as CustomerJob;
+  });
+
+  return { ...toCustomer(row), jobs };
 }
 
 export async function createCustomer(input: CreateCustomerInput): Promise<CustomerDetail> {
