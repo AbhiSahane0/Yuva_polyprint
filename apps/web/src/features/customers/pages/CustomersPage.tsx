@@ -10,7 +10,6 @@ import { CustomerTable } from '../components/CustomerTable';
 import { CustomerFormModal } from '../components/CustomerFormModal';
 import { DeleteCustomerDialog } from '../components/DeleteCustomerDialog';
 
-type SortBy = NonNullable<CustomerListParams['sortBy']>;
 type Filter = 'all' | 'needsReview' | 'fromBrand';
 
 const PAGE_SIZE = 25;
@@ -25,8 +24,7 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [page, setPage] = useState(1);
-  const [sortBy, setSortBy] = useState<SortBy>('companyName');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
@@ -39,34 +37,24 @@ export default function CustomersPage() {
   // can end up stranded on a page that no longer exists.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, filter, sortBy, sortOrder]);
+    setExpandedId(null);
+  }, [debouncedSearch, filter]);
 
   const params = useMemo<CustomerListParams>(
     () => ({
       page,
       pageSize: PAGE_SIZE,
-      sortBy,
-      sortOrder,
       ...(debouncedSearch ? { q: debouncedSearch } : {}),
       ...(filter === 'needsReview' ? { isVerified: false } : {}),
       ...(filter === 'fromBrand' ? { source: 'BRAND_INFERRED' as const } : {}),
     }),
-    [page, sortBy, sortOrder, debouncedSearch, filter],
+    [page, debouncedSearch, filter],
   );
 
   const { data, isPending, isFetching, isError, error, refetch } = useCustomers(params);
 
   const customers = data?.items ?? [];
   const pagination = data?.pagination;
-
-  function handleSort(column: SortBy) {
-    if (column === sortBy) {
-      setSortOrder((current) => (current === 'asc' ? 'desc' : 'asc'));
-      return;
-    }
-    setSortBy(column);
-    setSortOrder('asc');
-  }
 
   function openCreate() {
     setEditing(null);
@@ -110,7 +98,7 @@ export default function CustomersPage() {
               type="button"
               onClick={() => setSearch('')}
               aria-label="Clear search"
-              className="text-ink-400 hover:text-ink-700 absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-1"
+              className="text-ink-400 hover:text-ink-700 absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-full p-1"
             >
               <X className="size-4" />
             </button>
@@ -125,8 +113,8 @@ export default function CustomersPage() {
               onClick={() => setFilter(option.value)}
               className={
                 filter === option.value
-                  ? 'bg-brand-600 rounded-[calc(var(--radius-md)-2px)] px-3 py-1.5 text-sm font-medium text-white'
-                  : 'text-ink-600 hover:text-ink-900 rounded-[calc(var(--radius-md)-2px)] px-3 py-1.5 text-sm font-medium'
+                  ? 'bg-brand-600 cursor-pointer rounded-[calc(var(--radius-md)-2px)] px-3 py-1.5 text-sm font-medium text-white'
+                  : 'text-ink-600 hover:text-ink-900 cursor-pointer rounded-[calc(var(--radius-md)-2px)] px-3 py-1.5 text-sm font-medium'
               }
             >
               {option.label}
@@ -171,9 +159,8 @@ export default function CustomersPage() {
         ) : (
           <CustomerTable
             customers={customers}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            onSort={handleSort}
+            expandedId={expandedId}
+            onToggleExpand={(id) => setExpandedId((current) => (current === id ? null : id))}
             onEdit={openEdit}
             onDelete={setDeleting}
             isFetching={isFetching}

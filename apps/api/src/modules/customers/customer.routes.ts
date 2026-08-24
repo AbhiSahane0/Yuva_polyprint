@@ -12,10 +12,9 @@ import * as controller from './customer.controller.js';
 const router = Router();
 
 /*
- * NOTE: these routes are intentionally unauthenticated for now — the auth
- * module does not exist yet, so requiring a token would leave the UI unable to
- * call anything. Add `authenticate` (and `authorize`) here as soon as auth
- * lands; the middleware is already written.
+ * NOTE: these routes are open for now — there is no login yet. Auth will be a
+ * plain username + password form with a server-side session; guard these
+ * routes with that session middleware once it exists.
  */
 
 router.get('/', validate({ query: listCustomersQuerySchema }), asyncHandler(controller.list));

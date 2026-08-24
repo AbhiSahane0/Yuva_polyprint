@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import type { CreateCustomerInput, Customer, Paginated, UpdateCustomerInput } from '@yuva/shared';
+import type {
+  CreateCustomerInput,
+  Customer,
+  CustomerDetail,
+  Paginated,
+  UpdateCustomerInput,
+} from '@yuva/shared';
 import { request } from '@/lib/api-client';
 
 export interface CustomerListParams {
@@ -8,8 +14,6 @@ export interface CustomerListParams {
   q?: string;
   source?: 'SHEET' | 'BRAND_INFERRED';
   isVerified?: boolean;
-  sortBy?: 'companyName' | 'city' | 'createdAt' | 'updatedAt';
-  sortOrder?: 'asc' | 'desc';
 }
 
 /** One factory for every key, so invalidation cannot drift out of sync. */
@@ -30,11 +34,23 @@ export function useCustomers(params: CustomerListParams) {
   });
 }
 
+/**
+ * A single customer with their jobs. Only fetched when a row is expanded or
+ * opened for editing, so the list request stays small.
+ */
+export function useCustomer(id: string | null) {
+  return useQuery({
+    queryKey: customerKeys.detail(id ?? ''),
+    queryFn: () => request<CustomerDetail>({ url: `/customers/${id}`, method: 'GET' }),
+    enabled: Boolean(id),
+  });
+}
+
 export function useCreateCustomer() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateCustomerInput) =>
-      request<Customer>({ url: '/customers', method: 'POST', data: input }),
+      request<CustomerDetail>({ url: '/customers', method: 'POST', data: input }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: customerKeys.lists() }),
   });
 }
@@ -43,9 +59,11 @@ export function useUpdateCustomer() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateCustomerInput }) =>
-      request<Customer>({ url: `/customers/${id}`, method: 'PATCH', data: input }),
+      request<CustomerDetail>({ url: `/customers/${id}`, method: 'PATCH', data: input }),
     onSuccess: (customer) => {
       queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+      // Jobs may have changed, so replace the cached detail rather than
+      // leaving a stale expanded row on screen.
       queryClient.setQueryData(customerKeys.detail(customer.id), customer);
     },
   });

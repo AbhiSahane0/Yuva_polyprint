@@ -100,7 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 type="button"
                 onClick={() => setDrawerOpen(false)}
                 aria-label="Close menu"
-                className="text-ink-500 hover:bg-ink-100 rounded-full p-1.5"
+                className="text-ink-500 hover:bg-ink-100 cursor-pointer rounded-full p-1.5"
               >
                 <X className="size-5" />
               </button>
@@ -116,7 +116,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             type="button"
             onClick={() => setDrawerOpen(true)}
             aria-label="Open menu"
-            className="text-ink-600 hover:bg-ink-100 rounded-[var(--radius-md)] p-2"
+            className="text-ink-600 hover:bg-ink-100 cursor-pointer rounded-[var(--radius-md)] p-2"
           >
             <Menu className="size-5" />
           </button>
