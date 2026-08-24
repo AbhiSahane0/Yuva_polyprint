@@ -48,17 +48,97 @@ export type CustomerSource = z.infer<typeof customerSourceSchema>;
 export const JOB_TYPES = ['Pouch Form', 'Roll Form'] as const;
 
 /**
- * A job captured alongside its customer. The client works customer-first —
- * they open a customer and enter that customer's jobs — so this is the small
- * identifying subset, not the full 40-column engineering spec.
+ * A measurement the sheet stores as a number. Form inputs hand us strings, so
+ * blank becomes null and anything non-numeric is reported as a field error
+ * rather than silently saved as 0.
+ */
+const optionalNumber = z
+  .union([z.string(), z.number(), z.null()])
+  .optional()
+  .transform((value, ctx) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string' && value.trim() === '') return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      ctx.addIssue({ code: 'custom', message: 'Enter a number' });
+      return null;
+    }
+    return parsed;
+  });
+
+/**
+ * A job and its full specification.
+ *
+ * The client works customer-first — they open a customer and edit that
+ * customer's jobs — so every column the legacy sheet carried is editable here,
+ * not just the identifying handful.
  */
 export const customerJobSchema = z.object({
   /** Present when editing a job that already exists. */
   id: z.string().min(1).optional(),
+
+  // Basics
   jobCode: optionalText(40).default(NA),
   jobName: z.string().trim().min(1, 'Job name is required').max(200),
   jobType: z.enum(JOB_TYPES).or(z.literal(NA)).default(NA),
   pouchType: optionalText(80).default(NA),
+  pouchSubType: optionalText(80).default(NA),
+
+  // Film structure
+  petMicron: optionalNumber,
+  metPetMicron: optionalNumber,
+  polyMicron: optionalNumber,
+  polyType: optionalText(80).default(NA),
+  layer: optionalNumber,
+  jobFinalDirection: optionalText(40).default(NA),
+  printingType: optionalText(60).default(NA),
+
+  // Design and cylinders
+  designHeight: optionalNumber,
+  designOpenWidth: optionalNumber,
+  ups: optionalNumber,
+  design: optionalText(120).default(NA),
+  jobColours: optionalText(80).default(NA),
+  totalCylinders: optionalNumber,
+  cylinderParty: optionalText(120).default(NA),
+
+  // GSM
+  inkGsm: optionalNumber,
+  petGsm: optionalNumber,
+  metPetGsm: optionalNumber,
+  polyGsm: optionalNumber,
+  adhesiveGsm: optionalNumber,
+  compositeGsm: optionalNumber,
+  coatingGsm: optionalNumber,
+
+  // Tooling. The sheet stores several of these as ranges ("15-16", "60-70"),
+  // so they stay text rather than being forced into a number.
+  rubberSize: optionalNumber,
+  cylinderCell: optionalNumber,
+  cylinderDia: optionalNumber,
+  viscosity: optionalText(40).default(NA),
+  pouchPlateSize: optionalText(60).default(NA),
+  singleRollWeight: optionalText(40).default(NA),
+  pouchesPerKg: optionalText(40).default(NA),
+
+  // Pouch dimensions
+  pouchHeight: optionalNumber,
+  pouchOpenWidth: optionalNumber,
+  dPunch: optionalText(40).default(NA),
+  dPunchTopSize: optionalText(40).default(NA),
+  gusset: optionalText(40).default(NA),
+  gussetSize: optionalText(40).default(NA),
+  vNotch: optionalText(40).default(NA),
+
+  // Rarely used columns from the sheet, kept so nothing is lost
+  up1: optionalText(120).default(NA),
+  up2: optionalText(120).default(NA),
+  up3: optionalText(120).default(NA),
+  up4: optionalText(120).default(NA),
+  up2OpenWidth: optionalText(60).default(NA),
+  up2Height: optionalText(60).default(NA),
+  up3OpenWidth: optionalText(60).default(NA),
+  notes: optionalText(500).default(NA),
 });
 
 export type CustomerJobInput = z.infer<typeof customerJobSchema>;
