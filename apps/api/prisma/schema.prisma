@@ -18,6 +18,25 @@ datasource db {
   provider = "postgresql"
 }
 
+/// How a customer record came into existence.
+enum CustomerSource {
+  /// Company details were written in the sheet's combined customer column.
+  SHEET
+  /// Provisional: created from a brand name recurring in job names, because
+  /// the sheet never recorded the company. Contact details are 'NA'.
+  BRAND_INFERRED
+}
+
+/// How a job's customer was determined.
+enum JobCustomerSource {
+  /// Named on the job's own row.
+  EXPLICIT
+  /// Matched through the brand name in the job name.
+  INFERRED
+  /// Could not be determined; needs a human.
+  NONE
+}
+
 /// Customers, reconstructed from the legacy "Comapny Name, Address & Mobile"
 /// column of the May-2025 Jobs Data sheet. That single column mixed company
 /// name, postal address and one or more phone numbers; the importer splits it.
@@ -42,6 +61,8 @@ model Customer {
   /// False when the importer had to guess, or the source was incomplete.
   /// The office team confirms these inside the app.
   isVerified Boolean @default(false) @map("is_verified")
+
+  source CustomerSource @default(SHEET)
 
   jobs Job[]
 
@@ -68,6 +89,12 @@ model Job {
 
   customerId String?   @map("customer_id")
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  customerSource JobCustomerSource @default(NONE) @map("customer_source")
+
+  /// True when no customer could be determined and the office team must assign
+  /// one. Surfaced as a worklist in the app.
+  needsCustomer Boolean @default(false) @map("needs_customer")
 
   // ---- Structure -----------------------------------------------------------
   pouchType         String   @default("NA") @map("pouch_type")
@@ -137,5 +164,6 @@ model Job {
 
   @@index([jobCode])
   @@index([customerId])
+  @@index([needsCustomer])
   @@map("jobs")
 }
