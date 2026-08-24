@@ -1,13 +1,11 @@
 // Yuva Polyprint ERP — database schema
 //
-// Conventions for the models added here as modules are scoped in:
-//   - Model names PascalCase singular (Order, ProductionStage)
-//   - Table names snake_case plural via @@map("orders")
-//   - Column names snake_case via @map
+// Conventions:
+//   - Model names PascalCase singular; tables snake_case plural via @@map
+//   - Columns snake_case via @map
 //   - Every table: id (cuid), createdAt, updatedAt
-//   - Money and material quantities use Decimal, never Float — this system
-//     computes costs and consumption, and Float will drift.
-//   - Enums for every status vocabulary rather than free-text strings.
+//   - Money and material quantities use Decimal, never Float
+//   - Enums for status vocabularies rather than free-text strings
 //
 // The datasource URL is supplied by prisma.config.ts from DATABASE_URL.
 
@@ -18,4 +16,126 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+/// Customers, reconstructed from the legacy "Comapny Name, Address & Mobile"
+/// column of the May-2025 Jobs Data sheet. That single column mixed company
+/// name, postal address and one or more phone numbers; the importer splits it.
+/// Text fields carry the literal string 'NA' where the sheet had no value.
+model Customer {
+  id String @id @default(cuid())
+
+  companyName   String  @map("company_name")
+  contactPerson String  @default("NA") @map("contact_person")
+  address       String  @default("NA")
+  city          String  @default("NA")
+  district      String  @default("NA")
+  pincode       String  @default("NA")
+  mobile        String  @default("NA")
+  altPhone      String  @default("NA") @map("alt_phone")
+  email         String  @default("NA")
+
+  /// The untouched source string, kept so any parsing decision can be audited
+  /// or re-derived without going back to the CSV.
+  sourceRaw String @map("source_raw")
+
+  /// False when the importer had to guess, or the source was incomplete.
+  /// The office team confirms these inside the app.
+  isVerified Boolean @default(false) @map("is_verified")
+
+  jobs Job[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyName])
+  @@index([mobile])
+  @@map("customers")
+}
+
+/// One row per job in the legacy sheet — the product/spec master that
+/// quotations are costed against.
+///
+/// `jobCode` is deliberately NOT unique: 13 codes are reused across 36 rows in
+/// the source sheet for genuinely different jobs. The surrogate `id` is the key
+/// until the client confirms the correct codes.
+model Job {
+  id String @id @default(cuid())
+
+  jobCode String @default("NA") @map("job_code")
+  jobName String @default("NA") @map("job_name")
+  jobType String @default("NA") @map("job_type")
+
+  customerId String?   @map("customer_id")
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  // ---- Structure -----------------------------------------------------------
+  pouchType         String   @default("NA") @map("pouch_type")
+  petMicron         Decimal? @map("pet_micron") @db.Decimal(10, 3)
+  metPetMicron      Decimal? @map("met_pet_micron") @db.Decimal(10, 3)
+  polyMicron        Decimal? @map("poly_micron") @db.Decimal(10, 3)
+  polyType          String   @default("NA") @map("poly_type")
+  layer             Decimal? @db.Decimal(10, 3)
+  jobFinalDirection String   @default("NA") @map("job_final_direction")
+  printingType      String   @default("NA") @map("printing_type")
+
+  // ---- Design --------------------------------------------------------------
+  designHeight    Decimal? @map("design_height") @db.Decimal(10, 3)
+  designOpenWidth Decimal? @map("design_open_width") @db.Decimal(10, 3)
+  ups             Decimal? @db.Decimal(10, 3)
+  design          String   @default("NA")
+  jobColours      String   @default("NA") @map("job_colours")
+  totalCylinders  Decimal? @map("total_cylinders") @db.Decimal(10, 3)
+
+  // ---- GSM -----------------------------------------------------------------
+  inkGsm       Decimal? @map("ink_gsm") @db.Decimal(10, 3)
+  petGsm       Decimal? @map("pet_gsm") @db.Decimal(10, 3)
+  metPetGsm    Decimal? @map("met_pet_gsm") @db.Decimal(10, 3)
+  polyGsm      Decimal? @map("poly_gsm") @db.Decimal(10, 3)
+  adhesiveGsm  Decimal? @map("adhesive_gsm") @db.Decimal(10, 3)
+  compositeGsm Decimal? @map("composite_gsm") @db.Decimal(10, 3)
+  coatingGsm   Decimal? @map("coating_gsm") @db.Decimal(10, 3)
+
+  // ---- Ups / notes (sparse columns in the source sheet) --------------------
+  up1           String @default("NA") @map("up_1")
+  up2           String @default("NA") @map("up_2")
+  up3           String @default("NA") @map("up_3")
+  up4           String @default("NA") @map("up_4")
+  up2OpenWidth  String @default("NA") @map("up_2_open_width")
+  up2Height     String @default("NA") @map("up_2_height")
+  up3OpenWidth  String @default("NA") @map("up_3_open_width")
+  notes         String @default("NA")
+
+  // ---- Cylinder / tooling --------------------------------------------------
+  rubberSize      Decimal? @map("rubber_size") @db.Decimal(10, 3)
+  cylinderCell    Decimal? @map("cylinder_cell") @db.Decimal(10, 3)
+  cylinderDia     Decimal? @map("cylinder_dia") @db.Decimal(10, 3)
+  cylinderParty   String   @default("NA") @map("cylinder_party")
+
+  // ---- Ranges kept as text: the sheet stores values like "15-16", "60-70" ---
+  viscosity        String @default("NA")
+  singleRollWeight String @default("NA") @map("single_roll_weight")
+  pouchPlateSize   String @default("NA") @map("pouch_plate_size")
+  pouchesPerKg     String @default("NA") @map("pouches_per_kg")
+
+  // ---- Pouch dimensions ----------------------------------------------------
+  dPunch         String   @default("NA") @map("d_punch")
+  dPunchTopSize  String   @default("NA") @map("d_punch_top_size")
+  pouchSubType   String   @default("NA") @map("pouch_sub_type")
+  pouchHeight    Decimal? @map("pouch_height") @db.Decimal(10, 3)
+  pouchOpenWidth Decimal? @map("pouch_open_width") @db.Decimal(10, 3)
+  gusset         String   @default("NA")
+  gussetSize     String   @default("NA") @map("gusset_size")
+  vNotch         String   @default("NA") @map("v_notch")
+
+  /// 1-based row number in the source CSV, so any imported row can be traced
+  /// back to the exact line it came from.
+  sourceRow Int @map("source_row")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([jobCode])
+  @@index([customerId])
+  @@map("jobs")
 }

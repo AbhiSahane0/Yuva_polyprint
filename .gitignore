@@ -44,3 +44,6 @@ Thumbs.db
 
 # csv files
 csv_files/
+
+# Generated import reports
+apps/api/import-reports/
