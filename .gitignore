@@ -41,3 +41,6 @@ Thumbs.db
 .cache/
 .temp/
 .turbo/
+
+# csv files
+csv_files/
