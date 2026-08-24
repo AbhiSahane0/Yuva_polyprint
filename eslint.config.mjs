@@ -35,5 +35,13 @@ export default tseslint.config(
     },
   },
 
+  // One-off CLI scripts report progress on stdout; that is their interface.
+  {
+    files: ['**/scripts/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+
   prettier,
 );

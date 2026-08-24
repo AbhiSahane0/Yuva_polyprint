@@ -303,6 +303,34 @@ Run from the repository root.
 
 ---
 
+## Legacy data import
+
+The May-2025 "Jobs Data" sheet in `csv_files/` is loaded by a dedicated script.
+`csv_files/` is git-ignored (it holds client data), so the sheet must be present
+locally for the import to run.
+It splits the sheet's combined `Comapny Name, Address & Mobile` column into
+separate company / address / mobile / alt-phone fields, adds an `email` column,
+and loads all job rows with their specs.
+
+```bash
+npm run import:legacy -w @yuva/api -- --dry-run
+```
+
+```bash
+npm run import:legacy -w @yuva/api
+```
+
+`--dry-run` prints the parse and writes nothing. A plain run refuses to proceed
+if the tables already hold data; `--fresh` replaces them. Every skipped row and
+every customer needing human review is written to
+`apps/api/import-reports/legacy-jobs-report.json`.
+
+Text columns are filled with the literal `'NA'` where the sheet was blank.
+Numeric columns use `NULL` instead — `'NA'` is not a number, and values the
+sheet stores as ranges (`"15-16"`, `"60-70"`) are kept in their own text columns.
+
+---
+
 ## Conventions
 
 Detailed rules live next to the code they govern:
