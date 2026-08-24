@@ -45,19 +45,39 @@ function JobList({ customerId }: { customerId: string }) {
         Jobs ({data.jobs.length})
       </p>
       <ul className="divide-ink-100 border-ink-200 divide-y overflow-hidden rounded-[var(--radius-md)] border bg-white">
-        {data.jobs.map((job) => (
-          <li
-            key={job.id}
-            className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm"
-          >
-            <span className="text-ink-400 w-28 shrink-0 font-mono text-xs">
-              <Value value={job.jobCode} />
-            </span>
-            <span className="text-ink-800 min-w-0 flex-1 font-medium">{job.jobName}</span>
-            <Badge>{job.jobType === 'NA' ? 'Type not set' : job.jobType}</Badge>
-            {job.pouchType !== 'NA' ? <Badge tone="neutral">{job.pouchType}</Badge> : null}
-          </li>
-        ))}
+        {data.jobs.map((job) => {
+          // A one-line structure summary: the numbers people actually scan for.
+          const structure = [
+            job.petMicron ? `PET ${job.petMicron}µ` : null,
+            job.metPetMicron && Number(job.metPetMicron) > 0
+              ? `Met PET ${job.metPetMicron}µ`
+              : null,
+            job.polyMicron ? `Poly ${job.polyMicron}µ` : null,
+            job.compositeGsm ? `${job.compositeGsm} GSM` : null,
+            job.designHeight && job.designOpenWidth
+              ? `${job.designHeight} × ${job.designOpenWidth} mm`
+              : null,
+            job.jobColours !== 'NA' ? job.jobColours : null,
+          ].filter(Boolean);
+
+          return (
+            <li key={job.id} className="px-3 py-2.5">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                <span className="text-ink-400 w-28 shrink-0 font-mono text-xs">
+                  <Value value={job.jobCode} />
+                </span>
+                <span className="text-ink-800 min-w-0 flex-1 font-medium">{job.jobName}</span>
+                <Badge>{job.jobType === 'NA' ? 'Type not set' : job.jobType}</Badge>
+                {job.pouchType !== 'NA' ? <Badge tone="neutral">{job.pouchType}</Badge> : null}
+              </div>
+              {structure.length > 0 ? (
+                <p className="text-ink-500 mt-1 text-xs sm:pl-[7.75rem]">
+                  {structure.join('  ·  ')}
+                </p>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

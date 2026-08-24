@@ -10,7 +10,7 @@ interface ModalProps {
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
-  size?: 'md' | 'lg';
+  size?: 'md' | 'lg' | 'xl';
 }
 
 /**
@@ -95,7 +95,7 @@ export function Modal({
         className={cn(
           'flex max-h-[92dvh] w-full flex-col overflow-hidden bg-white shadow-[var(--shadow-elevated)]',
           'rounded-t-[var(--radius-xl)] sm:rounded-[var(--radius-xl)]',
-          size === 'lg' ? 'sm:max-w-3xl' : 'sm:max-w-xl',
+          size === 'xl' ? 'sm:max-w-5xl' : size === 'lg' ? 'sm:max-w-3xl' : 'sm:max-w-xl',
         )}
       >
         <header className="border-ink-200 flex items-start justify-between gap-4 border-b px-5 py-4">
