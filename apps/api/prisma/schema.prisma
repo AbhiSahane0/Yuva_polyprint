@@ -64,7 +64,8 @@ model Customer {
 
   source CustomerSource @default(SHEET)
 
-  jobs Job[]
+  jobs       Job[]
+  quotations Quotation[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -157,6 +158,8 @@ model Job {
 
   /// 1-based row number in the source CSV, so any imported row can be traced
   /// back to the exact line it came from.
+  quotationItems QuotationItem[]
+
   sourceRow Int @map("source_row")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -166,4 +169,127 @@ model Job {
   @@index([customerId])
   @@index([needsCustomer])
   @@map("jobs")
+}
+
+/// Where a quotation is in its life.
+enum QuotationStatus {
+  DRAFT
+  SENT
+  WON
+  LOST
+}
+
+/// A customer-facing quotation.
+///
+/// Customer details and every computed figure are SNAPSHOT onto the record
+/// rather than looked up live. A quotation that has been sent must never
+/// change because someone later edited the customer's address or the cylinder
+/// rate moved — the document has to keep saying what it said.
+model Quotation {
+  id String @id @default(cuid())
+
+  /// Sequential, human-facing number. Continues the client's existing series.
+  number Int      @unique
+  date   DateTime @db.Date
+
+  status QuotationStatus @default(DRAFT)
+
+  /// Optional link back to the customer master; the fields below are the snapshot.
+  customerId String?   @map("customer_id")
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  customerName String @map("customer_name")
+  addressLine1 String @default("NA") @map("address_line1")
+  addressLine2 String @default("NA") @map("address_line2")
+  addressLine3 String @default("NA") @map("address_line3")
+  mobile       String @default("NA")
+  email        String @default("NA")
+
+  /// Rates as they stood when this quotation was made.
+  cylinderRate           Decimal @map("cylinder_rate") @db.Decimal(10, 4)
+  gstPercent             Decimal @map("gst_percent") @db.Decimal(5, 2)
+  materialAdvancePercent Decimal @map("material_advance_percent") @db.Decimal(5, 2)
+  cylinderAdvancePercent Decimal @map("cylinder_advance_percent") @db.Decimal(5, 2)
+
+  /// Stored totals, so a saved document never recomputes.
+  materialSubtotal Decimal @map("material_subtotal") @db.Decimal(14, 2)
+  materialWithGst  Decimal @map("material_with_gst") @db.Decimal(14, 2)
+  cylinderSubtotal Decimal @map("cylinder_subtotal") @db.Decimal(14, 2)
+  cylinderWithGst  Decimal @map("cylinder_with_gst") @db.Decimal(14, 2)
+  grandSubtotal    Decimal @map("grand_subtotal") @db.Decimal(14, 2)
+  grandWithGst     Decimal @map("grand_with_gst") @db.Decimal(14, 2)
+  materialAdvance  Decimal @map("material_advance") @db.Decimal(14, 2)
+  cylinderAdvance  Decimal @map("cylinder_advance") @db.Decimal(14, 2)
+  totalAdvance     Decimal @map("total_advance") @db.Decimal(14, 2)
+
+  /// Printed terms. Stored per quotation so wording can change over time.
+  terms String[]
+  notes String @default("")
+
+  /// Set the first time the quotation is marked as sent.
+  sentAt DateTime? @map("sent_at")
+
+  items QuotationItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([customerId])
+  @@index([status])
+  @@map("quotations")
+}
+
+/// One priced line on a quotation.
+model QuotationItem {
+  id String @id @default(cuid())
+
+  quotationId String    @map("quotation_id")
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  /// Order on the printed document.
+  position Int
+
+  /// Optional link to the job this line was prefilled from.
+  jobId String? @map("job_id")
+  job   Job?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  jobName String @map("job_name")
+
+  // ---- Inputs -------------------------------------------------------------
+  layer         Int
+  widthMm       Decimal @map("width_mm") @db.Decimal(10, 2)
+  heightMm      Decimal @map("height_mm") @db.Decimal(10, 2)
+  polyMicron    Decimal @map("poly_micron") @db.Decimal(10, 2)
+  quantityKg    Decimal @map("quantity_kg") @db.Decimal(12, 3)
+  ratePerKg     Decimal @map("rate_per_kg") @db.Decimal(12, 2)
+  repeatWidth   Decimal @map("repeat_width") @db.Decimal(10, 2)
+  repeatHeight  Decimal @map("repeat_height") @db.Decimal(10, 2)
+  cylinderCount Int     @map("cylinder_count")
+  transportCost Decimal @default(0) @map("transport_cost") @db.Decimal(12, 2)
+
+  // ---- Computed, stored so the document is immutable ----------------------
+  micron                Decimal @db.Decimal(10, 2)
+  pouchesPerKg          Decimal @map("pouches_per_kg") @db.Decimal(12, 2)
+  totalPouches          Decimal @map("total_pouches") @db.Decimal(14, 2)
+  totalAmount           Decimal @map("total_amount") @db.Decimal(14, 2)
+  cylinderWidth         Decimal @map("cylinder_width") @db.Decimal(10, 2)
+  cylinderCircumference Decimal @map("cylinder_circumference") @db.Decimal(10, 2)
+  costPerCylinder       Decimal @map("cost_per_cylinder") @db.Decimal(14, 2)
+  totalCylinderCost     Decimal @map("total_cylinder_cost") @db.Decimal(14, 2)
+  costPerPouch          Decimal @map("cost_per_pouch") @db.Decimal(12, 4)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([quotationId])
+  @@map("quotation_items")
+}
+
+/// Editable system settings — cylinder rate, GST %, default advance rates.
+/// Kept as key/value so a new setting does not need a migration.
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
 }

@@ -4,6 +4,8 @@ import { AppShell } from '@/components/layout/AppShell';
 
 // Route-level code splitting keeps the initial bundle small as modules land.
 const CustomersPage = lazy(() => import('@/features/customers/pages/CustomersPage'));
+const QuotationsPage = lazy(() => import('@/features/quotations/pages/QuotationsPage'));
+const QuotationFormPage = lazy(() => import('@/features/quotations/pages/QuotationFormPage'));
 
 function PageFallback() {
   return <div className="text-ink-400 px-4 py-16 text-center text-sm">Loading…</div>;
@@ -25,6 +27,9 @@ export function AppRouter() {
         <Routes>
           <Route path="/" element={<Navigate to="/customers" replace />} />
           <Route path="/customers" element={<CustomersPage />} />
+          <Route path="/quotations" element={<QuotationsPage />} />
+          <Route path="/quotations/new" element={<QuotationFormPage />} />
+          <Route path="/quotations/:id/edit" element={<QuotationFormPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
