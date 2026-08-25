@@ -409,6 +409,70 @@ correctness bug.
 
 ---
 
+## Hosted database (Neon)
+
+Local development runs against the Docker container. Neon holds the same schema
+and data for deployed environments; the two are kept separate on purpose, so
+experiments and re-seeding locally never touch real data.
+
+### One-time setup
+
+Copy `.env.neon.example` to `.env.neon` (git-ignored) and paste both connection
+strings from the Neon console:
+
+| Variable       | Endpoint | How to spot it                  |
+| -------------- | -------- | ------------------------------- |
+| `DATABASE_URL` | Pooled   | Host contains `-pooler`         |
+| `DIRECT_URL`   | Direct   | Same host **without** `-pooler` |
+
+Keep `?sslmode=require` on both.
+
+**Why two.** Prisma migrations take advisory locks and run DDL, which a pooled
+endpoint cannot hold — migrations hang or fail with a lock error. So
+`prisma.config.ts` uses `DIRECT_URL` when it is set and falls back to
+`DATABASE_URL` otherwise, which is what plain Postgres wants.
+
+### Deploying the schema
+
+```bash
+cd apps/api && set -a && source .env.neon && set +a && npx prisma migrate deploy
+```
+
+`migrate deploy` applies pending migrations without prompting and never resets
+— it is the command for anything that is not your own machine.
+
+### Copying data up
+
+```bash
+npm run db:copy-to-remote -w @yuva/api
+```
+
+Reads the target from `.env.neon`, so the connection string never reaches shell
+history or a process listing, and echoes it with the credentials masked.
+
+Three things it does that a plain `pg_dump | psql` does not:
+
+- **Dumps table-by-table in dependency order.** `pg_dump --data-only` emits
+  tables alphabetically, which tries to insert `jobs` before the `customers`
+  they reference and fails on the foreign key.
+- **Refuses to run when the target already holds rows**, rather than
+  duplicating them or dying halfway on a unique key.
+- **Restores in a single transaction**, so a partial copy cannot leave the
+  target in a state that blocks a clean retry.
+
+It finishes by printing local and remote row counts side by side for every
+table.
+
+### Pointing the API at Neon temporarily
+
+```bash
+cd apps/api && set -a && source .env.neon && set +a && PORT=4001 npm run dev
+```
+
+Your `.env` stays pointed at Docker throughout.
+
+---
+
 ## Scripts
 
 | Command                              | Does                                                 |
