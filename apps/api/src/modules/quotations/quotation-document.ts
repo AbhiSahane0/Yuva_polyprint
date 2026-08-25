@@ -169,7 +169,7 @@ export function renderQuotationHtml(quotation: Quotation): string {
   .meta .doc { font-size: 8.5pt; text-align: right; line-height: 1.6; white-space: nowrap; }
   .meta .doc b { display: inline-block; min-width: 74px; text-align: left; }
 
-  .intro { margin: 10px 0 8px; line-height: 1.5; }
+  .intro { margin: 8px 0 6px; line-height: 1.42; }
   .intro h3 { margin: 0 0 3px; font-size: 9pt; }
 
   /* ---- Items table ---- */
@@ -187,6 +187,8 @@ export function renderQuotationHtml(quotation: Quotation): string {
   tfoot td { font-weight: 700; background: #f8f9fb; font-size: 7.6pt; white-space: nowrap; }
 
   /* ---- Summary ---- */
+  /* These blocks read as units — never split one across a page break. */
+  .summary, .terms, .foot { break-inside: avoid; page-break-inside: avoid; }
   .summary { margin-top: 8px; width: 100%; }
   .summary td { padding: 4px 6px; font-size: 8.2pt; }
   .summary .lbl { text-align: right; }
@@ -194,21 +196,21 @@ export function renderQuotationHtml(quotation: Quotation): string {
   .summary .grand td { font-weight: 800; font-size: 9.5pt; }
   .summary .grand .red { color: #c00; }
 
-  .closing { margin: 9px 0 6px; }
+  .closing { margin: 6px 0 4px; }
   .terms { margin: 0; }
   .terms h4 { margin: 0 0 3px; font-size: 8.6pt; }
-  .terms ol { margin: 0; padding-left: 16px; line-height: 1.55; }
+  .terms ol { margin: 0; padding-left: 16px; line-height: 1.42; }
 
   /* ---- Bank + sign-off ---- */
   .foot { display: flex; justify-content: space-between; gap: 16px;
-          margin-top: 10px; padding-top: 8px; border-top: 1px solid #999; }
-  .bank { line-height: 1.5; }
+          margin-top: 7px; padding-top: 6px; border-top: 1px solid #999; }
+  .bank { line-height: 1.38; }
   .bank h4 { margin: 0 0 2px; font-size: 8.6pt; }
   .payqr { text-align: center; }
   .payqr h4 { margin: 0 0 3px; font-size: 8.6pt; }
   .payqr img { width: 26mm; height: 26mm; display: block; margin: 0 auto; }
-  .signoff { text-align: right; line-height: 1.5; }
-  .signoff .who { font-weight: 700; margin-top: 22px; }
+  .signoff { text-align: right; line-height: 1.38; }
+  .signoff .who { font-weight: 700; margin-top: 14px; }
 
   .strip { margin-top: 8px; padding-top: 6px; border-top: 2px solid #111;
            display: flex; justify-content: space-between; gap: 14px; font-size: 7.4pt;

@@ -48,8 +48,3 @@ csv_files/
 # Generated import reports
 apps/api/import-reports/
 
-# Letterhead artwork is client-supplied; placeholders are not committed
-apps/api/assets/quotation/*.png
-apps/api/assets/quotation/*.jpg
-apps/api/assets/quotation/*.jpeg
-apps/api/assets/quotation/*.svg
