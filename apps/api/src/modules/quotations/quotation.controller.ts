@@ -2,7 +2,6 @@ import type { Request, Response } from 'express';
 import type { CreateQuotationInput, ListQuotationsQuery, UpdateQuotationInput } from '@yuva/shared';
 import { created, ok, paginated } from '../../utils/api-response.js';
 import * as quotationService from './quotation.service.js';
-import { renderQuotationHtml } from './quotation-document.js';
 import { renderQuotationPdf } from './quotation-pdf.js';
 
 export async function list(req: Request, res: Response) {
@@ -35,39 +34,28 @@ export async function remove(req: Request, res: Response) {
   ok(res, await quotationService.deleteQuotation(req.params.id as string));
 }
 
-/** The printable document as HTML — used by the on-screen preview. */
-export async function preview(req: Request, res: Response) {
-  const quotation = await quotationService.getQuotationById(req.params.id as string);
-
-  // The document carries one inline script that fills the job table to the foot
-  // of the page. Helmet's app-wide policy blocks inline scripts, so this
-  // response gets its own far stricter policy: no network access of any kind,
-  // only the inline style/script and the data: URIs the document already holds.
-  res.setHeader(
-    'Content-Security-Policy',
-    [
-      "default-src 'none'",
-      'img-src data:',
-      "style-src 'unsafe-inline'",
-      "script-src 'unsafe-inline'",
-      "base-uri 'none'",
-      "form-action 'none'",
-    ].join('; '),
-  );
-
-  res.type('html').send(renderQuotationHtml(quotation));
-}
-
-/** The same document as a real PDF file. */
+/**
+ * The document as a real PDF.
+ *
+ * `?inline=1` serves it for display rather than download — the preview uses
+ * that, so what the user approves on screen is byte-for-byte the file the
+ * customer receives, not a separate HTML rendering that can drift from it.
+ */
 export async function pdf(req: Request, res: Response) {
   const quotation = await quotationService.getQuotationById(req.params.id as string);
   const file = await renderQuotationPdf(quotation);
 
   const safeName = quotation.customerName.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
   const filename = `Quotation_${quotation.number}_${safeName || 'Customer'}.pdf`;
+  const inline = req.query.inline === '1';
 
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader(
+    'Content-Disposition',
+    `${inline ? 'inline' : 'attachment'}; filename="${filename}"`,
+  );
   res.setHeader('Content-Length', String(file.length));
+  // Helmet's default policy blocks a same-origin PDF from being framed.
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
   res.end(Buffer.from(file));
 }

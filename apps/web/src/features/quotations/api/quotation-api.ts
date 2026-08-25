@@ -88,8 +88,12 @@ export function useDeleteQuotation() {
   });
 }
 
-/** URLs the browser hits directly — the preview iframe and the PDF download. */
+/**
+ * URLs the browser hits directly. The preview shows the real generated PDF
+ * (served inline rather than as a download), so the document on screen is
+ * exactly the file the customer receives.
+ */
 export const quotationUrls = {
-  preview: (id: string) => `/api/quotations/${id}/preview`,
+  preview: (id: string) => `/api/quotations/${id}/pdf?inline=1`,
   pdf: (id: string) => `/api/quotations/${id}/pdf`,
 };
