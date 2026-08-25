@@ -130,21 +130,51 @@ export function renderQuotationHtml(quotation: Quotation): string {
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    padding: ${topPadMm}mm 8mm ${bottomPadMm}mm;
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-size: 8.5pt;
     color: #111;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  .band img { display: block; width: 100%; }
   .sheet { width: ${CONTENT_WIDTH_MM}mm; margin: 0 auto; }
 
-  /* Letterhead bands. position:fixed makes Chrome repeat them on every page,
-     which is what a business document needs if it runs to a second sheet. */
-  .band { position: fixed; left: 0; right: 0; width: 210mm; }
-  .band img { display: block; width: 100%; }
-  .band-top { top: 0; }
-  .band-bottom { bottom: 0; }
+  /* ---------------------------------------------------------------------
+     Screen and print need genuinely different letterhead behaviour.
+
+     On screen this is one continuous A4 sheet that scrolls: the header sits
+     at the very top of the paper and scrolls away, the footer sits at the
+     very bottom and is reached by scrolling down. Pinning either to the
+     viewport would float it over the table, which is not what a document
+     looks like.
+
+     In print the bands become fixed, which is how Chrome repeats an element
+     on every page — required so a two-page quotation carries the letterhead
+     and contact strip on both sheets.
+     --------------------------------------------------------------------- */
+  @media screen {
+    body { background: #52565e; padding: 24px 12px; }
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+    }
+    .sheet { padding: 4mm 0 6mm; }
+    /* Pushes the footer band to the foot of the paper, not the viewport. */
+    .band-bottom { margin-top: auto; }
+  }
+
+  @media print {
+    body { padding: ${topPadMm}mm 8mm ${bottomPadMm}mm; background: #fff; }
+    .page { display: block; width: auto; min-height: 0; box-shadow: none; }
+    .band { position: fixed; left: 0; right: 0; width: 210mm; }
+    .band-top { top: 0; }
+    .band-bottom { bottom: 0; margin-top: 0; }
+  }
 
   /* ---- Letterhead ---- */
   .head { display: flex; align-items: center; justify-content: space-between;
@@ -219,15 +249,11 @@ export function renderQuotationHtml(quotation: Quotation): string {
 </style>
 </head>
 <body>
+<div class="page">
 
   ${
     assets.header
       ? `<div class="band band-top"><img src="${assets.header.dataUri}" alt="" /></div>`
-      : ''
-  }
-  ${
-    assets.footer
-      ? `<div class="band band-bottom"><img src="${assets.footer.dataUri}" alt="" /></div>`
       : ''
   }
 
@@ -392,6 +418,14 @@ export function renderQuotationHtml(quotation: Quotation): string {
     </div>
     <ul>${COMPANY.services.map((service) => `<li>${service}</li>`).join('')}</ul>
   </section>`
+  }
+
+</div>
+
+  ${
+    assets.footer
+      ? `<div class="band band-bottom"><img src="${assets.footer.dataUri}" alt="" /></div>`
+      : ''
   }
 
 </div>
