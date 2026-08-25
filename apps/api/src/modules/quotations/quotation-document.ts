@@ -143,10 +143,10 @@ export function renderQuotationHtml(quotation: Quotation): string {
   .band-bottom { height: ${footerMm.toFixed(2)}mm; }
   .band img { display: block; width: 100%; height: 100%; object-fit: fill; }
   /*
-   * On a short quotation there is space left over above the footer band.
-   * Spreading it through the gaps between blocks keeps the page looking
-   * composed, rather than collecting it all into one hole above the footer or
-   * padding the job table out with rows that mean nothing.
+   * The bank details and payment QR sit hard against the footer artwork, with
+   * whatever space is left over appearing earlier in the page. Anything else
+   * either leaves a hole directly above the footer or pads the job table out
+   * with rows that mean nothing.
    */
   .sheet {
     width: ${CONTENT_WIDTH_MM}mm;
@@ -154,9 +154,8 @@ export function renderQuotationHtml(quotation: Quotation): string {
     padding: 3mm 0;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    gap: 3mm;
   }
+
 
   /* ---------------------------------------------------------------------
      Screen and print need genuinely different letterhead behaviour.
@@ -189,7 +188,16 @@ export function renderQuotationHtml(quotation: Quotation): string {
 
   @media print {
     body { padding: ${topPadMm}mm 8mm ${bottomPadMm}mm; background: #fff; }
-    .page { display: block; width: auto; min-height: 0; box-shadow: none; }
+    /* Exact remaining height of the page, so the sign-off lands in the same
+       place it does on screen. 100vh would resolve against the viewport. */
+    .page {
+      display: flex;
+      flex-direction: column;
+      width: auto;
+      min-height: calc(297mm - ${topPadMm}mm - ${bottomPadMm}mm);
+      box-shadow: none;
+    }
+    .sheet { flex: 1; }
     .band { position: fixed; left: 0; right: 0; width: 210mm; }
     .band-top { top: 0; }
     .band-bottom { bottom: 0; margin-top: 0; }
@@ -251,8 +259,11 @@ export function renderQuotationHtml(quotation: Quotation): string {
   .terms ol { margin: 0; padding-left: 16px; line-height: 1.42; }
 
   /* ---- Bank + sign-off ---- */
+  /* margin-top:auto drops the sign-off to the foot of the sheet, so the bank
+     block and payment QR sit hard against the footer artwork and any spare
+     space appears earlier in the page instead. */
   .foot { display: flex; justify-content: space-between; gap: 16px;
-          margin-top: 7px; padding-top: 6px; border-top: 1px solid #999; }
+          margin-top: auto; padding-top: 6px; border-top: 1px solid #999; }
   .bank { line-height: 1.38; }
   .bank h4 { margin: 0 0 2px; font-size: 8.6pt; }
   .payqr { text-align: center; }
