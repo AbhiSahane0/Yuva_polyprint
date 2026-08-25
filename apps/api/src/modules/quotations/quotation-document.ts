@@ -77,8 +77,9 @@ export function renderQuotationHtml(quotation: Quotation): string {
 
   // Without artwork the CSS letterhead stands in, so nothing depends on the
   // files being present.
+  // Only the top band needs space reserved: it is fixed so it can repeat on
+  // every page. The bottom band sits in normal flow, so it takes its own room.
   const topPadMm = assets.header ? headerMm : 5;
-  const bottomPadMm = assets.footer ? footerMm : 5;
   const addressLines = [quotation.addressLine1, quotation.addressLine2, quotation.addressLine3]
     .map(show)
     .filter(Boolean);
@@ -143,18 +144,12 @@ export function renderQuotationHtml(quotation: Quotation): string {
   .band-bottom { height: ${footerMm.toFixed(2)}mm; }
   .band img { display: block; width: 100%; height: 100%; object-fit: fill; }
   /*
-   * The bank details and payment QR sit hard against the footer artwork, with
-   * whatever space is left over appearing earlier in the page. Anything else
-   * either leaves a hole directly above the footer or pads the job table out
-   * with rows that mean nothing.
+   * Everything on the page flows tight, top to bottom: customer, table,
+   * totals, terms, bank details, then the footer artwork immediately after.
+   * Whatever space is left over on a short quotation falls BELOW the artwork,
+   * at the very foot of the paper — never as a hole inside the document.
    */
-  .sheet {
-    width: ${CONTENT_WIDTH_MM}mm;
-    margin: 0 auto;
-    padding: 3mm 0;
-    display: flex;
-    flex-direction: column;
-  }
+  .sheet { width: ${CONTENT_WIDTH_MM}mm; margin: 0 auto; padding: 3mm 0; }
 
 
   /* ---------------------------------------------------------------------
@@ -177,30 +172,17 @@ export function renderQuotationHtml(quotation: Quotation): string {
       min-height: 297mm;
       margin: 0 auto;
       background: #fff;
-      display: flex;
-      flex-direction: column;
       box-shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
     }
-    .sheet { flex: 1; }
-    /* Pushes the footer band to the foot of the paper, not the viewport. */
-    .band-bottom { margin-top: auto; }
   }
 
   @media print {
-    body { padding: ${topPadMm}mm 8mm ${bottomPadMm}mm; background: #fff; }
-    /* Exact remaining height of the page, so the sign-off lands in the same
-       place it does on screen. 100vh would resolve against the viewport. */
-    .page {
-      display: flex;
-      flex-direction: column;
-      width: auto;
-      min-height: calc(297mm - ${topPadMm}mm - ${bottomPadMm}mm);
-      box-shadow: none;
-    }
-    .sheet { flex: 1; }
-    .band { position: fixed; left: 0; right: 0; width: 210mm; }
-    .band-top { top: 0; }
-    .band-bottom { bottom: 0; margin-top: 0; }
+    body { padding: ${topPadMm}mm 8mm 6mm; background: #fff; }
+    .page { display: block; width: auto; min-height: 0; box-shadow: none; }
+    /* The letterhead repeats on every page; the contact strip belongs once, at
+       the end of the document, directly under the sign-off. */
+    .band-top { position: fixed; top: 0; left: 0; right: 0; width: 210mm; }
+    .band-bottom { width: 210mm; margin: 0 -8mm; }
   }
 
   /* ---- Letterhead ---- */
@@ -259,11 +241,8 @@ export function renderQuotationHtml(quotation: Quotation): string {
   .terms ol { margin: 0; padding-left: 16px; line-height: 1.42; }
 
   /* ---- Bank + sign-off ---- */
-  /* margin-top:auto drops the sign-off to the foot of the sheet, so the bank
-     block and payment QR sit hard against the footer artwork and any spare
-     space appears earlier in the page instead. */
   .foot { display: flex; justify-content: space-between; gap: 16px;
-          margin-top: auto; padding-top: 6px; border-top: 1px solid #999; }
+          margin-top: 7px; padding-top: 6px; border-top: 1px solid #999; }
   .bank { line-height: 1.38; }
   .bank h4 { margin: 0 0 2px; font-size: 8.6pt; }
   .payqr { text-align: center; }
