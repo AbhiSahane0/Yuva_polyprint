@@ -303,6 +303,24 @@ Run from the repository root.
 
 ---
 
+## Database schema
+
+A diagram and full column reference live in
+[`docs/database-schema.md`](./docs/database-schema.md) — GitHub renders the ER
+diagram inline. For an interactive version you can drag around and export,
+paste [`docs/database-schema.dbml`](./docs/database-schema.dbml) into
+[dbdiagram.io](https://dbdiagram.io/d).
+
+Both are generated from the live database, never written by hand:
+
+```bash
+npm run schema:docs -w @yuva/api
+```
+
+Re-run it after any migration and commit the result.
+
+---
+
 ## Legacy data import
 
 The May-2025 "Jobs Data" sheet in `csv_files/` is loaded by a dedicated script.
