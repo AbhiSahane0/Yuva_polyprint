@@ -11,8 +11,13 @@ services:
     name: yuva-polyprint-api
     runtime: docker
     dockerfilePath: ./apps/api/Dockerfile
-    # The build copies from the repository root — it is a monorepo, and the API
-    # depends on packages/shared.
+    # All three must stay at the repository root. This is a monorepo: the API
+    # build needs the root package-lock.json and packages/shared, both of which
+    # live ABOVE apps/api. Setting rootDir to apps/api makes the build context
+    # apps/api, and then every COPY in the Dockerfile fails with "not found" —
+    # rootDir also scopes autoDeploy, so shared-package changes stop triggering
+    # builds.
+    rootDir: .
     dockerContext: .
     plan: free
     # Neon is in us-east-2 (Ohio). Same region keeps database round-trips short,

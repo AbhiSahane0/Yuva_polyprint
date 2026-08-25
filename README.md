@@ -400,7 +400,19 @@ keeps its default of `/api` in every environment, exactly as in development.
 ### Deploying the API (Render)
 
 1. Render → **New → Blueprint** → pick this repository. It reads `render.yaml`.
-2. Fill in the three prompted values:
+2. **Leave Root Directory blank.** This is a monorepo — the API build needs the
+   root `package-lock.json` and `packages/shared`, both above `apps/api`. If
+   Root Directory is set to `apps/api`, the build context becomes `apps/api` and
+   every `COPY` in the Dockerfile fails with `not found`. In the dashboard the
+   correct settings are:
+
+   | Field                          | Value                 |
+   | ------------------------------ | --------------------- |
+   | Root Directory                 | _blank_               |
+   | Dockerfile Path                | `apps/api/Dockerfile` |
+   | Docker Build Context Directory | `.`                   |
+
+3. Fill in the three prompted values:
 
    | Variable       | Value                                                                                           |
    | -------------- | ----------------------------------------------------------------------------------------------- |
@@ -408,8 +420,8 @@ keeps its default of `/api` in every environment, exactly as in development.
    | `DIRECT_URL`   | Neon **direct** endpoint — boot migrations need it                                              |
    | `CORS_ORIGINS` | leave as `http://localhost:5173`; the rewrite means the browser never calls Render cross-origin |
 
-3. Wait for the first build. It is slow — the image is ~1.8GB, mostly Chromium.
-4. Confirm `https://<service>.onrender.com/health/ready` returns
+4. Wait for the first build. It is slow — the image is ~1.8GB, mostly Chromium.
+5. Confirm `https://<service>.onrender.com/health/ready` returns
    `{"status":"ready","database":"connected"}`.
 
 **Migrations run on boot.** The container runs `prisma migrate deploy` before
