@@ -45,13 +45,33 @@ export function JobCard({ index, register, errors, onRemove, summary, derived }:
               invalid={Boolean(fieldError)}
               {...register(`jobs.${index}.${field.name}`)}
             >
-              <option value="NA">Not set</option>
+              {/* Empty, not 'NA': a cleared field is stored blank in the form
+                  and only becomes 'NA' on submit. With value="NA" here the
+                  option never matches and the select renders empty. */}
+              <option value="">Not set</option>
               {(field.options ?? []).map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>
               ))}
             </Select>
+          ) : field.kind === 'datalist' ? (
+            <>
+              <Input
+                id={id}
+                list={`${id}-options`}
+                autoComplete="off"
+                {...(field.placeholder ? { placeholder: field.placeholder } : {})}
+                invalid={Boolean(fieldError)}
+                {...register(`jobs.${index}.${field.name}`)}
+              />
+              {/* Suggestions, not a restriction — anything can still be typed. */}
+              <datalist id={`${id}-options`}>
+                {(field.options ?? []).map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
+            </>
           ) : field.kind === 'textarea' ? (
             <Textarea
               id={id}

@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react';
 import {
   forwardRef,
   type InputHTMLAttributes,
@@ -90,25 +91,39 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   invalid?: boolean;
 }
 
+/**
+ * A native select with a drawn chevron.
+ *
+ * `appearance: none` strips the browser's own arrow, so without one of our own
+ * the control is indistinguishable from a text box and nobody realises it can
+ * be opened. The icon is a real element rather than a CSS background image
+ * because arbitrary data-URI backgrounds do not survive the Tailwind class
+ * parser reliably.
+ */
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
   { invalid, className, children, ...props },
   ref,
 ) {
   return (
-    <select
-      ref={ref}
-      aria-invalid={invalid || undefined}
-      className={cn(
-        CONTROL,
-        'cursor-pointer appearance-none bg-[length:16px] bg-[right_0.75rem_center] bg-no-repeat pr-9',
-        "bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")]",
-        invalid ? 'border-danger-500' : 'border-ink-200',
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </select>
+    <div className="relative">
+      <select
+        ref={ref}
+        aria-invalid={invalid || undefined}
+        className={cn(
+          CONTROL,
+          'cursor-pointer appearance-none pr-10',
+          invalid ? 'border-danger-500' : 'border-ink-200',
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </select>
+      <ChevronDown
+        className="text-ink-400 pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2"
+        aria-hidden
+      />
+    </div>
   );
 });
 
