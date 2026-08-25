@@ -12,6 +12,13 @@ const envSchema = z.object({
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
+  /**
+   * Direct, non-pooled connection. Neon's pooler cannot run the advisory locks
+   * and DDL that migrations need, so `prisma migrate` uses this when present
+   * while the app keeps using the pooled DATABASE_URL. Unset on plain Postgres.
+   */
+  DIRECT_URL: z.string().min(1).optional(),
+
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
 
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
