@@ -20,7 +20,8 @@
     "clean": "rm -rf dist src/generated *.tsbuildinfo",
     "postinstall": "prisma generate",
     "import:legacy": "tsx scripts/import-legacy-jobs.ts",
-    "schema:docs": "tsx scripts/generate-schema-docs.ts"
+    "schema:docs": "tsx scripts/generate-schema-docs.ts",
+    "seed:materials": "tsx scripts/seed-materials.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

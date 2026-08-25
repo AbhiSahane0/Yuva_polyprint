@@ -1,7 +1,10 @@
 import {
   computeItem,
+  computeMargin,
+  computeMaterialCostPerKg,
   computeTotals,
   DEFAULT_TERMS,
+  round,
   type CreateQuotationInput,
   type ListQuotationsQuery,
   type Quotation,
@@ -14,6 +17,7 @@ import type { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
 import { getSettings } from '../settings/settings.service.js';
+import { getRateMap } from '../materials/material.service.js';
 
 /** Prisma hands back Decimal objects; the API contract is plain numbers. */
 const toNumber = (value: Prisma.Decimal | number | null): number =>
@@ -26,6 +30,8 @@ function toItem(row: QuotationRow['items'][number]): QuotationItem {
     id: row.id,
     position: row.position,
     jobId: row.jobId,
+    filmMaterialId: row.filmMaterialId,
+    filmMaterialName: null,
     jobName: row.jobName,
     layer: row.layer,
     widthMm: toNumber(row.widthMm),
@@ -46,6 +52,36 @@ function toItem(row: QuotationRow['items'][number]): QuotationItem {
     costPerCylinder: toNumber(row.costPerCylinder),
     totalCylinderCost: toNumber(row.totalCylinderCost),
     costPerPouch: toNumber(row.costPerPouch),
+    materialCostPerKg: row.materialCostPerKg === null ? null : Number(row.materialCostPerKg),
+    materialCost: row.materialCost === null ? null : Number(row.materialCost),
+    marginPercent: row.marginPercent === null ? null : Number(row.marginPercent),
+  };
+}
+
+/**
+ * Everything needed to cost a line against a given day's prices: the rate in
+ * force per material, and each film's density so a micron figure can become a
+ * weight.
+ */
+async function loadCostingContext(onDate: string) {
+  const [settings, rates, materials] = await Promise.all([
+    getSettings(),
+    getRateMap(onDate),
+    prisma.material.findMany({ select: { id: true, name: true, density: true } }),
+  ]);
+
+  const byId = new Map(materials.map((m) => [m.id, m]));
+  const byName = new Map(materials.map((m) => [m.name, m]));
+  const rateOf = (material?: { id: string }) =>
+    material ? (rates.get(material.id) ?? null) : null;
+
+  return {
+    settings,
+    byId,
+    petRate: rateOf(byName.get(settings.defaultPetMaterial)),
+    inkRate: rateOf(byName.get(settings.defaultInkMaterial)),
+    adhesiveRate: rateOf(byName.get(settings.defaultAdhesiveMaterial)),
+    rateOfId: (id: string | null | undefined) => (id ? (rates.get(id) ?? null) : null),
   };
 }
 
@@ -108,10 +144,38 @@ function priceQuotation(
     materialAdvancePercent: number;
     cylinderAdvancePercent: number;
   },
+  costing: Awaited<ReturnType<typeof loadCostingContext>>,
 ) {
   const priced = items.map((item, index) => {
     const computed = computeItem(item, rates.cylinderRate);
-    return { input: item, computed, position: index + 1 };
+
+    // Costed against the rates in force on the quotation's date, and stored, so
+    // the margin a quotation was accepted on never moves when prices do.
+    const film = item.filmMaterialId ? costing.byId.get(item.filmMaterialId) : undefined;
+    const material = computeMaterialCostPerKg({
+      layer: item.layer,
+      polyMicron: item.polyMicron,
+      polyDensity: film?.density ? Number(film.density) : null,
+      petRate: costing.petRate,
+      polyRate: costing.rateOfId(item.filmMaterialId ?? null),
+      inkRate: costing.inkRate,
+      adhesiveRate: costing.adhesiveRate,
+      inkGsm: costing.settings.inkGsm,
+      adhesiveGsm: costing.settings.adhesiveGsm,
+    });
+
+    const materialCostPerKg = material.costPerKg;
+    return {
+      input: item,
+      computed,
+      position: index + 1,
+      cost: {
+        materialCostPerKg,
+        materialCost:
+          materialCostPerKg === null ? null : round(materialCostPerKg * item.quantityKg, 2),
+        marginPercent: computeMargin(item.ratePerKg, materialCostPerKg),
+      },
+    };
   });
 
   const allTotals = computeTotals(
@@ -192,7 +256,8 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
     cylinderAdvancePercent: input.cylinderAdvancePercent ?? settings.cylinderAdvancePercent,
   };
 
-  const { priced, totals } = priceQuotation(input.items, rates);
+  const costing = await loadCostingContext(input.date);
+  const { priced, totals } = priceQuotation(input.items, rates, costing);
 
   const id = await prisma.$transaction(async (tx) => {
     const number = await nextQuotationNumber(tx);
@@ -229,7 +294,9 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
             repeatHeight: entry.input.repeatHeight,
             cylinderCount: entry.input.cylinderCount,
             transportCost: entry.input.transportCost,
+            filmMaterialId: entry.input.filmMaterialId ?? null,
             ...entry.computed,
+            ...entry.cost,
           })),
         },
       },
@@ -265,6 +332,7 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
       .sort((a, b) => a.position - b.position)
       .map((item) => ({
         jobId: item.jobId,
+        filmMaterialId: item.filmMaterialId,
         jobName: item.jobName,
         // Constrained to 2 or 3 by the schema when the row was written.
         layer: item.layer as 2 | 3,
@@ -279,7 +347,8 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
         transportCost: toNumber(item.transportCost),
       }));
 
-  const { priced, totals } = priceQuotation(items, rates);
+  const costing = await loadCostingContext(input.date ?? toISODate(existing.date));
+  const { priced, totals } = priceQuotation(items, rates, costing);
 
   const becomingSent = input.status === 'SENT' && existing.status !== 'SENT';
 
@@ -320,7 +389,9 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
             repeatHeight: entry.input.repeatHeight,
             cylinderCount: entry.input.cylinderCount,
             transportCost: entry.input.transportCost,
+            filmMaterialId: entry.input.filmMaterialId ?? null,
             ...entry.computed,
+            ...entry.cost,
           })),
         },
       },

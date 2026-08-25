@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import customerRoutes from '../modules/customers/customer.routes.js';
+import materialRoutes from '../modules/materials/material.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
 import settingsRoutes from '../modules/settings/settings.routes.js';
 
@@ -11,6 +12,7 @@ import settingsRoutes from '../modules/settings/settings.routes.js';
 const router = Router();
 
 router.use('/customers', customerRoutes);
+router.use('/materials', materialRoutes);
 router.use('/quotations', quotationRoutes);
 router.use('/settings', settingsRoutes);
 

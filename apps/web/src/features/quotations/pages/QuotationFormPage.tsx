@@ -5,6 +5,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import {
   computeItem,
+  computeMargin,
+  computeMaterialCostPerKg,
   computeTotals,
   createQuotationSchema,
   DEFAULT_TERMS,
@@ -20,6 +22,7 @@ import { Field, FieldSection, Input, ReadOnlyValue, Select, Textarea } from '@/c
 import { toast } from '@/lib/toast';
 import { ApiClientError } from '@/lib/api-client';
 import { useCustomers } from '@/features/customers/api/customer-api';
+import { useMaterials } from '@/features/rates/api/rate-api';
 import { useCustomer } from '@/features/customers/api/customer-api';
 import {
   useCreateQuotation,
@@ -95,6 +98,10 @@ export default function QuotationFormPage() {
 
   const itemFields = useFieldArray({ control, name: 'items' });
   const watched = useWatch({ control });
+
+  // Costing uses the rates in force on the quotation's own date, so changing
+  // the date re-costs the lines against that day's prices.
+  const { data: materials } = useMaterials(String(watched.date ?? '') || undefined);
 
   useEffect(() => {
     if (!existing) return;
@@ -177,6 +184,19 @@ export default function QuotationFormPage() {
     cylinderAdvancePercent: settings?.cylinderAdvancePercent ?? 100,
   };
 
+  const films = useMemo(
+    () => (materials ?? []).filter((material) => material.category === 'FILM'),
+    [materials],
+  );
+  const materialById = useMemo(
+    () => new Map((materials ?? []).map((material) => [material.id, material])),
+    [materials],
+  );
+  const byName = useMemo(
+    () => new Map((materials ?? []).map((material) => [material.name, material])),
+    [materials],
+  );
+
   /** Mirrors the server's pricing so the user sees the document total live. */
   const live = useMemo(() => {
     const rows = (watched.items ?? []).map((item) =>
@@ -206,8 +226,29 @@ export default function QuotationFormPage() {
       rates,
     );
 
-    return { rows, totals };
-  }, [watched, rates.cylinderRate, rates.gstPercent]);
+    // Material cost, mirroring the server so the margin is visible before saving.
+    const costs = (watched.items ?? []).map((item) => {
+      const film = item?.filmMaterialId ? materialById.get(String(item.filmMaterialId)) : undefined;
+      const result = computeMaterialCostPerKg({
+        layer: num(item?.layer) || 2,
+        polyMicron: num(item?.polyMicron),
+        polyDensity: film?.density ?? null,
+        petRate: byName.get(settings?.defaultPetMaterial ?? 'PET 12µm')?.currentRate ?? null,
+        polyRate: film?.currentRate ?? null,
+        inkRate: byName.get(settings?.defaultInkMaterial ?? 'Ink — Black')?.currentRate ?? null,
+        adhesiveRate:
+          byName.get(settings?.defaultAdhesiveMaterial ?? 'Adhesive — PU')?.currentRate ?? null,
+        inkGsm: settings?.inkGsm ?? 1.8,
+        adhesiveGsm: settings?.adhesiveGsm ?? 2.5,
+      });
+      return {
+        ...result,
+        marginPercent: computeMargin(num(item?.ratePerKg), result.costPerKg),
+      };
+    });
+
+    return { rows, totals, costs };
+  }, [watched, rates.cylinderRate, rates.gstPercent, materialById, byName, settings]);
 
   async function onSubmit(values: CreateQuotationInput) {
     try {
@@ -369,6 +410,7 @@ export default function QuotationFormPage() {
           <ul className="mt-4 flex flex-col gap-4">
             {itemFields.fields.map((field, index) => {
               const computed = live.rows[index];
+              const cost = live.costs[index];
               const itemErrors = errors.items?.[index];
               return (
                 <li
@@ -528,6 +570,28 @@ export default function QuotationFormPage() {
                     </div>
                     <div className="sm:col-span-3">
                       <Field
+                        label="Film"
+                        htmlFor={`items.${index}.filmMaterialId`}
+                        hint="Sets the material cost"
+                      >
+                        <Select
+                          id={`items.${index}.filmMaterialId`}
+                          {...register(`items.${index}.filmMaterialId`)}
+                        >
+                          <option value="">— Not costed —</option>
+                          {films.map((film) => (
+                            <option key={film.id} value={film.id}>
+                              {film.name}
+                              {film.currentRate === null
+                                ? ' (no rate)'
+                                : ` — ${formatRs(film.currentRate)}`}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                    </div>
+                    <div className="sm:col-span-3">
+                      <Field
                         label="Pouches per kg"
                         htmlFor={`items.${index}.ppk`}
                         hint="Calculated"
@@ -646,6 +710,42 @@ export default function QuotationFormPage() {
                           {computed ? formatRs(computed.totalAmount) : formatRs(0)}
                         </span>
                       </div>
+
+                      {/* Costed from the day's rates, so the margin is visible
+                          before the quotation goes out rather than after. */}
+                      {cost ? (
+                        <div className="border-ink-200 text-ink-600 mt-2 flex flex-wrap items-center justify-between gap-x-6 gap-y-1 rounded-[var(--radius-md)] border border-dashed px-4 py-2.5 text-sm">
+                          {cost.costPerKg === null ? (
+                            <span className="text-ink-400">
+                              Choose a film to see the material cost and margin
+                            </span>
+                          ) : (
+                            <>
+                              <span>
+                                Material cost{' '}
+                                <span className="text-ink-900 font-medium tabular-nums">
+                                  {formatRs(cost.costPerKg, 2)}/kg
+                                </span>
+                                <span className="text-ink-400 ml-1 text-xs">
+                                  ({formatNumber(cost.compositeGsm, 1)} GSM)
+                                </span>
+                              </span>
+                              <span
+                                className={
+                                  cost.marginPercent !== null && cost.marginPercent < 10
+                                    ? 'text-danger-600 font-semibold'
+                                    : 'text-success-600 font-semibold'
+                                }
+                              >
+                                Margin{' '}
+                                {cost.marginPercent === null
+                                  ? '—'
+                                  : `${formatNumber(cost.marginPercent, 1)}%`}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </li>

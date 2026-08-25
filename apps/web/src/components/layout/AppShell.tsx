@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Boxes, FileText, Menu, Users, X } from 'lucide-react';
+import { Boxes, FileText, IndianRupee, Menu, Users, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -18,6 +18,10 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: '/customers', label: 'Customers', icon: Users },
       { to: '/quotations', label: 'Quotations', icon: FileText },
     ],
+  },
+  {
+    group: 'Materials',
+    items: [{ to: '/rates', label: 'Rates', icon: IndianRupee }],
   },
   {
     group: 'Production',
