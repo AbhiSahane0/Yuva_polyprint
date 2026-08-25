@@ -77,8 +77,9 @@ export function renderQuotationHtml(quotation: Quotation): string {
 
   // Without artwork the CSS letterhead stands in, so nothing depends on the
   // files being present.
+  // Only the top band needs space reserved: it is fixed so it can repeat on
+  // every page. The bottom band sits in normal flow, so it takes its own room.
   const topPadMm = assets.header ? headerMm : 5;
-  const bottomPadMm = assets.footer ? footerMm : 5;
   const addressLines = [quotation.addressLine1, quotation.addressLine2, quotation.addressLine3]
     .map(show)
     .filter(Boolean);
@@ -143,20 +144,13 @@ export function renderQuotationHtml(quotation: Quotation): string {
   .band-bottom { height: ${footerMm.toFixed(2)}mm; }
   .band img { display: block; width: 100%; height: 100%; object-fit: fill; }
   /*
-   * On a short quotation there is space left over above the footer band.
-   * Spreading it through the gaps between blocks keeps the page looking
-   * composed, rather than collecting it all into one hole above the footer or
-   * padding the job table out with rows that mean nothing.
+   * Everything on the page flows tight, top to bottom: customer, table,
+   * totals, terms, bank details, then the footer artwork immediately after.
+   * Whatever space is left over on a short quotation falls BELOW the artwork,
+   * at the very foot of the paper — never as a hole inside the document.
    */
-  .sheet {
-    width: ${CONTENT_WIDTH_MM}mm;
-    margin: 0 auto;
-    padding: 3mm 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 3mm;
-  }
+  .sheet { width: ${CONTENT_WIDTH_MM}mm; margin: 0 auto; padding: 3mm 0; }
+
 
   /* ---------------------------------------------------------------------
      Screen and print need genuinely different letterhead behaviour.
@@ -178,21 +172,17 @@ export function renderQuotationHtml(quotation: Quotation): string {
       min-height: 297mm;
       margin: 0 auto;
       background: #fff;
-      display: flex;
-      flex-direction: column;
       box-shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
     }
-    .sheet { flex: 1; }
-    /* Pushes the footer band to the foot of the paper, not the viewport. */
-    .band-bottom { margin-top: auto; }
   }
 
   @media print {
-    body { padding: ${topPadMm}mm 8mm ${bottomPadMm}mm; background: #fff; }
+    body { padding: ${topPadMm}mm 8mm 6mm; background: #fff; }
     .page { display: block; width: auto; min-height: 0; box-shadow: none; }
-    .band { position: fixed; left: 0; right: 0; width: 210mm; }
-    .band-top { top: 0; }
-    .band-bottom { bottom: 0; margin-top: 0; }
+    /* The letterhead repeats on every page; the contact strip belongs once, at
+       the end of the document, directly under the sign-off. */
+    .band-top { position: fixed; top: 0; left: 0; right: 0; width: 210mm; }
+    .band-bottom { width: 210mm; margin: 0 -8mm; }
   }
 
   /* ---- Letterhead ---- */

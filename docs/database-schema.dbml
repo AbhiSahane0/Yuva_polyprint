@@ -1,0 +1,179 @@
+// Yuva Polyprint ERP — database schema
+// Generated from the live database by:
+//   npm run schema:docs -w @yuva/api
+// Paste the whole file into https://dbdiagram.io/d to explore it.
+
+Enum CustomerSource {
+  SHEET
+  BRAND_INFERRED
+}
+
+Enum JobCustomerSource {
+  EXPLICIT
+  INFERRED
+  NONE
+}
+
+Enum QuotationStatus {
+  DRAFT
+  SENT
+  WON
+  LOST
+}
+
+Table app_settings {
+  key text [pk]
+  value text [not null]
+  updated_at timestamp [not null]
+
+  Note: '0 row(s) at time of generation'
+}
+
+Table customers {
+  id text [pk]
+  company_name text [unique, not null]
+  contact_person text [not null, default: `'NA'`]
+  address text [not null, default: `'NA'`]
+  city text [not null, default: `'NA'`]
+  district text [not null, default: `'NA'`]
+  pincode text [not null, default: `'NA'`]
+  mobile text [not null, default: `'NA'`]
+  alt_phone text [not null, default: `'NA'`]
+  email text [not null, default: `'NA'`]
+  source_raw text [not null]
+  is_verified boolean [not null, default: `false`]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+  source CustomerSource [not null, default: `'SHEET'::"CustomerSource"`]
+
+  Note: '68 row(s) at time of generation'
+}
+
+Table jobs {
+  id text [pk]
+  job_code text [not null, default: `'NA'`]
+  job_name text [not null, default: `'NA'`]
+  job_type text [not null, default: `'NA'`]
+  customer_id text
+  pouch_type text [not null, default: `'NA'`]
+  pet_micron decimal(10,3)
+  met_pet_micron decimal(10,3)
+  poly_micron decimal(10,3)
+  poly_type text [not null, default: `'NA'`]
+  layer decimal(10,3)
+  job_final_direction text [not null, default: `'NA'`]
+  printing_type text [not null, default: `'NA'`]
+  design_height decimal(10,3)
+  design_open_width decimal(10,3)
+  ups decimal(10,3)
+  design text [not null, default: `'NA'`]
+  job_colours text [not null, default: `'NA'`]
+  total_cylinders decimal(10,3)
+  ink_gsm decimal(10,3)
+  pet_gsm decimal(10,3)
+  met_pet_gsm decimal(10,3)
+  poly_gsm decimal(10,3)
+  adhesive_gsm decimal(10,3)
+  composite_gsm decimal(10,3)
+  coating_gsm decimal(10,3)
+  up_1 text [not null, default: `'NA'`]
+  up_2 text [not null, default: `'NA'`]
+  up_3 text [not null, default: `'NA'`]
+  up_4 text [not null, default: `'NA'`]
+  up_2_open_width text [not null, default: `'NA'`]
+  up_2_height text [not null, default: `'NA'`]
+  up_3_open_width text [not null, default: `'NA'`]
+  notes text [not null, default: `'NA'`]
+  rubber_size decimal(10,3)
+  cylinder_cell decimal(10,3)
+  cylinder_dia decimal(10,3)
+  cylinder_party text [not null, default: `'NA'`]
+  viscosity text [not null, default: `'NA'`]
+  single_roll_weight text [not null, default: `'NA'`]
+  pouch_plate_size text [not null, default: `'NA'`]
+  pouches_per_kg text [not null, default: `'NA'`]
+  d_punch text [not null, default: `'NA'`]
+  d_punch_top_size text [not null, default: `'NA'`]
+  pouch_sub_type text [not null, default: `'NA'`]
+  pouch_height decimal(10,3)
+  pouch_open_width decimal(10,3)
+  gusset text [not null, default: `'NA'`]
+  gusset_size text [not null, default: `'NA'`]
+  v_notch text [not null, default: `'NA'`]
+  source_row integer [not null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+  customer_source JobCustomerSource [not null, default: `'NONE'::"JobCustomerSource"`]
+  needs_customer boolean [not null, default: `false`]
+
+  Note: '414 row(s) at time of generation'
+}
+
+Table quotation_items {
+  id text [pk]
+  quotation_id text [not null]
+  position integer [not null]
+  job_id text
+  job_name text [not null]
+  layer integer [not null]
+  width_mm decimal(10,2) [not null]
+  height_mm decimal(10,2) [not null]
+  poly_micron decimal(10,2) [not null]
+  quantity_kg decimal(12,3) [not null]
+  rate_per_kg decimal(12,2) [not null]
+  repeat_width decimal(10,2) [not null]
+  repeat_height decimal(10,2) [not null]
+  cylinder_count integer [not null]
+  transport_cost decimal(12,2) [not null, default: `0`]
+  micron decimal(10,2) [not null]
+  pouches_per_kg decimal(12,2) [not null]
+  total_pouches decimal(14,2) [not null]
+  total_amount decimal(14,2) [not null]
+  cylinder_width decimal(10,2) [not null]
+  cylinder_circumference decimal(10,2) [not null]
+  cost_per_cylinder decimal(14,2) [not null]
+  total_cylinder_cost decimal(14,2) [not null]
+  cost_per_pouch decimal(12,4) [not null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+
+  Note: '5 row(s) at time of generation'
+}
+
+Table quotations {
+  id text [pk]
+  number integer [unique, not null]
+  date date [not null]
+  status QuotationStatus [not null, default: `'DRAFT'::"QuotationStatus"`]
+  customer_id text
+  customer_name text [not null]
+  address_line1 text [not null, default: `'NA'`]
+  address_line2 text [not null, default: `'NA'`]
+  address_line3 text [not null, default: `'NA'`]
+  mobile text [not null, default: `'NA'`]
+  email text [not null, default: `'NA'`]
+  cylinder_rate decimal(10,4) [not null]
+  gst_percent decimal(5,2) [not null]
+  material_advance_percent decimal(5,2) [not null]
+  cylinder_advance_percent decimal(5,2) [not null]
+  material_subtotal decimal(14,2) [not null]
+  material_with_gst decimal(14,2) [not null]
+  cylinder_subtotal decimal(14,2) [not null]
+  cylinder_with_gst decimal(14,2) [not null]
+  grand_subtotal decimal(14,2) [not null]
+  grand_with_gst decimal(14,2) [not null]
+  material_advance decimal(14,2) [not null]
+  cylinder_advance decimal(14,2) [not null]
+  total_advance decimal(14,2) [not null]
+  terms text[]
+  notes text [not null, default: `''`]
+  sent_at timestamp
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+
+  Note: '3 row(s) at time of generation'
+}
+
+Ref: jobs.customer_id > customers.id [delete: set null]
+Ref: quotations.customer_id > customers.id [delete: set null]
+Ref: quotation_items.quotation_id > quotations.id [delete: cascade]
+Ref: quotation_items.job_id > jobs.id [delete: set null]

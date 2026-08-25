@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Yuva Polyprint ERP — REST API",
+  "description": "Yuva Polyprint ERP \u2014 REST API",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/server.ts",
@@ -19,7 +19,8 @@
     "db:reset": "prisma migrate reset",
     "clean": "rm -rf dist src/generated *.tsbuildinfo",
     "postinstall": "prisma generate",
-    "import:legacy": "tsx scripts/import-legacy-jobs.ts"
+    "import:legacy": "tsx scripts/import-legacy-jobs.ts",
+    "schema:docs": "tsx scripts/generate-schema-docs.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

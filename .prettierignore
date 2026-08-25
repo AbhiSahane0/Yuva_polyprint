@@ -6,3 +6,7 @@ coverage
 *.log
 package-lock.json
 apps/api/src/generated
+
+# Generated from the database — reformatting them creates a diff on every regen
+docs/database-schema.md
+docs/database-schema.dbml
