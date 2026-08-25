@@ -14,6 +14,14 @@ Enum JobCustomerSource {
   NONE
 }
 
+Enum MaterialCategory {
+  FILM
+  INK
+  ADHESIVE
+  SOLVENT
+  CONSUMABLE
+}
+
 Enum QuotationStatus {
   DRAFT
   SENT
@@ -109,6 +117,31 @@ Table jobs {
   Note: '414 row(s) at time of generation'
 }
 
+Table material_rates {
+  id text [pk]
+  material_id text [unique, not null]
+  rate decimal(12,4) [not null]
+  effective_date date [unique, not null]
+  entered_by text [not null, default: `'Office'`]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+
+  Note: '16 row(s) at time of generation'
+}
+
+Table materials {
+  id text [pk]
+  name text [unique, not null]
+  category MaterialCategory [not null]
+  unit text [not null, default: `'KG'`]
+  density decimal(6,4)
+  is_active boolean [not null, default: `true`]
+  sort_order integer [not null, default: `0`]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+
+  Note: '16 row(s) at time of generation'
+}
+
 Table quotation_items {
   id text [pk]
   quotation_id text [not null]
@@ -135,6 +168,10 @@ Table quotation_items {
   total_cylinder_cost decimal(14,2) [not null]
   cost_per_pouch decimal(12,4) [not null]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  film_material_id text
+  margin_percent decimal(6,2)
+  material_cost decimal(14,2)
+  material_cost_per_kg decimal(12,4)
 
   Note: '5 row(s) at time of generation'
 }
@@ -177,3 +214,5 @@ Ref: jobs.customer_id > customers.id [delete: set null]
 Ref: quotations.customer_id > customers.id [delete: set null]
 Ref: quotation_items.quotation_id > quotations.id [delete: cascade]
 Ref: quotation_items.job_id > jobs.id [delete: set null]
+Ref: quotation_items.film_material_id > materials.id [delete: set null]
+Ref: material_rates.material_id > materials.id [delete: cascade]

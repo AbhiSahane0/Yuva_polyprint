@@ -20,6 +20,7 @@ production → quality/waste → costing → dispatch, with full job-level trace
   - [`apps/web`](#appsweb)
 - [Where does my code go?](#where-does-my-code-go)
 - [Scripts](#scripts)
+- [Deployment](#deployment)
 - [Conventions](#conventions)
 - [Adding a module end to end](#adding-a-module-end-to-end)
 - [Notes and known issues](#notes-and-known-issues)
@@ -346,6 +347,106 @@ every customer needing human review is written to
 Text columns are filled with the literal `'NA'` where the sheet was blank.
 Numeric columns use `NULL` instead — `'NA'` is not a number, and values the
 sheet stores as ranges (`"15-16"`, `"60-70"`) are kept in their own text columns.
+
+---
+
+## Documentation
+
+Each app documents itself, next to the code it describes:
+
+| Document                                               | Covers                                                                                                                        |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/api/README.md`](./apps/api/README.md)           | Every endpoint, the request/response envelope, **all the calculations with worked examples**, the data model, and the scripts |
+| [`apps/web/README.md`](./apps/web/README.md)           | Every screen and what it does, how server state is handled, which figures are previewed in the browser, and the UI components |
+| [`docs/database-schema.md`](./docs/database-schema.md) | ER diagram and full column reference, generated from the live database                                                        |
+
+Start with the API's [Calculations](./apps/api/README.md#calculations) section
+if you want to understand how a quotation is priced and costed — pouches per
+kg, cylinder cost, GST, advances and material margin are all derived there,
+each with the reasoning and a worked example.
+
+---
+
+## Deployment
+
+The API runs on **Render** as a Docker container, the web app on **Vercel** as
+static files, and the database is **Neon**. The browser only ever talks to the
+Vercel domain.
+
+```
+browser ──► Vercel (static React)
+              │  /api/*  rewritten at the edge
+              ▼
+            Render (Express + Chromium)
+              │
+              ▼
+            Neon (Postgres, us-east-2)
+```
+
+**Why the rewrite.** `vercel.json` proxies `/api/*` to Render, so to the
+browser every request is same-origin. There is no CORS to configure, no
+preflight round-trip, and no API URL baked into the bundle — `VITE_API_BASE_URL`
+keeps its default of `/api` in every environment, exactly as in development.
+
+### Files
+
+| File                                           | Purpose                                               |
+| ---------------------------------------------- | ----------------------------------------------------- |
+| [`apps/api/Dockerfile`](./apps/api/Dockerfile) | Three-stage build for the API image                   |
+| [`render.yaml`](./render.yaml)                 | Render Blueprint — service, region, health check      |
+| [`vercel.json`](./vercel.json)                 | Vercel build and the `/api` rewrite                   |
+| [`.dockerignore`](./.dockerignore)             | Keeps host `node_modules` and `.env` out of the image |
+
+### Deploying the API (Render)
+
+1. Render → **New → Blueprint** → pick this repository. It reads `render.yaml`.
+2. Fill in the three prompted values:
+
+   | Variable       | Value                                                                                           |
+   | -------------- | ----------------------------------------------------------------------------------------------- |
+   | `DATABASE_URL` | Neon **pooled** endpoint (host contains `-pooler`)                                              |
+   | `DIRECT_URL`   | Neon **direct** endpoint — boot migrations need it                                              |
+   | `CORS_ORIGINS` | leave as `http://localhost:5173`; the rewrite means the browser never calls Render cross-origin |
+
+3. Wait for the first build. It is slow — the image is ~1.8GB, mostly Chromium.
+4. Confirm `https://<service>.onrender.com/health/ready` returns
+   `{"status":"ready","database":"connected"}`.
+
+**Migrations run on boot.** The container runs `prisma migrate deploy` before
+starting the server, so a deploy can never serve against an older schema.
+`migrate deploy` only applies pending migrations — it never resets or drops.
+
+### Deploying the web app (Vercel)
+
+1. Put your Render URL in `vercel.json` — the one line under `rewrites`:
+
+   ```json
+   "destination": "https://yuva-polyprint-api.onrender.com/api/:path*"
+   ```
+
+   It defaults to the service name in `render.yaml`. Correct it if Render gave
+   you a different hostname, and commit.
+
+2. Vercel → **Add New → Project** → pick this repository. `vercel.json` supplies
+   the build; leave the framework preset as **Other**.
+3. **No environment variables are needed.**
+
+### Chromium
+
+Puppeteer's bundled Chromium is linked against glibc and cannot run on Alpine's
+musl, so the image installs Alpine's own build and points Puppeteer at it via
+`PUPPETEER_EXECUTABLE_PATH`. The font packages are not optional — without them
+every glyph in the quotation PDF renders as an empty box.
+
+### Cold starts
+
+Render's free tier stops the service after 15 minutes of inactivity, and the
+next request has to start a ~1.8GB container. That wake can outlast Vercel's
+30-second edge timeout, in which case the first request after an idle period
+fails and a retry — once the container is up — succeeds.
+
+If that becomes annoying in daily use, Render's Starter plan does not spin down.
+A scheduled ping is the cheaper workaround, but it only narrows the window.
 
 ---
 

@@ -5,6 +5,9 @@ export interface QuotationItem {
   id: string;
   position: number;
   jobId: string | null;
+  /** Film this line was costed against, and its name for display. */
+  filmMaterialId: string | null;
+  filmMaterialName: string | null;
   jobName: string;
 
   layer: number;
@@ -27,6 +30,11 @@ export interface QuotationItem {
   costPerCylinder: number;
   totalCylinderCost: number;
   costPerPouch: number;
+
+  /** Null when no film was chosen, or a rate was missing on the quotation date. */
+  materialCostPerKg: number | null;
+  materialCost: number | null;
+  marginPercent: number | null;
 }
 
 /** Summary shape used by the list screen. */

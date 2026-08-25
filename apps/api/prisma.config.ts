@@ -7,6 +7,8 @@ export default defineConfig({
     path: 'prisma/migrations',
   },
   datasource: {
-    url: process.env['DATABASE_URL'],
+    // Migrations go over the direct connection when there is one — a pooled
+    // Neon endpoint cannot hold the locks DDL requires.
+    url: process.env['DIRECT_URL'] ?? process.env['DATABASE_URL'],
   },
 });

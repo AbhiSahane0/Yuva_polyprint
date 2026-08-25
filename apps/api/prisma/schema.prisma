@@ -255,6 +255,11 @@ model QuotationItem {
 
   jobName String @map("job_name")
 
+  /// The film this line is costed against. Optional: a quotation can be priced
+  /// without a material cost, and retiring a material must not erase old lines.
+  filmMaterialId String?   @map("film_material_id")
+  filmMaterial   Material? @relation(fields: [filmMaterialId], references: [id], onDelete: SetNull)
+
   // ---- Inputs -------------------------------------------------------------
   layer         Int
   widthMm       Decimal @map("width_mm") @db.Decimal(10, 2)
@@ -278,6 +283,13 @@ model QuotationItem {
   totalCylinderCost     Decimal @map("total_cylinder_cost") @db.Decimal(14, 2)
   costPerPouch          Decimal @map("cost_per_pouch") @db.Decimal(12, 4)
 
+  // ---- Material costing, from the rates that applied on the quotation date --
+  /// Null when no film was chosen, or no rate existed for it that day.
+  materialCostPerKg Decimal? @map("material_cost_per_kg") @db.Decimal(12, 4)
+  materialCost      Decimal? @map("material_cost") @db.Decimal(14, 2)
+  /// (selling - cost) / selling, as a percentage.
+  marginPercent     Decimal? @map("margin_percent") @db.Decimal(6, 2)
+
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([quotationId])
@@ -292,4 +304,68 @@ model AppSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("app_settings")
+}
+
+/// Broad grouping for the rates screen.
+enum MaterialCategory {
+  FILM
+  INK
+  ADHESIVE
+  SOLVENT
+  CONSUMABLE
+}
+
+/// A raw material whose price is tracked. Editable by the office: suppliers
+/// and specifications change, and adding a film should not need a developer.
+model Material {
+  id String @id @default(cuid())
+
+  name     String           @unique
+  category MaterialCategory
+  /// KG for films, inks and adhesives; L for solvents.
+  unit     String           @default("KG")
+
+  /**
+   * g/cm³. Turns a film's thickness into weight: a 12µ PET at 1.4 is 16.8 GSM,
+   * which is exactly what the imported jobs show on 404 rows. Without it a
+   * micron figure cannot be costed, because price is per kilogram.
+   */
+  density Decimal? @db.Decimal(6, 4)
+
+  /// Retired materials stay for the sake of old quotations but leave the form.
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  rates          MaterialRate[]
+  quotationItems QuotationItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([category, sortOrder])
+  @@map("materials")
+}
+
+/// One material's price on one day.
+///
+/// A dated row per change rather than a single mutable price: the office keys
+/// rates in most mornings, quotations must stay costed against the rate that
+/// applied when they were made, and the day-on-day delta comes free.
+model MaterialRate {
+  id String @id @default(cuid())
+
+  materialId String   @map("material_id")
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  rate          Decimal  @db.Decimal(12, 4)
+  effectiveDate DateTime @map("effective_date") @db.Date
+
+  /// Who keyed it in. Free text until there are user accounts.
+  enteredBy String @default("Office") @map("entered_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([materialId, effectiveDate])
+  @@index([effectiveDate])
+  @@map("material_rates")
 }

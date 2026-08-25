@@ -11,9 +11,18 @@ let browserPromise: Promise<Browser> | null = null;
 
 async function getBrowser(): Promise<Browser> {
   if (!browserPromise) {
+    // In the container Puppeteer's bundled Chromium is not downloaded at all —
+    // it cannot run on Alpine — so the image installs the system build and
+    // points here. Locally the variable is unset and the bundled one is used.
+    const executablePath = process.env['PUPPETEER_EXECUTABLE_PATH'];
+
     browserPromise = puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-dev-shm-usage'],
+      // --no-sandbox is required in a container running as an unprivileged
+      // user; --disable-dev-shm-usage avoids the small /dev/shm that hosts
+      // like Render provide, which otherwise crashes Chromium mid-render.
+      args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+      ...(executablePath ? { executablePath } : {}),
     });
   }
 

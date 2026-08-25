@@ -1,5 +1,7 @@
 # API modules
 
+> Endpoint and calculation documentation lives in [`apps/api/README.md`](../../README.md).
+
 One folder per business module. Nothing is scaffolded here yet — modules are
 added as each is confirmed in scope.
 
