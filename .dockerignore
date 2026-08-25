@@ -26,8 +26,8 @@ dist
 docker-compose*.yml
 **/coverage
 **/.turbo
-*.log
-.DS_Store
+**/*.log
+**/.DS_Store
 
 # Frontend — not part of the API image
 apps/web
