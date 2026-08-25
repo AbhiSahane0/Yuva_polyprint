@@ -16,7 +16,6 @@ router.get('/next-number', asyncHandler(controller.nextNumber));
 
 router.get('/', validate({ query: listQuotationsQuerySchema }), asyncHandler(controller.list));
 router.get('/:id', validate({ params: idParamSchema }), asyncHandler(controller.getById));
-router.get('/:id/preview', validate({ params: idParamSchema }), asyncHandler(controller.preview));
 router.get('/:id/pdf', validate({ params: idParamSchema }), asyncHandler(controller.pdf));
 
 router.post('/', validate({ body: createQuotationSchema }), asyncHandler(controller.create));
