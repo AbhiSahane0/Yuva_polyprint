@@ -31,7 +31,13 @@ export async function renderQuotationPdf(quotation: Quotation): Promise<Uint8Arr
   const page = await browser.newPage();
 
   try {
-    await page.setContent(renderQuotationHtml(quotation), { waitUntil: 'domcontentloaded' });
+    await page.setContent(renderQuotationHtml(quotation), { waitUntil: 'load' });
+
+    // Final top-up once layout is completely settled, so the PDF and the
+    // on-screen preview agree on how many rows fit. Passed as a string because
+    // this file is typed for Node and has no DOM lib.
+    await page.evaluate('window.__fillSheet && window.__fillSheet()');
+
     return await page.pdf({
       format: 'A4',
       printBackground: true,

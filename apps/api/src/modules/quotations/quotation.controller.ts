@@ -38,6 +38,23 @@ export async function remove(req: Request, res: Response) {
 /** The printable document as HTML — used by the on-screen preview. */
 export async function preview(req: Request, res: Response) {
   const quotation = await quotationService.getQuotationById(req.params.id as string);
+
+  // The document carries one inline script that fills the job table to the foot
+  // of the page. Helmet's app-wide policy blocks inline scripts, so this
+  // response gets its own far stricter policy: no network access of any kind,
+  // only the inline style/script and the data: URIs the document already holds.
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'none'",
+      'img-src data:',
+      "style-src 'unsafe-inline'",
+      "script-src 'unsafe-inline'",
+      "base-uri 'none'",
+      "form-action 'none'",
+    ].join('; '),
+  );
+
   res.type('html').send(renderQuotationHtml(quotation));
 }
 
