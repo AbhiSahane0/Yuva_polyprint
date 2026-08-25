@@ -10,12 +10,19 @@ export async function getSettings(): Promise<AppSettings> {
   const rows = await prisma.appSetting.findMany();
   const stored = Object.fromEntries(rows.map((row) => [row.key, row.value]));
 
-  const merged = { ...DEFAULT_SETTINGS };
-  for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof AppSettings)[]) {
+  const merged: Record<string, unknown> = { ...DEFAULT_SETTINGS };
+  for (const key of Object.keys(DEFAULT_SETTINGS)) {
     const raw = stored[key];
     if (raw === undefined) continue;
-    const parsed = Number(raw);
-    if (Number.isFinite(parsed)) merged[key] = parsed;
+
+    // Settings are all stored as text; only replace a numeric default with a
+    // number, so a malformed row cannot turn a rate into NaN.
+    if (typeof DEFAULT_SETTINGS[key as keyof AppSettings] === 'number') {
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed)) merged[key] = parsed;
+    } else {
+      merged[key] = raw;
+    }
   }
 
   // Re-validate so a hand-edited row cannot put nonsense into a quotation.

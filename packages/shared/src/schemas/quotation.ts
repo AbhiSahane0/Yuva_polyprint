@@ -22,6 +22,8 @@ export const quotationItemSchema = z.object({
   id: z.string().min(1).optional(),
   /** Set when the line was prefilled from an existing job. */
   jobId: z.string().min(1).nullable().optional(),
+  /** Which film this line is costed against; null leaves it uncosted. */
+  filmMaterialId: z.string().min(1).nullable().optional(),
 
   jobName: z.string().trim().min(1, 'Job name is required').max(200),
   layer: z.coerce
@@ -100,6 +102,18 @@ export const settingsSchema = z.object({
   gstPercent: z.coerce.number().min(0).max(100),
   materialAdvancePercent: z.coerce.number().min(0).max(100),
   cylinderAdvancePercent: z.coerce.number().min(0).max(100),
+
+  /**
+   * Costing inputs. Ink and adhesive are laid down by weight rather than
+   * thickness, so their GSM is a setting instead of something derived from a
+   * micron figure. The three material names say which rate to cost each
+   * component against; the film itself is chosen per quotation line.
+   */
+  inkGsm: z.coerce.number().min(0).max(50),
+  adhesiveGsm: z.coerce.number().min(0).max(50),
+  defaultPetMaterial: z.string().trim().max(80),
+  defaultInkMaterial: z.string().trim().max(80),
+  defaultAdhesiveMaterial: z.string().trim().max(80),
 });
 
 export type AppSettings = z.infer<typeof settingsSchema>;
@@ -111,4 +125,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   gstPercent: 18,
   materialAdvancePercent: 70,
   cylinderAdvancePercent: 100,
+  // Averages of what the imported jobs actually record.
+  inkGsm: 1.8,
+  adhesiveGsm: 2.5,
+  defaultPetMaterial: 'PET 12µm',
+  defaultInkMaterial: 'Ink — Black',
+  defaultAdhesiveMaterial: 'Adhesive — PU',
 };

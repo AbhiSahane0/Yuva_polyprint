@@ -35,6 +35,13 @@ erDiagram
     JobCustomerSource customer_source
     boolean needs_customer
   }
+  material_rates {
+    text id PK
+    text material_id FK
+  }
+  materials {
+    text id PK
+  }
   quotation_items {
     text id PK
     text quotation_id FK
@@ -44,6 +51,7 @@ erDiagram
     decimal quantity_kg
     decimal rate_per_kg
     decimal total_amount
+    text film_material_id FK
   }
   quotations {
     text id PK
@@ -60,6 +68,8 @@ erDiagram
   customers ||--o{ quotations : "customer_id"
   quotations ||--|{ quotation_items : "quotation_id"
   jobs ||--o{ quotation_items : "job_id"
+  materials ||--o{ quotation_items : "film_material_id"
+  materials ||--|{ material_rates : "material_id"
 ```
 
 ## Tables
@@ -69,7 +79,9 @@ erDiagram
 | `app_settings` | 3 | 0 | Editable rates: cylinder rate, GST %, advance %. |
 | `customers` | 15 | 68 | Companies that order from Yuva Polyprint. |
 | `jobs` | 55 | 414 | Products and their full engineering specification. |
-| `quotation_items` | 25 | 5 | One priced line on a quotation. |
+| `material_rates` | 6 | 16 |  |
+| `materials` | 9 | 16 |  |
+| `quotation_items` | 29 | 5 | One priced line on a quotation. |
 | `quotations` | 29 | 3 | Customer-facing quotations, with totals frozen at save. |
 
 ## Relationships
@@ -80,6 +92,8 @@ erDiagram
 | `quotations.customer_id` | `customers.id` | SET NULL | Links a quotation to the customer master; the printed details are snapshot on the quotation itself. |
 | `quotation_items.quotation_id` | `quotations.id` | CASCADE | Lines belong to their quotation and are removed with it. |
 | `quotation_items.job_id` | `jobs.id` | SET NULL | Set when a line was prefilled from a saved job spec. |
+| `quotation_items.film_material_id` | `materials.id` | SET NULL |  |
+| `material_rates.material_id` | `materials.id` | CASCADE |  |
 
 ## Enums
 
@@ -87,6 +101,7 @@ erDiagram
 | --- | --- |
 | `CustomerSource` | `SHEET`, `BRAND_INFERRED` |
 | `JobCustomerSource` | `EXPLICIT`, `INFERRED`, `NONE` |
+| `MaterialCategory` | `FILM`, `INK`, `ADHESIVE`, `SOLVENT`, `CONSUMABLE` |
 | `QuotationStatus` | `DRAFT`, `SENT`, `WON`, `LOST` |
 
 ## Full column reference
@@ -179,6 +194,31 @@ erDiagram
 | `customer_source` | `JobCustomerSource` (enum) |  |  |
 | `needs_customer` | `boolean` |  |  |
 
+### `material_rates`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `material_id` | `text` |  | FK → `materials.id` |
+| `rate` | `decimal(12,4)` |  |  |
+| `effective_date` | `date` |  | unique |
+| `entered_by` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+
+### `materials`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `name` | `text` |  | unique |
+| `category` | `MaterialCategory` (enum) |  |  |
+| `unit` | `text` |  |  |
+| `density` | `decimal(6,4)` | ✓ |  |
+| `is_active` | `boolean` |  |  |
+| `sort_order` | `integer` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+
 ### `quotation_items`
 
 | Column | Type | Null | Key |
@@ -208,6 +248,10 @@ erDiagram
 | `total_cylinder_cost` | `decimal(14,2)` |  |  |
 | `cost_per_pouch` | `decimal(12,4)` |  |  |
 | `created_at` | `timestamp` |  |  |
+| `film_material_id` | `text` | ✓ | FK → `materials.id` |
+| `margin_percent` | `decimal(6,2)` | ✓ |  |
+| `material_cost` | `decimal(14,2)` | ✓ |  |
+| `material_cost_per_kg` | `decimal(12,4)` | ✓ |  |
 
 ### `quotations`
 
