@@ -1,4 +1,5 @@
 import { formatNumber, formatRs, type Quotation } from '@yuva/shared';
+import { getQuotationAssets } from './quotation-assets.js';
 
 /**
  * The printable quotation, as a single self-contained A4 HTML page.
@@ -55,7 +56,29 @@ function formatDate(iso: string): string {
   return `${day}-${month}-${year}`;
 }
 
+/** A4 content width once the 8mm side margins are taken off. */
+const CONTENT_WIDTH_MM = 194;
+/** Used when artwork exists but its dimensions could not be read. */
+const FALLBACK_HEADER_MM = 32;
+const FALLBACK_FOOTER_MM = 30;
+
 export function renderQuotationHtml(quotation: Quotation): string {
+  const assets = getQuotationAssets();
+
+  // The bands are position:fixed, which Chrome repeats on every printed page.
+  // Their exact height comes from the real image aspect ratio, so the page body
+  // reserves precisely the space the artwork occupies — no clipping, no gap.
+  const headerMm = assets.header
+    ? CONTENT_WIDTH_MM * (assets.header.aspect ?? FALLBACK_HEADER_MM / CONTENT_WIDTH_MM)
+    : 0;
+  const footerMm = assets.footer
+    ? CONTENT_WIDTH_MM * (assets.footer.aspect ?? FALLBACK_FOOTER_MM / CONTENT_WIDTH_MM)
+    : 0;
+
+  // Without artwork the CSS letterhead stands in, so nothing depends on the
+  // files being present.
+  const topPadMm = assets.header ? headerMm + 3 : 8;
+  const bottomPadMm = assets.footer ? footerMm + 3 : 8;
   const addressLines = [quotation.addressLine1, quotation.addressLine2, quotation.addressLine3]
     .map(show)
     .filter(Boolean);
@@ -103,17 +126,25 @@ export function renderQuotationHtml(quotation: Quotation): string {
 <meta charset="utf-8" />
 <title>Quotation ${quotation.number}</title>
 <style>
-  @page { size: A4 portrait; margin: 8mm; }
+  @page { size: A4 portrait; margin: 0; }
   * { box-sizing: border-box; }
   body {
     margin: 0;
+    padding: ${topPadMm}mm 8mm ${bottomPadMm}mm;
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-size: 8.5pt;
     color: #111;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .sheet { width: 194mm; margin: 0 auto; }
+  .sheet { width: ${CONTENT_WIDTH_MM}mm; margin: 0 auto; }
+
+  /* Letterhead bands. position:fixed makes Chrome repeat them on every page,
+     which is what a business document needs if it runs to a second sheet. */
+  .band { position: fixed; left: 0; right: 0; width: 210mm; }
+  .band img { display: block; width: 100%; }
+  .band-top { top: 0; }
+  .band-bottom { bottom: 0; }
 
   /* ---- Letterhead ---- */
   .head { display: flex; align-items: center; justify-content: space-between;
@@ -173,6 +204,9 @@ export function renderQuotationHtml(quotation: Quotation): string {
           margin-top: 10px; padding-top: 8px; border-top: 1px solid #999; }
   .bank { line-height: 1.5; }
   .bank h4 { margin: 0 0 2px; font-size: 8.6pt; }
+  .payqr { text-align: center; }
+  .payqr h4 { margin: 0 0 3px; font-size: 8.6pt; }
+  .payqr img { width: 26mm; height: 26mm; display: block; margin: 0 auto; }
   .signoff { text-align: right; line-height: 1.5; }
   .signoff .who { font-weight: 700; margin-top: 22px; }
 
@@ -183,9 +217,24 @@ export function renderQuotationHtml(quotation: Quotation): string {
 </style>
 </head>
 <body>
+
+  ${
+    assets.header
+      ? `<div class="band band-top"><img src="${assets.header.dataUri}" alt="" /></div>`
+      : ''
+  }
+  ${
+    assets.footer
+      ? `<div class="band band-bottom"><img src="${assets.footer.dataUri}" alt="" /></div>`
+      : ''
+  }
+
 <div class="sheet">
 
-  <header class="head">
+  ${
+    assets.header
+      ? ''
+      : `<header class="head">
     <div class="brand">
       <div class="logo">
         <span style="background:#7b2d8e">Y</span>
@@ -202,7 +251,8 @@ export function renderQuotationHtml(quotation: Quotation): string {
       <div class="ring">ISO</div>
       9001:2015
     </div>
-  </header>
+  </header>`
+  }
 
   <section class="meta">
     <div class="who">
@@ -313,6 +363,14 @@ export function renderQuotationHtml(quotation: Quotation): string {
       <div>Branch Name: ${COMPANY.bank.branch}</div>
       <div>GST No.: ${COMPANY.bank.gst}</div>
     </div>
+    ${
+      assets.paymentQr
+        ? `<div class="payqr">
+             <h4>QR Code For Payment</h4>
+             <img src="${assets.paymentQr.dataUri}" alt="Payment QR code" />
+           </div>`
+        : ''
+    }
     <div class="signoff">
       <div>Thanks and Regards,</div>
       <div class="who">${COMPANY.signatory}</div>
@@ -321,14 +379,18 @@ export function renderQuotationHtml(quotation: Quotation): string {
     </div>
   </section>
 
-  <section class="strip">
+  ${
+    assets.footer
+      ? ''
+      : `<section class="strip">
     <div>
       <div>${COMPANY.addressLine}</div>
       <div>${COMPANY.phones}</div>
       <div>${COMPANY.website} &nbsp;·&nbsp; ${COMPANY.emailAddress}</div>
     </div>
     <ul>${COMPANY.services.map((service) => `<li>${service}</li>`).join('')}</ul>
-  </section>
+  </section>`
+  }
 
 </div>
 </body>
