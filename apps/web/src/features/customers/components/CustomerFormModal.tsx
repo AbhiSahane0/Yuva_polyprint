@@ -82,6 +82,8 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
     handleSubmit,
     reset,
     setError,
+    setValue,
+    watch,
     control,
     formState: { errors, isSubmitting, isDirty },
     // TFieldValues is the pre-default shape; the resolver transforms it into
@@ -361,6 +363,8 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
                     index={index}
                     register={register}
                     errors={errors}
+                    setValue={setValue}
+                    watch={watch}
                     onRemove={() => jobFields.remove(index)}
                     summary={{
                       jobName: String(watched?.jobName ?? ''),

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
-import type { FieldErrors, UseFormRegister } from 'react-hook-form';
+import type { FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import type { CreateCustomerFormValues } from '@yuva/shared';
 import { Field, FieldSection, Input, ReadOnlyValue, Select, Textarea } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
+import { Combobox } from '@/components/ui/Combobox';
 import { cn } from '@/lib/utils';
 import { JOB_FIELD_GROUPS, SPAN_CLASS, type JobFieldDef } from '../job-fields';
 
@@ -11,6 +12,9 @@ interface Props {
   index: number;
   register: UseFormRegister<CreateCustomerFormValues>;
   errors: FieldErrors<CreateCustomerFormValues>;
+  /** Needed so picking a suggestion writes through react-hook-form. */
+  setValue: UseFormSetValue<CreateCustomerFormValues>;
+  watch: UseFormWatch<CreateCustomerFormValues>;
   onRemove: () => void;
   /** Job name and code, for the collapsed summary line. */
   summary: { jobName: string; jobCode: string; jobType: string };
@@ -18,7 +22,16 @@ interface Props {
   derived: { compositeGsm: string | null; pouchesPerKg: string | null };
 }
 
-export function JobCard({ index, register, errors, onRemove, summary, derived }: Props) {
+export function JobCard({
+  index,
+  register,
+  errors,
+  setValue,
+  watch,
+  onRemove,
+  summary,
+  derived,
+}: Props) {
   // A job with no name yet is one the user just added, so open it for them.
   const [open, setOpen] = useState(summary.jobName === '');
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -56,22 +69,20 @@ export function JobCard({ index, register, errors, onRemove, summary, derived }:
               ))}
             </Select>
           ) : field.kind === 'datalist' ? (
-            <>
-              <Input
-                id={id}
-                list={`${id}-options`}
-                autoComplete="off"
-                {...(field.placeholder ? { placeholder: field.placeholder } : {})}
-                invalid={Boolean(fieldError)}
-                {...register(`jobs.${index}.${field.name}`)}
-              />
-              {/* Suggestions, not a restriction — anything can still be typed. */}
-              <datalist id={`${id}-options`}>
-                {(field.options ?? []).map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-            </>
+            <Combobox
+              id={id}
+              options={field.options ?? []}
+              registration={register(`jobs.${index}.${field.name}`)}
+              value={String(watch(`jobs.${index}.${field.name}`) ?? '')}
+              onPick={(picked) =>
+                setValue(`jobs.${index}.${field.name}`, picked, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+              invalid={Boolean(fieldError)}
+              {...(field.placeholder ? { placeholder: field.placeholder } : {})}
+            />
           ) : field.kind === 'textarea' ? (
             <Textarea
               id={id}
