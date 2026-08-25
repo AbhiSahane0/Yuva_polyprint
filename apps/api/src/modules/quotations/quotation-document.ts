@@ -77,8 +77,14 @@ export function renderQuotationHtml(quotation: Quotation): string {
 
   // Without artwork the CSS letterhead stands in, so nothing depends on the
   // files being present.
-  const topPadMm = assets.header ? headerMm + 3 : 8;
-  const bottomPadMm = assets.footer ? footerMm + 3 : 8;
+  const topPadMm = assets.header ? headerMm : 5;
+  const bottomPadMm = assets.footer ? footerMm : 5;
+  /**
+   * Height available to .sheet, including the 3mm it pads itself with. The
+   * sheet carries that padding in both media, so this figure means the same
+   * thing on screen and in print.
+   */
+  const CONTENT_HEIGHT_MM = 297 - topPadMm - bottomPadMm;
   const addressLines = [quotation.addressLine1, quotation.addressLine2, quotation.addressLine3]
     .map(show)
     .filter(Boolean);
@@ -136,8 +142,13 @@ export function renderQuotationHtml(quotation: Quotation): string {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .band img { display: block; width: 100%; }
-  .sheet { width: ${CONTENT_WIDTH_MM}mm; margin: 0 auto; }
+  /* Height comes from the real image ratio, so the page does not reflow when
+     the artwork finishes decoding — the row-filling measurement depends on the
+     layout already being final. */
+  .band-top { height: ${headerMm.toFixed(2)}mm; }
+  .band-bottom { height: ${footerMm.toFixed(2)}mm; }
+  .band img { display: block; width: 100%; height: 100%; object-fit: fill; }
+  .sheet { width: ${CONTENT_WIDTH_MM}mm; margin: 0 auto; padding: 3mm 0; }
 
   /* ---------------------------------------------------------------------
      Screen and print need genuinely different letterhead behaviour.
@@ -163,7 +174,6 @@ export function renderQuotationHtml(quotation: Quotation): string {
       flex-direction: column;
       box-shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
     }
-    .sheet { padding: 4mm 0 6mm; }
     /* Pushes the footer band to the foot of the paper, not the viewport. */
     .band-bottom { margin-top: auto; }
   }
@@ -429,6 +439,83 @@ export function renderQuotationHtml(quotation: Quotation): string {
   }
 
 </div>
+
+<script>
+/*
+ * Fills the leftover space on the sheet with blank job rows.
+ *
+ * The footer band belongs at the foot of the paper, so on a short quotation
+ * all the slack used to collect as one large gap above it. Extending the job
+ * table instead closes that gap and mirrors the client's spreadsheet, where
+ * the table was always a fixed block of rows. As jobs are added the filler
+ * rows disappear on their own — no configuration, no fixed row count.
+ *
+ * The measurement is taken in screen layout, which is safe because the screen
+ * and print stylesheets reserve exactly the same content height: on screen the
+ * bands sit in flow, and in print an equal body padding stands in for them.
+ */
+function fillSheet() {
+  var MAX_FILLER_ROWS = 40;
+  // Space available to the document body, in CSS pixels. Injected as a
+  // constant rather than measured off the footer band, because the band is
+  // position:fixed when printing — its on-screen coordinates say nothing about
+  // where the content must stop — and because a live measurement lets the loop
+  // run away: every row added grows the page, which moves the band down, which
+  // makes room for another row.
+  var CONTENT_MAX_PX = ${(CONTENT_HEIGHT_MM * 96) / 25.4};
+
+  var sheet = document.querySelector('.sheet');
+  var tbody = document.querySelector('table tbody');
+  if (!sheet || !tbody) return;
+
+  var lastRow = tbody.rows[tbody.rows.length - 1];
+  if (!lastRow) return;
+  var rowHeight = lastRow.getBoundingClientRect().height;
+  if (rowHeight < 4) return;
+
+  var columns = lastRow.cells.length;
+  var added = 0;
+
+  while (
+    added < MAX_FILLER_ROWS &&
+    sheet.getBoundingClientRect().height + rowHeight <= CONTENT_MAX_PX
+  ) {
+    var row = tbody.insertRow(-1);
+    row.className = 'empty';
+    for (var c = 0; c < columns; c += 1) {
+      var cell = row.insertCell(-1);
+      if (c === 0) {
+        cell.className = 'c';
+        cell.textContent = String(tbody.rows.length);
+      }
+    }
+    added += 1;
+  }
+
+  // Never leave the sheet taller than the page. Only remove rows this pass
+  // added — never one that was already there.
+  while (added > 0 && sheet.getBoundingClientRect().height > CONTENT_MAX_PX) {
+    tbody.deleteRow(-1);
+    added -= 1;
+  }
+}
+
+// Safe to call repeatedly: each pass tops the table up to the space available,
+// and does nothing once the page is full.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', fillSheet);
+} else {
+  fillSheet();
+}
+window.addEventListener('load', fillSheet);
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(fillSheet).catch(function () {});
+}
+
+// The PDF renderer calls this explicitly as its last step, once layout has
+// completely settled.
+window.__fillSheet = fillSheet;
+</script>
 </body>
 </html>`;
 }
