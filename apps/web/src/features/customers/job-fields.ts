@@ -10,13 +10,58 @@ export interface JobFieldDef {
   name: Exclude<keyof CustomerJobFormValues, 'id'>;
   label: string;
   hint?: string;
-  kind?: 'text' | 'number' | 'select' | 'textarea';
+  /**
+   * `select`   — a closed set; nothing else is valid.
+   * `datalist` — suggestions, but anything can still be typed. Used where the
+   *              imported data has a handful of common values plus a long tail,
+   *              so people stop inventing new spellings of the same thing
+   *              without being blocked from entering something genuinely new.
+   */
+  kind?: 'text' | 'number' | 'select' | 'datalist' | 'textarea';
   options?: readonly string[];
   placeholder?: string;
   required?: boolean;
   /** Columns out of 12 on desktop. Defaults to 3. */
   span?: 3 | 4 | 6 | 12;
 }
+
+/** Plain yes/no. Anything else in these columns was a mistake. */
+const YES_NO = ['Yes', 'No'] as const;
+
+/**
+ * Values already in the imported data, canonicalised. "White LDPE" and
+ * "White Ldpe" are the same film typed two ways (54 and 46 rows); offering one
+ * spelling stops the split getting worse.
+ */
+const POLY_TYPES = [
+  'Nat Metlocene',
+  'W/O Metlocene',
+  'Natural LDPE',
+  'White LDPE',
+  'Natural GP',
+  'Pearl BOPP',
+] as const;
+
+const POUCH_TYPES = [
+  'Center & Top Seal',
+  'Top & Side Seal',
+  'Side & Top Seal',
+  'Bottom & Side Seal',
+  'Three Side Seal',
+  'Side Seal',
+  'Standy Zipper Pouch',
+] as const;
+
+const PRINTING_TYPES = ['Reverse Printing', 'Surface Printing', 'Blank'] as const;
+
+const CYLINDER_SUPPLIERS = [
+  'Shilp Gravures',
+  'Techno Plast',
+  'Techno Engineering',
+  'Afflatus Gravures',
+] as const;
+
+const JOB_COLOURS = ['CMYK', 'CMYK & White', 'CMYK & Brown', 'CMYK & Red'] as const;
 
 export interface JobFieldGroup {
   title: string;
@@ -39,8 +84,15 @@ export const JOB_FIELD_GROUPS: JobFieldGroup[] = [
         span: 6,
       },
       { name: 'jobType', label: 'Form', kind: 'select', options: JOB_TYPES, span: 3 },
-      { name: 'pouchType', label: 'Pouch type', placeholder: 'Center & Top Seal', span: 6 },
-      { name: 'pouchSubType', label: 'Pouch style', placeholder: 'Standy Zipper', span: 6 },
+      {
+        name: 'pouchType',
+        label: 'Pouch type',
+        kind: 'datalist',
+        options: POUCH_TYPES,
+        placeholder: 'Choose or type',
+        span: 6,
+      },
+      { name: 'pouchSubType', label: 'Pouch style', placeholder: 'e.g. Standy Zipper', span: 6 },
     ],
   },
   {
@@ -51,17 +103,27 @@ export const JOB_FIELD_GROUPS: JobFieldGroup[] = [
       { name: 'metPetMicron', label: 'Metallised PET', hint: 'microns', kind: 'number', span: 3 },
       { name: 'polyMicron', label: 'Poly', hint: 'microns', kind: 'number', span: 3 },
       { name: 'layer', label: 'Number of layers', kind: 'number', span: 3 },
-      { name: 'polyType', label: 'Poly type', placeholder: 'White LDPE', span: 4 },
+      {
+        name: 'polyType',
+        label: 'Poly type',
+        kind: 'datalist',
+        options: POLY_TYPES,
+        placeholder: 'Choose or type',
+        span: 4,
+      },
       {
         name: 'printingType',
         label: 'Printing type',
-        placeholder: 'Reverse Printing',
+        kind: 'datalist',
+        options: PRINTING_TYPES,
+        placeholder: 'Choose or type',
         span: 4,
       },
       {
         name: 'jobFinalDirection',
         label: 'Final direction',
-        hint: 'Readable or Unreadable',
+        kind: 'select',
+        options: ['Readable', 'Unreadable'],
         span: 4,
       },
     ],
@@ -74,9 +136,23 @@ export const JOB_FIELD_GROUPS: JobFieldGroup[] = [
       { name: 'designOpenWidth', label: 'Design open width', hint: 'mm', kind: 'number', span: 3 },
       { name: 'ups', label: 'Ups', hint: 'Impressions across', kind: 'number', span: 3 },
       { name: 'totalCylinders', label: 'Total cylinders', kind: 'number', span: 3 },
-      { name: 'design', label: 'Design name', placeholder: 'Atta 5kg.', span: 4 },
-      { name: 'jobColours', label: 'Colours', placeholder: 'CMYK & Brown', span: 4 },
-      { name: 'cylinderParty', label: 'Cylinder supplier', placeholder: 'Shilp Gravures', span: 4 },
+      { name: 'design', label: 'Design name', placeholder: 'e.g. Atta 5kg.', span: 4 },
+      {
+        name: 'jobColours',
+        label: 'Colours',
+        kind: 'datalist',
+        options: JOB_COLOURS,
+        placeholder: 'Choose or type',
+        span: 4,
+      },
+      {
+        name: 'cylinderParty',
+        label: 'Cylinder supplier',
+        kind: 'datalist',
+        options: CYLINDER_SUPPLIERS,
+        placeholder: 'Choose or type',
+        span: 4,
+      },
     ],
   },
   {
@@ -109,11 +185,11 @@ export const JOB_FIELD_GROUPS: JobFieldGroup[] = [
     fields: [
       { name: 'pouchHeight', label: 'Pouch height', hint: 'mm', kind: 'number', span: 3 },
       { name: 'pouchOpenWidth', label: 'Pouch open width', hint: 'mm', kind: 'number', span: 3 },
-      { name: 'dPunch', label: 'D punch', hint: 'Yes / No / size', span: 3 },
-      { name: 'dPunchTopSize', label: 'D punch top size', span: 3 },
-      { name: 'gusset', label: 'Gusset', hint: 'Yes / No', span: 4 },
-      { name: 'gussetSize', label: 'Gusset size', span: 4 },
-      { name: 'vNotch', label: 'V notch', hint: 'Yes / No', span: 4 },
+      { name: 'dPunch', label: 'D punch', kind: 'select', options: YES_NO, span: 3 },
+      { name: 'dPunchTopSize', label: 'D punch top size', hint: 'mm', span: 3 },
+      { name: 'gusset', label: 'Gusset', kind: 'select', options: YES_NO, span: 4 },
+      { name: 'gussetSize', label: 'Gusset size', hint: 'mm', span: 4 },
+      { name: 'vNotch', label: 'V notch', kind: 'select', options: YES_NO, span: 4 },
     ],
   },
   {
