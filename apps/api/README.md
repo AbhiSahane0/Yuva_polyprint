@@ -1,0 +1,439 @@
+# API — Yuva Polyprint ERP
+
+Express 5 + Prisma 7 + PostgreSQL 17. Serves the web client and renders
+quotation PDFs.
+
+- [Running it](#running-it)
+- [Layout](#layout)
+- [Request and response shape](#request-and-response-shape)
+- [Endpoints](#endpoints)
+- [Calculations](#calculations) ← the part worth reading
+- [Data model](#data-model)
+- [Scripts](#scripts)
+
+---
+
+## Running it
+
+```bash
+npm run db:up
+```
+
+```bash
+npm run db:migrate -w @yuva/api
+```
+
+```bash
+npm run seed:materials -w @yuva/api
+```
+
+```bash
+npm run dev -w @yuva/api
+```
+
+Listens on `http://localhost:4000`. Environment is validated by Zod at boot —
+a missing or malformed variable exits immediately with a readable report rather
+than failing later with something confusing. See `.env.example`.
+
+There is **no authentication yet**. Login will be a plain username + password
+form with a server-side session; the routes are open until that exists.
+
+---
+
+## Layout
+
+```
+src/
+├── server.ts              boot, listen, graceful shutdown
+├── app.ts                 Express app factory (no port binding, so tests can use it)
+├── config/env.ts          Zod-validated environment, parsed once
+├── lib/
+│   ├── prisma.ts          PrismaClient singleton + pg driver adapter
+│   └── logger.ts          pino, with credential redaction
+├── middleware/
+│   ├── validate.ts        Zod validation for body / query / params
+│   ├── error-handler.ts   404 fallback + the single place errors are formatted
+│   ├── rate-limit.ts      baseline limiter + a stricter one for future login
+│   └── request-logger.ts  correlation id, one structured line per request
+├── routes/index.ts        the /api surface map
+├── utils/                 ApiError, response envelopes, asyncHandler
+└── modules/
+    ├── customers/         customers and their job specifications
+    ├── quotations/        quotations, costing, PDF rendering
+    ├── materials/         material catalogue and daily rates
+    └── settings/          editable rates and costing defaults
+```
+
+**Layering:** `routes → controller → service → Prisma`. Controllers read the
+request and send the response; they hold no business logic. Services take plain
+arguments and return plain data, so they can be called from scripts and jobs as
+easily as from a route.
+
+---
+
+## Request and response shape
+
+Every success is wrapped:
+
+```json
+{ "success": true, "data": {} }
+```
+
+Every failure is wrapped:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Validation failed",
+    "fields": [{ "field": "mobile", "message": "Enter a 10-digit mobile number" }],
+    "requestId": "34ad81bd-12b6-4837-961f-c86b77f7bfe4"
+  }
+}
+```
+
+`code` is a stable machine-readable value — `VALIDATION_ERROR`, `NOT_FOUND`,
+`CONFLICT`, `RATE_LIMITED`, `INTERNAL_ERROR`. **The client branches on the code,
+never on the message**, so error wording can change without breaking anything.
+
+`fields` appears only on validation failures and is keyed so the form can put
+each message beside the input that caused it. `requestId` matches the
+`x-request-id` header and the server log line, so a user's screenshot can be
+traced to the exact request.
+
+Lists are paginated:
+
+```json
+{
+  "items": [],
+  "pagination": {
+    "page": 1,
+    "pageSize": 25,
+    "total": 68,
+    "totalPages": 3,
+    "hasNextPage": true,
+    "hasPreviousPage": false
+  }
+}
+```
+
+---
+
+## Endpoints
+
+All under `/api`. Health probes sit outside it, so they are never rate-limited.
+
+### Health
+
+| Method | Path            | Notes                                          |
+| ------ | --------------- | ---------------------------------------------- |
+| GET    | `/health`       | Liveness. Is the process up?                   |
+| GET    | `/health/ready` | Readiness. Runs `SELECT 1` against PostgreSQL. |
+
+### Customers
+
+| Method | Path             | Notes                                               |
+| ------ | ---------------- | --------------------------------------------------- |
+| GET    | `/customers`     | Search, filter, paginate. See query below.          |
+| GET    | `/customers/:id` | One customer **with all their jobs and full specs** |
+| POST   | `/customers`     | Create. Optionally with nested jobs.                |
+| PATCH  | `/customers/:id` | Update. Optionally with nested jobs.                |
+| DELETE | `/customers/:id` | Delete; returns how many jobs were released.        |
+
+Query: `page`, `pageSize`, `q`, `source` (`SHEET` / `BRAND_INFERRED`),
+`isVerified`. `q` searches company, contact, mobile, alternate phone, email,
+city, district, address and pincode. The list is always alphabetical by company.
+
+**Nested jobs.** When `jobs` is present it is treated as the _complete_ set for
+that customer: rows with an `id` are updated, rows without one are created, and
+jobs no longer listed are **unlinked, never deleted** — they return to the
+"needs a customer" worklist. Omit `jobs` entirely to leave them untouched.
+
+**Deleting a customer** keeps their jobs (the foreign key is `ON DELETE SET
+NULL`) but flags each one `needsCustomer`, so nothing silently disappears from
+every view.
+
+### Quotations
+
+| Method | Path                      | Notes                                                    |
+| ------ | ------------------------- | -------------------------------------------------------- |
+| GET    | `/quotations`             | Search by number, customer or job name; filter by status |
+| GET    | `/quotations/next-number` | The number the next quotation will get                   |
+| GET    | `/quotations/:id`         | Full document with all lines                             |
+| GET    | `/quotations/:id/pdf`     | The PDF. `?inline=1` displays, otherwise downloads       |
+| POST   | `/quotations`             | Create; prices and costs every line                      |
+| PATCH  | `/quotations/:id`         | Update; **re-prices the whole document**                 |
+| DELETE | `/quotations/:id`         | Delete; lines cascade                                    |
+
+**Lines are replaced wholesale** on update. Positions shift and lines get
+removed, so reconciling by id would be more fragile than rewriting the set.
+
+**Every figure is computed server-side.** `POST`/`PATCH` ignore any totals sent
+by the client — the numbers on a quotation are the whole point of the document.
+
+### Materials and rates
+
+| Method | Path                     | Notes                                                      |
+| ------ | ------------------------ | ---------------------------------------------------------- |
+| GET    | `/materials`             | With the rate in force, the previous one, and the change % |
+| POST   | `/materials`             | Add a material                                             |
+| PATCH  | `/materials/:id`         | Rename, re-price-group, set density, retire                |
+| GET    | `/materials/:id/history` | Every recorded rate, newest first                          |
+| PUT    | `/materials/rates`       | Save a day's rates in one request                          |
+
+Query on `GET /materials`: `onDate` (yyyy-mm-dd, defaults to today),
+`includeInactive`.
+
+Rates are saved as a **batch, not per field** — the office keys the morning's
+rates in together, and a partial save would leave the day half-recorded.
+
+### Settings
+
+| Method | Path        | Notes                                 |
+| ------ | ----------- | ------------------------------------- |
+| GET    | `/settings` | All settings, with defaults filled in |
+| PATCH  | `/settings` | Update any subset                     |
+
+Stored as key/value rows so a new setting never needs a migration. Anything
+missing falls back to a documented default, so a fresh database works with no
+seeding step.
+
+| Setting                   | Default         | Meaning                                      |
+| ------------------------- | --------------- | -------------------------------------------- |
+| `quotationStartNumber`    | 119             | Continues the client's existing paper series |
+| `cylinderRate`            | 2.5             | Multiplier in the cylinder cost formula      |
+| `gstPercent`              | 18              | Applied to material and cylinder totals      |
+| `materialAdvancePercent`  | 70              | Advance taken on the material total          |
+| `cylinderAdvancePercent`  | 100             | Advance taken on the cylinder total          |
+| `inkGsm`                  | 1.8             | Ink laid down per m², for costing            |
+| `adhesiveGsm`             | 2.5             | Adhesive laid down per m², for costing       |
+| `defaultPetMaterial`      | `PET 12µm`      | Which material's rate prices the PET layer   |
+| `defaultInkMaterial`      | `Ink — Black`   | Which rate prices the ink                    |
+| `defaultAdhesiveMaterial` | `Adhesive — PU` | Which rate prices the adhesive               |
+
+---
+
+## Calculations
+
+All arithmetic lives in `packages/shared`, so the form, the API and the PDF
+produce identical numbers from identical inputs. It is locked to the client's
+real quotation #118 by tests (`packages/shared/src/lib/quotation-math.test.ts`).
+
+### Quotation line
+
+Given: layers (2 or 3), width and height in mm, poly micron, quantity in kg,
+rate per kg, repeat width and height, cylinder count, optional transport cost.
+
+**1. Total micron** — PET is 12µ per ply and adhesive adds 2µ:
+
+```
+2 layer:  micron = 12 + poly + 2
+3 layer:  micron = 12 + 12 + poly + 2
+```
+
+**2. Yield factor** — 3-layer film wastes more:
+
+```
+2 layer: 1.1     3 layer: 1.2
+```
+
+**3. Pouches per kg** — how many pouches a kilogram of film yields:
+
+```
+pouches/kg = 1000 ÷ ( ((width × height ÷ 100) × micron × factor) ÷ 10000 )
+```
+
+**4. Total pouches** — note the rounding order:
+
+```
+totalPouches = round( round(pouches/kg, 2) × quantityKg )
+```
+
+Pouches per kg is rounded to **2 decimals before** multiplying. This is not
+cosmetic: the 1 Kg Paneer Bag line reads **24,930** on the client's document,
+and multiplying the unrounded 99.716 gives 24,929. The spreadsheet rounds
+first, so we do too.
+
+**5. Printing total**
+
+```
+totalAmount = quantityKg × ratePerKg
+```
+
+**6. Cylinder** — the +80 is the mounting allowance:
+
+```
+cylinderWidth         = width × repeatWidth + 80
+cylinderCircumference = height × repeatHeight
+costPerCylinder       = (cylinderWidth × cylinderCircumference ÷ 100) × cylinderRate
+totalCylinderCost     = costPerCylinder × cylinderCount + transportCost
+```
+
+Worked example, 5 Kg Paneer Bag, 670 × 460 mm, 60µ poly, 2 layer, 250 kg at
+₹295, repeat 1 × 1, 4 cylinders:
+
+```
+micron            = 12 + 60 + 2 = 74
+pouches/kg        = 1000 ÷ (((670×460÷100) × 74 × 1.1) ÷ 10000) = 39.86
+totalPouches      = 39.86 × 250                                 = 9,965
+totalAmount       = 250 × 295                                   = ₹73,750
+cylinderWidth     = 670 × 1 + 80                                = 750
+circumference     = 460 × 1                                     = 460
+costPerCylinder   = (750 × 460 ÷ 100) × 2.5                     = ₹8,625
+totalCylinderCost = 8,625 × 4                                   = ₹34,500
+```
+
+### Quotation totals
+
+```
+materialSubtotal = Σ line totalAmount
+cylinderSubtotal = Σ line totalCylinderCost
+grandSubtotal    = materialSubtotal + cylinderSubtotal
+
+materialWithGst  = round(materialSubtotal × 1.18)
+cylinderWithGst  = round(cylinderSubtotal × 1.18)
+grandWithGst     = round(grandSubtotal   × 1.18)
+
+materialAdvance  = materialWithGst × 70%
+cylinderAdvance  = cylinderWithGst × 100%
+totalAdvance     = materialAdvance + cylinderAdvance
+```
+
+**Advances are taken on the GST-inclusive amounts.** The client's spreadsheet
+printed pre-GST figures on the two advance rows but a GST-inclusive Advance
+total, and the two did not reconcile (₹1,65,910 against ₹1,95,774). Confirmed
+with the client: GST-inclusive is what they actually collect, so both the rows
+and the total now use it.
+
+### Material cost and margin
+
+A quotation is priced per kilogram of finished film, so every component must
+become a weight before it can be costed. Films are specified by thickness, and
+**density** converts it:
+
+```
+GSM = microns × density          e.g. 12µ PET at 1.4 g/cm³ = 16.8 GSM
+```
+
+Ink and adhesive are laid down by weight already, so their GSM comes from
+settings rather than from a thickness.
+
+```
+petGsm       = (layers = 3 ? 2 : 1) × 12 × 1.4
+polyGsm      = polyMicron × the chosen film's density
+inkGsm       = settings.inkGsm
+adhesiveGsm  = settings.adhesiveGsm
+compositeGsm = petGsm + polyGsm + inkGsm + adhesiveGsm
+
+costPerKg = Σ(componentGsm × componentRate) ÷ compositeGsm
+margin %  = (sellingRate − costPerKg) ÷ sellingRate × 100
+```
+
+Worked example — 2-layer, 60µ poly on PE 60µm (density 0.94, ₹190), PET ₹210,
+ink ₹610, adhesive ₹480, selling at ₹295/kg:
+
+```
+petGsm       = 12 × 1.4  = 16.8
+polyGsm      = 60 × 0.94 = 56.4
+inkGsm       = 1.8       adhesiveGsm = 2.5
+compositeGsm = 77.5
+
+costPerKg = (16.8×210 + 56.4×190 + 1.8×610 + 2.5×480) ÷ 77.5 = ₹213.4452
+margin    = (295 − 213.4452) ÷ 295                            = 27.65%
+```
+
+**A missing rate produces no cost at all, not a partial one.** If any component
+has no rate on the quotation's date, `materialCostPerKg` is `null`. An
+understated cost would make a quotation look more profitable than it is because
+someone had not keyed a rate in that morning — the worst possible failure here.
+
+**Rates are read as of the quotation's own date**, and the result is stored on
+the line. A quotation already sent keeps the margin it was accepted on, even
+after prices move.
+
+### Rates "in force"
+
+`GET /materials?onDate=X` returns the **most recent rate on or before X** — not
+the rate keyed in on that exact day. Rates are not entered every morning, and a
+quotation made on a Sunday must still cost against Friday's price.
+
+A blank rate on save means **"no change today"**, not zero: no row is written
+and the previous rate stays in force.
+
+### Derived job fields
+
+Three columns on a job are computed and never accepted from the client. Which
+ones was decided by checking the imported data for formulas, not by guessing:
+
+| Field          | Formula                                            | Held on        |
+| -------------- | -------------------------------------------------- | -------------- |
+| `compositeGsm` | ink + PET + metallised PET + poly + adhesive       | 411 / 411 rows |
+| `pouchesPerKg` | 1e9 ÷ (design height × open width × composite GSM) | 384 / 384 rows |
+| `jobCode`      | `YPP` + YY + MM + sequence, restarting each month  | identifier     |
+
+A job code is generated on create and **never rewritten on update** — it is the
+job's identity. Sending a forged `jobCode`, `compositeGsm` or `pouchesPerKg` has
+no effect; they are not in the input schema at all.
+
+---
+
+## Data model
+
+Full diagram and column reference: [`docs/database-schema.md`](../../docs/database-schema.md).
+Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
+
+| Table             | Holds                                                                            |
+| ----------------- | -------------------------------------------------------------------------------- |
+| `customers`       | Companies that order. Text fields use `'NA'` where the imported sheet was blank. |
+| `jobs`            | Products and their full 55-column specification.                                 |
+| `quotations`      | Customer-facing documents. Totals frozen at save.                                |
+| `quotation_items` | One priced line, with its costing.                                               |
+| `materials`       | The rate catalogue, with density for films.                                      |
+| `material_rates`  | One material's price on one date.                                                |
+| `app_settings`    | Editable rates and costing defaults.                                             |
+
+Two deliberate choices:
+
+**`jobs.job_code` is not unique.** Thirteen codes are reused across 36 rows in
+the source spreadsheet for genuinely different jobs. A surrogate `id` is the key
+until the client confirms the correct codes.
+
+**Nothing cascades except quotation lines.** Deleting a customer sets
+`customer_id` to null on their jobs and quotations rather than destroying
+production history or a sent quotation.
+
+Money and quantities are `Decimal`, never `Float` — this system computes costs
+and variance, and floating point drift in a costing engine is a silent
+correctness bug.
+
+---
+
+## Scripts
+
+| Command                              | Does                                                 |
+| ------------------------------------ | ---------------------------------------------------- |
+| `npm run dev`                        | Watch mode on port 4000                              |
+| `npm run build` / `start`            | Compile to `dist/`, then run it                      |
+| `npm test`                           | Vitest, including the shell smoke tests              |
+| `npm run db:migrate`                 | Create and apply a migration                         |
+| `npm run db:studio`                  | Prisma Studio                                        |
+| `npm run seed:materials`             | Seed the 16 materials and opening rates. Idempotent. |
+| `npm run import:legacy -- --dry-run` | Parse the legacy sheet, write nothing                |
+| `npm run import:legacy [-- --fresh]` | Import it; `--fresh` replaces existing rows          |
+| `npm run schema:docs`                | Regenerate the database documentation                |
+
+### PDF rendering
+
+`GET /quotations/:id/pdf` renders with Puppeteer from
+`quotation-document.ts` — one self-contained A4 page, everything inlined,
+because the renderer has no network access.
+
+One Chromium instance is shared for the process and closed on shutdown;
+launching per request would make every download feel broken. The letterhead
+comes from `assets/quotation/` (`header.png`, `footer.png`, `payment-qr.png`);
+if those files are missing the document still renders with a CSS letterhead
+instead.
+
+The header band repeats on every page (`position: fixed` in print), while the
+footer follows the content so it appears once, under the sign-off.
