@@ -67,7 +67,11 @@ COPY --from=build /repo/apps/api/dist apps/api/dist
 COPY --from=build /repo/apps/api/src/generated apps/api/src/generated
 COPY --from=build /repo/apps/api/prisma apps/api/prisma
 COPY --from=build /repo/apps/api/prisma.config.ts apps/api/
-COPY apps/api/assets apps/api/assets
+# From the build stage, like every other runtime COPY above — the build stage
+# already has these via `COPY apps/api apps/api`. Reading the raw build context
+# here made this the one line whose success depended on how the platform
+# assembles that context.
+COPY --from=build /repo/apps/api/assets apps/api/assets
 
 USER node
 EXPOSE 4000
