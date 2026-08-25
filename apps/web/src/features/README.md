@@ -1,5 +1,7 @@
 # Web features
 
+> Screen-by-screen documentation lives in [`apps/web/README.md`](../../README.md).
+
 One folder per business feature, mirroring the API modules. Nothing is
 scaffolded here yet — features are added as each is confirmed in scope.
 

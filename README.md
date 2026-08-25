@@ -349,6 +349,23 @@ sheet stores as ranges (`"15-16"`, `"60-70"`) are kept in their own text columns
 
 ---
 
+## Documentation
+
+Each app documents itself, next to the code it describes:
+
+| Document                                               | Covers                                                                                                                        |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/api/README.md`](./apps/api/README.md)           | Every endpoint, the request/response envelope, **all the calculations with worked examples**, the data model, and the scripts |
+| [`apps/web/README.md`](./apps/web/README.md)           | Every screen and what it does, how server state is handled, which figures are previewed in the browser, and the UI components |
+| [`docs/database-schema.md`](./docs/database-schema.md) | ER diagram and full column reference, generated from the live database                                                        |
+
+Start with the API's [Calculations](./apps/api/README.md#calculations) section
+if you want to understand how a quotation is priced and costed — pouches per
+kg, cylinder cost, GST, advances and material margin are all derived there,
+each with the reasoning and a worked example.
+
+---
+
 ## Conventions
 
 Detailed rules live next to the code they govern:
