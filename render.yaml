@@ -1,0 +1,48 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# In Render: New -> Blueprint -> pick this repository. Render reads this file
+# and creates the service; you then fill in the three secret values below.
+#
+# Deployed as Docker rather than Render's native Node runtime because the
+# quotation PDF needs Chromium, and the image installs and wires it up.
+
+services:
+  - type: web
+    name: yuva-polyprint-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    # The build copies from the repository root — it is a monorepo, and the API
+    # depends on packages/shared.
+    dockerContext: .
+    plan: free
+    # Neon is in us-east-2 (Ohio). Same region keeps database round-trips short,
+    # which matters most for the quotation screens.
+    region: ohio
+    healthCheckPath: /health
+    autoDeploy: true
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: LOG_LEVEL
+        value: info
+
+      # Set these in the Render dashboard — `sync: false` means Render prompts
+      # for them and never stores them in the repository.
+      #
+      #   DATABASE_URL   Neon pooled endpoint  (host contains "-pooler")
+      #   DIRECT_URL     Neon direct endpoint  — migrations run on boot and
+      #                  cannot use a pooled connection
+      #   CORS_ORIGINS   only needed if the browser calls this API directly.
+      #                  With the Vercel rewrite in vercel.json it does not:
+      #                  requests arrive from Vercel's edge, same-origin to the
+      #                  browser. Leave it as the localhost default unless you
+      #                  switch to direct calls.
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
