@@ -428,6 +428,42 @@ keeps its default of `/api` in every environment, exactly as in development.
 starting the server, so a deploy can never serve against an older schema.
 `migrate deploy` only applies pending migrations — it never resets or drops.
 
+### Preview deployments and CORS
+
+Vercel builds every pull request to its own hostname —
+`yuva-polyprint-git-my-branch-me.vercel.app`, a new one per branch and per
+commit. **Nothing needs configuring for these to work**, because the browser
+never calls Render: `vercel.json` rewrites `/api` at the edge, so a preview
+proxies through its own hostname exactly as production does. There is no
+cross-origin request, so there is no origin to allow.
+
+If a preview is blocked by CORS, the rewrite is being bypassed. Check, in order:
+
+1. **`VITE_API_BASE_URL` must not be set in Vercel.** If it points at the Render
+   URL, the browser calls Render directly and every preview hostname is a fresh
+   origin Render has never heard of. Delete it in all three environments —
+   Production, Preview and Development. It defaults to `/api`, which is what
+   makes the rewrite work. Nothing in `apps/web/src` contains an absolute URL.
+2. **The rewrite destination must be your real Render hostname.** If it is
+   wrong, `/api` goes nowhere and the natural next move is to point the app
+   straight at Render — which is what causes the CORS error in the first place.
+
+   ```bash
+   grep destination vercel.json
+   ```
+
+**If you do choose to call Render directly**, `CORS_ORIGINS` entries accept `*`,
+matching within a single hostname label, so one pattern covers every preview:
+
+```
+CORS_ORIGINS=https://yuva-polyprint.vercel.app,https://yuva-polyprint-*.vercel.app
+```
+
+Keep the project name in the pattern. `https://*.vercel.app` would let any site
+anyone deploys on Vercel call this API with credentials attached. The wildcard
+cannot cross a dot, so `https://yuva-polyprint-*.vercel.app` will not match
+`https://yuva-polyprint-x.attacker.com`.
+
 ### Deploying the web app (Vercel)
 
 1. Put your Render URL in `vercel.json` — the one line under `rewrites`:

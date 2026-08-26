@@ -9,6 +9,7 @@ quotation PDFs.
 - [Endpoints](#endpoints)
 - [Calculations](#calculations) ← the part worth reading
 - [Data model](#data-model)
+- [CORS](#cors)
 - [Scripts](#scripts)
 
 ---
@@ -481,6 +482,40 @@ production history or a sent quotation.
 Money and quantities are `Decimal`, never `Float` — this system computes costs
 and variance, and floating point drift in a costing engine is a silent
 correctness bug.
+
+---
+
+## CORS
+
+`CORS_ORIGINS` is a comma-separated allowlist. Entries may contain `*`, which
+matches any run of characters **except a dot or a slash** — so a wildcard stays
+inside one hostname label.
+
+That exists for Vercel preview deployments, which get a new hostname per branch
+and per commit. One pattern covers all of them:
+
+```
+CORS_ORIGINS=https://yuva-polyprint.vercel.app,https://yuva-polyprint-*.vercel.app
+```
+
+| Origin                                                | Allowed |
+| ----------------------------------------------------- | ------- |
+| `https://yuva-polyprint.vercel.app`                   | yes     |
+| `https://yuva-polyprint-git-abhi-dev-me.vercel.app`   | yes     |
+| `https://yuva-polyprint-k2f9x1qzp-me.vercel.app`      | yes     |
+| `https://someone-elses-app.vercel.app`                | no      |
+| `https://yuva-polyprint-x.attacker.com`               | no      |
+| `http://yuva-polyprint.vercel.app` (scheme downgrade) | no      |
+
+**Keep the project name in the pattern.** `https://*.vercel.app` would let any
+site anyone deploys on Vercel call this API with credentials attached.
+
+A request with **no `Origin` header is always allowed** — that is curl,
+server-to-server calls, and the Vercel rewrite, which proxies `/api` from the
+edge and never presents a browser origin. In the deployed setup that is every
+request, which is why `CORS_ORIGINS` can stay at its localhost default: the
+browser only ever talks to the Vercel host. See
+[Preview deployments and CORS](../../README.md#preview-deployments-and-cors).
 
 ---
 
