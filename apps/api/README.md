@@ -9,6 +9,7 @@ quotation PDFs.
 - [Endpoints](#endpoints)
 - [Calculations](#calculations) ← the part worth reading
 - [Data model](#data-model)
+- [CORS](#cors)
 - [Scripts](#scripts)
 
 ---
@@ -174,16 +175,23 @@ by the client — the numbers on a quotation are the whole point of the document
 
 ### Materials and rates
 
-| Method | Path                     | Notes                                                      |
-| ------ | ------------------------ | ---------------------------------------------------------- |
-| GET    | `/materials`             | With the rate in force, the previous one, and the change % |
-| POST   | `/materials`             | Add a material                                             |
-| PATCH  | `/materials/:id`         | Rename, re-price-group, set density, retire                |
-| GET    | `/materials/:id/history` | Every recorded rate, newest first                          |
-| PUT    | `/materials/rates`       | Save a day's rates in one request                          |
+| Method | Path                     | Notes                                                                                                                                           |
+| ------ | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/materials`             | With the rate in force, the previous one, and the change %. **Also materialises any missing daily rates** — see [Carry-forward](#carry-forward) |
+| POST   | `/materials`             | Add a material                                                                                                                                  |
+| PATCH  | `/materials/:id`         | Rename, re-price-group, set density, retire                                                                                                     |
+| GET    | `/materials/:id/history` | Every recorded rate, newest first                                                                                                               |
+| PUT    | `/materials/rates`       | Save a day's rates in one request                                                                                                               |
 
 Query on `GET /materials`: `onDate` (yyyy-mm-dd, defaults to today),
 `includeInactive`.
+
+`GET /materials` is the one read in the API that writes: it brings every
+material's rates up to today before answering. The write is idempotent and
+never changes an existing row, so the endpoint is still safe to call repeatedly
+and safe to retry. `onDate` does not affect it — rates are always carried
+forward to today, never to the date being viewed, so opening last month's rates
+cannot backdate anything.
 
 Rates are saved as a **batch, not per field** — the office keys the morning's
 rates in together, and a partial save would leave the day half-recorded.
@@ -361,6 +369,74 @@ quotation made on a Sunday must still cost against Friday's price.
 A blank rate on save means **"no change today"**, not zero: no row is written
 and the previous rate stays in force.
 
+#### Carry-forward
+
+Every material's last known rate is copied forward, **one row per day, up to
+today**, so the Rates screen always opens on a row for today that is already
+filled in and ready to edit. Rates rarely move day to day, and nobody should
+have to retype yesterday's numbers to record that nothing changed.
+
+Costing never needed this — the `lte` lookup above already falls back to the
+last rate in force. What it buys is the pre-filled screen, and a price history
+that reads as a continuous daily series rather than scattered entries.
+
+It runs **when rates are read, not on a schedule**:
+
+- It is idempotent. The `(material_id, effective_date)` unique key means a
+  second call, or a second open tab, inserts nothing.
+- Render's free tier stops the service while idle, so a midnight cron would
+  routinely not fire. Filling the gap when someone next opens the screen
+  produces exactly the same rows, however many days were missed.
+
+Carried rows are written with `entered_by = 'Carried forward'`, so the record
+never claims the office keyed in a number it did not. Saving over one **updates
+that row** rather than adding a second — `created: 0, updated: 1`.
+
+A gap longer than `MAX_CARRY_FORWARD_DAYS` (90) fills only its most recent 90
+days, so one unlucky page load after a long idle period cannot write thousands
+of rows. Costing is unaffected, since old rates stay in force regardless.
+
+**Change % compares against the literal previous row.** On a carried-forward day
+that is the same number, so the Rates screen reads `0.00%` until someone
+actually edits a rate. That is deliberate.
+
+##### A worked week
+
+The office prices PET 12µm at 210 on Monday, does not open the app again until
+Friday, and puts the rate up to 225 that morning:
+
+| Date       | Rate | `entered_by`    | Written when              | Change % shown |
+| ---------- | ---- | --------------- | ------------------------- | -------------- |
+| Mon 24 Aug | 210  | Office          | Monday, on save           | —              |
+| Tue 25 Aug | 210  | Carried forward | **Friday**, on first read | 0.00%          |
+| Wed 26 Aug | 210  | Carried forward | **Friday**, on first read | 0.00%          |
+| Thu 27 Aug | 210  | Carried forward | **Friday**, on first read | 0.00%          |
+| Fri 28 Aug | 225  | Office          | Friday, on save           | +7.14%         |
+
+Three things this shows:
+
+- **Missed days are filled in with their own dates**, not lumped onto the day
+  someone noticed. Tuesday's row says Tuesday even though it was written on
+  Friday, so the series stays honest.
+- **Friday's save replaced Friday's carried row.** The screen was already
+  showing 210 for Friday, so typing 225 updated that row rather than adding a
+  second one for the same day. The save reports `updated: 1` and `created: 0`.
+- **The change % is right anyway.** It compares Friday against Thursday's
+  carried 210 and reports +7.14% — the literal previous row happens to hold the
+  last real rate, because carrying forward is what keeps it there.
+
+A quotation raised on Wednesday costs against 210 whether or not Wednesday's row
+had been written yet. The `lte` lookup does not care; only the shape of the
+history does.
+
+#### Dates are the office's
+
+The API runs with `TZ=Asia/Kolkata`. "Today" has to mean the office's today:
+carry-forward happens at midnight IST, and a quotation dated on the morning of
+the 26th must not be filed under the 25th. Without it the server runs UTC and
+the date would not roll over until 05:30 local. Node's bundled ICU resolves the
+zone name, so the Alpine image needs no `tzdata` package.
+
 ### Derived job fields
 
 Three columns on a job are computed and never accepted from the client. Which
@@ -390,7 +466,7 @@ Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 | `quotations`      | Customer-facing documents. Totals frozen at save.                                |
 | `quotation_items` | One priced line, with its costing.                                               |
 | `materials`       | The rate catalogue, with density for films.                                      |
-| `material_rates`  | One material's price on one date.                                                |
+| `material_rates`  | One material's price on one date — one row per active material per day.          |
 | `app_settings`    | Editable rates and costing defaults.                                             |
 
 Two deliberate choices:
@@ -406,6 +482,40 @@ production history or a sent quotation.
 Money and quantities are `Decimal`, never `Float` — this system computes costs
 and variance, and floating point drift in a costing engine is a silent
 correctness bug.
+
+---
+
+## CORS
+
+`CORS_ORIGINS` is a comma-separated allowlist. Entries may contain `*`, which
+matches any run of characters **except a dot or a slash** — so a wildcard stays
+inside one hostname label.
+
+That exists for Vercel preview deployments, which get a new hostname per branch
+and per commit. One pattern covers all of them:
+
+```
+CORS_ORIGINS=https://yuva-polyprint.vercel.app,https://yuva-polyprint-*.vercel.app
+```
+
+| Origin                                                | Allowed |
+| ----------------------------------------------------- | ------- |
+| `https://yuva-polyprint.vercel.app`                   | yes     |
+| `https://yuva-polyprint-git-abhi-dev-me.vercel.app`   | yes     |
+| `https://yuva-polyprint-k2f9x1qzp-me.vercel.app`      | yes     |
+| `https://someone-elses-app.vercel.app`                | no      |
+| `https://yuva-polyprint-x.attacker.com`               | no      |
+| `http://yuva-polyprint.vercel.app` (scheme downgrade) | no      |
+
+**Keep the project name in the pattern.** `https://*.vercel.app` would let any
+site anyone deploys on Vercel call this API with credentials attached.
+
+A request with **no `Origin` header is always allowed** — that is curl,
+server-to-server calls, and the Vercel rewrite, which proxies `/api` from the
+edge and never presents a browser origin. In the deployed setup that is every
+request, which is why `CORS_ORIGINS` can stay at its localhost default: the
+browser only ever talks to the Vercel host. See
+[Preview deployments and CORS](../../README.md#preview-deployments-and-cors).
 
 ---
 

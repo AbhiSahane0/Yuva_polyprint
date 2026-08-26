@@ -400,7 +400,19 @@ keeps its default of `/api` in every environment, exactly as in development.
 ### Deploying the API (Render)
 
 1. Render → **New → Blueprint** → pick this repository. It reads `render.yaml`.
-2. Fill in the three prompted values:
+2. **Leave Root Directory blank.** This is a monorepo — the API build needs the
+   root `package-lock.json` and `packages/shared`, both above `apps/api`. If
+   Root Directory is set to `apps/api`, the build context becomes `apps/api` and
+   every `COPY` in the Dockerfile fails with `not found`. In the dashboard the
+   correct settings are:
+
+   | Field                          | Value                 |
+   | ------------------------------ | --------------------- |
+   | Root Directory                 | _blank_               |
+   | Dockerfile Path                | `apps/api/Dockerfile` |
+   | Docker Build Context Directory | `.`                   |
+
+3. Fill in the three prompted values:
 
    | Variable       | Value                                                                                           |
    | -------------- | ----------------------------------------------------------------------------------------------- |
@@ -408,13 +420,49 @@ keeps its default of `/api` in every environment, exactly as in development.
    | `DIRECT_URL`   | Neon **direct** endpoint — boot migrations need it                                              |
    | `CORS_ORIGINS` | leave as `http://localhost:5173`; the rewrite means the browser never calls Render cross-origin |
 
-3. Wait for the first build. It is slow — the image is ~1.8GB, mostly Chromium.
-4. Confirm `https://<service>.onrender.com/health/ready` returns
+4. Wait for the first build. It is slow — the image is ~1.8GB, mostly Chromium.
+5. Confirm `https://<service>.onrender.com/health/ready` returns
    `{"status":"ready","database":"connected"}`.
 
 **Migrations run on boot.** The container runs `prisma migrate deploy` before
 starting the server, so a deploy can never serve against an older schema.
 `migrate deploy` only applies pending migrations — it never resets or drops.
+
+### Preview deployments and CORS
+
+Vercel builds every pull request to its own hostname —
+`yuva-polyprint-git-my-branch-me.vercel.app`, a new one per branch and per
+commit. **Nothing needs configuring for these to work**, because the browser
+never calls Render: `vercel.json` rewrites `/api` at the edge, so a preview
+proxies through its own hostname exactly as production does. There is no
+cross-origin request, so there is no origin to allow.
+
+If a preview is blocked by CORS, the rewrite is being bypassed. Check, in order:
+
+1. **`VITE_API_BASE_URL` must not be set in Vercel.** If it points at the Render
+   URL, the browser calls Render directly and every preview hostname is a fresh
+   origin Render has never heard of. Delete it in all three environments —
+   Production, Preview and Development. It defaults to `/api`, which is what
+   makes the rewrite work. Nothing in `apps/web/src` contains an absolute URL.
+2. **The rewrite destination must be your real Render hostname.** If it is
+   wrong, `/api` goes nowhere and the natural next move is to point the app
+   straight at Render — which is what causes the CORS error in the first place.
+
+   ```bash
+   grep destination vercel.json
+   ```
+
+**If you do choose to call Render directly**, `CORS_ORIGINS` entries accept `*`,
+matching within a single hostname label, so one pattern covers every preview:
+
+```
+CORS_ORIGINS=https://yuva-polyprint.vercel.app,https://yuva-polyprint-*.vercel.app
+```
+
+Keep the project name in the pattern. `https://*.vercel.app` would let any site
+anyone deploys on Vercel call this API with credentials attached. The wildcard
+cannot cross a dot, so `https://yuva-polyprint-*.vercel.app` will not match
+`https://yuva-polyprint-x.attacker.com`.
 
 ### Deploying the web app (Vercel)
 

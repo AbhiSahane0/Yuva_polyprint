@@ -2,6 +2,7 @@ import { Fragment } from 'react';
 import { ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import type { Customer } from '@yuva/shared';
 import { Badge } from '@/components/ui/Badge';
+import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/lib/utils';
 import { useCustomer } from '../api/customer-api';
 
@@ -26,7 +27,12 @@ function JobList({ customerId }: { customerId: string }) {
   const { data, isPending, isError } = useCustomer(customerId);
 
   if (isPending) {
-    return <p className="text-ink-400 px-4 py-3 text-sm">Loading jobs…</p>;
+    return (
+      <div className="text-ink-400 flex items-center gap-2 px-4 py-3 text-sm">
+        <Spinner size="sm" />
+        Loading jobs…
+      </div>
+    );
   }
   if (isError) {
     return <p className="text-danger-600 px-4 py-3 text-sm">Could not load jobs.</p>;

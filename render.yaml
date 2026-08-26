@@ -11,8 +11,13 @@ services:
     name: yuva-polyprint-api
     runtime: docker
     dockerfilePath: ./apps/api/Dockerfile
-    # The build copies from the repository root — it is a monorepo, and the API
-    # depends on packages/shared.
+    # All three must stay at the repository root. This is a monorepo: the API
+    # build needs the root package-lock.json and packages/shared, both of which
+    # live ABOVE apps/api. Setting rootDir to apps/api makes the build context
+    # apps/api, and then every COPY in the Dockerfile fails with "not found" —
+    # rootDir also scopes autoDeploy, so shared-package changes stop triggering
+    # builds.
+    rootDir: .
     dockerContext: .
     plan: free
     # Neon is in us-east-2 (Ohio). Same region keeps database round-trips short,
@@ -28,6 +33,10 @@ services:
         value: 4000
       - key: LOG_LEVEL
         value: info
+      # Dates are the office's, not the server's. Without this Render runs UTC
+      # and "today" would not roll over until 05:30 local.
+      - key: TZ
+        value: Asia/Kolkata
 
       # Set these in the Render dashboard — `sync: false` means Render prompts
       # for them and never stores them in the repository.
@@ -38,8 +47,11 @@ services:
       #   CORS_ORIGINS   only needed if the browser calls this API directly.
       #                  With the Vercel rewrite in vercel.json it does not:
       #                  requests arrive from Vercel's edge, same-origin to the
-      #                  browser. Leave it as the localhost default unless you
-      #                  switch to direct calls.
+      #                  browser, carrying no Origin header at all. Leave it as
+      #                  the localhost default unless you switch to direct
+      #                  calls. If you do, entries accept `*` within a hostname
+      #                  label, so one pattern covers every preview URL:
+      #                    https://app.vercel.app,https://app-*.vercel.app
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL
