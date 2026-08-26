@@ -361,6 +361,45 @@ quotation made on a Sunday must still cost against Friday's price.
 A blank rate on save means **"no change today"**, not zero: no row is written
 and the previous rate stays in force.
 
+#### Carry-forward
+
+Every material's last known rate is copied forward, **one row per day, up to
+today**, so the Rates screen always opens on a row for today that is already
+filled in and ready to edit. Rates rarely move day to day, and nobody should
+have to retype yesterday's numbers to record that nothing changed.
+
+Costing never needed this — the `lte` lookup above already falls back to the
+last rate in force. What it buys is the pre-filled screen, and a price history
+that reads as a continuous daily series rather than scattered entries.
+
+It runs **when rates are read, not on a schedule**:
+
+- It is idempotent. The `(material_id, effective_date)` unique key means a
+  second call, or a second open tab, inserts nothing.
+- Render's free tier stops the service while idle, so a midnight cron would
+  routinely not fire. Filling the gap when someone next opens the screen
+  produces exactly the same rows, however many days were missed.
+
+Carried rows are written with `entered_by = 'Carried forward'`, so the record
+never claims the office keyed in a number it did not. Saving over one **updates
+that row** rather than adding a second — `created: 0, updated: 1`.
+
+A gap longer than `MAX_CARRY_FORWARD_DAYS` (90) fills only its most recent 90
+days, so one unlucky page load after a long idle period cannot write thousands
+of rows. Costing is unaffected, since old rates stay in force regardless.
+
+**Change % compares against the literal previous row.** On a carried-forward day
+that is the same number, so the Rates screen reads `0.00%` until someone
+actually edits a rate. That is deliberate.
+
+#### Dates are the office's
+
+The API runs with `TZ=Asia/Kolkata`. "Today" has to mean the office's today:
+carry-forward happens at midnight IST, and a quotation dated on the morning of
+the 26th must not be filed under the 25th. Without it the server runs UTC and
+the date would not roll over until 05:30 local. Node's bundled ICU resolves the
+zone name, so the Alpine image needs no `tzdata` package.
+
 ### Derived job fields
 
 Three columns on a job are computed and never accepted from the client. Which
