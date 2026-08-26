@@ -154,6 +154,13 @@ A blank field means "no change today", not zero. The date picker lets you record
 a rate you forgot yesterday, and each material has a history showing every
 recorded rate and who keyed it in.
 
+**Today's rates are already there when you open the screen.** The server copies
+the last known rate forward one row per day, so the screen never starts empty
+and a rate only needs touching when it actually moves. Because a carried-forward
+day holds the same number as the day before, the change column reads `0.00%`
+until someone edits — it lights up only on a real change. Saving over a
+carried-forward rate replaces it; it does not add a second row for the day.
+
 Saving invalidates the quotation queries too, since their costing depends on
 these rates.
 

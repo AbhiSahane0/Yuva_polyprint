@@ -43,6 +43,12 @@ RUN apk add --no-cache \
       font-noto \
  && rm -rf /var/cache/apk/*
 
+# The office is in Maharashtra, and the server is not. "Today" has to mean the
+# office's today: rates carry forward at midnight IST, and a quotation dated on
+# the morning of the 26th must not be filed under the 25th. Node's bundled ICU
+# resolves the zone name, so no tzdata package is needed.
+ENV TZ=Asia/Kolkata
+
 ENV PUPPETEER_SKIP_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 

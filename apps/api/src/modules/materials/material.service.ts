@@ -28,6 +28,103 @@ function parseDate(value: string | undefined): Date {
   return new Date(`${iso}T00:00:00.000Z`);
 }
 
+/** DATE columns are stored at UTC midnight, which has no DST, so this is exact. */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * How far back one carry-forward will fill. If the system sits unused for
+ * longer than this, the older part of the gap stays empty rather than writing
+ * thousands of rows on whichever page load happens to notice. Costing is
+ * unaffected: rates resolve with `lte`, so the last rate stays in force whether
+ * or not the days between were ever written.
+ */
+const MAX_CARRY_FORWARD_DAYS = 90;
+
+/**
+ * Recorded as the author of a row nobody typed. Kept in `entered_by` so the
+ * provenance survives without a schema change — the history list still shows
+ * every day, this just does not claim the office keyed it in.
+ */
+const CARRIED_FORWARD = 'Carried forward';
+
+const addDays = (date: Date, days: number): Date => new Date(date.getTime() + days * DAY_MS);
+
+/**
+ * The days that need a copy of `lastPriced`'s rate: everything after it, up to
+ * and including `through`, capped at the most recent `maxDays`.
+ *
+ * Pure and exported so the awkward part — gap arithmetic across month ends and
+ * the cap — is testable without a database.
+ */
+export function carryForwardDates(
+  lastPriced: Date,
+  through: Date,
+  maxDays: number = MAX_CARRY_FORWARD_DAYS,
+): Date[] {
+  const earliest = addDays(through, -(maxDays - 1));
+  let cursor = addDays(lastPriced, 1);
+  if (cursor.getTime() < earliest.getTime()) cursor = earliest;
+
+  const dates: Date[] = [];
+  for (; cursor.getTime() <= through.getTime(); cursor = addDays(cursor, 1)) {
+    dates.push(cursor);
+  }
+  return dates;
+}
+
+/**
+ * Copies each active material's last known rate forward, one row per day, up to
+ * `through` (today by default). Returns how many rows were created.
+ *
+ * Rates rarely move day to day, and the office should not have to retype
+ * yesterday's numbers just to record that nothing changed. Quotation costing
+ * never needed this — it already resolves the most recent rate on or before the
+ * date — but a row per day means the Rates screen opens on today already filled
+ * in and ready to edit, and a material's price history reads as a continuous
+ * series rather than a handful of scattered entries.
+ *
+ * This runs when rates are read rather than on a schedule, for two reasons. It
+ * is idempotent, because the (material, date) unique key means a second call or
+ * a second open tab inserts nothing. And Render's free tier stops the service
+ * while it is idle, so a midnight cron would routinely not fire — filling the
+ * gap when someone next looks produces exactly the same rows, however many days
+ * were missed.
+ */
+export async function carryForwardRates(through: Date = parseDate(undefined)): Promise<number> {
+  const latest = await prisma.materialRate.groupBy({
+    by: ['materialId'],
+    where: { effectiveDate: { lte: through }, material: { isActive: true } },
+    _max: { effectiveDate: true },
+  });
+
+  const behind = latest.flatMap((row) => {
+    const on = row._max.effectiveDate;
+    return on !== null && on.getTime() < through.getTime()
+      ? [{ materialId: row.materialId, effectiveDate: on }]
+      : [];
+  });
+  if (behind.length === 0) return 0;
+
+  // The value to copy is whatever stood on each material's last priced day.
+  const sources = await prisma.materialRate.findMany({
+    where: { OR: behind },
+    select: { materialId: true, rate: true, effectiveDate: true },
+  });
+
+  const rows = sources.flatMap((source) =>
+    carryForwardDates(source.effectiveDate, through).map((effectiveDate) => ({
+      materialId: source.materialId,
+      rate: source.rate,
+      effectiveDate,
+      enteredBy: CARRIED_FORWARD,
+    })),
+  );
+  if (rows.length === 0) return 0;
+
+  const { count } = await prisma.materialRate.createMany({ data: rows, skipDuplicates: true });
+  return count;
+}
+
 /**
  * Materials with the rate in force on `onDate`, plus the one before it.
  *
@@ -39,6 +136,10 @@ export async function listMaterials(options: {
   onDate?: string;
   includeInactive?: boolean;
 }): Promise<Material[]> {
+  // Bring every material up to today before reading, so the screen opens on a
+  // row for today even when nobody has touched it since last week.
+  await carryForwardRates();
+
   const on = parseDate(options.onDate);
 
   const materials = await prisma.material.findMany({

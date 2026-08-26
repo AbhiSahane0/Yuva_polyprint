@@ -33,6 +33,10 @@ services:
         value: 4000
       - key: LOG_LEVEL
         value: info
+      # Dates are the office's, not the server's. Without this Render runs UTC
+      # and "today" would not roll over until 05:30 local.
+      - key: TZ
+        value: Asia/Kolkata
 
       # Set these in the Render dashboard — `sync: false` means Render prompts
       # for them and never stores them in the repository.
