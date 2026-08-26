@@ -47,8 +47,11 @@ services:
       #   CORS_ORIGINS   only needed if the browser calls this API directly.
       #                  With the Vercel rewrite in vercel.json it does not:
       #                  requests arrive from Vercel's edge, same-origin to the
-      #                  browser. Leave it as the localhost default unless you
-      #                  switch to direct calls.
+      #                  browser, carrying no Origin header at all. Leave it as
+      #                  the localhost default unless you switch to direct
+      #                  calls. If you do, entries accept `*` within a hostname
+      #                  label, so one pattern covers every preview URL:
+      #                    https://app.vercel.app,https://app-*.vercel.app
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL

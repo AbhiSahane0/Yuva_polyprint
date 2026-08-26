@@ -8,6 +8,7 @@ import { apiRateLimiter } from './middleware/rate-limit.js';
 import apiRoutes from './routes/index.js';
 import healthRoutes from './routes/health.route.js';
 import { env } from './config/env.js';
+import { createOriginMatcher } from './config/cors.js';
 
 /**
  * Builds the Express application. Kept separate from server.ts so tests can
@@ -21,7 +22,23 @@ export function createApp(): Express {
   app.disable('x-powered-by');
 
   app.use(helmet());
-  app.use(cors({ origin: env.corsOrigins, credentials: true }));
+  /*
+   * A function rather than a list, so CORS_ORIGINS can carry wildcards and one
+   * setting covers every Vercel preview URL. See config/cors.ts.
+   *
+   * Requests with no Origin header are allowed: that is curl, server-to-server
+   * calls, and — the case that matters here — the Vercel rewrite, which proxies
+   * /api from the edge and so never presents a browser origin at all.
+   */
+  const isAllowedOrigin = createOriginMatcher(env.corsOrigins);
+  app.use(
+    cors({
+      origin(origin, callback) {
+        callback(null, origin === undefined || isAllowedOrigin(origin));
+      },
+      credentials: true,
+    }),
+  );
   app.use(compression());
   app.use(express.json({ limit: '2mb' }));
   app.use(express.urlencoded({ extended: true, limit: '2mb' }));
