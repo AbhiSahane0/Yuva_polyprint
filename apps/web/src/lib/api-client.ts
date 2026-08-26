@@ -25,37 +25,6 @@ export class ApiClientError extends Error {
   }
 }
 
-/**
- * Joins the configured API base with a path.
- *
- * Pure and exported separately from `apiUrl` so the joining rules are testable
- * without a browser environment.
- */
-export function joinApiUrl(base: string, path: string): string {
-  const trimmedBase = base.replace(/\/+$/, '');
-  const suffix = path.startsWith('/') ? path : `/${path}`;
-  return `${trimmedBase}${suffix}`;
-}
-
-/**
- * An absolute-or-relative URL for an API path, built from the same base the
- * axios client uses.
- *
- * Needed wherever the browser itself fetches a URL rather than going through
- * `apiClient` — an `<object>` embed, a download link, a plain `fetch`. Those
- * bypass the axios instance, so writing `/api/...` by hand there quietly hard
- * codes an assumption that the API is same-origin. That holds in development,
- * where Vite proxies `/api`, and breaks in production the moment
- * `VITE_API_BASE_URL` points somewhere else — which is exactly how the
- * quotation PDF came to 404 against the frontend's own domain while every
- * other call worked.
- *
- * Use this for any API URL that does not go through `apiClient`.
- */
-export function apiUrl(path: string): string {
-  return joinApiUrl(env.apiBaseUrl, path);
-}
-
 export const apiClient: AxiosInstance = axios.create({
   baseURL: env.apiBaseUrl,
   timeout: 30_000,
@@ -122,4 +91,28 @@ apiClient.interceptors.response.use(
 export async function request<T>(config: Parameters<AxiosInstance['request']>[0]): Promise<T> {
   const response = await apiClient.request<ApiSuccess<T>>(config);
   return response.data.data;
+}
+
+/**
+ * Fetches a file, with the filename the server suggested.
+ *
+ * Goes through the same axios instance as everything else, which is the whole
+ * point: the request interceptor attaches the session token, so exactly one
+ * place in the app knows how requests are authenticated. A hand-rolled `fetch`
+ * here would need its own copy of that knowledge — and silently answer 401 the
+ * day it drifts.
+ *
+ * This is also why an authenticated file cannot be an `<a href>`. A browser
+ * navigation carries cookies but never a custom header, so anything protected
+ * has to be fetched by script and handed to the page as a blob.
+ */
+export async function requestBlob(
+  config: Parameters<AxiosInstance['request']>[0],
+): Promise<{ blob: Blob; filename: string | null }> {
+  const response = await apiClient.request<Blob>({ ...config, responseType: 'blob' });
+
+  const disposition = response.headers['content-disposition'];
+  const match = typeof disposition === 'string' ? /filename="?([^";]+)"?/i.exec(disposition) : null;
+
+  return { blob: response.data, filename: match?.[1] ?? null };
 }

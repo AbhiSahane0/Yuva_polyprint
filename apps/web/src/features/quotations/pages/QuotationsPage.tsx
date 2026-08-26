@@ -16,9 +16,12 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Modal } from '@/components/ui/Modal';
 import { useDebounce } from '@/hooks/useDebounce';
 import { toast } from '@/lib/toast';
+import { saveBlob } from '@/lib/download';
+import { ApiClientError } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import {
-  quotationUrls,
+  fetchQuotationPdf,
+  quotationPdfName,
   useDeleteQuotation,
   useQuotations,
   type QuotationListParams,
@@ -353,6 +356,28 @@ function RowActions({
   onPreview: () => void;
   onDelete: () => void;
 }) {
+  /*
+   * The download lives here rather than in the page because this component is
+   * rendered twice per quotation — once for the desktop table and once for the
+   * mobile card — and each needs its own in-flight state.
+   */
+  const [downloading, setDownloading] = useState(false);
+
+  async function onDownload() {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const { blob, filename } = await fetchQuotationPdf(quotation.id);
+      saveBlob(blob, quotationPdfName(filename, quotation.number));
+    } catch (error) {
+      toast.error(
+        error instanceof ApiClientError ? error.message : 'Could not prepare the document.',
+      );
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   const iconClass =
     'text-ink-500 hover:bg-brand-50 hover:text-brand-700 cursor-pointer rounded-[var(--radius-md)] p-2 inline-flex';
   return (
@@ -366,14 +391,23 @@ function RowActions({
       >
         <Eye className="size-4" />
       </button>
-      <a
-        href={quotationUrls.pdf(quotation.id)}
+      {/*
+        A button, not a link. The endpoint needs a session and the token
+        travels in a header, which a browser navigation cannot carry — so the
+        file is fetched and saved by script. Rendering takes fifteen seconds or
+        more, hence the spinner: a download icon that does nothing visible for
+        that long reads as a broken button.
+      */}
+      <button
+        type="button"
+        onClick={() => void onDownload()}
+        disabled={downloading}
         title="Download PDF"
         aria-label="Download PDF"
-        className={iconClass}
+        className={cn(iconClass, downloading && 'cursor-wait opacity-60')}
       >
-        <Download className="size-4" />
-      </a>
+        {downloading ? <Spinner size="sm" /> : <Download className="size-4" />}
+      </button>
       <Link
         to={`/quotations/${quotation.id}/edit`}
         title="Edit"
