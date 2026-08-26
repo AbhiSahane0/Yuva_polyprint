@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 
@@ -9,7 +10,7 @@ const RatesPage = lazy(() => import('@/features/rates/pages/RatesPage'));
 const QuotationFormPage = lazy(() => import('@/features/quotations/pages/QuotationFormPage'));
 
 function PageFallback() {
-  return <div className="text-ink-400 px-4 py-16 text-center text-sm">Loading…</div>;
+  return <LoadingState />;
 }
 
 function NotFound() {

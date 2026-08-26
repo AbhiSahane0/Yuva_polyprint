@@ -11,6 +11,8 @@ import { Field, Input } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { LoadingState } from '@/components/ui/LoadingState';
+import { Spinner } from '@/components/ui/Spinner';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { ApiClientError } from '@/lib/api-client';
@@ -129,7 +131,7 @@ export default function RatesPage() {
           />
         </section>
       ) : isPending ? (
-        <p className="text-ink-400 mt-8 text-center text-sm">Loading rates…</p>
+        <LoadingState label="Loading rates…" className="mt-8" />
       ) : (
         <div className="mt-6 flex flex-col gap-6">
           {grouped.map(({ category, materials: rows }) => (
@@ -272,7 +274,10 @@ function RateHistoryModal({
       }
     >
       {isPending ? (
-        <p className="text-ink-400 py-6 text-sm">Loading…</p>
+        <div className="text-ink-400 flex items-center gap-2 py-6 text-sm">
+          <Spinner size="sm" />
+          Loading history…
+        </div>
       ) : !data || data.length === 0 ? (
         <p className="text-ink-500 py-6 text-sm">No rates recorded yet.</p>
       ) : (

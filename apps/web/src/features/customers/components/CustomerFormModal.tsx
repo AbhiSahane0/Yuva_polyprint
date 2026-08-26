@@ -11,6 +11,7 @@ import {
 } from '@yuva/shared';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { Spinner } from '@/components/ui/Spinner';
 import { Field, FieldSection, Input, Textarea } from '@/components/ui/Field';
 import { toast } from '@/lib/toast';
 import { ApiClientError } from '@/lib/api-client';
@@ -345,7 +346,10 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
           </div>
 
           {isEdit && detailLoading ? (
-            <p className="text-ink-400 py-6 text-sm">Loading jobs…</p>
+            <div className="text-ink-400 flex items-center gap-2 py-6 text-sm">
+              <Spinner size="sm" />
+              Loading jobs…
+            </div>
           ) : jobCount === 0 ? (
             <p className="text-ink-500 border-ink-200 mt-4 rounded-[var(--radius-md)] border border-dashed px-4 py-8 text-center text-sm">
               No jobs yet. Use <span className="font-medium">Add job</span> to record what this
