@@ -20,6 +20,7 @@ production → quality/waste → costing → dispatch, with full job-level trace
   - [`apps/web`](#appsweb)
 - [Where does my code go?](#where-does-my-code-go)
 - [Scripts](#scripts)
+- [Signing in](#signing-in)
 - [Deployment](#deployment)
 - [Conventions](#conventions)
 - [Adding a module end to end](#adding-a-module-end-to-end)
@@ -364,6 +365,31 @@ Start with the API's [Calculations](./apps/api/README.md#calculations) section
 if you want to understand how a quotation is priced and costed — pouches per
 kg, cylinder cost, GST, advances and material margin are all derived there,
 each with the reasoning and a worked example.
+
+---
+
+## Signing in
+
+The app is behind a username and password. There is no JWT, no OTP and no social
+sign-in — a session is an opaque token stored server-side, which means an admin
+can revoke it instantly.
+
+Create the first administrator once, then add everyone else from the Users
+screen:
+
+```bash
+ADMIN_USERNAME=anand ADMIN_PASSWORD='choose-a-real-one' ADMIN_NAME='Anand Hase' npm run seed:admin -w @yuva/api
+```
+
+The script refuses to run if an active administrator already exists.
+
+**Access is two tiers and no more.** An administrator sees everything and manages
+users; everyone else sees only the sections ticked for them — Customers,
+Quotations, Rates, Jobs. The sidebar hides the rest, and the API refuses it
+independently, because hiding a link is not access control.
+
+Full detail, including how sessions and passwords are stored:
+[`apps/api/README.md`](./apps/api/README.md#authentication-and-access).
 
 ---
 

@@ -1,8 +1,11 @@
 import { Router } from 'express';
+import authRoutes from '../modules/auth/auth.routes.js';
 import customerRoutes from '../modules/customers/customer.routes.js';
 import materialRoutes from '../modules/materials/material.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
 import settingsRoutes from '../modules/settings/settings.routes.js';
+import userRoutes from '../modules/users/user.routes.js';
+import { authenticate, requireModule } from '../middleware/authenticate.js';
 
 /**
  * The /api router — the single, readable map of the API surface.
@@ -11,10 +14,31 @@ import settingsRoutes from '../modules/settings/settings.routes.js';
  */
 const router = Router();
 
-router.use('/customers', customerRoutes);
-router.use('/materials', materialRoutes);
-router.use('/quotations', quotationRoutes);
-router.use('/settings', settingsRoutes);
+/*
+ * Signing in is the only thing you can do without being signed in. Everything
+ * below requires a session, and most of it requires access to a named module.
+ *
+ * The guards live here, on the one page that lists the whole API surface,
+ * rather than inside each module's routes. A module added without a guard is
+ * visible in this diff; a guard forgotten three files away is not.
+ */
+router.use('/auth', authRoutes);
+
+router.use('/customers', authenticate, requireModule('customers'), customerRoutes);
+router.use('/quotations', authenticate, requireModule('quotations'), quotationRoutes);
+
+/*
+ * Rates are readable by anyone signed in, because quotation costing depends on
+ * them and the quotation screens would otherwise break for a user who has
+ * quotations but not rates. Changing a rate still needs the rates module —
+ * enforced in the module's own routes, where the write endpoint is.
+ */
+router.use('/materials', authenticate, materialRoutes);
+
+router.use('/settings', authenticate, settingsRoutes);
+
+/** Administrators only — the router applies that guard to itself. */
+router.use('/users', userRoutes);
 
 /* ---------------------------------------------------------------------------
  * Further module routes are registered here as each is scoped in and built:

@@ -44,15 +44,15 @@ enum JobCustomerSource {
 model Customer {
   id String @id @default(cuid())
 
-  companyName   String  @map("company_name")
-  contactPerson String  @default("NA") @map("contact_person")
-  address       String  @default("NA")
-  city          String  @default("NA")
-  district      String  @default("NA")
-  pincode       String  @default("NA")
-  mobile        String  @default("NA")
-  altPhone      String  @default("NA") @map("alt_phone")
-  email         String  @default("NA")
+  companyName   String @map("company_name")
+  contactPerson String @default("NA") @map("contact_person")
+  address       String @default("NA")
+  city          String @default("NA")
+  district      String @default("NA")
+  pincode       String @default("NA")
+  mobile        String @default("NA")
+  altPhone      String @default("NA") @map("alt_phone")
+  email         String @default("NA")
 
   /// The untouched source string, kept so any parsing decision can be audited
   /// or re-derived without going back to the CSV.
@@ -125,20 +125,20 @@ model Job {
   coatingGsm   Decimal? @map("coating_gsm") @db.Decimal(10, 3)
 
   // ---- Ups / notes (sparse columns in the source sheet) --------------------
-  up1           String @default("NA") @map("up_1")
-  up2           String @default("NA") @map("up_2")
-  up3           String @default("NA") @map("up_3")
-  up4           String @default("NA") @map("up_4")
-  up2OpenWidth  String @default("NA") @map("up_2_open_width")
-  up2Height     String @default("NA") @map("up_2_height")
-  up3OpenWidth  String @default("NA") @map("up_3_open_width")
-  notes         String @default("NA")
+  up1          String @default("NA") @map("up_1")
+  up2          String @default("NA") @map("up_2")
+  up3          String @default("NA") @map("up_3")
+  up4          String @default("NA") @map("up_4")
+  up2OpenWidth String @default("NA") @map("up_2_open_width")
+  up2Height    String @default("NA") @map("up_2_height")
+  up3OpenWidth String @default("NA") @map("up_3_open_width")
+  notes        String @default("NA")
 
   // ---- Cylinder / tooling --------------------------------------------------
-  rubberSize      Decimal? @map("rubber_size") @db.Decimal(10, 3)
-  cylinderCell    Decimal? @map("cylinder_cell") @db.Decimal(10, 3)
-  cylinderDia     Decimal? @map("cylinder_dia") @db.Decimal(10, 3)
-  cylinderParty   String   @default("NA") @map("cylinder_party")
+  rubberSize    Decimal? @map("rubber_size") @db.Decimal(10, 3)
+  cylinderCell  Decimal? @map("cylinder_cell") @db.Decimal(10, 3)
+  cylinderDia   Decimal? @map("cylinder_dia") @db.Decimal(10, 3)
+  cylinderParty String   @default("NA") @map("cylinder_party")
 
   // ---- Ranges kept as text: the sheet stores values like "15-16", "60-70" ---
   viscosity        String @default("NA")
@@ -224,7 +224,7 @@ model Quotation {
 
   /// Printed terms. Stored per quotation so wording can change over time.
   terms String[]
-  notes String @default("")
+  notes String   @default("")
 
   /// Set the first time the quotation is marked as sent.
   sentAt DateTime? @map("sent_at")
@@ -368,4 +368,67 @@ model MaterialRate {
   @@unique([materialId, effectiveDate])
   @@index([effectiveDate])
   @@map("material_rates")
+}
+
+/// A person who can sign in.
+///
+/// Access is deliberately two-tier and nothing more: `isAdmin` reaches
+/// everything, and everyone else is limited to the modules listed in
+/// `modules`. There is no role vocabulary, because the office has one admin
+/// and a handful of staff, and a role table would be scaffolding around a
+/// decision nobody needs to make.
+model User {
+  id String @id @default(cuid())
+
+  /// Stored lower-case, so "Anand" and "anand" cannot become two accounts.
+  username String @unique
+
+  /// scrypt, salted per user. Never leaves the API — no response type
+  /// includes it, so it cannot escape by being spread into one.
+  passwordHash String @map("password_hash")
+
+  displayName String  @map("display_name")
+  isAdmin     Boolean @default(false) @map("is_admin")
+
+  /// A deactivated user keeps their history but cannot sign in, and their
+  /// sessions are dropped. Preferred over deletion: quotations record who
+  /// entered a rate, and that reference should not rot.
+  isActive Boolean @default(true) @map("is_active")
+
+  /// Module keys from APP_MODULES in @yuva/shared. A plain array rather than a
+  /// join table — the list is four items long and always read whole.
+  modules String[] @default([])
+
+  lastLoginAt DateTime? @map("last_login_at")
+
+  sessions Session[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+/// An active sign-in.
+///
+/// The token itself is never stored — only its SHA-256 — so a leaked database
+/// dump cannot be replayed as a live session. Deleting the row signs that
+/// session out immediately, which is the whole reason for keeping sessions in
+/// the database rather than encoding them into a token.
+model Session {
+  id String @id @default(cuid())
+
+  tokenHash String @unique @map("token_hash")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt  DateTime @map("expires_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
 }
