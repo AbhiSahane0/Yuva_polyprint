@@ -216,6 +216,13 @@ export const customerKeys = {
 Mutations invalidate `lists()` and write the fresh record into `detail(id)`,
 so an expanded row is never left showing stale data after a save.
 
+**URLs the browser fetches itself** — an `<object>` embed, a download link, a
+plain `fetch` — must be built with `apiUrl()`, not written as `/api/…`. Those
+requests never touch the axios instance, so a hand-written path hard codes the
+assumption that the API is same-origin. Vite's dev proxy makes that true locally
+and a deployment pointing at another API host makes it false, which is how the
+quotation PDF once 404'd in production while every other call worked.
+
 **Errors.** Every failure from `api-client.ts` becomes an `ApiClientError` with
 a `code`, an HTTP `status`, and `fields` keyed by input name. Forms map those
 straight onto the matching inputs, so a server-side validation error appears

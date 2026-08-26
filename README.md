@@ -428,6 +428,35 @@ keeps its default of `/api` in every environment, exactly as in development.
 starting the server, so a deploy can never serve against an older schema.
 `migrate deploy` only applies pending migrations — it never resets or drops.
 
+### Two ways the browser can reach the API
+
+Pick one and set it deliberately. The difference is one environment variable.
+
+|                               | **Direct** (current)                 | **Proxied**                                   |
+| ----------------------------- | ------------------------------------ | --------------------------------------------- |
+| `VITE_API_BASE_URL` on Vercel | `https://<service>.onrender.com/api` | unset (defaults to `/api`)                    |
+| `CORS_ORIGINS` on Render      | must list the Vercel origins         | not needed                                    |
+| `vercel.json` rewrite         | unused                               | carries every `/api` call                     |
+| Slow requests                 | limited only by the API              | must finish inside Vercel's ~30s edge timeout |
+
+**Direct is the right default for this app, because of the PDF.** Rendering a
+quotation takes **15–20 seconds** on Render's free tier — Chromium has to lay
+the document out — and longer from cold. Proxying that through Vercel puts it
+under an edge timeout it can genuinely exceed, turning a slow preview into a
+failed one. Direct calls have no such ceiling.
+
+Proxied is simpler where every request is fast: no CORS at all, and preview
+deployments need no configuration.
+
+**Whichever you choose, build API URLs from the configured base.** `apiUrl()` in
+[`lib/api-client.ts`](./apps/web/src/lib/api-client.ts) exists for the places
+the browser fetches a URL itself — an `<object>` embed, a download link, a plain
+`fetch` — because those bypass the axios instance. Writing `/api/…` by hand in
+those spots silently assumes the API is same-origin. That is true of the Vite
+dev proxy and false in production the moment `VITE_API_BASE_URL` points
+elsewhere, which is how the quotation PDF once 404'd against the frontend's own
+domain while every other call worked.
+
 ### Preview deployments and CORS
 
 Vercel builds every pull request to its own hostname —

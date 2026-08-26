@@ -8,7 +8,7 @@ import type {
   QuotationSummary,
   UpdateQuotationInput,
 } from '@yuva/shared';
-import { request } from '@/lib/api-client';
+import { apiUrl, request } from '@/lib/api-client';
 
 export interface QuotationListParams {
   page: number;
@@ -93,7 +93,16 @@ export function useDeleteQuotation() {
  * (served inline rather than as a download), so the document on screen is
  * exactly the file the customer receives.
  */
+/**
+ * The PDF endpoints as URLs rather than client calls, because the browser
+ * fetches these itself — an <object> embed and a download link.
+ *
+ * Built through `apiUrl` so they follow VITE_API_BASE_URL like every other
+ * request. Writing `/api/...` here instead assumes the API is same-origin,
+ * which is true of the Vite dev proxy and not true of a deployment that points
+ * the client straight at the API host.
+ */
 export const quotationUrls = {
-  preview: (id: string) => `/api/quotations/${id}/pdf?inline=1`,
-  pdf: (id: string) => `/api/quotations/${id}/pdf`,
+  preview: (id: string) => apiUrl(`/quotations/${id}/pdf?inline=1`),
+  pdf: (id: string) => apiUrl(`/quotations/${id}/pdf`),
 };
