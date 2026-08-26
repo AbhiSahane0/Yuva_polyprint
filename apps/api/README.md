@@ -174,16 +174,23 @@ by the client — the numbers on a quotation are the whole point of the document
 
 ### Materials and rates
 
-| Method | Path                     | Notes                                                      |
-| ------ | ------------------------ | ---------------------------------------------------------- |
-| GET    | `/materials`             | With the rate in force, the previous one, and the change % |
-| POST   | `/materials`             | Add a material                                             |
-| PATCH  | `/materials/:id`         | Rename, re-price-group, set density, retire                |
-| GET    | `/materials/:id/history` | Every recorded rate, newest first                          |
-| PUT    | `/materials/rates`       | Save a day's rates in one request                          |
+| Method | Path                     | Notes                                                                                                                                           |
+| ------ | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/materials`             | With the rate in force, the previous one, and the change %. **Also materialises any missing daily rates** — see [Carry-forward](#carry-forward) |
+| POST   | `/materials`             | Add a material                                                                                                                                  |
+| PATCH  | `/materials/:id`         | Rename, re-price-group, set density, retire                                                                                                     |
+| GET    | `/materials/:id/history` | Every recorded rate, newest first                                                                                                               |
+| PUT    | `/materials/rates`       | Save a day's rates in one request                                                                                                               |
 
 Query on `GET /materials`: `onDate` (yyyy-mm-dd, defaults to today),
 `includeInactive`.
+
+`GET /materials` is the one read in the API that writes: it brings every
+material's rates up to today before answering. The write is idempotent and
+never changes an existing row, so the endpoint is still safe to call repeatedly
+and safe to retry. `onDate` does not affect it — rates are always carried
+forward to today, never to the date being viewed, so opening last month's rates
+cannot backdate anything.
 
 Rates are saved as a **batch, not per field** — the office keys the morning's
 rates in together, and a partial save would leave the day half-recorded.
@@ -392,6 +399,35 @@ of rows. Costing is unaffected, since old rates stay in force regardless.
 that is the same number, so the Rates screen reads `0.00%` until someone
 actually edits a rate. That is deliberate.
 
+##### A worked week
+
+The office prices PET 12µm at 210 on Monday, does not open the app again until
+Friday, and puts the rate up to 225 that morning:
+
+| Date       | Rate | `entered_by`    | Written when              | Change % shown |
+| ---------- | ---- | --------------- | ------------------------- | -------------- |
+| Mon 24 Aug | 210  | Office          | Monday, on save           | —              |
+| Tue 25 Aug | 210  | Carried forward | **Friday**, on first read | 0.00%          |
+| Wed 26 Aug | 210  | Carried forward | **Friday**, on first read | 0.00%          |
+| Thu 27 Aug | 210  | Carried forward | **Friday**, on first read | 0.00%          |
+| Fri 28 Aug | 225  | Office          | Friday, on save           | +7.14%         |
+
+Three things this shows:
+
+- **Missed days are filled in with their own dates**, not lumped onto the day
+  someone noticed. Tuesday's row says Tuesday even though it was written on
+  Friday, so the series stays honest.
+- **Friday's save replaced Friday's carried row.** The screen was already
+  showing 210 for Friday, so typing 225 updated that row rather than adding a
+  second one for the same day. The save reports `updated: 1` and `created: 0`.
+- **The change % is right anyway.** It compares Friday against Thursday's
+  carried 210 and reports +7.14% — the literal previous row happens to hold the
+  last real rate, because carrying forward is what keeps it there.
+
+A quotation raised on Wednesday costs against 210 whether or not Wednesday's row
+had been written yet. The `lte` lookup does not care; only the shape of the
+history does.
+
 #### Dates are the office's
 
 The API runs with `TZ=Asia/Kolkata`. "Today" has to mean the office's today:
@@ -429,7 +465,7 @@ Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 | `quotations`      | Customer-facing documents. Totals frozen at save.                                |
 | `quotation_items` | One priced line, with its costing.                                               |
 | `materials`       | The rate catalogue, with density for films.                                      |
-| `material_rates`  | One material's price on one date.                                                |
+| `material_rates`  | One material's price on one date — one row per active material per day.          |
 | `app_settings`    | Editable rates and costing defaults.                                             |
 
 Two deliberate choices:

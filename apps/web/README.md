@@ -154,15 +154,36 @@ A blank field means "no change today", not zero. The date picker lets you record
 a rate you forgot yesterday, and each material has a history showing every
 recorded rate and who keyed it in.
 
-**Today's rates are already there when you open the screen.** The server copies
-the last known rate forward one row per day, so the screen never starts empty
-and a rate only needs touching when it actually moves. Because a carried-forward
-day holds the same number as the day before, the change column reads `0.00%`
-until someone edits — it lights up only on a real change. Saving over a
-carried-forward rate replaces it; it does not add a second row for the day.
-
 Saving invalidates the quotation queries too, since their costing depends on
 these rates.
+
+#### Today's rates are already filled in
+
+The screen never starts empty. Each material's last known rate is carried
+forward a day at a time, so opening `/rates` on any morning shows yesterday's
+numbers already sitting under today's date, ready to edit.
+
+Day to day that means: **open the screen, change only what actually moved, save.**
+Nothing needs touching on a day when no price changed — the rate for that day is
+already recorded.
+
+Two consequences worth knowing:
+
+- **The change column reads `0.00%` most days.** A carried-forward day holds the
+  same number as the day before, and the comparison is against the literal
+  previous day. It lights up only when someone genuinely edits a rate — which
+  makes a real change easy to spot.
+- **A material's history lists every day**, including the carried ones, so the
+  price reads as a continuous series. Carried days show `Carried forward` in
+  place of a person's name, so it is clear nobody keyed that number in.
+
+Editing a carried-forward rate **replaces** that day's row rather than adding a
+second one, so a day never appears twice.
+
+This is entirely server-side — no screen code implements it. The API brings
+rates up to date when `GET /materials` is read. See
+[Carry-forward](../api/README.md#carry-forward) for why it works that way rather
+than on a midnight schedule.
 
 ---
 
