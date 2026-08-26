@@ -2,8 +2,20 @@
 
 > Endpoint and calculation documentation lives in [`apps/api/README.md`](../../README.md).
 
-One folder per business module. Nothing is scaffolded here yet — modules are
-added as each is confirmed in scope.
+One folder per business module. Built so far:
+
+| Module       | Covers                                                           |
+| ------------ | ---------------------------------------------------------------- |
+| `auth`       | Sign in and out, the current session, changing your own password |
+| `users`      | Administrators managing who can sign in and what they can open   |
+| `customers`  | Customers and their job specifications                           |
+| `quotations` | Quotations, their costing, and the generated PDF                 |
+| `materials`  | The rate catalogue and daily rates                               |
+| `settings`   | Editable costing defaults                                        |
+
+Access is applied in [`routes/index.ts`](../routes/index.ts), not inside these
+folders — the one page listing the whole API surface is where a missing guard is
+visible.
 
 ## Layout
 

@@ -21,13 +21,17 @@ export const apiRateLimiter = rateLimit({
 });
 
 /**
- * Tighter limiter for the future login endpoint. A username + password form is
- * exactly what brute-force attempts target, so this stays even though the auth
- * module is not built yet.
+ * Tighter limiter for the login endpoint. A username and password form is
+ * exactly what brute-force attempts target, and scrypt makes every attempt
+ * expensive for us too — so this guards the CPU as much as the account.
+ *
+ * Successful logins are not counted. The office signs in every morning on a
+ * shared machine, and counting those would let ordinary work lock them out.
  */
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
+  skipSuccessfulRequests: true,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   skip: () => env.isTest,

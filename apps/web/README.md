@@ -55,6 +55,16 @@ src/
 │   ├── toast.ts           tiny Zustand store
 │   └── utils.ts           cn() — Tailwind-aware class merging
 └── styles/index.css       Tailwind v4 @theme — the design tokens
+
+Brand assets in `public/` — `logo.svg` and `favicon.svg` — are **generated**, by
+`scripts/generate-logo.mjs`. Edit the script, not the SVGs: the long shadow is a
+few hundred offset copies of each letter, which is not something to maintain by
+hand. Geometry and colour were measured off the printed letterhead rather than
+eyeballed, and the result sits within 1.4% of the original on every letter.
+
+The favicon is deliberately **one tile, not the whole mark**. Rendered at 16px
+the four letters collapse into an unreadable smear; a single Y in the brand
+purple stays legible and still reads as the same logo.
 ```
 
 **`app/` versus `features/`.** `app/` is application wiring that exists once —
@@ -340,6 +350,7 @@ documented in [the API README](../api/README.md#calculations).
 | `Modal`               | Escape closes, background scroll locks, focus moves inside and Tab is trapped, backdrop click closes                                                              |
 | `ReadOnlyValue`       | Dashed box for system-owned values, captioned with where the value comes from — a greyed box with no explanation reads like a bug                                 |
 | `Toaster`             | Bottom-right on desktop, bottom-centre on mobile                                                                                                                  |
+| `Logo`                | The client's YUVA mark. Sized by height; served from `public/logo.svg`                                                                                            |
 | `Spinner`             | The spinning indicator on its own, for inline use. Same `Loader2` the `Button` draws, so a busy button and a busy panel look like one system                      |
 | `LoadingState`        | Fills a page or panel while its data loads. Deliberately the same shape as `EmptyState`, because the two swap places in the same slot — otherwise lists jump      |
 | `EmptyState`, `Badge` |                                                                                                                                                                   |

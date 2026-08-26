@@ -35,7 +35,7 @@ production → quality/waste → costing → dispatch, with full job-level trace
 | Web      | React 19, Vite 8, TypeScript, Tailwind CSS v4, TanStack Query v5    |
 |          | React Router v7, React Hook Form + Zod, Zustand, lucide-react       |
 | API      | Node 22, Express 5, TypeScript, Prisma 7 (`pg` driver adapter), Zod |
-|          | pino logging, helmet, CORS, rate limiting, JWT auth plumbing        |
+|          | pino logging, helmet, CORS, rate limiting, session auth (scrypt)    |
 | Database | PostgreSQL 17                                                       |
 | Tooling  | npm workspaces, ESLint flat config, Prettier, Vitest, Husky, CI     |
 
@@ -49,13 +49,6 @@ npm install
 
 ```bash
 cp apps/api/.env.example apps/api/.env && cp apps/web/.env.example apps/web/.env
-```
-
-Generate real JWT secrets — the example values are placeholders and the API
-refuses to boot with anything under 32 characters:
-
-```bash
-openssl rand -base64 48
 ```
 
 Start PostgreSQL (requires Docker Desktop to be running):
@@ -72,6 +65,12 @@ npm run db:migrate
 
 ```bash
 npm run dev
+```
+
+Create an administrator, or there is no way to sign in:
+
+```bash
+ADMIN_USERNAME=you ADMIN_PASSWORD='choose-a-real-one' ADMIN_NAME='Your Name' npm run seed:admin -w @yuva/api
 ```
 
 | Service | URL                          |
@@ -179,9 +178,10 @@ apps/api/
     │   └── env.ts            Zod-validated environment, parsed once at boot
     ├── lib/
     │   ├── prisma.ts         PrismaClient singleton + pg driver adapter
+    │   ├── password.ts       scrypt hashing and constant-time verification
     │   └── logger.ts         pino instance with credential redaction
     ├── middleware/
-    │   ├── authenticate.ts   JWT verification + authorize(...roles) guard
+    │   ├── authenticate.ts   session lookup + requireAdmin / requireModule
     │   ├── validate.ts       Zod validation for body / query / params
     │   ├── error-handler.ts  404 fallback + terminal error handler
     │   ├── rate-limit.ts     baseline API limiter + stricter auth limiter
@@ -234,11 +234,13 @@ apps/web/
     │   └── router.tsx        the route map — features register here
     ├── components/
     │   ├── ui/               generic primitives: Button, Input, Modal, Table
-    │   └── layout/           app shells: office sidebar, shop-floor operator
+    │   └── layout/           AppShell — sidebar on desktop, drawer on mobile
     ├── features/             ← business features live here (see its README)
     ├── hooks/                cross-feature hooks only
     ├── lib/
     │   ├── api-client.ts     Axios instance, interceptors, ApiClientError
+    │   ├── download.ts       saveBlob / openBlobUrl for fetched files
+    │   ├── toast.ts          tiny Zustand store
     │   └── utils.ts          cn() — Tailwind-aware class merging
     ├── config/
     │   └── env.ts            validated VITE_ variables
@@ -302,6 +304,16 @@ Run from the repository root.
 | `npm run db:studio`               | open Prisma Studio                             |
 | `npm run db:generate`             | regenerate the Prisma client                   |
 | `npm run clean`                   | remove all node_modules and build output       |
+
+Workspace scripts worth knowing:
+
+| Script                                   | Does                                                        |
+| ---------------------------------------- | ----------------------------------------------------------- |
+| `npm run seed:admin -w @yuva/api`        | create the first administrator (refuses if one exists)      |
+| `npm run seed:materials -w @yuva/api`    | seed the material catalogue                                 |
+| `npm run schema:docs -w @yuva/api`       | regenerate `docs/database-schema.md` from the live database |
+| `npm run db:copy-to-remote -w @yuva/api` | copy local data up to Neon                                  |
+| `npm run import:legacy -w @yuva/api`     | import the legacy spreadsheet                               |
 
 ---
 
@@ -440,11 +452,11 @@ keeps its default of `/api` in every environment, exactly as in development.
 
 3. Fill in the three prompted values:
 
-   | Variable       | Value                                                                                           |
-   | -------------- | ----------------------------------------------------------------------------------------------- |
-   | `DATABASE_URL` | Neon **pooled** endpoint (host contains `-pooler`)                                              |
-   | `DIRECT_URL`   | Neon **direct** endpoint — boot migrations need it                                              |
-   | `CORS_ORIGINS` | leave as `http://localhost:5173`; the rewrite means the browser never calls Render cross-origin |
+   | Variable       | Value                                                                                                                                                                          |
+   | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+   | `DATABASE_URL` | Neon **pooled** endpoint (host contains `-pooler`)                                                                                                                             |
+   | `DIRECT_URL`   | Neon **direct** endpoint — boot migrations need it                                                                                                                             |
+   | `CORS_ORIGINS` | the Vercel origins, comma-separated — see [Two ways the browser can reach the API](#two-ways-the-browser-can-reach-the-api). Only omit this if you switch to the proxied setup |
 
 4. Wait for the first build. It is slow — the image is ~1.8GB, mostly Chromium.
 5. Confirm `https://<service>.onrender.com/health/ready` returns
@@ -458,12 +470,13 @@ starting the server, so a deploy can never serve against an older schema.
 
 Pick one and set it deliberately. The difference is one environment variable.
 
-|                               | **Direct** (current)                 | **Proxied**                                   |
-| ----------------------------- | ------------------------------------ | --------------------------------------------- |
-| `VITE_API_BASE_URL` on Vercel | `https://<service>.onrender.com/api` | unset (defaults to `/api`)                    |
-| `CORS_ORIGINS` on Render      | must list the Vercel origins         | not needed                                    |
-| `vercel.json` rewrite         | unused                               | carries every `/api` call                     |
-| Slow requests                 | limited only by the API              | must finish inside Vercel's ~30s edge timeout |
+|                               | **Direct** (current)                     | **Proxied**                                   |
+| ----------------------------- | ---------------------------------------- | --------------------------------------------- |
+| `VITE_API_BASE_URL` on Vercel | `https://<service>.onrender.com/api`     | unset (defaults to `/api`)                    |
+| `CORS_ORIGINS` on Render      | must list the Vercel origins             | not needed                                    |
+| `vercel.json` rewrite         | unused                                   | carries every `/api` call                     |
+| Slow requests                 | limited only by the API                  | must finish inside Vercel's ~30s edge timeout |
+| Session token                 | header — files must be fetched by script | header today; a cookie becomes possible       |
 
 **Direct is the right default for this app, because of the PDF.** Rendering a
 quotation takes **15–20 seconds** on Render's free tier — Chromium has to lay
@@ -473,6 +486,14 @@ failed one. Direct calls have no such ceiling.
 
 Proxied is simpler where every request is fast: no CORS at all, and preview
 deployments need no configuration.
+
+**Sign-in adds one consequence to whichever you pick.** The session token
+travels in an `Authorization` header, and a browser navigation cannot carry a
+header — so an authenticated file can never be an `<a href>` or an `<object
+data>`. It has to be fetched by script and handed to the page as a blob, which
+is what `requestBlob()` in the web client does. Moving to the proxied setup, or
+to a custom domain, would make an httpOnly cookie possible and lift that
+restriction; until then it applies.
 
 **Whichever you choose, build API URLs from the configured base.** `apiUrl()` in
 [`lib/api-client.ts`](./apps/web/src/lib/api-client.ts) exists for the places
@@ -608,6 +629,9 @@ Four rules worth repeating here:
   only through the Prisma **CLI** (`@prisma/config`) — a dev dependency excluded
   from the runtime image by `npm ci --omit=dev`. The suggested `audit fix --force`
   downgrades to Prisma 6, so it is deliberately not applied.
-- **Not yet verified against a live database.** Migrations and the
-  `/health/ready` probe have not been exercised against a running PostgreSQL
-  instance, because the schema currently defines no models.
+- **The app requires a sign-in.** There is no anonymous access to any module.
+  A fresh database therefore needs `seed:admin` before anyone can get in — see
+  [Signing in](#signing-in).
+- **Rendering a quotation PDF takes 15–20 seconds** on Render's free tier, and
+  longer from cold, because Chromium lays the document out on the server. Every
+  screen that waits on it shows a spinner; do not mistake that for a hang.
