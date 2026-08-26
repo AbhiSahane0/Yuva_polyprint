@@ -2,8 +2,8 @@
 
 > Screen-by-screen documentation lives in [`apps/web/README.md`](../../README.md).
 
-One folder per business feature, mirroring the API modules. Nothing is
-scaffolded here yet — features are added as each is confirmed in scope.
+One folder per business feature, mirroring the API modules. Built so far:
+`auth`, `users`, `customers`, `quotations`, `rates`.
 
 ## Layout
 
@@ -22,7 +22,9 @@ features/<feature>/
 1. **Features never import from each other.** Anything two features need is
    promoted to `src/components`, `src/hooks`, or `src/lib`.
 2. **Server state lives in TanStack Query**, not in Zustand. Zustand is for
-   genuine client state only (open panels, filters, shop-floor session).
+   genuine client state only — currently the toast queue and the session store
+   in `features/auth`, which holds the signed-in user and the token the API
+   client reads on every request.
 3. **One query-key factory per feature** in `api/`, so invalidation is reliable.
 4. **Pages are lazy-loaded** in `src/app/router.tsx` to keep the shop-floor
    bundle small.
