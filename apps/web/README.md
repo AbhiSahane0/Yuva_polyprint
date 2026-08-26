@@ -51,6 +51,7 @@ src/
 ├── hooks/useDebounce.ts
 ├── lib/
 │   ├── api-client.ts      Axios instance, interceptors, ApiClientError
+│   ├── download.ts        saveBlob / openBlobUrl for fetched files
 │   ├── toast.ts           tiny Zustand store
 │   └── utils.ts           cn() — Tailwind-aware class merging
 └── styles/index.css       Tailwind v4 @theme — the design tokens
@@ -176,12 +177,23 @@ Shows the **actual generated PDF**, from the same endpoint as the download — s
 the preview and the file are the same bytes and cannot disagree.
 
 The PDF is **fetched by the component**, and only then handed to `<object>` as a
-blob. Pointing `<object>` straight at the URL looks simpler but cannot report
-progress: Chrome instantiates its PDF viewer and fires `load` immediately, while
-the document is still in flight, so anything tied to that event fires against an
-empty viewer. Fetching it makes the wait observable — a spinner and "Generating
-the PDF…" while Chromium renders it on the server — and gives a real failure
-message instead of a permanently blank frame.
+blob. Three reasons, each of which alone would be enough:
+
+- The endpoint needs a session, and the token travels in a header. `<object
+data="…">` is a navigation and cannot carry one.
+- The element cannot report progress. Chrome instantiates its PDF viewer and
+  fires `load` immediately, while the document is still in flight, so a spinner
+  tied to that event vanishes against an empty viewer.
+- **Download** and **Open in tab** reuse the same blob. Rendering takes fifteen
+  seconds or more, and pointing each button at the endpoint would rebuild the
+  identical document from scratch. Both are disabled until it arrives, then
+  instant.
+
+Failures show the reason — a 403 and a timeout need different responses — rather
+than a permanently blank frame.
+
+The download button on each list row works the same way, showing a spinner in
+place of its icon while the server renders.
 
 It uses `<object>` rather than `<iframe>`: a browser with no PDF viewer shows an
 empty grey box in an iframe but falls back to real content in an object. An
@@ -255,12 +267,21 @@ export const customerKeys = {
 Mutations invalidate `lists()` and write the fresh record into `detail(id)`,
 so an expanded row is never left showing stale data after a save.
 
-**URLs the browser fetches itself** — an `<object>` embed, a download link, a
-plain `fetch` — must be built with `apiUrl()`, not written as `/api/…`. Those
-requests never touch the axios instance, so a hand-written path hard codes the
-assumption that the API is same-origin. Vite's dev proxy makes that true locally
-and a deployment pointing at another API host makes it false, which is how the
-quotation PDF once 404'd in production while every other call worked.
+**Every request goes through `apiClient`, including files.** Use `requestBlob()`
+for a PDF or any other download — never an `<a href>` or `<object data>` to an
+API path.
+
+Two separate bugs came from breaking that rule, and both are worth remembering.
+A hand-written `/api/…` hard codes the assumption that the API is same-origin,
+true of the Vite dev proxy and false the moment `VITE_API_BASE_URL` points
+elsewhere — that 404'd the quotation PDF in production while every other call
+worked. Then sign-in landed, and the same links answered 401: the session token
+travels in a header, and **a browser navigation cannot carry one**. Only script
+can.
+
+So an authenticated file is fetched and handed to the page as a blob. The axios
+instance attaches the token, one place knows how requests are authenticated, and
+neither failure can recur.
 
 **Access is decided twice, on purpose.** The sidebar hides sections a user
 cannot open and route guards refuse them, but that is presentation — it stops

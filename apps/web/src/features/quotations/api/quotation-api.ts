@@ -8,7 +8,7 @@ import type {
   QuotationSummary,
   UpdateQuotationInput,
 } from '@yuva/shared';
-import { apiUrl, request } from '@/lib/api-client';
+import { request, requestBlob } from '@/lib/api-client';
 
 export interface QuotationListParams {
   page: number;
@@ -94,15 +94,25 @@ export function useDeleteQuotation() {
  * exactly the file the customer receives.
  */
 /**
- * The PDF endpoints as URLs rather than client calls, because the browser
- * fetches these itself — an <object> embed and a download link.
+ * Fetches the generated PDF.
  *
- * Built through `apiUrl` so they follow VITE_API_BASE_URL like every other
- * request. Writing `/api/...` here instead assumes the API is same-origin,
- * which is true of the Vite dev proxy and not true of a deployment that points
- * the client straight at the API host.
+ * The document is rendered by Chromium on the server and takes fifteen seconds
+ * or more, so it is fetched **once** and the resulting blob is reused for the
+ * preview, the download and the open-in-a-new-tab. Pointing each of those at
+ * the endpoint separately would rebuild the same document from scratch every
+ * time.
+ *
+ * It goes through `requestBlob` — and therefore the shared axios instance —
+ * because the endpoint requires a session, and the token is attached by the
+ * request interceptor. That is also why these are no longer plain URLs handed
+ * to `<a href>` and `<object data>`: a browser navigation cannot carry an
+ * Authorization header, so those links answered 401 the moment sign-in landed.
  */
-export const quotationUrls = {
-  preview: (id: string) => apiUrl(`/quotations/${id}/pdf?inline=1`),
-  pdf: (id: string) => apiUrl(`/quotations/${id}/pdf`),
-};
+export function fetchQuotationPdf(id: string) {
+  return requestBlob({ url: `/quotations/${id}/pdf`, method: 'GET' });
+}
+
+/** Falls back to a readable name when the server sends no Content-Disposition. */
+export function quotationPdfName(filename: string | null, number: number | string): string {
+  return filename ?? `Quotation_${number}.pdf`;
+}
