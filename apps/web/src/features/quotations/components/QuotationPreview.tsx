@@ -34,7 +34,7 @@ export function QuotationPreview({ id, onClose }: { id: string | null; onClose: 
    * path, and hands <object> a blob it can paint at once.
    */
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
     if (id === null) return;
@@ -42,11 +42,30 @@ export function QuotationPreview({ id, onClose }: { id: string | null; onClose: 
     let cancelled = false;
     let objectUrl: string | null = null;
     setPdfUrl(null);
-    setFailed(false);
+    setFailure(null);
 
-    void fetch(quotationUrls.preview(id))
-      .then((response) => {
-        if (!response.ok) throw new Error(`PDF request failed: ${response.status}`);
+    /*
+     * Rendering happens on the server and a cold instance has to start Chromium
+     * first, so this is allowed to be slow — but not to hang forever. Without a
+     * deadline a stalled request leaves the spinner turning with no way out.
+     */
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), 120_000);
+
+    void fetch(quotationUrls.preview(id), {
+      // Matches the axios client, so this keeps working when sign-in lands.
+      credentials: 'include',
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`The server answered ${response.status}.`);
+
+        const type = response.headers.get('content-type') ?? '';
+        if (!type.includes('pdf')) {
+          // An HTML or text body here means something answered that is not the
+          // API — a proxy's 404 page, or a login redirect.
+          throw new Error(`Expected a PDF but received ${type || 'an unknown type'}.`);
+        }
         return response.blob();
       })
       .then((blob) => {
@@ -54,13 +73,24 @@ export function QuotationPreview({ id, onClose }: { id: string | null; onClose: 
         objectUrl = URL.createObjectURL(blob);
         setPdfUrl(objectUrl);
       })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      });
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setFailure(
+          controller.signal.aborted
+            ? 'It took too long to respond.'
+            : error instanceof Error
+              ? error.message
+              : 'The request could not be completed.',
+        );
+      })
+      .finally(() => clearTimeout(deadline));
 
     return () => {
-      // Closing mid-fetch must not leave the blob pinned in memory.
+      // Closing mid-fetch must not leave the blob pinned in memory, nor let a
+      // late response resolve into a closed modal.
       cancelled = true;
+      clearTimeout(deadline);
+      controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [id]);
@@ -120,16 +150,17 @@ export function QuotationPreview({ id, onClose }: { id: string | null; onClose: 
               aria-live="polite"
               className="flex h-[70vh] flex-col items-center justify-center gap-3 bg-white px-6 text-center sm:rounded-[var(--radius-md)]"
             >
-              {failed ? (
+              {failure !== null ? (
                 <>
                   <FileText className="text-ink-300 size-10" />
                   <div>
                     <p className="text-ink-800 text-sm font-semibold">
                       The document couldn&rsquo;t be prepared
                     </p>
-                    <p className="text-ink-500 mt-1 text-sm">
-                      Close this and try again, or open it in a new tab.
-                    </p>
+                    {/* The reason, not just the fact — a 404 and a timeout need
+                        different things done about them. */}
+                    <p className="text-ink-500 mt-1 text-sm">{failure}</p>
+                    <p className="text-ink-400 mt-1 text-sm">Try again, or open it in a new tab.</p>
                   </div>
                 </>
               ) : (

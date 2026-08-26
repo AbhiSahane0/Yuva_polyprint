@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://yuva-polyprint-api.onrender.com/api/:path*"
+      "destination": "https://yuva-polyprint.onrender.com/api/:path*"
     },
     {
       "source": "/:path*",
