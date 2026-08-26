@@ -21,6 +21,21 @@ const envSchema = z.object({
 
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
 
+  /*
+   * Email. Optional: without a key the app runs normally and only the "send
+   * quotation" action reports that it is unavailable, so a developer without
+   * credentials is not blocked from everything else.
+   */
+  RESEND_API_KEY: z.string().min(1).optional(),
+  /*
+   * Must be an address Resend will send from. `onboarding@resend.dev` needs no
+   * domain but only delivers to the Resend account owner; anything else has to
+   * be on a domain verified with them.
+   */
+  MAIL_FROM: z.string().min(1).default('Yuva Polyprint <onboarding@resend.dev>'),
+  /** Where replies go, if that should differ from the sender. */
+  MAIL_REPLY_TO: z.string().email().optional(),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   RATE_LIMIT_WINDOW_MS: z.coerce

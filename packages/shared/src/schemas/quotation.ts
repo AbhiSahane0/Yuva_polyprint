@@ -132,3 +132,33 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultInkMaterial: 'Ink — Black',
   defaultAdhesiveMaterial: 'Adhesive — PU',
 };
+
+/*
+ * Sending a quotation by email.
+ *
+ * Addresses are trimmed and lower-cased so the same person typed two ways does
+ * not become two recipients, and duplicates are collapsed for the same reason.
+ * The cap is a guard against a paste going wrong, not a business rule — a
+ * quotation goes to a handful of people.
+ */
+const emailAddress = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(1, 'Enter an email address')
+  .email('That does not look like an email address');
+
+const recipients = z
+  .array(emailAddress)
+  .max(20, 'That is more recipients than a quotation needs')
+  .transform((values) => [...new Set(values)]);
+
+export const sendQuotationSchema = z.object({
+  to: recipients.refine((values) => values.length > 0, 'Add at least one recipient'),
+  cc: recipients.default([]),
+  subject: z.string().trim().min(1, 'Enter a subject').max(200),
+  /** Free text above the standard body. Plain text — it is escaped, never HTML. */
+  message: z.string().trim().max(4000).default(''),
+});
+
+export type SendQuotationInput = z.infer<typeof sendQuotationSchema>;

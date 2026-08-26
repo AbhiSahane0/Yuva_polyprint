@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import type { SendQuotationInput } from '@yuva/shared';
 import type { CreateQuotationInput, ListQuotationsQuery, UpdateQuotationInput } from '@yuva/shared';
 import { created, ok, paginated } from '../../utils/api-response.js';
 import * as quotationService from './quotation.service.js';
@@ -58,4 +59,19 @@ export async function pdf(req: Request, res: Response) {
   // Helmet's default policy blocks a same-origin PDF from being framed.
   res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
   res.end(Buffer.from(file));
+}
+
+/** Emails the quotation, with the PDF attached. */
+export async function send(req: Request, res: Response) {
+  const result = await quotationService.sendQuotationEmail(
+    req.params.id as string,
+    req.body as SendQuotationInput,
+    req.user?.displayName ?? 'Office',
+  );
+  ok(res, result);
+}
+
+/** Every recorded send for this quotation. */
+export async function emailHistory(req: Request, res: Response) {
+  ok(res, await quotationService.listQuotationEmails(req.params.id as string));
 }

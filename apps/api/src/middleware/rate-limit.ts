@@ -39,3 +39,22 @@ export const authRateLimiter = rateLimit({
     res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json(tooManyRequests);
   },
 });
+
+/**
+ * Sending quotations by email.
+ *
+ * Every call costs money at the provider and renders a PDF with Chromium
+ * first, so this is looser than login but far tighter than the general API. It
+ * is per-IP, which for one office is effectively per-company — the intent is to
+ * bound a runaway loop, not to ration ordinary work.
+ */
+export const emailRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skip: () => env.isTest,
+  handler: (_req, res) => {
+    res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json(tooManyRequests);
+  },
+});

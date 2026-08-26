@@ -21,6 +21,7 @@ production → quality/waste → costing → dispatch, with full job-level trace
 - [Where does my code go?](#where-does-my-code-go)
 - [Scripts](#scripts)
 - [Signing in](#signing-in)
+- [Emailing a quotation](#emailing-a-quotation)
 - [Deployment](#deployment)
 - [Conventions](#conventions)
 - [Adding a module end to end](#adding-a-module-end-to-end)
@@ -402,6 +403,27 @@ independently, because hiding a link is not access control.
 
 Full detail, including how sessions and passwords are stored:
 [`apps/api/README.md`](./apps/api/README.md#authentication-and-access).
+
+---
+
+## Emailing a quotation
+
+The Quotations screen can send a quotation to the customer with the PDF
+attached, through [Resend](https://resend.com). The customer's saved address is
+filled in automatically, and more can be typed in.
+
+Set `RESEND_API_KEY` and `MAIL_FROM` in `apps/api/.env`. It is optional — with
+no key the rest of the app is unaffected and only this action reports that email
+is unavailable.
+
+**One thing decides whether this works for real customers.**
+`onboarding@resend.dev` needs no domain but Resend will only deliver to the
+address that owns the Resend account. Sending to a customer needs `MAIL_FROM` on
+a domain verified in the Resend dashboard. `delivered@resend.dev` tests the
+whole path without emailing anybody.
+
+Full detail:
+[`apps/api/README.md`](./apps/api/README.md#sending-quotations-by-email).
 
 ---
 

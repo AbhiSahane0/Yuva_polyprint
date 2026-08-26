@@ -11,6 +11,9 @@ import {
   type QuotationItem,
   type QuotationItemInput,
   type QuotationSummary,
+  type QuotationEmail as QuotationEmailRecord,
+  type SendQuotationInput,
+  type SendQuotationResult,
   type UpdateQuotationInput,
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
@@ -18,6 +21,10 @@ import { prisma } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
 import { getSettings } from '../settings/settings.service.js';
 import { getRateMap } from '../materials/material.service.js';
+import { env } from '../../config/env.js';
+import { sendEmail } from '../../lib/mailer.js';
+import { renderQuotationPdf } from './quotation-pdf.js';
+import { buildQuotationEmail } from './quotation-email.js';
 
 /** Prisma hands back Decimal objects; the API contract is plain numbers. */
 const toNumber = (value: Prisma.Decimal | number | null): number =>
@@ -416,4 +423,90 @@ export async function peekNextNumber(): Promise<number> {
     getSettings(),
   ]);
   return Math.max((latest?.number ?? 0) + 1, settings.quotationStartNumber);
+}
+
+/**
+ * Emails a quotation, with the PDF attached, and records that it happened.
+ *
+ * The PDF is rendered fresh rather than reused from any cache, so what the
+ * customer receives is the quotation as it stands right now — a document sent
+ * from a stale render would be a quietly wrong price list.
+ *
+ * The send is recorded and the status advanced only *after* Resend accepts the
+ * message. Writing first would leave a quotation marked Sent that never went
+ * anywhere, which is the more damaging way to be wrong: the office would stop
+ * chasing it.
+ */
+export async function sendQuotationEmail(
+  id: string,
+  input: SendQuotationInput,
+  sentBy: string,
+): Promise<SendQuotationResult> {
+  const quotation = await getQuotationById(id);
+
+  const file = await renderQuotationPdf(quotation);
+  const { html, text } = buildQuotationEmail(quotation, input.message);
+
+  const safeCustomer = quotation.customerName.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  const filename = `Quotation_${quotation.number}_${safeCustomer || 'Customer'}.pdf`;
+
+  const providerId = await sendEmail({
+    to: input.to,
+    cc: input.cc,
+    subject: input.subject,
+    html,
+    text,
+    replyTo: env.MAIL_REPLY_TO,
+    attachments: [{ filename, content: Buffer.from(file) }],
+  });
+
+  const sentAt = new Date();
+  const [record] = await prisma.$transaction([
+    prisma.quotationEmail.create({
+      data: {
+        quotationId: id,
+        to: input.to,
+        cc: input.cc,
+        subject: input.subject,
+        providerId,
+        sentBy,
+      },
+      select: { createdAt: true },
+    }),
+    prisma.quotation.update({
+      where: { id },
+      data: {
+        // Only a draft advances. A quotation already Won must not be dragged
+        // back to Sent just because someone forwarded a copy.
+        ...(quotation.status === 'DRAFT' ? { status: 'SENT' as const } : {}),
+        // sentAt records the *first* send, so it is never overwritten.
+        ...(quotation.sentAt === null ? { sentAt } : {}),
+      },
+      select: { status: true },
+    }),
+  ]);
+
+  return {
+    sentTo: input.to,
+    sentAt: record.createdAt.toISOString(),
+    status: quotation.status === 'DRAFT' ? 'SENT' : quotation.status,
+  };
+}
+
+/** Every recorded send for one quotation, newest first. */
+export async function listQuotationEmails(id: string): Promise<QuotationEmailRecord[]> {
+  const rows = await prisma.quotationEmail.findMany({
+    where: { quotationId: id },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    to: row.to,
+    cc: row.cc,
+    subject: row.subject,
+    sentBy: row.sentBy,
+    createdAt: row.createdAt.toISOString(),
+  }));
 }

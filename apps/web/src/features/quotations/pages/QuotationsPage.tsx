@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Download, Eye, FileText, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { Download, Eye, FileText, Pencil, Plus, Search, Send, Trash2, X } from 'lucide-react';
 import {
   formatRs,
   QUOTATION_STATUS_LABELS,
@@ -27,6 +27,7 @@ import {
   type QuotationListParams,
 } from '../api/quotation-api';
 import { QuotationPreview } from '../components/QuotationPreview';
+import { SendQuotationModal } from '../components/SendQuotationModal';
 
 const PAGE_SIZE = 25;
 
@@ -57,6 +58,7 @@ export default function QuotationsPage() {
   const [page, setPage] = useState(1);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<QuotationSummary | null>(null);
+  const [sending, setSending] = useState<QuotationSummary | null>(null);
 
   const debouncedSearch = useDebounce(search, 300);
   const deleteQuotation = useDeleteQuotation();
@@ -247,6 +249,7 @@ export default function QuotationsPage() {
                         <RowActions
                           quotation={quotation}
                           onPreview={() => setPreviewId(quotation.id)}
+                          onSend={() => setSending(quotation)}
                           onDelete={() => setDeleting(quotation)}
                         />
                       </td>
@@ -286,6 +289,7 @@ export default function QuotationsPage() {
                   <RowActions
                     quotation={quotation}
                     onPreview={() => setPreviewId(quotation.id)}
+                    onSend={() => setSending(quotation)}
                     onDelete={() => setDeleting(quotation)}
                   />
                 </li>
@@ -322,6 +326,7 @@ export default function QuotationsPage() {
       ) : null}
 
       <QuotationPreview id={previewId} onClose={() => setPreviewId(null)} />
+      <SendQuotationModal quotation={sending} onClose={() => setSending(null)} />
 
       <Modal
         open={deleting !== null}
@@ -350,10 +355,12 @@ export default function QuotationsPage() {
 function RowActions({
   quotation,
   onPreview,
+  onSend,
   onDelete,
 }: {
   quotation: QuotationSummary;
   onPreview: () => void;
+  onSend: () => void;
   onDelete: () => void;
 }) {
   /*
@@ -390,6 +397,15 @@ function RowActions({
         className={iconClass}
       >
         <Eye className="size-4" />
+      </button>
+      <button
+        type="button"
+        onClick={onSend}
+        title="Send by email"
+        aria-label="Send by email"
+        className={iconClass}
+      >
+        <Send className="size-4" />
       </button>
       {/*
         A button, not a link. The endpoint needs a session and the token
