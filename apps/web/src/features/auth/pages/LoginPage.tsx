@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import { LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Logo } from '@/components/ui/Logo';
 import { Field, Input } from '@/components/ui/Field';
 import { ApiClientError } from '@/lib/api-client';
 import { useLogin } from '../api/auth-api';
@@ -32,10 +32,11 @@ export default function LoginPage() {
     <div className="bg-ink-50 flex min-h-dvh flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <div className="bg-brand-600 mx-auto mb-3 flex size-11 items-center justify-center rounded-[var(--radius-lg)]">
-            <LogIn className="size-5 text-white" />
-          </div>
-          <h1 className="text-ink-900 text-xl font-bold">Yuva Polyprint</h1>
+          {/* The letterhead's own arrangement: the mark, then the company name
+              beneath it — so the login screen looks like the quotations the
+              office sends out. */}
+          <Logo className="mx-auto mb-3 h-11" />
+          <h1 className="text-ink-900 text-lg font-bold">Polyprint &amp; Packaging</h1>
           <p className="text-ink-500 mt-1 text-sm">Sign in to continue</p>
         </div>
 

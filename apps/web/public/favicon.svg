@@ -1,4 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="7" fill="#4F46E5"/>
-  <path d="M8 9h4.2l3.8 6.4L19.8 9H24l-6.1 9.8V23h-3.8v-4.2z" fill="#fff"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Yuva Polyprint"><rect x="54" y="0" width="148" height="256" rx="17.6" fill="#892F7F"/><g transform="translate(54 0) scale(1.2542)"><path d="M28,52 L59,104 L90,52 M59,104 L59,154" stroke="#FFFFFF" fill="none" stroke-width="13" stroke-linecap="butt" stroke-linejoin="miter"/></g></svg>

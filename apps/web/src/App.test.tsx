@@ -46,7 +46,9 @@ describe('application shell', () => {
     render(<App />);
 
     expect(await screen.findByRole('link', { name: /customers/i })).toBeInTheDocument();
-    expect(screen.getAllByText('Yuva Polyprint').length).toBeGreaterThan(0);
+    // The brand is the mark plus the word beside it, not one run of text.
+    expect(screen.getAllByRole('img', { name: 'Yuva' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Polyprint').length).toBeGreaterThan(0);
     expect(screen.getByText('Test User')).toBeInTheDocument();
   });
 

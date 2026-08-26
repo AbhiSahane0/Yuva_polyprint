@@ -36,8 +36,12 @@ export default tseslint.config(
   },
 
   // One-off CLI scripts report progress on stdout; that is their interface.
+  // They run under Node, so they get Node's globals rather than the browser's.
   {
-    files: ['**/scripts/**/*.ts'],
+    files: ['**/scripts/**/*.{ts,mjs,js}'],
+    languageOptions: {
+      globals: { console: 'readonly', process: 'readonly' },
+    },
     rules: {
       'no-console': 'off',
     },

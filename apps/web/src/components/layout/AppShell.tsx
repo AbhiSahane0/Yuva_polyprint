@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { Boxes, FileText, IndianRupee, LogOut, Menu, ShieldCheck, Users, X } from 'lucide-react';
 import type { AppModule } from '@yuva/shared';
 import { cn } from '@/lib/utils';
+import { Logo } from '@/components/ui/Logo';
 import { canAccess, useAuthStore } from '@/features/auth/auth-store';
 import { useLogout } from '@/features/auth/api/auth-api';
 
@@ -135,9 +136,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="bg-ink-50 min-h-dvh">
       {/* Desktop sidebar */}
       <aside className="border-ink-200 fixed inset-y-0 left-0 hidden w-60 overflow-y-auto border-r bg-white pb-28 lg:block">
-        <div className="border-ink-200 flex h-14 items-center gap-2 border-b px-5">
-          <div className="bg-brand-600 size-6 rounded-md" />
-          <span className="text-ink-900 text-sm font-bold">Yuva Polyprint</span>
+        <div className="border-ink-200 flex h-14 items-center gap-2.5 border-b px-5">
+          <Logo className="h-6" />
+          <span className="text-ink-900 text-sm font-bold">Polyprint</span>
         </div>
         <NavContent />
         <SessionFooter />
@@ -153,7 +154,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           />
           <aside className="absolute inset-y-0 left-0 w-64 overflow-y-auto bg-white pb-28 shadow-xl">
             <div className="border-ink-200 flex h-14 items-center justify-between border-b px-4">
-              <span className="text-ink-900 text-sm font-bold">Yuva Polyprint</span>
+              <span className="flex items-center gap-2.5">
+                <Logo className="h-6" />
+                <span className="text-ink-900 text-sm font-bold">Polyprint</span>
+              </span>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
@@ -179,7 +183,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <Menu className="size-5" />
           </button>
-          <span className="text-ink-900 text-sm font-bold">Yuva Polyprint</span>
+          <Logo className="h-6" />
+          <span className="text-ink-900 text-sm font-bold">Polyprint</span>
         </header>
 
         <main>{children}</main>
