@@ -43,6 +43,8 @@ src/
 │   │                      Spinner, LoadingState
 │   └── layout/AppShell    sidebar on desktop, slide-over drawer on mobile
 ├── features/
+│   ├── auth/              login, session store, route guards
+│   ├── users/             user management (admins only)
 │   ├── customers/         customer list, edit modal, job specification editor
 │   ├── quotations/        quotation list, form, PDF preview
 │   └── rates/             daily material rates
@@ -68,6 +70,43 @@ Features never import from each other. Anything two of them need moves to
 ---
 
 ## Screens
+
+### Sign in — `/login`
+
+Username and password, outside the app shell — no sidebar to a stranger.
+
+The session token is kept in `localStorage`, which is the trade-off that comes
+with sending it as a header instead of a cookie: it survives a refresh and works
+no matter which host the API is on, but JavaScript on the page can read it.
+Acceptable for an internal tool, and it stops being necessary the day the app
+and API share a domain.
+
+On boot, a stored token is exchanged for the user via `GET /auth/me` before
+anything renders. Until that answers we know a token exists but not whether it
+is still valid, so the app shows "Signing you in…" rather than guessing —
+guessing "signed in" flashes the dashboard before bouncing to login, and
+guessing "signed out" bounces a perfectly good session on every refresh.
+
+A 401 from any request signs the user out, so a session the server has already
+rejected cannot linger in the browser.
+
+### Users — `/users` (administrators only)
+
+Add someone, set what they can open, reset a password, deactivate them.
+
+Access is a tick per section. **Administrator** is a separate tick that grants
+everything and greys the rest out, because ticking boxes that do not apply is
+just a way to record something untrue.
+
+Creating a user asks for a password; changing one later is a **separate action**
+on the row. Folding a password box into the same form as "rename this person" is
+how passwords get reset by accident. The reset field shows the password in plain
+text on purpose — the admin has to read it out to the person.
+
+**Deactivate rather than delete.** A rate records who entered it, and deleting
+the person makes that record ambiguous. Deactivating keeps the history, blocks
+sign-in, and drops their sessions on the spot. You cannot deactivate or delete
+your own account, and the API refuses to let the last administrator be demoted.
 
 ### Customers — `/customers`
 
@@ -222,6 +261,18 @@ requests never touch the axios instance, so a hand-written path hard codes the
 assumption that the API is same-origin. Vite's dev proxy makes that true locally
 and a deployment pointing at another API host makes it false, which is how the
 quotation PDF once 404'd in production while every other call worked.
+
+**Access is decided twice, on purpose.** The sidebar hides sections a user
+cannot open and route guards refuse them, but that is presentation — it stops
+the app looking broken. The API enforces the same rules independently, because a
+guard in the browser is no obstacle to anyone willing to open the network tab.
+Both read the same `APP_MODULES` list from `@yuva/shared`.
+
+Where someone lands after signing in is **the first section they can actually
+open**, not a fixed `/customers` — otherwise a user with only Rates would be
+dropped onto a page telling them they have no access. A remembered destination
+from before sign-in is honoured only if the newly signed-in user may visit it,
+since that path belonged to whoever was here last.
 
 **Errors.** Every failure from `api-client.ts` becomes an `ApiClientError` with
 a `code`, an HTTP `status`, and `fields` keyed by input name. Forms map those

@@ -22,7 +22,8 @@
     "import:legacy": "tsx scripts/import-legacy-jobs.ts",
     "schema:docs": "tsx scripts/generate-schema-docs.ts",
     "seed:materials": "tsx scripts/seed-materials.ts",
-    "db:copy-to-remote": "bash scripts/migrate-data-to-remote.sh"
+    "db:copy-to-remote": "bash scripts/migrate-data-to-remote.sh",
+    "seed:admin": "tsx scripts/seed-admin.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

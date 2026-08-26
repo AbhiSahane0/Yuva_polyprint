@@ -6,6 +6,7 @@ quotation PDFs.
 - [Running it](#running-it)
 - [Layout](#layout)
 - [Request and response shape](#request-and-response-shape)
+- [Authentication and access](#authentication-and-access)
 - [Endpoints](#endpoints)
 - [Calculations](#calculations) ← the part worth reading
 - [Data model](#data-model)
@@ -118,6 +119,108 @@ Lists are paginated:
   }
 }
 ```
+
+---
+
+## Authentication and access
+
+Username and password. No JWT, no OTP, no social sign-in.
+
+### How a session works
+
+Signing in returns an **opaque token** — 32 random bytes, meaning nothing on its
+own. It is a key into the `sessions` table, not a container of claims, and that
+is the point: deleting the row signs that session out **immediately**. A JWT
+stays valid until it expires no matter what the server later decides.
+
+The client sends it back as `Authorization: Bearer <token>`.
+
+Only the token's **SHA-256 is stored**, never the token itself, so a database
+dump cannot be replayed as a live session. Sessions last 7 days, and expired
+rows are swept on each login — the one moment the table is already being
+written.
+
+Passwords use **scrypt** from Node's own crypto, salted per user. Not bcrypt:
+scrypt is memory-hard, and being built in means the Alpine image needs no native
+module and no compiler. The stored format is self-describing —
+`scrypt$N$r$p$salt$hash` — so the cost can be raised later without invalidating
+existing passwords.
+
+### Two tiers, and no more
+
+|                        | Reaches                                          |
+| ---------------------- | ------------------------------------------------ |
+| **Admin** (`is_admin`) | Everything, including user management            |
+| **Everyone else**      | Only the modules listed in their `modules` array |
+
+Module keys come from `APP_MODULES` in `@yuva/shared` — one list shared by the
+tick boxes, the sidebar and the guards below, so the three cannot drift.
+
+An admin's `modules` is always stored empty. They reach everything through the
+flag, and keeping a list as well would be a second source of truth able to
+disagree with the first.
+
+### Where access is enforced
+
+In [`routes/index.ts`](./src/routes/index.ts) — on the one page that lists the
+whole API surface, rather than inside each module. A module registered without a
+guard is visible in that diff; a guard forgotten three files away is not.
+
+```
+/auth        public (login), then authenticated
+/customers   authenticate + requireModule('customers')
+/quotations  authenticate + requireModule('quotations')
+/materials   authenticate — reading rates is open to any signed-in user,
+             because quotation costing depends on it. Writing a rate needs
+             requireModule('rates'), applied on the write endpoints themselves.
+/users       authenticate + requireAdmin
+```
+
+**The sidebar hiding a section is not access control.** It is a courtesy so the
+app does not look broken. Anyone can type a URL or call the endpoint with curl,
+so the server is what actually says no — and it returns 403 whether or not the
+client bothered to hide the link.
+
+### Things the API refuses
+
+- Demoting or deactivating the **last active administrator**, so the system
+  cannot be locked away from everyone.
+- Deactivating or deleting **your own account**.
+- Any hint about _why_ a login failed. Unknown user, wrong password and
+  deactivated account all return the same message — saying which would tell
+  someone guessing which half of the pair to keep working on. An unknown
+  username is still verified against a dummy hash so it takes the same time as a
+  real one.
+
+Deactivating a user **drops their sessions immediately** rather than waiting for
+expiry, and so does resetting their password — a password reset is usually a
+response to a problem, and leaving the old sessions alive would defeat it.
+
+### Creating the first administrator
+
+```bash
+ADMIN_USERNAME=anand ADMIN_PASSWORD='choose-a-real-one' ADMIN_NAME='Anand Hase' \
+  npm run seed:admin -w @yuva/api
+```
+
+Credentials come from the environment rather than arguments, keeping the
+password out of shell history and out of `ps`. The script refuses to run if an
+active administrator already exists, so it cannot quietly mint a second one on a
+live system. Everyone else is added from the Users screen.
+
+### Endpoints
+
+| Method | Path                    | Notes                                                                                                                                   |
+| ------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/auth/login`           | Public. Rate limited to 10 attempts per 15 minutes per IP; successful logins are not counted, so normal work cannot lock the office out |
+| POST   | `/auth/logout`          | Deletes this session                                                                                                                    |
+| GET    | `/auth/me`              | Turns a stored token back into a session on boot                                                                                        |
+| POST   | `/auth/change-password` | Your own password; signs out your other devices                                                                                         |
+| GET    | `/users`                | Admin                                                                                                                                   |
+| POST   | `/users`                | Admin — create                                                                                                                          |
+| PATCH  | `/users/:id`            | Admin — name, admin flag, modules, active                                                                                               |
+| POST   | `/users/:id/password`   | Admin — reset, drops that user's sessions                                                                                               |
+| DELETE | `/users/:id`            | Admin — prefer deactivating                                                                                                             |
 
 ---
 
