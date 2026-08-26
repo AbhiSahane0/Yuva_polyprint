@@ -9,6 +9,7 @@
  * files under `src/schemas` and `src/types` as those modules are scoped in.
  */
 export * from './constants/roles.js';
+export * from './constants/modules.js';
 export * from './constants/http.js';
 export * from './constants/pagination.js';
 
@@ -17,6 +18,7 @@ export * from './types/pagination.js';
 export * from './types/customer.js';
 export * from './types/quotation.js';
 export * from './types/material.js';
+export * from './types/user.js';
 
 export * from './lib/quotation-math.js';
 export * from './lib/material-cost.js';
@@ -25,3 +27,4 @@ export * from './schemas/common.js';
 export * from './schemas/customer.js';
 export * from './schemas/quotation.js';
 export * from './schemas/material.js';
+export * from './schemas/user.js';

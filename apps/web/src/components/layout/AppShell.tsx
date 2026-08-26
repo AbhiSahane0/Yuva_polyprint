@@ -1,12 +1,19 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Boxes, FileText, IndianRupee, Menu, Users, X } from 'lucide-react';
+import { Boxes, FileText, IndianRupee, LogOut, Menu, ShieldCheck, Users, X } from 'lucide-react';
+import type { AppModule } from '@yuva/shared';
 import { cn } from '@/lib/utils';
+import { canAccess, useAuthStore } from '@/features/auth/auth-store';
+import { useLogout } from '@/features/auth/api/auth-api';
 
 interface NavItem {
   to: string;
   label: string;
   icon: typeof Users;
+  /** The permission this item needs. Omitted for admin-only items. */
+  module?: AppModule;
+  /** Admin-only, regardless of module permissions. */
+  adminOnly?: boolean;
   /** Modules that exist in the plan but are not built yet. */
   disabled?: boolean;
 }
@@ -15,24 +22,43 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'Commercial',
     items: [
-      { to: '/customers', label: 'Customers', icon: Users },
-      { to: '/quotations', label: 'Quotations', icon: FileText },
+      { to: '/customers', label: 'Customers', icon: Users, module: 'customers' },
+      { to: '/quotations', label: 'Quotations', icon: FileText, module: 'quotations' },
     ],
   },
   {
     group: 'Materials',
-    items: [{ to: '/rates', label: 'Rates', icon: IndianRupee }],
+    items: [{ to: '/rates', label: 'Rates', icon: IndianRupee, module: 'rates' }],
   },
   {
     group: 'Production',
-    items: [{ to: '/jobs', label: 'Jobs', icon: Boxes, disabled: true }],
+    items: [{ to: '/jobs', label: 'Jobs', icon: Boxes, module: 'jobs', disabled: true }],
+  },
+  {
+    group: 'Administration',
+    items: [{ to: '/users', label: 'Users', icon: ShieldCheck, adminOnly: true }],
   },
 ];
 
 function NavContent({ onNavigate }: { onNavigate?: () => void }) {
+  const user = useAuthStore((state) => state.user);
+
+  /*
+   * Hiding a section is a courtesy, not the access control — the API refuses
+   * these routes independently. It matters anyway: a sidebar full of things
+   * that answer "you do not have access" makes the app feel broken rather
+   * than tailored.
+   */
+  const sections = NAV.map((section) => ({
+    ...section,
+    items: section.items.filter((item) =>
+      item.adminOnly ? user?.isAdmin === true : item.module ? canAccess(user, item.module) : true,
+    ),
+  })).filter((section) => section.items.length > 0);
+
   return (
     <nav className="flex flex-col gap-6 p-4">
-      {NAV.map((section) => (
+      {sections.map((section) => (
         <div key={section.group}>
           <p className="text-ink-400 px-3 pb-2 text-xs font-semibold tracking-wider uppercase">
             {section.group}
@@ -74,6 +100,33 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/** Who is signed in, and the way out. Pinned to the bottom of the sidebar. */
+function SessionFooter() {
+  const user = useAuthStore((state) => state.user);
+  const logout = useLogout();
+
+  if (!user) return null;
+
+  return (
+    <div className="border-ink-200 absolute inset-x-0 bottom-0 border-t bg-white p-3">
+      <div className="px-2 pb-2">
+        <p className="text-ink-800 truncate text-sm font-medium">{user.displayName}</p>
+        <p className="text-ink-400 truncate text-xs">
+          {user.isAdmin ? 'Administrator' : user.username}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => logout.mutate()}
+        className="text-ink-600 hover:bg-ink-100 hover:text-ink-900 flex w-full cursor-pointer items-center gap-2.5 rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium"
+      >
+        <LogOut className="size-4" />
+        Sign out
+      </button>
+    </div>
+  );
+}
+
 /** Office layout: persistent sidebar on desktop, slide-over drawer on mobile. */
 export function AppShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -81,12 +134,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="bg-ink-50 min-h-dvh">
       {/* Desktop sidebar */}
-      <aside className="border-ink-200 fixed inset-y-0 left-0 hidden w-60 border-r bg-white lg:block">
+      <aside className="border-ink-200 fixed inset-y-0 left-0 hidden w-60 overflow-y-auto border-r bg-white pb-28 lg:block">
         <div className="border-ink-200 flex h-14 items-center gap-2 border-b px-5">
           <div className="bg-brand-600 size-6 rounded-md" />
           <span className="text-ink-900 text-sm font-bold">Yuva Polyprint</span>
         </div>
         <NavContent />
+        <SessionFooter />
       </aside>
 
       {/* Mobile drawer */}
@@ -97,7 +151,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             onClick={() => setDrawerOpen(false)}
             aria-hidden
           />
-          <aside className="absolute inset-y-0 left-0 w-64 bg-white shadow-xl">
+          <aside className="absolute inset-y-0 left-0 w-64 overflow-y-auto bg-white pb-28 shadow-xl">
             <div className="border-ink-200 flex h-14 items-center justify-between border-b px-4">
               <span className="text-ink-900 text-sm font-bold">Yuva Polyprint</span>
               <button
@@ -110,6 +164,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </button>
             </div>
             <NavContent onNavigate={() => setDrawerOpen(false)} />
+            <SessionFooter />
           </aside>
         </div>
       ) : null}
