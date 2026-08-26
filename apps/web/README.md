@@ -39,7 +39,8 @@ src/
 │   └── router.tsx         route map; pages are lazy-loaded
 ├── components/
 │   ├── ui/                Button, Field, Input, Select, Combobox, Modal,
-│   │                      Badge, EmptyState, Toaster, ReadOnlyValue
+│   │                      Badge, EmptyState, Toaster, ReadOnlyValue,
+│   │                      Spinner, LoadingState
 │   └── layout/AppShell    sidebar on desktop, slide-over drawer on mobile
 ├── features/
 │   ├── customers/         customer list, edit modal, job specification editor
@@ -132,8 +133,16 @@ Margin under 10% turns red. Document totals update live at the bottom.
 
 ### Quotation preview
 
-Shows the **actual generated PDF**, served inline from the same endpoint as the
-download — so the preview and the file are the same bytes and cannot disagree.
+Shows the **actual generated PDF**, from the same endpoint as the download — so
+the preview and the file are the same bytes and cannot disagree.
+
+The PDF is **fetched by the component**, and only then handed to `<object>` as a
+blob. Pointing `<object>` straight at the URL looks simpler but cannot report
+progress: Chrome instantiates its PDF viewer and fires `load` immediately, while
+the document is still in flight, so anything tied to that event fires against an
+empty viewer. Fetching it makes the wait observable — a spinner and "Generating
+the PDF…" while Chromium renders it on the server — and gives a real failure
+message instead of a permanently blank frame.
 
 It uses `<object>` rather than `<iframe>`: a browser with no PDF viewer shows an
 empty grey box in an iframe but falls back to real content in an object. An
@@ -252,10 +261,32 @@ documented in [the API README](../api/README.md#calculations).
 | `Modal`               | Escape closes, background scroll locks, focus moves inside and Tab is trapped, backdrop click closes                                                              |
 | `ReadOnlyValue`       | Dashed box for system-owned values, captioned with where the value comes from — a greyed box with no explanation reads like a bug                                 |
 | `Toaster`             | Bottom-right on desktop, bottom-centre on mobile                                                                                                                  |
+| `Spinner`             | The spinning indicator on its own, for inline use. Same `Loader2` the `Button` draws, so a busy button and a busy panel look like one system                      |
+| `LoadingState`        | Fills a page or panel while its data loads. Deliberately the same shape as `EmptyState`, because the two swap places in the same slot — otherwise lists jump      |
 | `EmptyState`, `Badge` |                                                                                                                                                                   |
 
 Controls are deliberately roomy. This system replaces a spreadsheet; cramped
 inputs are the fastest way to make it feel worse than what it replaces.
+
+**Nothing waits silently.** Every wait shows a spinner and says what it is
+waiting for — "Loading quotations…" rather than a bare spinner, because on a
+slow connection that is the difference between waiting and wondering whether the
+click registered. Whole pages and panels use `LoadingState`; smaller waits put a
+`Spinner` beside their own label.
+
+Two that are easy to miss:
+
+- **The search box's magnifier becomes the spinner** while a debounced search is
+  in flight. The right-hand slot already holds the clear button, and swapping the
+  decorative icon costs no layout shift.
+- **The quotation preview fetches its PDF itself** rather than pointing
+  `<object>` at the URL. Chrome instantiates its PDF viewer and fires `load`
+  immediately, while the bytes are still in flight — so a spinner tied to that
+  event disappears at once and leaves the viewer's empty dark rectangle on
+  screen, which is the very thing it was there to prevent.
+
+The animation slows rather than stops under `prefers-reduced-motion`: a spinner
+frozen mid-rotation reads as a broken image.
 
 ---
 

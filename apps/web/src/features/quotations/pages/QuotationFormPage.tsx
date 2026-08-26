@@ -18,6 +18,7 @@ import {
   type CreateQuotationInput,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { Field, FieldSection, Input, ReadOnlyValue, Select, Textarea } from '@/components/ui/Field';
 import { toast } from '@/lib/toast';
 import { ApiClientError } from '@/lib/api-client';
@@ -271,7 +272,7 @@ export default function QuotationFormPage() {
   }
 
   if (isEdit && loadingExisting) {
-    return <div className="text-ink-400 px-4 py-16 text-center text-sm">Loading quotation…</div>;
+    return <LoadingState label="Loading quotation…" />;
   }
 
   return (

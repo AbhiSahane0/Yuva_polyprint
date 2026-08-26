@@ -4,6 +4,8 @@ import type { Customer } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { LoadingState } from '@/components/ui/LoadingState';
+import { Spinner } from '@/components/ui/Spinner';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useCustomers, type CustomerListParams } from '../api/customer-api';
 import { CustomerTable } from '../components/CustomerTable';
@@ -72,9 +74,14 @@ export default function CustomersPage() {
         <div>
           <h1 className="text-ink-900 text-xl font-bold sm:text-2xl">Customers</h1>
           <p className="text-ink-500 mt-1 text-sm">
-            {pagination
-              ? `${pagination.total} customer${pagination.total === 1 ? '' : 's'}`
-              : 'Loading…'}
+            {pagination ? (
+              `${pagination.total} customer${pagination.total === 1 ? '' : 's'}`
+            ) : (
+              <span className="inline-flex items-center gap-1.5">
+                <Spinner size="sm" />
+                Loading…
+              </span>
+            )}
           </p>
         </div>
         <Button onClick={openCreate}>
@@ -85,7 +92,15 @@ export default function CustomersPage() {
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          <Search className="text-ink-400 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+          {/*
+            The search icon doubles as the activity light. The right-hand slot
+            already holds the clear button, and swapping this decorative icon
+            costs no layout shift and takes no affordance away — while a
+            debounced search is in flight, the box itself says so.
+          */}
+          <span className="text-ink-400 pointer-events-none absolute top-1/2 left-3 -translate-y-1/2">
+            {isFetching && !isPending ? <Spinner size="sm" /> : <Search className="size-4" />}
+          </span>
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -135,7 +150,7 @@ export default function CustomersPage() {
             }
           />
         ) : isPending ? (
-          <div className="text-ink-400 px-4 py-16 text-center text-sm">Loading customers…</div>
+          <LoadingState label="Loading customers…" />
         ) : customers.length === 0 ? (
           <EmptyState
             icon={<Users className="size-8" />}
