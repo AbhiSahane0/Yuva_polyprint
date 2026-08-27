@@ -598,7 +598,8 @@ correctness bug.
 ## Sending quotations by email
 
 `POST /quotations/:id/send` renders the PDF, attaches it, and emails it through
-[Resend](https://resend.com).
+[Resend](https://resend.com). The web client reaches it from the list, from a
+card on mobile, or from the preview.
 
 | Method | Path                     | Notes                                                             |
 | ------ | ------------------------ | ----------------------------------------------------------------- |

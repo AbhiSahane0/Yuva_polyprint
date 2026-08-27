@@ -325,7 +325,16 @@ export default function QuotationsPage() {
         </nav>
       ) : null}
 
-      <QuotationPreview id={previewId} onClose={() => setPreviewId(null)} />
+      <QuotationPreview
+        id={previewId}
+        onClose={() => setPreviewId(null)}
+        onSend={() => {
+          // The previewed quotation is always one of the rows on screen.
+          const quotation = quotations.find((row) => row.id === previewId);
+          setPreviewId(null);
+          if (quotation) setSending(quotation);
+        }}
+      />
       <SendQuotationModal quotation={sending} onClose={() => setSending(null)} />
 
       <Modal

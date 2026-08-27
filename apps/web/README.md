@@ -184,8 +184,14 @@ Margin under 10% turns red. Document totals update live at the bottom.
 ### Send a quotation
 
 Emails the quotation to the customer with the PDF attached. Reached from the
-envelope on a row in the list, or on its card on mobile — **not** from inside
-the preview, which only views and downloads.
+envelope on a row in the list, from its card on mobile, or from **Send** in the
+preview once you have looked the document over.
+
+Sending from the preview **closes it first** rather than opening one dialog on
+top of another: `Modal` installs its own Escape handler and focus trap, so two
+at once would fight over both. The Send button is not disabled while the
+preview is still rendering, because sending builds its own PDF on the server
+and never waits on the copy being drawn on screen.
 
 Recipients are **chips, not a comma-separated box**: a mistyped address can be
 removed without re-typing the rest, and what will actually be sent is visible at
