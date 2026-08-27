@@ -4,8 +4,11 @@ import type {
   CreateQuotationInput,
   Paginated,
   Quotation,
+  QuotationEmail as QuotationEmailRecord,
   QuotationStatus,
   QuotationSummary,
+  SendQuotationInput,
+  SendQuotationResult,
   UpdateQuotationInput,
 } from '@yuva/shared';
 import { request, requestBlob } from '@/lib/api-client';
@@ -23,6 +26,7 @@ export const quotationKeys = {
   list: (params: QuotationListParams) => [...quotationKeys.lists(), params] as const,
   detail: (id: string) => [...quotationKeys.all, 'detail', id] as const,
   nextNumber: () => [...quotationKeys.all, 'next-number'] as const,
+  emails: (id: string) => [...quotationKeys.all, 'emails', id] as const,
 };
 
 export function useQuotations(params: QuotationListParams) {
@@ -115,4 +119,33 @@ export function fetchQuotationPdf(id: string) {
 /** Falls back to a readable name when the server sends no Content-Disposition. */
 export function quotationPdfName(filename: string | null, number: number | string): string {
   return filename ?? `Quotation_${number}.pdf`;
+}
+
+/**
+ * Emails the quotation with its PDF attached.
+ *
+ * Rendering happens on the server before the message goes out, so this is slow
+ * — fifteen seconds and up. Every caller shows that wait.
+ */
+export function useSendQuotation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, ...input }: SendQuotationInput & { id: string }) =>
+      request<SendQuotationResult>({ url: `/quotations/${id}/send`, method: 'POST', data: input }),
+    onSuccess: (_result, variables) => {
+      // Sending moves a draft to Sent, so the list and the row are both stale.
+      void queryClient.invalidateQueries({ queryKey: quotationKeys.all });
+      void queryClient.invalidateQueries({ queryKey: quotationKeys.emails(variables.id) });
+    },
+  });
+}
+
+/** Every recorded send for one quotation, newest first. */
+export function useQuotationEmails(id: string | null) {
+  return useQuery({
+    queryKey: quotationKeys.emails(id ?? ''),
+    queryFn: () => request<QuotationEmailRecord[]>({ url: `/quotations/${id}/emails` }),
+    enabled: id !== null,
+  });
 }

@@ -181,6 +181,26 @@ Choosing a **Film** adds a cost strip:
 
 Margin under 10% turns red. Document totals update live at the bottom.
 
+### Send a quotation — from the list, or the preview
+
+Emails the quotation to the customer with the PDF attached.
+
+Recipients are **chips, not a comma-separated box**: a mistyped address can be
+removed without re-typing the rest, and what will actually be sent is visible at
+a glance. Enter, comma or Tab commits one; Backspace on an empty box takes the
+last one back; pasting several addresses at once splits them.
+
+**The customer's saved address is filled in automatically** when the quotation
+has one — and the hint says so, rather than leaving a mystery address in the
+box. Where there is none, it says that too, so an empty field does not look
+broken. `NA` from the spreadsheet import is treated as no address, not as one.
+
+The dialog also lists what has already been sent, with recipients and who sent
+it, because the common question before sending is whether someone already did.
+
+Sending takes fifteen seconds or more — the server renders the PDF first — so
+the button says "Sending…" and a line underneath explains the wait.
+
 ### Quotation preview
 
 Shows the **actual generated PDF**, from the same endpoint as the download — so

@@ -78,3 +78,21 @@ export interface Quotation extends QuotationSummary {
   notes: string;
   items: QuotationItem[];
 }
+
+/** One recorded attempt to email a quotation. */
+export interface QuotationEmail {
+  id: string;
+  to: string[];
+  cc: string[];
+  subject: string;
+  sentBy: string;
+  createdAt: string;
+}
+
+/** What the send endpoint answers with. */
+export interface SendQuotationResult {
+  sentTo: string[];
+  sentAt: string;
+  /** The quotation's status after sending — Draft becomes Sent. */
+  status: QuotationStatus;
+}

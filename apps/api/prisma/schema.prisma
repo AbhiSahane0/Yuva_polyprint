@@ -229,7 +229,8 @@ model Quotation {
   /// Set the first time the quotation is marked as sent.
   sentAt DateTime? @map("sent_at")
 
-  items QuotationItem[]
+  items  QuotationItem[]
+  emails QuotationEmail[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -431,4 +432,34 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+/// One attempt to email a quotation to somebody.
+///
+/// Kept as history rather than a pair of columns on the quotation, because a
+/// quotation is commonly revised and sent again — to a different person, or to
+/// the same one twice — and "who has actually seen this, and when" is a
+/// question the office asks. `Quotation.sentAt` still records the first send.
+model QuotationEmail {
+  id String @id @default(cuid())
+
+  quotationId String    @map("quotation_id")
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  /// Recipients as typed, so the record shows what was actually sent where.
+  to      String[]
+  cc      String[]
+  subject String
+
+  /// Resend's id for the message, for chasing a delivery with their dashboard.
+  providerId String? @map("provider_id")
+
+  /// Display name of whoever pressed send. Free text, matching `entered_by`
+  /// on rates — a deleted user should not orphan the record.
+  sentBy String @map("sent_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([quotationId, createdAt])
+  @@map("quotation_emails")
 }

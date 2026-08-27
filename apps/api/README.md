@@ -10,6 +10,7 @@ quotation PDFs.
 - [Endpoints](#endpoints)
 - [Calculations](#calculations) ← the part worth reading
 - [Data model](#data-model)
+- [Sending quotations by email](#sending-quotations-by-email)
 - [CORS](#cors)
 - [Scripts](#scripts)
 
@@ -585,6 +586,76 @@ production history or a sent quotation.
 Money and quantities are `Decimal`, never `Float` — this system computes costs
 and variance, and floating point drift in a costing engine is a silent
 correctness bug.
+
+---
+
+## Sending quotations by email
+
+`POST /quotations/:id/send` renders the PDF, attaches it, and emails it through
+[Resend](https://resend.com).
+
+| Method | Path                     | Notes                                                             |
+| ------ | ------------------------ | ----------------------------------------------------------------- |
+| POST   | `/quotations/:id/send`   | `{ to[], cc[], subject, message }`. Needs the `quotations` module |
+| GET    | `/quotations/:id/emails` | Every recorded send, newest first                                 |
+
+### What happens, in order
+
+1. The PDF is rendered **fresh**, never reused from a cache. A document sent
+   from a stale render would be a quietly wrong price list.
+2. Resend is called, with a 30-second timeout.
+3. **Only once Resend accepts** is the send recorded and the status advanced.
+
+That order matters. Writing first would leave a quotation marked Sent that never
+went anywhere — the more damaging way to be wrong, because the office would stop
+chasing it.
+
+Sending a **draft** moves it to Sent. A quotation already Won or Lost keeps its
+status; forwarding a copy should not drag it backwards. `Quotation.sentAt`
+records the **first** send only and is never overwritten; the full history lives
+in `quotation_emails`, because a quotation is commonly revised and sent again
+and "who has seen this, and when" is a question the office asks.
+
+### Configuration
+
+| Variable         | Meaning                                                                                                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RESEND_API_KEY` | Optional. Without it the app runs normally and only this action reports that email is unavailable, so a developer with no credentials is not blocked from everything else |
+| `MAIL_FROM`      | The sender. Must be an address Resend will send from                                                                                                                      |
+| `MAIL_REPLY_TO`  | Optional, if replies should go somewhere other than the sender                                                                                                            |
+
+**`MAIL_FROM` decides whether this feature is usable.** `onboarding@resend.dev`
+needs no domain, but Resend will only deliver to the address that owns the
+Resend account — fine for a demo, useless for sending to a customer. Any other
+address must be on a domain **verified in the Resend dashboard**, and that is
+what real sending requires.
+
+`delivered@resend.dev` is Resend's simulator: it exercises the whole path and
+reaches nobody. Use it to test without emailing a real person.
+
+### Failures the office will actually see
+
+Resend's own errors are unhelpful out of context — a 403 for test mode reads
+like a bug in this app. They are translated in `lib/mailer.ts`:
+
+| Cause                                   | What the user is told                                   |
+| --------------------------------------- | ------------------------------------------------------- |
+| Test-mode sender, third-party recipient | Verify a domain and set `MAIL_FROM` to an address on it |
+| Unverified domain in `MAIL_FROM`        | Verify it, or use `onboarding@resend.dev` while testing |
+| A reserved domain such as `example.com` | Use a real address, or `delivered@resend.dev`           |
+| No API key configured                   | Email is not configured on the server                   |
+
+### Safety
+
+Sending is rate limited to **60 an hour** — looser than login, far tighter than
+the general API. Each call costs money at the provider, renders a PDF with
+Chromium first, and is the only endpoint here that reaches outside the company;
+the limit bounds a runaway loop rather than rationing ordinary work.
+
+The customer name and the sender's note are both **escaped** before going into
+the HTML. Neither is trusted: the names came from a spreadsheet import, and a
+company really can be called "Smith & Sons". Every message carries a plain-text
+alternative, because some clients render nothing else.
 
 ---
 

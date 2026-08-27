@@ -3,9 +3,11 @@ import {
   createQuotationSchema,
   idParamSchema,
   listQuotationsQuerySchema,
+  sendQuotationSchema,
   updateQuotationSchema,
 } from '@yuva/shared';
 import { validate } from '../../middleware/validate.js';
+import { emailRateLimiter } from '../../middleware/rate-limit.js';
 import { asyncHandler } from '../../utils/async-handler.js';
 import * as controller from './quotation.controller.js';
 
@@ -24,6 +26,24 @@ router.patch(
   validate({ params: idParamSchema, body: updateQuotationSchema }),
   asyncHandler(controller.update),
 );
+/*
+ * Sending is limited more tightly than the rest of the API. It costs money per
+ * message, renders a PDF with Chromium first, and is the one endpoint here that
+ * reaches outside the company — a runaway loop would be expensive and visible
+ * to customers.
+ */
+router.post(
+  '/:id/send',
+  emailRateLimiter,
+  validate({ params: idParamSchema, body: sendQuotationSchema }),
+  asyncHandler(controller.send),
+);
+router.get(
+  '/:id/emails',
+  validate({ params: idParamSchema }),
+  asyncHandler(controller.emailHistory),
+);
+
 router.delete('/:id', validate({ params: idParamSchema }), asyncHandler(controller.remove));
 
 export default router;
