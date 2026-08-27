@@ -257,6 +257,26 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
 
             <div className="sm:col-span-4">
               <Field
+                label="GST number"
+                htmlFor="gstNumber"
+                hint="Carried onto their quotations"
+                error={errors.gstNumber?.message}
+              >
+                {/* Upper-cased by the schema — it is printed and read back aloud. */}
+                <Input
+                  id="gstNumber"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  placeholder="27ABCDE1234F1Z5"
+                  invalid={Boolean(errors.gstNumber)}
+                  {...register('gstNumber')}
+                />
+              </Field>
+            </div>
+
+            <div className="sm:col-span-4">
+              <Field
                 label="Alternate phone"
                 htmlFor="altPhone"
                 hint="Extra mobiles or landlines"

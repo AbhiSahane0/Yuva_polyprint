@@ -23,6 +23,17 @@ import { round } from './quotation-math.js';
 export const PET_DENSITY = 1.4;
 export const PET_MICRON_PER_LAYER = 12;
 
+/**
+ * Metallised PET, the middle ply of a 3-layer structure.
+ *
+ * Same thickness and very nearly the same density as plain PET, so quoted
+ * prices and pouch counts are unaffected — but it is a different material at a
+ * different price, and costing it as PET overstated the margin on every
+ * 3-layer job.
+ */
+export const METPET_DENSITY = 1.4;
+export const METPET_MICRON_PER_LAYER = 12;
+
 export interface MaterialCostInputs {
   /** 2 or 3. A 3-layer structure carries two PET plies. */
   layer: number;
@@ -32,6 +43,8 @@ export interface MaterialCostInputs {
 
   /** Rates in rupees per kg on the quotation's date. Null when unknown. */
   petRate: number | null;
+  /** Only consulted for a 3-layer structure. */
+  metpetRate: number | null;
   polyRate: number | null;
   inkRate: number | null;
   adhesiveRate: number | null;
@@ -50,13 +63,19 @@ export interface MaterialCostResult {
 }
 
 export function computeMaterialCostPerKg(input: MaterialCostInputs): MaterialCostResult {
-  const petLayers = input.layer === 3 ? 2 : 1;
-  const petGsm = round(petLayers * PET_MICRON_PER_LAYER * PET_DENSITY, 3);
+  /*
+   * Every structure has exactly one plain PET ply. A 3-layer job adds a
+   * metallised PET in the middle — priced on its own, because it is a
+   * different material. Costing both plies as PET is what this corrects.
+   */
+  const petGsm = round(PET_MICRON_PER_LAYER * PET_DENSITY, 3);
+  const metpetGsm = input.layer === 3 ? round(METPET_MICRON_PER_LAYER * METPET_DENSITY, 3) : 0;
   const polyGsm =
     input.polyDensity && input.polyMicron > 0 ? round(input.polyMicron * input.polyDensity, 3) : 0;
 
   const components = [
     { component: 'PET', gsm: petGsm, rate: input.petRate },
+    { component: 'MET PET', gsm: metpetGsm, rate: input.metpetRate },
     { component: 'Poly', gsm: polyGsm, rate: input.polyRate },
     { component: 'Ink', gsm: input.inkGsm, rate: input.inkRate },
     { component: 'Adhesive', gsm: input.adhesiveGsm, rate: input.adhesiveRate },

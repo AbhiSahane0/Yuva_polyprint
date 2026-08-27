@@ -153,6 +153,10 @@ export const createCustomerSchema = z.object({
   district: optionalText(80).default(NA),
   pincode: pincodeField.default(NA),
   mobile: mobileField.default(NA),
+  /** GSTIN. Upper-cased — it is printed and read back over the phone. */
+  gstNumber: optionalText(20)
+    .transform((v) => v.toUpperCase())
+    .default(NA),
   altPhone: altPhoneField.default(NA),
   email: emailField.default(NA),
   isVerified: z.boolean().default(false),

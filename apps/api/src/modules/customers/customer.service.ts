@@ -200,6 +200,7 @@ function toCustomer(row: CustomerRow): Customer {
     district: row.district,
     pincode: row.pincode,
     mobile: row.mobile,
+    gstNumber: row.gstNumber,
     altPhone: row.altPhone,
     email: row.email,
     sourceRaw: row.sourceRaw,

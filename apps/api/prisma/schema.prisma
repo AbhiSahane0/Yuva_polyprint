@@ -18,6 +18,26 @@ datasource db {
   provider = "postgresql"
 }
 
+/// What the customer physically receives.
+enum JobKind {
+  /// Printed film on the reel.
+  ROLL
+  /// Film converted into a bag.
+  POUCH
+}
+
+/// Pouch styles the works produces. OTHER carries a free-text note alongside,
+/// because a fixed list that cannot describe a real order is worse than none.
+enum PouchType {
+  STANDUP
+  STANDUP_ZIPPER
+  ZIPPER
+  SPOUT
+  CENTRE_SEAL
+  THREE_SIDE_SEAL
+  OTHER
+}
+
 /// How a customer record came into existence.
 enum CustomerSource {
   /// Company details were written in the sheet's combined customer column.
@@ -51,6 +71,8 @@ model Customer {
   district      String @default("NA")
   pincode       String @default("NA")
   mobile        String @default("NA")
+  /// GSTIN. 'NA' where unknown, matching the rest of the imported text fields.
+  gstNumber     String @default("NA") @map("gst_number")
   altPhone      String @default("NA") @map("alt_phone")
   email         String @default("NA")
 
@@ -204,6 +226,9 @@ model Quotation {
   addressLine3 String @default("NA") @map("address_line3")
   mobile       String @default("NA")
   email        String @default("NA")
+  /// Snapshotted with the address: a sent quotation must keep the GSTIN it was
+  /// issued against, even if the customer master is corrected later.
+  gstNumber    String @default("NA") @map("gst_number")
 
   /// Rates as they stood when this quotation was made.
   cylinderRate           Decimal @map("cylinder_rate") @db.Decimal(10, 4)
@@ -255,6 +280,16 @@ model QuotationItem {
   job   Job?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
 
   jobName String @map("job_name")
+
+  /// Roll or pouch, and for a pouch which style. Defaults to POUCH because
+  /// every imported line is one — a roll is the newer, rarer case.
+  jobKind JobKind @default(POUCH) @map("job_kind")
+
+  /// Null on a roll. On a pouch it is the style; OTHER pairs with the note.
+  pouchType PouchType? @map("pouch_type")
+
+  /// Free text, only meaningful when pouchType is OTHER.
+  pouchTypeNote String @default("") @map("pouch_type_note")
 
   /// The film this line is costed against. Optional: a quotation can be priced
   /// without a material cost, and retiring a material must not erase old lines.

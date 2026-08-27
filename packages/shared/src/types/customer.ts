@@ -69,6 +69,7 @@ export interface Customer {
   district: string;
   pincode: string;
   mobile: string;
+  gstNumber: string;
   altPhone: string;
   email: string;
   /** The original spreadsheet text this record was parsed from. */

@@ -4,22 +4,28 @@ import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import {
+  DEFAULT_TERMS,
+  JOB_KINDS,
+  JOB_KIND_LABELS,
+  POUCH_TYPES,
+  POUCH_TYPE_LABELS,
+  QUOTATION_STATUS_LABELS,
   computeItem,
   computeMargin,
   computeMaterialCostPerKg,
   computeTotals,
   createQuotationSchema,
-  DEFAULT_TERMS,
   formatNumber,
   formatRs,
   quotationStatusSchema,
-  QUOTATION_STATUS_LABELS,
   type CreateQuotationFormValues,
   type CreateQuotationInput,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Field, FieldSection, Input, ReadOnlyValue, Select, Textarea } from '@/components/ui/Field';
+import { Combobox } from '@/components/ui/Combobox';
+import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { ApiClientError } from '@/lib/api-client';
 import { useCustomers } from '@/features/customers/api/customer-api';
@@ -36,6 +42,10 @@ import { QuotationPreview } from '../components/QuotationPreview';
 
 const BLANK_ITEM = {
   jobName: '',
+  // Every imported line is a pouch; a roll is the newer, rarer case.
+  jobKind: 'POUCH',
+  pouchType: '',
+  pouchTypeNote: '',
   layer: 2,
   widthMm: '',
   heightMm: '',
@@ -68,6 +78,12 @@ export default function QuotationFormPage() {
 
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  /*
+   * Existing means pick a company we already hold; new means type one in and
+   * add it to the master as the quotation saves. Editing always starts as
+   * existing — the company was already chosen when the quotation was raised.
+   */
+  const [customerMode, setCustomerMode] = useState<'existing' | 'new'>('existing');
 
   // Pulls the chosen customer's address, phone and jobs.
   const { data: customerDetail } = useCustomer(selectedCustomerId || null);
@@ -116,7 +132,9 @@ export default function QuotationFormPage() {
       addressLine3: existing.addressLine3,
       mobile: existing.mobile,
       email: existing.email,
+      gstNumber: existing.gstNumber,
       status: existing.status,
+      saveAsCustomer: false,
       terms: existing.terms,
       notes: existing.notes,
       cylinderRate: existing.cylinderRate,
@@ -125,6 +143,10 @@ export default function QuotationFormPage() {
         id: item.id,
         jobId: item.jobId,
         jobName: item.jobName,
+        jobKind: item.jobKind,
+        // The select works in strings; null is "nothing chosen".
+        pouchType: item.pouchType ?? '',
+        pouchTypeNote: item.pouchTypeNote,
         layer: item.layer,
         widthMm: item.widthMm,
         heightMm: item.heightMm,
@@ -140,6 +162,41 @@ export default function QuotationFormPage() {
   }, [existing, reset]);
 
   /** Fills the header block from the customer master. */
+  const customers = customerList?.items ?? [];
+  const customerNames = customers.map((customer) => customer.companyName);
+
+  /** The combobox deals in names; this maps one back to its record. */
+  function applyCustomerByName(companyName: string) {
+    const chosen = customers.find(
+      (customer) => customer.companyName.toLowerCase() === companyName.trim().toLowerCase(),
+    );
+    if (chosen) applyCustomer(chosen.id);
+  }
+
+  /**
+   * Switches between picking a saved company and typing a new one.
+   *
+   * Changing mode clears the block. Leaving a half-filled form behind is how a
+   * new company inherits the previous one's GST number.
+   */
+  function changeCustomerMode(mode: 'existing' | 'new') {
+    setCustomerMode(mode);
+    setSelectedCustomerId('');
+    setValue('customerId', null, { shouldDirty: true });
+    setValue('saveAsCustomer', mode === 'new', { shouldDirty: true });
+    for (const field of [
+      'customerName',
+      'mobile',
+      'email',
+      'gstNumber',
+      'addressLine1',
+      'addressLine2',
+      'addressLine3',
+    ] as const) {
+      setValue(field, '', { shouldDirty: true });
+    }
+  }
+
   function applyCustomer(customerId: string) {
     setSelectedCustomerId(customerId);
     setValue('customerId', customerId || null, { shouldDirty: true });
@@ -148,6 +205,7 @@ export default function QuotationFormPage() {
 
     const clean = (value: string) => (value === 'NA' ? '' : value);
     setValue('customerName', chosen.companyName, { shouldDirty: true });
+    setValue('gstNumber', clean(chosen.gstNumber), { shouldDirty: true });
     setValue('addressLine1', clean(chosen.address), { shouldDirty: true });
     setValue(
       'addressLine2',
@@ -235,6 +293,8 @@ export default function QuotationFormPage() {
         polyMicron: num(item?.polyMicron),
         polyDensity: film?.density ?? null,
         petRate: byName.get(settings?.defaultPetMaterial ?? 'PET 12µm')?.currentRate ?? null,
+        metpetRate:
+          byName.get(settings?.defaultMetpetMaterial ?? 'MET PET 12µm')?.currentRate ?? null,
         polyRate: film?.currentRate ?? null,
         inkRate: byName.get(settings?.defaultInkMaterial ?? 'Ink — Black')?.currentRate ?? null,
         adhesiveRate:
@@ -300,28 +360,49 @@ export default function QuotationFormPage() {
       </header>
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-6 flex flex-col gap-8" noValidate>
-        <FieldSection title="Customer" description="Pick a saved customer to fill this in.">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
-            <div className="sm:col-span-6">
-              <Field
-                label="Choose customer"
-                htmlFor="customerPicker"
-                hint="Or type the details below"
+        <FieldSection
+          title="Customer"
+          description={
+            customerMode === 'existing'
+              ? 'Start typing to find a company you already hold.'
+              : 'Type the details in. The company is added to your customer list when you save.'
+          }
+        >
+          {/*
+            Two clearly separate paths rather than one field that behaves
+            differently depending on what is typed into it. Which of the two
+            you are doing is a decision the office makes before they start.
+          */}
+          <div
+            role="radiogroup"
+            aria-label="Customer"
+            className="border-ink-200 mb-4 inline-flex rounded-[var(--radius-md)] border p-0.5"
+          >
+            {(
+              [
+                ['existing', 'Existing company'],
+                ['new', 'New company'],
+              ] as const
+            ).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={customerMode === mode}
+                onClick={() => changeCustomerMode(mode)}
+                className={cn(
+                  'cursor-pointer rounded-[var(--radius-sm)] px-3.5 py-1.5 text-sm font-medium transition-colors',
+                  customerMode === mode
+                    ? 'bg-brand-600 text-white'
+                    : 'text-ink-600 hover:bg-ink-100',
+                )}
               >
-                <Select
-                  id="customerPicker"
-                  value={selectedCustomerId}
-                  onChange={(event) => applyCustomer(event.target.value)}
-                >
-                  <option value="">— Type manually —</option>
-                  {(customerList?.items ?? []).map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.companyName}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
             <div className="sm:col-span-3">
               <Field label="Date" htmlFor="date" required error={errors.date?.message}>
                 <Input id="date" type="date" {...register('date')} />
@@ -345,12 +426,35 @@ export default function QuotationFormPage() {
                 htmlFor="customerName"
                 required
                 error={errors.customerName?.message}
+                hint={
+                  customerMode === 'existing'
+                    ? 'Type to search. Choosing one fills in the rest.'
+                    : undefined
+                }
               >
-                <Input
-                  id="customerName"
-                  invalid={Boolean(errors.customerName)}
-                  {...register('customerName')}
-                />
+                {/*
+                  A searchable text box rather than a dropdown: with dozens of
+                  companies, typing three letters beats scrolling a list, and it
+                  stays a text field so an unusual name can still be typed.
+                */}
+                {customerMode === 'existing' ? (
+                  <Combobox
+                    id="customerName"
+                    options={customerNames}
+                    registration={register('customerName')}
+                    value={String(watched.customerName ?? '')}
+                    onPick={applyCustomerByName}
+                    placeholder="Search companies…"
+                    invalid={Boolean(errors.customerName)}
+                  />
+                ) : (
+                  <Input
+                    id="customerName"
+                    invalid={Boolean(errors.customerName)}
+                    placeholder="Company name"
+                    {...register('customerName')}
+                  />
+                )}
               </Field>
             </div>
             <div className="sm:col-span-3">
@@ -361,6 +465,24 @@ export default function QuotationFormPage() {
             <div className="sm:col-span-3">
               <Field label="Email" htmlFor="email">
                 <Input id="email" type="email" {...register('email')} />
+              </Field>
+            </div>
+            <div className="sm:col-span-3">
+              <Field
+                label="GST number"
+                htmlFor="gstNumber"
+                hint="Printed on the quotation"
+                error={errors.gstNumber?.message}
+              >
+                {/* Upper-cased by the schema, so it reads back consistently. */}
+                <Input
+                  id="gstNumber"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  placeholder="27ABCDE1234F1Z5"
+                  invalid={Boolean(errors.gstNumber)}
+                  {...register('gstNumber')}
+                />
               </Field>
             </div>
 
@@ -434,6 +556,16 @@ export default function QuotationFormPage() {
                     ) : null}
                   </div>
 
+                  {/*
+                    The line splits in two because the office fills it in as
+                    two jobs: what gets printed and converted, and the cylinder
+                    tooling that has to be made for it. They are quoted and paid
+                    for separately — cylinders are one-time and 100% advance —
+                    so running them together as one long row of boxes hid that.
+                  */}
+                  <p className="text-ink-400 mb-2 text-xs font-semibold tracking-wider uppercase">
+                    Printing &amp; pouching
+                  </p>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
                     {customerDetail && customerDetail.jobs.length > 0 ? (
                       <div className="sm:col-span-4">
@@ -471,6 +603,73 @@ export default function QuotationFormPage() {
                         />
                       </Field>
                     </div>
+
+                    <div className="sm:col-span-3">
+                      <Field
+                        label="Type"
+                        htmlFor={`items.${index}.jobKind`}
+                        hint="What the customer receives"
+                      >
+                        <Select
+                          id={`items.${index}.jobKind`}
+                          {...register(`items.${index}.jobKind`)}
+                        >
+                          {JOB_KINDS.map((kind) => (
+                            <option key={kind} value={kind}>
+                              {JOB_KIND_LABELS[kind]}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                    </div>
+
+                    {/*
+                      Only a pouch has a style, so the field appears with it
+                      rather than sitting there greyed out on a roll.
+                    */}
+                    {watched.items?.[index]?.jobKind !== 'ROLL' ? (
+                      <div className="sm:col-span-3">
+                        <Field
+                          label="Pouch type"
+                          htmlFor={`items.${index}.pouchType`}
+                          required
+                          error={itemErrors?.pouchType?.message}
+                        >
+                          <Select
+                            id={`items.${index}.pouchType`}
+                            invalid={Boolean(itemErrors?.pouchType)}
+                            {...register(`items.${index}.pouchType`)}
+                          >
+                            <option value="">— Choose —</option>
+                            {POUCH_TYPES.map((type) => (
+                              <option key={type} value={type}>
+                                {POUCH_TYPE_LABELS[type]}
+                              </option>
+                            ))}
+                          </Select>
+                        </Field>
+                      </div>
+                    ) : null}
+
+                    {/* "Other" is only useful if it says what the other is. */}
+                    {watched.items?.[index]?.jobKind !== 'ROLL' &&
+                    watched.items?.[index]?.pouchType === 'OTHER' ? (
+                      <div className="sm:col-span-3">
+                        <Field
+                          label="Describe it"
+                          htmlFor={`items.${index}.pouchTypeNote`}
+                          required
+                          error={itemErrors?.pouchTypeNote?.message}
+                        >
+                          <Input
+                            id={`items.${index}.pouchTypeNote`}
+                            placeholder="e.g. Four side seal"
+                            invalid={Boolean(itemErrors?.pouchTypeNote)}
+                            {...register(`items.${index}.pouchTypeNote`)}
+                          />
+                        </Field>
+                      </div>
+                    ) : null}
 
                     <div className="sm:col-span-3">
                       <Field label="Layers" htmlFor={`items.${index}.layer`}>
@@ -609,7 +808,12 @@ export default function QuotationFormPage() {
                         />
                       </Field>
                     </div>
+                  </div>
 
+                  <p className="text-ink-400 mt-5 mb-2 text-xs font-semibold tracking-wider uppercase">
+                    Cylinder
+                  </p>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
                     <div className="sm:col-span-3">
                       <Field
                         label="Repeat width"

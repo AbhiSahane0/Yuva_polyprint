@@ -296,6 +296,12 @@ export function renderQuotationHtml(quotation: Quotation): string {
       <div class="name">${esc(quotation.customerName)}</div>
       ${addressLines.map((line) => `<div>${esc(line)}</div>`).join('')}
       ${show(quotation.mobile) ? `<div>Mobile: ${esc(quotation.mobile)}</div>` : ''}
+      ${
+        // The customer's GSTIN belongs on a B2B quotation — their accounts team
+        // needs it to claim input credit. Omitted when unknown rather than
+        // printing an empty label.
+        show(quotation.gstNumber) ? `<div>GST No.: ${esc(quotation.gstNumber)}</div>` : ''
+      }
       ${show(quotation.email) ? `<div>Email: ${esc(quotation.email)}</div>` : ''}
     </div>
     <div class="title">QUOTATION</div>
