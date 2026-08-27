@@ -1,3 +1,4 @@
+import type { JobKind, PouchType } from '../constants/job.js';
 import type { QuotationStatus } from '../schemas/quotation.js';
 
 /** One priced line as returned by the API. Decimals serialise as numbers. */
@@ -9,6 +10,12 @@ export interface QuotationItem {
   filmMaterialId: string | null;
   filmMaterialName: string | null;
   jobName: string;
+
+  jobKind: JobKind;
+  /** Null on a roll. */
+  pouchType: PouchType | null;
+  /** Only meaningful when pouchType is OTHER. */
+  pouchTypeNote: string;
 
   layer: number;
   widthMm: number;
@@ -60,6 +67,7 @@ export interface Quotation extends QuotationSummary {
   addressLine3: string;
   mobile: string;
   email: string;
+  gstNumber: string;
 
   cylinderRate: number;
   gstPercent: number;

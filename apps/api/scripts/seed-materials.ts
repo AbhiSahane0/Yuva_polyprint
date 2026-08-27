@@ -28,6 +28,9 @@ const MATERIALS: Seed[] = [
   // Films — density converts microns to GSM, which is what makes costing work.
   { name: 'PET 12µm', category: 'FILM', density: 1.4, openingRate: 210 },
   { name: 'PET 19µm', category: 'FILM', density: 1.4, openingRate: 224 },
+  // The middle ply of a 3-layer structure. Same 12µ and density as plain PET,
+  // but dearer — costing it as PET overstated the margin on every 3-layer job.
+  { name: 'MET PET 12µm', category: 'FILM', density: 1.4, openingRate: 258 },
   { name: 'PE 50µm', category: 'FILM', density: 0.94, openingRate: 185 },
   { name: 'PE 60µm', category: 'FILM', density: 0.94, openingRate: 190 },
   { name: 'LDPE 60µm', category: 'FILM', density: 0.92, openingRate: 178 },

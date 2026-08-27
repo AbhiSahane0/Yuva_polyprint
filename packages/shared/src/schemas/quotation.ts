@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { JOB_KINDS, POUCH_TYPES } from '../constants/job.js';
 import { paginationQuerySchema } from './common.js';
 
 export const quotationStatusSchema = z.enum(['DRAFT', 'SENT', 'WON', 'LOST']);
@@ -17,31 +18,54 @@ const positiveNumber = (label: string) =>
 const zeroOrMore = (label: string) =>
   z.coerce.number({ message: `${label} is required` }).min(0, `${label} cannot be negative`);
 
-export const quotationItemSchema = z.object({
-  /** Present when editing a line that already exists. */
-  id: z.string().min(1).optional(),
-  /** Set when the line was prefilled from an existing job. */
-  jobId: z.string().min(1).nullable().optional(),
-  /** Which film this line is costed against; null leaves it uncosted. */
-  filmMaterialId: z.string().min(1).nullable().optional(),
+export const quotationItemSchema = z
+  .object({
+    /** Present when editing a line that already exists. */
+    id: z.string().min(1).optional(),
+    /** Set when the line was prefilled from an existing job. */
+    jobId: z.string().min(1).nullable().optional(),
+    /** Which film this line is costed against; null leaves it uncosted. */
+    filmMaterialId: z.string().min(1).nullable().optional(),
 
-  jobName: z.string().trim().min(1, 'Job name is required').max(200),
-  layer: z.coerce
-    .number()
-    .int()
-    .refine((v) => v === 2 || v === 3, 'Choose 2 or 3 layers'),
+    jobName: z.string().trim().min(1, 'Job name is required').max(200),
 
-  widthMm: positiveNumber('Width'),
-  heightMm: positiveNumber('Height'),
-  polyMicron: positiveNumber('Poly micron'),
-  quantityKg: positiveNumber('Quantity'),
-  ratePerKg: positiveNumber('Rate'),
+    /** Roll or pouch, and for a pouch which style. */
+    jobKind: z.enum(JOB_KINDS).default('POUCH'),
+    pouchType: z.enum(POUCH_TYPES).nullable().default(null),
+    pouchTypeNote: z.string().trim().max(120).default(''),
 
-  repeatWidth: positiveNumber('Repeat width'),
-  repeatHeight: positiveNumber('Repeat height'),
-  cylinderCount: z.coerce.number().int().min(0, 'Cannot be negative'),
-  transportCost: zeroOrMore('Transport cost').default(0),
-});
+    layer: z.coerce
+      .number()
+      .int()
+      .refine((v) => v === 2 || v === 3, 'Choose 2 or 3 layers'),
+
+    widthMm: positiveNumber('Width'),
+    heightMm: positiveNumber('Height'),
+    polyMicron: positiveNumber('Poly micron'),
+    quantityKg: positiveNumber('Quantity'),
+    ratePerKg: positiveNumber('Rate'),
+
+    repeatWidth: positiveNumber('Repeat width'),
+    repeatHeight: positiveNumber('Repeat height'),
+    cylinderCount: z.coerce.number().int().min(0, 'Cannot be negative'),
+    transportCost: zeroOrMore('Transport cost').default(0),
+  })
+  /*
+   * A roll has no pouch style. Rather than reject the combination — which would
+   * make switching Pouch to Roll an error the user has to clear — the style is
+   * dropped, so the stored line always matches what the form is showing.
+   */
+  .transform((item) =>
+    item.jobKind === 'ROLL' ? { ...item, pouchType: null, pouchTypeNote: '' } : item,
+  )
+  .refine((item) => item.jobKind !== 'POUCH' || item.pouchType !== null, {
+    message: 'Choose the pouch type',
+    path: ['pouchType'],
+  })
+  .refine((item) => item.pouchType !== 'OTHER' || item.pouchTypeNote.length > 0, {
+    message: 'Describe the pouch type',
+    path: ['pouchTypeNote'],
+  });
 
 export const DEFAULT_TERMS = [
   'Cylinder charges are one-time and reusable for repeat orders (same design).',
@@ -57,11 +81,19 @@ export const createQuotationSchema = z.object({
   date: z.string().min(1, 'Date is required'),
 
   customerId: z.string().min(1).nullable().optional(),
+  /**
+   * Set when the form was filled in as a new company rather than picked from
+   * the list. The customer master gains the company as the quotation saves, so
+   * the next enquiry finds it under "Existing company" instead of being retyped.
+   */
+  saveAsCustomer: z.boolean().default(false),
   customerName: z.string().trim().min(2, 'Customer name is required').max(200),
   addressLine1: z.string().trim().max(200).default(''),
   addressLine2: z.string().trim().max(200).default(''),
   addressLine3: z.string().trim().max(200).default(''),
   mobile: z.string().trim().max(40).default(''),
+  /** GSTIN. Upper-cased, because it is printed and read back over the phone. */
+  gstNumber: z.string().trim().toUpperCase().max(20).default(''),
   email: z.string().trim().max(160).default(''),
 
   /** Rates may be overridden per quotation; omitted means "use the settings". */
@@ -112,6 +144,8 @@ export const settingsSchema = z.object({
   inkGsm: z.coerce.number().min(0).max(50),
   adhesiveGsm: z.coerce.number().min(0).max(50),
   defaultPetMaterial: z.string().trim().max(80),
+  /** The metallised ply of a 3-layer structure, costed on its own rate. */
+  defaultMetpetMaterial: z.string().trim().max(80),
   defaultInkMaterial: z.string().trim().max(80),
   defaultAdhesiveMaterial: z.string().trim().max(80),
 });
@@ -129,6 +163,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   inkGsm: 1.8,
   adhesiveGsm: 2.5,
   defaultPetMaterial: 'PET 12µm',
+  defaultMetpetMaterial: 'MET PET 12µm',
   defaultInkMaterial: 'Ink — Black',
   defaultAdhesiveMaterial: 'Adhesive — PU',
 };

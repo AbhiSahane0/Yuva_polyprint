@@ -40,6 +40,9 @@ function toItem(row: QuotationRow['items'][number]): QuotationItem {
     filmMaterialId: row.filmMaterialId,
     filmMaterialName: null,
     jobName: row.jobName,
+    jobKind: row.jobKind,
+    pouchType: row.pouchType,
+    pouchTypeNote: row.pouchTypeNote,
     layer: row.layer,
     widthMm: toNumber(row.widthMm),
     heightMm: toNumber(row.heightMm),
@@ -86,6 +89,7 @@ async function loadCostingContext(onDate: string) {
     settings,
     byId,
     petRate: rateOf(byName.get(settings.defaultPetMaterial)),
+    metpetRate: rateOf(byName.get(settings.defaultMetpetMaterial)),
     inkRate: rateOf(byName.get(settings.defaultInkMaterial)),
     adhesiveRate: rateOf(byName.get(settings.defaultAdhesiveMaterial)),
     rateOfId: (id: string | null | undefined) => (id ? (rates.get(id) ?? null) : null),
@@ -120,6 +124,7 @@ function toQuotation(row: QuotationRow): Quotation {
     addressLine3: row.addressLine3,
     mobile: row.mobile,
     email: row.email,
+    gstNumber: row.gstNumber,
     cylinderRate: toNumber(row.cylinderRate),
     gstPercent: toNumber(row.gstPercent),
     materialAdvancePercent: toNumber(row.materialAdvancePercent),
@@ -164,6 +169,7 @@ function priceQuotation(
       polyMicron: item.polyMicron,
       polyDensity: film?.density ? Number(film.density) : null,
       petRate: costing.petRate,
+      metpetRate: costing.metpetRate,
       polyRate: costing.rateOfId(item.filmMaterialId ?? null),
       inkRate: costing.inkRate,
       adhesiveRate: costing.adhesiveRate,
@@ -269,18 +275,63 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
   const id = await prisma.$transaction(async (tx) => {
     const number = await nextQuotationNumber(tx);
 
+    /*
+     * "New company" adds to the customer master as the quotation saves, so the
+     * next enquiry finds it under "Existing company" rather than being retyped.
+     *
+     * Inside the same transaction as the quotation: a customer created for a
+     * quotation that then failed to save would be a ghost record nobody asked
+     * for. An existing company of the same name is reused rather than
+     * duplicated — companyName is unique, and the office typing a name that
+     * already exists means the same firm, not a second one.
+     */
+    let customerId = input.customerId ?? null;
+    if (customerId === null && input.saveAsCustomer) {
+      const existing = await tx.customer.findUnique({
+        where: { companyName: input.customerName },
+        select: { id: true },
+      });
+      customerId =
+        existing?.id ??
+        (
+          await tx.customer.create({
+            data: {
+              companyName: input.customerName,
+              // The quotation's address is three free-text lines; the customer
+              // master keeps one. Joining them loses nothing a human reads.
+              address:
+                [input.addressLine1, input.addressLine2, input.addressLine3]
+                  .map((line) => line.trim())
+                  .filter(Boolean)
+                  .join(', ') || 'NA',
+              mobile: input.mobile || 'NA',
+              email: input.email || 'NA',
+              gstNumber: input.gstNumber || 'NA',
+              source: 'SHEET',
+              // What the record was built from. There is no spreadsheet row
+              // behind this one, so it says where it really came from.
+              sourceRaw: `Created from quotation for ${input.customerName}`,
+              // Typed in by hand, so it is as checked as it will ever be.
+              isVerified: true,
+            },
+            select: { id: true },
+          })
+        ).id;
+    }
+
     const created = await tx.quotation.create({
       data: {
         number,
         date: new Date(input.date),
         status: input.status,
-        customerId: input.customerId ?? null,
+        customerId,
         customerName: input.customerName,
         addressLine1: input.addressLine1,
         addressLine2: input.addressLine2,
         addressLine3: input.addressLine3,
         mobile: input.mobile,
         email: input.email,
+        gstNumber: input.gstNumber,
         ...rates,
         ...totals,
         terms: input.terms.length > 0 ? input.terms : DEFAULT_TERMS,
@@ -291,6 +342,9 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
             position: entry.position,
             jobId: entry.input.jobId ?? null,
             jobName: entry.input.jobName,
+            jobKind: entry.input.jobKind,
+            pouchType: entry.input.pouchType,
+            pouchTypeNote: entry.input.pouchTypeNote,
             layer: entry.input.layer,
             widthMm: entry.input.widthMm,
             heightMm: entry.input.heightMm,
@@ -341,6 +395,9 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
         jobId: item.jobId,
         filmMaterialId: item.filmMaterialId,
         jobName: item.jobName,
+        jobKind: item.jobKind,
+        pouchType: item.pouchType,
+        pouchTypeNote: item.pouchTypeNote,
         // Constrained to 2 or 3 by the schema when the row was written.
         layer: item.layer as 2 | 3,
         widthMm: toNumber(item.widthMm),
@@ -376,6 +433,7 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
         ...(input.addressLine3 !== undefined ? { addressLine3: input.addressLine3 } : {}),
         ...(input.mobile !== undefined ? { mobile: input.mobile } : {}),
         ...(input.email !== undefined ? { email: input.email } : {}),
+        ...(input.gstNumber !== undefined ? { gstNumber: input.gstNumber } : {}),
         ...(input.terms ? { terms: input.terms } : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
         ...(becomingSent ? { sentAt: new Date() } : {}),
@@ -386,6 +444,9 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
             position: entry.position,
             jobId: entry.input.jobId ?? null,
             jobName: entry.input.jobName,
+            jobKind: entry.input.jobKind,
+            pouchType: entry.input.pouchType,
+            pouchTypeNote: entry.input.pouchTypeNote,
             layer: entry.input.layer,
             widthMm: entry.input.widthMm,
             heightMm: entry.input.heightMm,

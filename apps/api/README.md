@@ -273,6 +273,14 @@ every view.
 | GET    | `/quotations/:id/emails`  | Every recorded send, newest first                        |
 | DELETE | `/quotations/:id`         | Delete; lines cascade                                    |
 
+**A new company is created with the quotation.** `POST /quotations` with
+`saveAsCustomer: true` and no `customerId` adds the company to the customer
+master in the _same transaction_ as the quotation — a customer created for a
+quotation that then failed to save would be a ghost record nobody asked for. A
+company whose name already exists is reused rather than duplicated, since
+`companyName` is unique and the office typing an existing name means that firm,
+not a second one.
+
 **Lines are replaced wholesale** on update. Positions shift and lines get
 removed, so reconciling by id would be more fragile than rewriting the set.
 
@@ -339,15 +347,25 @@ real quotation #118 by tests (`packages/shared/src/lib/quotation-math.test.ts`).
 
 ### Quotation line
 
-Given: layers (2 or 3), width and height in mm, poly micron, quantity in kg,
-rate per kg, repeat width and height, cylinder count, optional transport cost.
+Given: **roll or pouch** (and for a pouch, its style), layers (2 or 3), width
+and height in mm, poly micron, quantity in kg, rate per kg, repeat width and
+height, cylinder count, optional transport cost.
 
-**1. Total micron** — PET is 12µ per ply and adhesive adds 2µ:
+Roll or pouch is recorded, not calculated — it changes what the customer
+receives, not what the line costs. A roll carries no pouch style; the schema
+clears it rather than rejecting the combination, so switching a line from pouch
+to roll is not an error the user then has to tidy up.
+
+**1. Total micron** — each PET ply is 12µ and adhesive adds 2µ:
 
 ```
-2 layer:  micron = 12 + poly + 2
-3 layer:  micron = 12 + 12 + poly + 2
+2 layer:  PET + poly              micron = 12 + poly + 2
+3 layer:  PET + MET PET + poly    micron = 12 + 12 + poly + 2
 ```
+
+The two structures differ by a metallised PET ply. It is the same 12µ, so the
+arithmetic here is unchanged — but it is a different material, which is why
+[Material cost](#material-cost-and-margin) prices it separately.
 
 **2. Yield factor** — 3-layer film wastes more:
 
@@ -437,15 +455,21 @@ Ink and adhesive are laid down by weight already, so their GSM comes from
 settings rather than from a thickness.
 
 ```
-petGsm       = (layers = 3 ? 2 : 1) × 12 × 1.4
+petGsm       = 12 × 1.4                      one plain PET ply, always
+metpetGsm    = layers = 3 ? 12 × 1.4 : 0     the metallised middle ply
 polyGsm      = polyMicron × the chosen film's density
 inkGsm       = settings.inkGsm
 adhesiveGsm  = settings.adhesiveGsm
-compositeGsm = petGsm + polyGsm + inkGsm + adhesiveGsm
+compositeGsm = petGsm + metpetGsm + polyGsm + inkGsm + adhesiveGsm
 
 costPerKg = Σ(componentGsm × componentRate) ÷ compositeGsm
 margin %  = (sellingRate − costPerKg) ÷ sellingRate × 100
 ```
+
+**The middle ply of a 3-layer structure is metallised PET, not a second plain
+one.** Same 12µ and the same density, so quoted prices and pouch counts are
+identical either way — but it is a different material at a different price, and
+it is costed against its own rate (`MET PET 12µm`, set on the Rates screen).
 
 Worked example — 2-layer, 60µ poly on PE 60µm (density 0.94, ₹190), PET ₹210,
 ink ₹610, adhesive ₹480, selling at ₹295/kg:
@@ -459,6 +483,24 @@ compositeGsm = 77.5
 costPerKg = (16.8×210 + 56.4×190 + 1.8×610 + 2.5×480) ÷ 77.5 = ₹213.4452
 margin    = (295 − 213.4452) ÷ 295                            = 27.65%
 ```
+
+Worked example — **3-layer**, 60µ poly on PE 60µm (density 0.94, ₹190), PET
+₹210, MET PET ₹258, ink ₹610, adhesive ₹480, selling at ₹320/kg:
+
+```
+petGsm       = 12 × 1.4  = 16.8
+metpetGsm    = 12 × 1.4  = 16.8
+polyGsm      = 60 × 0.94 = 56.4
+inkGsm       = 1.8       adhesiveGsm = 2.5
+compositeGsm = 94.3
+
+costPerKg = (16.8×210 + 16.8×258 + 56.4×190 + 1.8×610 + 2.5×480) ÷ 94.3 = ₹221.3828
+margin    = (320 − 221.3828) ÷ 320                                      = 30.82%
+```
+
+Pricing both plies as plain PET — which is what this did before MET PET was
+separated out — gives ₹212.8314 and a margin of 33.49%. **Every 3-layer job
+looked about 2.7 points more profitable than it was.**
 
 **A missing rate produces no cost at all, not a partial one.** If any component
 has no rate on the quotation's date, `materialCostPerKg` is `null`. An

@@ -156,6 +156,9 @@ PET + Poly + Adhesive") and Pouches per kg ("From design size and composite
 GSM"). The two calculated ones update live as you type. The server recomputes
 on save regardless; the live figure is feedback, not the source of truth.
 
+**GST number** sits with the contact details and is carried onto every
+quotation raised for that customer.
+
 `NA` never appears in the UI. The imported data is full of it, so the table
 shows a muted dash and edit boxes open blank. Clearing a box saves it back as
 `NA`, keeping the database consistent with the import.
@@ -170,8 +173,47 @@ filters. Each row previews, downloads, edits or deletes.
 
 ### Quotation form — `/quotations/new`, `/quotations/:id/edit`
 
-Pick a saved customer and the address block fills in; job rows can copy
-dimensions from that customer's saved specs.
+#### Who it is for
+
+**Existing company** or **New company** is chosen first, as two separate paths
+rather than one field that behaves differently depending on what is typed into
+it — which of the two you are doing is a decision the office makes before they
+start.
+
+- **Existing** makes the customer name a **searchable text box**. With dozens of
+  companies, typing three letters beats scrolling a list, and it stays a text
+  field so an unusual name can still be typed. Choosing one fills in the
+  address, mobile, email and GST number.
+- **New** gives plain boxes, and the company is **added to your customer list
+  when the quotation saves** — so the next enquiry finds it under Existing
+  instead of being retyped. A name that already exists is reused, not
+  duplicated.
+
+Switching between the two **clears the block**. Leaving a half-filled form
+behind is how a new company inherits the previous one's GST number.
+
+**GST number** is recorded here and printed on the quotation, because the
+customer's accounts team needs it to claim input credit.
+
+#### Each job, in two parts
+
+A job card is split, because the office fills it in as two jobs:
+
+| Printing & pouching                                                           | Cylinder                                                     |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Type (roll or pouch), pouch style, layers, size, micron, quantity, rate, film | Repeat width and height, number of cylinders, transport cost |
+
+They are quoted and paid for separately — cylinders are one-time and 100%
+advance — which one long row of boxes hid.
+
+**Type** is Roll or Pouch. A pouch also asks its style: Standup, Standup zipper,
+Zipper, Spout, Centre seal, Three side seal, or Other. The style field only
+appears for a pouch rather than sitting greyed out on a roll, and choosing
+Other reveals a box to say what it is — the option is worthless otherwise.
+Switching a line to Roll clears the style rather than raising an error, so
+changing your mind is not something you then have to tidy up.
+
+#### What is calculated
 
 Per line you enter size, quantity and rate; **micron, pouches per kg, total
 pouches, cylinder size and cylinder cost are calculated and shown read-only**.
@@ -180,6 +222,11 @@ Choosing a **Film** adds a cost strip:
 > Material cost **Rs. 213.45/kg** (77.5 GSM) · Margin **27.7%**
 
 Margin under 10% turns red. Document totals update live at the bottom.
+
+A 3-layer job is costed as PET + **MET PET** + poly, each on its own rate, so
+the margin shown accounts for the metallised ply being dearer than plain PET.
+Set that rate on the Rates screen; without it the strip reports no cost at all
+rather than a flattering one.
 
 ### Send a quotation
 
