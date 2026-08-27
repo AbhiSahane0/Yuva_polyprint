@@ -58,3 +58,17 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
+
+      #   RESEND_API_KEY Optional. Without it the app runs normally and only
+      #                  "send quotation" reports that email is unavailable.
+      #   MAIL_FROM      The sender. Prompted rather than fixed here because the
+      #                  right value differs per environment and changes the
+      #                  moment a Yuva domain is verified — a default committed
+      #                  today would quietly outlive its usefulness.
+      #                  onboarding@resend.dev delivers ONLY to the Resend
+      #                  account owner; a real customer needs an address on a
+      #                  domain verified with Resend.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
