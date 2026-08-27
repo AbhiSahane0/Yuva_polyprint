@@ -55,6 +55,7 @@ src/
 │   ├── toast.ts           tiny Zustand store
 │   └── utils.ts           cn() — Tailwind-aware class merging
 └── styles/index.css       Tailwind v4 @theme — the design tokens
+```
 
 Brand assets in `public/` — `logo.svg` and `favicon.svg` — are **generated**, by
 `scripts/generate-logo.mjs`. Edit the script, not the SVGs: the long shadow is a
@@ -65,7 +66,6 @@ eyeballed, and the result sits within 1.4% of the original on every letter.
 The favicon is deliberately **one tile, not the whole mark**. Rendered at 16px
 the four letters collapse into an unreadable smear; a single Y in the brand
 purple stays legible and still reads as the same logo.
-```
 
 **`app/` versus `features/`.** `app/` is application wiring that exists once —
 providers, router, query client. `features/` is business functionality, one
@@ -181,9 +181,11 @@ Choosing a **Film** adds a cost strip:
 
 Margin under 10% turns red. Document totals update live at the bottom.
 
-### Send a quotation — from the list, or the preview
+### Send a quotation
 
-Emails the quotation to the customer with the PDF attached.
+Emails the quotation to the customer with the PDF attached. Reached from the
+envelope on a row in the list, or on its card on mobile — **not** from inside
+the preview, which only views and downloads.
 
 Recipients are **chips, not a comma-separated box**: a mistyped address can be
 removed without re-typing the rest, and what will actually be sent is visible at
@@ -200,6 +202,11 @@ it, because the common question before sending is whether someone already did.
 
 Sending takes fifteen seconds or more — the server renders the PDF first — so
 the button says "Sending…" and a line underneath explains the wait.
+
+**A Draft becomes Sent** once the email goes out, and the list updates on its
+own. A quotation already Won or Lost keeps its status: forwarding a copy should
+not drag it backwards. If the send fails, nothing changes — the reason appears
+in the dialog and the quotation stays exactly as it was.
 
 ### Quotation preview
 
