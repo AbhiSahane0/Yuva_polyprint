@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, ExternalLink, FileText, Pencil } from 'lucide-react';
+import { Download, ExternalLink, FileText, Pencil, Send } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -21,7 +21,20 @@ import { fetchQuotationPdf, quotationPdfName, useQuotation } from '../api/quotat
  * empty grey box, whereas an object falls back to the markup inside it. That
  * fallback is a real way out, not an apology.
  */
-export function QuotationPreview({ id, onClose }: { id: string | null; onClose: () => void }) {
+export function QuotationPreview({
+  id,
+  onClose,
+  onSend,
+}: {
+  id: string | null;
+  onClose: () => void;
+  /**
+   * Hands off to the send dialog. The preview closes first rather than opening
+   * one modal on top of another: `Modal` installs its own Escape handler and
+   * focus trap, so two at once would fight over both.
+   */
+  onSend?: (() => void) | undefined;
+}) {
   const { data } = useQuotation(id);
 
   /*
@@ -112,6 +125,17 @@ export function QuotationPreview({ id, onClose }: { id: string | null; onClose: 
                 Edit
               </Button>
             </Link>
+          ) : null}
+          {/*
+            Deliberately not disabled while the preview is still rendering:
+            sending builds its own PDF on the server, so it never waits on the
+            copy being drawn here.
+          */}
+          {id && onSend ? (
+            <Button variant="secondary" onClick={onSend}>
+              <Send className="size-4" />
+              Send
+            </Button>
           ) : null}
           {/*
             Disabled until the document exists, because both actions now reuse

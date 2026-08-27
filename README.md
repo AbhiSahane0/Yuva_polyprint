@@ -472,13 +472,18 @@ keeps its default of `/api` in every environment, exactly as in development.
    | Dockerfile Path                | `apps/api/Dockerfile` |
    | Docker Build Context Directory | `.`                   |
 
-3. Fill in the three prompted values:
+3. Fill in the prompted values:
 
-   | Variable       | Value                                                                                                                                                                          |
-   | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-   | `DATABASE_URL` | Neon **pooled** endpoint (host contains `-pooler`)                                                                                                                             |
-   | `DIRECT_URL`   | Neon **direct** endpoint — boot migrations need it                                                                                                                             |
-   | `CORS_ORIGINS` | the Vercel origins, comma-separated — see [Two ways the browser can reach the API](#two-ways-the-browser-can-reach-the-api). Only omit this if you switch to the proxied setup |
+   | Variable         | Value                                                                                                                                                                                           |
+   | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | `DATABASE_URL`   | Neon **pooled** endpoint (host contains `-pooler`)                                                                                                                                              |
+   | `DIRECT_URL`     | Neon **direct** endpoint — boot migrations need it                                                                                                                                              |
+   | `CORS_ORIGINS`   | the Vercel origins, comma-separated — see [Two ways the browser can reach the API](#two-ways-the-browser-can-reach-the-api). Only omit this if you switch to the proxied setup                  |
+   | `RESEND_API_KEY` | Optional. Enables emailing a quotation; without it every other screen still works                                                                                                               |
+   | `MAIL_FROM`      | The sender, e.g. `Yuva Polyprint <quotations@yourdomain.com>`. **Decides whether customers can be emailed at all** — see [Sending quotations](./apps/api/README.md#sending-quotations-by-email) |
+
+   The two mail variables are optional. Leave them unset and the app runs
+   normally, with only "send quotation" reporting that email is unavailable.
 
 4. Wait for the first build. It is slow — the image is ~1.8GB, mostly Chromium.
 5. Confirm `https://<service>.onrender.com/health/ready` returns

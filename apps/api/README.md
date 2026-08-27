@@ -269,6 +269,8 @@ every view.
 | GET    | `/quotations/:id/pdf`     | The PDF. `?inline=1` displays, otherwise downloads       |
 | POST   | `/quotations`             | Create; prices and costs every line                      |
 | PATCH  | `/quotations/:id`         | Update; **re-prices the whole document**                 |
+| POST   | `/quotations/:id/send`    | Email it to the customer with the PDF attached           |
+| GET    | `/quotations/:id/emails`  | Every recorded send, newest first                        |
 | DELETE | `/quotations/:id`         | Delete; lines cascade                                    |
 
 **Lines are replaced wholesale** on update. Positions shift and lines get
@@ -276,6 +278,9 @@ removed, so reconciling by id would be more fragile than rewriting the set.
 
 **Every figure is computed server-side.** `POST`/`PATCH` ignore any totals sent
 by the client — the numbers on a quotation are the whole point of the document.
+
+The two mail routes have their own section:
+[Sending quotations by email](#sending-quotations-by-email).
 
 ### Materials and rates
 
@@ -563,15 +568,16 @@ no effect; they are not in the input schema at all.
 Full diagram and column reference: [`docs/database-schema.md`](../../docs/database-schema.md).
 Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 
-| Table             | Holds                                                                            |
-| ----------------- | -------------------------------------------------------------------------------- |
-| `customers`       | Companies that order. Text fields use `'NA'` where the imported sheet was blank. |
-| `jobs`            | Products and their full 55-column specification.                                 |
-| `quotations`      | Customer-facing documents. Totals frozen at save.                                |
-| `quotation_items` | One priced line, with its costing.                                               |
-| `materials`       | The rate catalogue, with density for films.                                      |
-| `material_rates`  | One material's price on one date — one row per active material per day.          |
-| `app_settings`    | Editable rates and costing defaults.                                             |
+| Table              | Holds                                                                            |
+| ------------------ | -------------------------------------------------------------------------------- |
+| `customers`        | Companies that order. Text fields use `'NA'` where the imported sheet was blank. |
+| `jobs`             | Products and their full 55-column specification.                                 |
+| `quotations`       | Customer-facing documents. Totals frozen at save.                                |
+| `quotation_items`  | One priced line, with its costing.                                               |
+| `materials`        | The rate catalogue, with density for films.                                      |
+| `material_rates`   | One material's price on one date — one row per active material per day.          |
+| `quotation_emails` | One recorded attempt to email a quotation — recipients, subject, who sent it.    |
+| `app_settings`     | Editable rates and costing defaults.                                             |
 
 Two deliberate choices:
 
@@ -592,7 +598,8 @@ correctness bug.
 ## Sending quotations by email
 
 `POST /quotations/:id/send` renders the PDF, attaches it, and emails it through
-[Resend](https://resend.com).
+[Resend](https://resend.com). The web client reaches it from the list, from a
+card on mobile, or from the preview.
 
 | Method | Path                     | Notes                                                             |
 | ------ | ------------------------ | ----------------------------------------------------------------- |
