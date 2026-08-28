@@ -97,7 +97,15 @@ export function renderQuotationHtml(quotation: Quotation): string {
         <td class="r">${formatNumber(item.widthMm)}</td>
         <td class="r">${formatNumber(item.heightMm)}</td>
         <td class="r">${formatNumber(item.micron)}</td>
-        <td class="r">${formatNumber(item.pouchesPerKg)}</td>
+        <td class="r">${
+          /*
+           * Two decimals, because this is a multiplier the customer checks
+           * against the total. Rounded to a whole number it stops reconciling:
+           * 29.67 prints as 30, and 30 × 100 kg suggests 3,000 pouches where
+           * the line correctly reads 2,967.
+           */
+          formatNumber(item.pouchesPerKg, 2)
+        }</td>
         <td class="r">${
           // Order quantity in the unit the line was quoted in: pouches for a
           // standup, kilograms for everything else.

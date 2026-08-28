@@ -392,6 +392,11 @@ cosmetic: the 1 Kg Paneer Bag line reads **24,930** on the client's document,
 and multiplying the unrounded 99.716 gives 24,929. The spreadsheet rounds
 first, so we do too.
 
+**Those two decimals are printed too.** Pouches per kg is a multiplier the
+customer checks against the total, so showing it as a whole number stops it
+reconciling: 29.67 prints as 30, and 30 × 100 kg suggests 3,000 pouches where
+the line correctly reads 2,967.
+
 **5. Printing total** — and this depends on the pouch style:
 
 ```
