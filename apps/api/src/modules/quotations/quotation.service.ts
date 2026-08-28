@@ -265,7 +265,18 @@ export async function listQuotations(query: ListQuotationsQuery) {
     prisma.quotation.findMany({
       where,
       include: { items: true },
-      orderBy: { number: 'desc' },
+      /*
+       * Work order, not date order: drafts need finishing, sent ones need
+       * chasing, and won or lost are settled. So the list reads as a queue
+       * with whatever still needs doing at the top.
+       *
+       * Sorting on the enum itself is enough — Postgres orders enum values by
+       * the order they were declared, and QuotationStatus is declared
+       * DRAFT, SENT, WON, LOST, which is exactly this sequence. Sorting in the
+       * database rather than the page matters because the list is paginated;
+       * re-ordering one page in the browser would only shuffle that page.
+       */
+      orderBy: [{ status: 'asc' }, { number: 'desc' }],
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     }),

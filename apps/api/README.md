@@ -9,6 +9,10 @@ quotation PDFs.
 - [Authentication and access](#authentication-and-access)
 - [Endpoints](#endpoints)
 - [Calculations](#calculations) ← the part worth reading
+  - [The vocabulary](#the-vocabulary)
+  - [2 layer versus 3 layer](#2-layer-versus-3-layer)
+  - [Reading a printed quotation](#reading-a-printed-quotation)
+  - [What is frozen, and what moves](#what-is-frozen-and-what-moves)
 - [Data model](#data-model)
 - [Sending quotations by email](#sending-quotations-by-email)
 - [Winning and losing](#winning-and-losing)
@@ -262,18 +266,18 @@ every view.
 
 ### Quotations
 
-| Method | Path                      | Notes                                                              |
-| ------ | ------------------------- | ------------------------------------------------------------------ |
-| GET    | `/quotations`             | Search by number, customer or job name; filter by status           |
-| GET    | `/quotations/next-number` | The number the next quotation will get                             |
-| GET    | `/quotations/:id`         | Full document with all lines                                       |
-| GET    | `/quotations/:id/pdf`     | The PDF. `?inline=1` displays, otherwise downloads                 |
-| POST   | `/quotations`             | Create; prices and costs every line                                |
-| PATCH  | `/quotations/:id`         | Update; **re-prices the whole document**                           |
-| POST   | `/quotations/:id/send`    | Email it to the customer with the PDF attached                     |
-| GET    | `/quotations/:id/emails`  | Every recorded send, newest first                                  |
-| POST   | `/quotations/:id/outcome` | Record won or lost — see [Winning and losing](#winning-and-losing) |
-| DELETE | `/quotations/:id`         | Delete; lines cascade                                              |
+| Method | Path                      | Notes                                                                                                                 |
+| ------ | ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/quotations`             | Search by number, customer or job name; filter by status. Ordered Draft → Sent → Won → Lost, newest first within each |
+| GET    | `/quotations/next-number` | The number the next quotation will get                                                                                |
+| GET    | `/quotations/:id`         | Full document with all lines                                                                                          |
+| GET    | `/quotations/:id/pdf`     | The PDF. `?inline=1` displays, otherwise downloads                                                                    |
+| POST   | `/quotations`             | Create; prices and costs every line                                                                                   |
+| PATCH  | `/quotations/:id`         | Update; **re-prices the whole document**                                                                              |
+| POST   | `/quotations/:id/send`    | Email it to the customer with the PDF attached                                                                        |
+| GET    | `/quotations/:id/emails`  | Every recorded send, newest first                                                                                     |
+| POST   | `/quotations/:id/outcome` | Record won or lost — see [Winning and losing](#winning-and-losing)                                                    |
+| DELETE | `/quotations/:id`         | Delete; lines cascade                                                                                                 |
 
 **A new company is created with the quotation.** `POST /quotations` with
 `saveAsCustomer: true` and no `customerId` adds the company to the customer
@@ -346,6 +350,62 @@ seeding step.
 All arithmetic lives in `packages/shared`, so the form, the API and the PDF
 produce identical numbers from identical inputs. It is locked to the client's
 real quotation #118 by tests (`packages/shared/src/lib/quotation-math.test.ts`).
+
+### The vocabulary
+
+Every figure on a quotation traces back to these. Worth reading once.
+
+| Term               | What it is                                                                                                                                                                         |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Micron (µ)**     | Thickness of a film ply. One thousandth of a millimetre.                                                                                                                           |
+| **Density**        | Weight of a film per unit volume, g/cm³. What turns a thickness into a weight.                                                                                                     |
+| **GSM**            | Grams per square metre — `microns × density`. The unit everything is costed in, because film is bought by weight.                                                                  |
+| **Composite GSM**  | All the plies added together: the weight of one square metre of the finished laminate.                                                                                             |
+| **PET**            | The printed outer ply. 12µ in every structure this works produces.                                                                                                                 |
+| **MET PET**        | Metallised PET — the same 12µ film with a thin aluminium coating. A barrier against moisture, oxygen and light, and what makes a pouch silver inside. Only in a 3-layer structure. |
+| **Poly**           | The inner sealing ply. Its thickness and grade are chosen per job; the **Film** dropdown picks which one, and its density and rate come from that choice.                          |
+| **Adhesive**       | Bonds the plies. Adds 2µ and its own GSM.                                                                                                                                          |
+| **Yield factor**   | A wastage allowance applied when working out pouches per kilogram.                                                                                                                 |
+| **Pouches per kg** | How many pouches a kilogram of finished film yields. Falls as the film gets thicker.                                                                                               |
+| **Repeat**         | How many times the design wraps around the cylinder. Sets the engraved area, and so the cylinder's cost.                                                                           |
+
+### 2 layer versus 3 layer
+
+The layer count is one field, but it moves **three** things: the thickness, the
+wastage allowance, and what the material costs.
+
+```
+2 layer:  PET + Poly              micron = 12 + poly + 2       factor 1.1
+3 layer:  PET + MET PET + Poly    micron = 12 + 12 + poly + 2  factor 1.2
+```
+
+The same 420 × 260 pouch with 45µ poly, 250 kg ordered, priced at ₹300/kg:
+
+|                | 2 layer        | 3 layer                  |
+| -------------- | -------------- | ------------------------ |
+| Structure      | PET + Poly     | PET + **MET PET** + Poly |
+| Micron         | 59             | 71                       |
+| Yield factor   | 1.1            | 1.2                      |
+| Pouches per kg | 141.10         | **107.48**               |
+| 250 kg yields  | 35,275 pouches | **26,870 pouches**       |
+| Composite      | 63.4 GSM       | 80.2 GSM                 |
+| Cost per kg    | ₹215.32        | **₹224.26**              |
+| Margin at ₹300 | 28.23%         | **25.25%**               |
+
+**Thicker film means fewer pouches per kilogram.** The same 250 kg yields about
+24% fewer three-layer pouches. Quoting per kilogram at an unchanged rate
+therefore earns the same money for materially fewer pouches, which is why the
+customer's cost per piece rises even when the rate per kg has not moved.
+
+The cost per kilogram rises too, because MET PET is dearer than the plain PET
+beside it. At the same selling rate the margin drops about three points.
+
+> **This was wrong until recently.** A 3-layer job was costed as _two plain PET
+> plies_, both at the PET rate. Thickness was unaffected, so quoted prices and
+> pouch counts were always right — but the cost was understated and every
+> 3-layer margin read a few points better than reality. Quotations saved before
+> that fix keep their stored figures; only new and re-priced lines use the
+> corrected costing.
 
 ### Quotation line
 
@@ -491,6 +551,60 @@ printed pre-GST figures on the two advance rows but a GST-inclusive Advance
 total, and the two did not reconcile (₹1,65,910 against ₹1,95,774). Confirmed
 with the client: GST-inclusive is what they actually collect, so both the rows
 and the total now use it.
+
+### Reading a printed quotation
+
+Every column on the document, and where its number comes from. **Typed** means
+someone entered it; everything else is worked out.
+
+| Column                   | Source                                                                |
+| ------------------------ | --------------------------------------------------------------------- |
+| Job Name                 | Typed                                                                 |
+| Layer                    | Typed — 2 or 3, see [2 layer versus 3 layer](#2-layer-versus-3-layer) |
+| Job Size, Width × Height | Typed, in mm                                                          |
+| Micron                   | `12 (+12 if 3 layer) + poly + 2`                                      |
+| No. of Pouch Per kg      | `1000 ÷ ((W×H÷100 × micron × factor) ÷ 10000)`, to 2 decimals         |
+| Order Qty                | Typed. **Kilograms**, or **pouches** on a standup line                |
+| Total Pouches            | `pouches/kg × kg`, or the typed count on a standup line               |
+| Rate /Kg                 | Typed. Reads `4.20 /pc` on a standup line, which is priced per piece  |
+| Total Rs.                | `kg × rate/kg`, or `pouches × rate/pouch`                             |
+| Cylinder Size, Width     | `job width × repeat width + 80` — the 80 is mounting allowance        |
+| Cylinder Size, Circum    | `job height × repeat height`                                          |
+| No. of Cylinder          | Typed                                                                 |
+| Cost Per Cylinder        | `(cyl width × circum ÷ 100) × cylinder rate`                          |
+| Total Cylinder Cost      | `cost per cylinder × count` **+ transport**                           |
+
+Three of these do not reconcile the way a reader first expects, and each has
+caught someone out:
+
+- **Total Cylinder Cost includes transport.** It is the one term not derived
+  from the cylinder's size, so checking `cost per cylinder × count` comes up
+  short by exactly the transport. The document says so beneath the totals
+  whenever any was charged.
+- **Pouches per kg is printed to two decimals** because it is a multiplier the
+  reader checks against the total. As a whole number it stops reconciling —
+  29.67 shown as 30 makes `30 × 100 kg` look like 3,000 pouches where the line
+  correctly reads 2,967.
+- **Order Qty is not always kilograms.** A standup or standup-zipper line is
+  quoted per piece, so that cell holds a pouch count. When a document mixes the
+  two, the Order Qty **total shows a dash** — adding kilograms to pouches would
+  print a number that cannot be checked.
+
+### What is frozen, and what moves
+
+A saved quotation is a **snapshot**, not a live view:
+
+| Frozen at save                                    | Read live                                         |
+| ------------------------------------------------- | ------------------------------------------------- |
+| Every total and line figure                       | Nothing on a saved quotation                      |
+| The customer's name, address, mobile, GSTIN       | The customer master, which may since have changed |
+| The material rates used, and the margin they gave | Today's rates, on the Rates screen                |
+| Cylinder rate, GST %, advance %                   | The same settings, for the _next_ quotation       |
+
+So a quotation accepted in March keeps March's prices and March's margin,
+whatever has happened since. Editing one **re-prices the whole document** at the
+rates in force on its own date — which is why the edit screen warns that
+changes are re-priced and the PDF regenerated.
 
 ### Material cost and margin
 
