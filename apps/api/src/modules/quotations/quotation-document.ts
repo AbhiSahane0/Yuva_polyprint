@@ -98,9 +98,19 @@ export function renderQuotationHtml(quotation: Quotation): string {
         <td class="r">${formatNumber(item.heightMm)}</td>
         <td class="r">${formatNumber(item.micron)}</td>
         <td class="r">${formatNumber(item.pouchesPerKg)}</td>
-        <td class="r">${formatNumber(item.quantityKg)}</td>
+        <td class="r">${
+          // Order quantity in the unit the line was quoted in: pouches for a
+          // standup, kilograms for everything else.
+          item.pricingBasis === 'PER_POUCH'
+            ? formatNumber(item.quantityPouches)
+            : formatNumber(item.quantityKg)
+        }</td>
         <td class="r">${formatNumber(item.totalPouches)}</td>
-        <td class="r">${formatNumber(item.ratePerKg, 2)}</td>
+        <td class="r">${
+          item.pricingBasis === 'PER_POUCH'
+            ? `${formatNumber(item.ratePerPouch, 2)} /pc`
+            : formatNumber(item.ratePerKg, 2)
+        }</td>
         <td class="r">${formatRs(item.totalAmount)}</td>
         <td class="r">${formatNumber(item.cylinderWidth)}</td>
         <td class="r">${formatNumber(item.cylinderCircumference)}</td>
@@ -347,7 +357,20 @@ export function renderQuotationHtml(quotation: Quotation): string {
     <tfoot>
       <tr>
         <td colspan="7" class="c">Total</td>
-        <td class="r">${formatNumber(quotation.items.reduce((s, i) => s + i.quantityKg, 0))}</td>
+        <td class="r">${(() => {
+          /*
+           * Only total this column when every line is quoted in the same unit.
+           * A document mixing kilograms and pouches has no meaningful sum here,
+           * and printing one would invite the customer to check it and find it
+           * wrong. The money totals below are unaffected — they are always
+           * rupees.
+           */
+          const bases = new Set(quotation.items.map((i) => i.pricingBasis));
+          if (bases.size !== 1) return '&mdash;';
+          return bases.has('PER_POUCH')
+            ? formatNumber(quotation.items.reduce((sum, i) => sum + i.quantityPouches, 0))
+            : formatNumber(quotation.items.reduce((sum, i) => sum + i.quantityKg, 0));
+        })()}</td>
         <td></td>
         <td></td>
         <td class="r">${formatRs(quotation.materialSubtotal)}</td>

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { JOB_KINDS, POUCH_TYPES } from '../constants/job.js';
+import { JOB_KINDS, POUCH_TYPES, pricingBasisFor } from '../constants/job.js';
 import { paginationQuerySchema } from './common.js';
 
 export const quotationStatusSchema = z.enum(['DRAFT', 'SENT', 'WON', 'LOST']);
@@ -42,8 +42,15 @@ export const quotationItemSchema = z
     widthMm: positiveNumber('Width'),
     heightMm: positiveNumber('Height'),
     polyMicron: positiveNumber('Poly micron'),
-    quantityKg: positiveNumber('Quantity'),
-    ratePerKg: positiveNumber('Rate'),
+    /*
+     * Both pairs are optional here and reconciled by the refines below, because
+     * which one is required depends on the pouch style: standup and
+     * standup-zipper lines are typed in pouches, everything else in kilograms.
+     */
+    quantityKg: zeroOrMore('Quantity').default(0),
+    ratePerKg: zeroOrMore('Rate').default(0),
+    quantityPouches: zeroOrMore('Quantity').default(0),
+    ratePerPouch: zeroOrMore('Rate').default(0),
 
     repeatWidth: positiveNumber('Repeat width'),
     repeatHeight: positiveNumber('Repeat height'),
@@ -65,7 +72,31 @@ export const quotationItemSchema = z
   .refine((item) => item.pouchType !== 'OTHER' || item.pouchTypeNote.length > 0, {
     message: 'Describe the pouch type',
     path: ['pouchTypeNote'],
-  });
+  })
+  /*
+   * Whichever pair the line is priced on must be filled in. Checked here rather
+   * than with `positiveNumber` on the fields themselves, because a per-pouch
+   * line legitimately leaves the kilogram pair at zero and a per-kg line the
+   * pouch pair — requiring both would make every line fail.
+   */
+  .refine(
+    (item) =>
+      pricingBasisFor(item.jobKind, item.pouchType) !== 'PER_POUCH' || item.quantityPouches > 0,
+    { message: 'Enter how many pouches', path: ['quantityPouches'] },
+  )
+  .refine(
+    (item) =>
+      pricingBasisFor(item.jobKind, item.pouchType) !== 'PER_POUCH' || item.ratePerPouch > 0,
+    { message: 'Enter the rate per pouch', path: ['ratePerPouch'] },
+  )
+  .refine(
+    (item) => pricingBasisFor(item.jobKind, item.pouchType) !== 'PER_KG' || item.quantityKg > 0,
+    { message: 'Enter the quantity in kg', path: ['quantityKg'] },
+  )
+  .refine(
+    (item) => pricingBasisFor(item.jobKind, item.pouchType) !== 'PER_KG' || item.ratePerKg > 0,
+    { message: 'Enter the rate per kg', path: ['ratePerKg'] },
+  );
 
 export const DEFAULT_TERMS = [
   'Cylinder charges are one-time and reusable for repeat orders (same design).',

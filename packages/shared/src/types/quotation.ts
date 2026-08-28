@@ -1,4 +1,4 @@
-import type { JobKind, PouchType } from '../constants/job.js';
+import type { JobKind, PouchType, PricingBasis } from '../constants/job.js';
 import type { QuotationStatus } from '../schemas/quotation.js';
 
 /** One priced line as returned by the API. Decimals serialise as numbers. */
@@ -21,8 +21,11 @@ export interface QuotationItem {
   widthMm: number;
   heightMm: number;
   polyMicron: number;
+  pricingBasis: PricingBasis;
   quantityKg: number;
   ratePerKg: number;
+  quantityPouches: number;
+  ratePerPouch: number;
   repeatWidth: number;
   repeatHeight: number;
   cylinderCount: number;

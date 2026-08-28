@@ -17,6 +17,7 @@ import {
   PET_MICRON_PER_LAYER,
   JOB_KIND_LABELS,
   POUCH_TYPE_LABELS,
+  pricingBasisFor,
   type QuotationEmail as QuotationEmailRecord,
   type RecordOutcomeInput,
   type RecordOutcomeResult,
@@ -56,8 +57,11 @@ function toItem(row: QuotationRow['items'][number]): QuotationItem {
     widthMm: toNumber(row.widthMm),
     heightMm: toNumber(row.heightMm),
     polyMicron: toNumber(row.polyMicron),
+    pricingBasis: row.pricingBasis,
     quantityKg: toNumber(row.quantityKg),
     ratePerKg: toNumber(row.ratePerKg),
+    quantityPouches: row.quantityPouches,
+    ratePerPouch: toNumber(row.ratePerPouch),
     repeatWidth: toNumber(row.repeatWidth),
     repeatHeight: toNumber(row.repeatHeight),
     cylinderCount: row.cylinderCount,
@@ -170,7 +174,12 @@ function priceQuotation(
   costing: Awaited<ReturnType<typeof loadCostingContext>>,
 ) {
   const priced = items.map((item, index) => {
-    const computed = computeItem(item, rates.cylinderRate);
+    /*
+     * The basis is derived from the style rather than trusted from the client,
+     * so a request cannot ask for a standup pouch to be priced by weight.
+     */
+    const pricingBasis = pricingBasisFor(item.jobKind, item.pouchType);
+    const computed = computeItem({ ...item, pricingBasis }, rates.cylinderRate);
 
     // Costed against the rates in force on the quotation's date, and stored, so
     // the margin a quotation was accepted on never moves when prices do.
@@ -205,7 +214,8 @@ function priceQuotation(
   const allTotals = computeTotals(
     priced.map((entry) => ({
       ...entry.computed,
-      quantityKg: entry.input.quantityKg,
+      // The computed weight: on a per-pouch line it is worked out, not typed.
+      quantityKg: entry.computed.quantityKg,
       cylinderCount: entry.input.cylinderCount,
     })),
     rates,
@@ -360,8 +370,15 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
             widthMm: entry.input.widthMm,
             heightMm: entry.input.heightMm,
             polyMicron: entry.input.polyMicron,
-            quantityKg: entry.input.quantityKg,
-            ratePerKg: entry.input.ratePerKg,
+            pricingBasis: pricingBasisFor(entry.input.jobKind, entry.input.pouchType),
+            /*
+             * quantityKg and ratePerKg arrive with the `...entry.computed`
+             * spread below, already resolved for whichever basis this line
+             * uses — listing them here as well would be dead code that TS
+             * rightly flags as overwritten.
+             */
+            quantityPouches: entry.computed.totalPouches,
+            ratePerPouch: entry.computed.costPerPouch,
             repeatWidth: entry.input.repeatWidth,
             repeatHeight: entry.input.repeatHeight,
             cylinderCount: entry.input.cylinderCount,
@@ -416,6 +433,8 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
         polyMicron: toNumber(item.polyMicron),
         quantityKg: toNumber(item.quantityKg),
         ratePerKg: toNumber(item.ratePerKg),
+        quantityPouches: item.quantityPouches,
+        ratePerPouch: toNumber(item.ratePerPouch),
         repeatWidth: toNumber(item.repeatWidth),
         repeatHeight: toNumber(item.repeatHeight),
         cylinderCount: item.cylinderCount,
@@ -462,8 +481,15 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
             widthMm: entry.input.widthMm,
             heightMm: entry.input.heightMm,
             polyMicron: entry.input.polyMicron,
-            quantityKg: entry.input.quantityKg,
-            ratePerKg: entry.input.ratePerKg,
+            pricingBasis: pricingBasisFor(entry.input.jobKind, entry.input.pouchType),
+            /*
+             * quantityKg and ratePerKg arrive with the `...entry.computed`
+             * spread below, already resolved for whichever basis this line
+             * uses — listing them here as well would be dead code that TS
+             * rightly flags as overwritten.
+             */
+            quantityPouches: entry.computed.totalPouches,
+            ratePerPouch: entry.computed.costPerPouch,
             repeatWidth: entry.input.repeatWidth,
             repeatHeight: entry.input.repeatHeight,
             cylinderCount: entry.input.cylinderCount,
