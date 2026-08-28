@@ -168,8 +168,10 @@ returns to the "needs a customer" worklist.
 
 ### Quotations — `/quotations`
 
-List with search by number, customer or job name, and Draft / Sent / Won / Lost
-filters.
+The list reads as a **work queue, not a diary**: Draft first, then Sent, then
+Won and Lost, with the newest at the top of each group. Drafts need finishing
+and sent quotations need chasing, so whatever still needs doing sits at the top.
+Search by number, customer or job name, and the same four filters narrow it.
 
 Each row previews, records the outcome, emails, downloads, edits or deletes.
 The outcome tick is hidden on drafts — the status a quotation moves through is
