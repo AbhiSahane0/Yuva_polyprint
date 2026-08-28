@@ -69,6 +69,11 @@ export interface Quotation extends QuotationSummary {
   email: string;
   gstNumber: string;
 
+  /** When the customer's answer was recorded. */
+  decidedAt: string | null;
+  /** Why they said no. Empty unless the quotation was lost. */
+  lostReason: string;
+
   cylinderRate: number;
   gstPercent: number;
   materialAdvancePercent: number;
@@ -103,4 +108,16 @@ export interface SendQuotationResult {
   sentAt: string;
   /** The quotation's status after sending — Draft becomes Sent. */
   status: QuotationStatus;
+}
+
+/** What recording an outcome answers with. */
+export interface RecordOutcomeResult {
+  status: QuotationStatus;
+  /** The customer this quotation is now attached to; created if there was none. */
+  customerId: string | null;
+  customerCreated: boolean;
+  /** Job names added to that customer from the quotation's lines. */
+  jobsCreated: string[];
+  /** Lines whose job the customer already had, left untouched. */
+  jobsSkipped: string[];
 }

@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import type { SendQuotationInput } from '@yuva/shared';
+import type { RecordOutcomeInput, SendQuotationInput } from '@yuva/shared';
 import type { CreateQuotationInput, ListQuotationsQuery, UpdateQuotationInput } from '@yuva/shared';
 import { created, ok, paginated } from '../../utils/api-response.js';
 import * as quotationService from './quotation.service.js';
@@ -74,4 +74,13 @@ export async function send(req: Request, res: Response) {
 /** Every recorded send for this quotation. */
 export async function emailHistory(req: Request, res: Response) {
   ok(res, await quotationService.listQuotationEmails(req.params.id as string));
+}
+
+/** Records the customer's answer; a win creates the customer and their jobs. */
+export async function recordOutcome(req: Request, res: Response) {
+  const result = await quotationService.recordOutcome(
+    req.params.id as string,
+    req.body as RecordOutcomeInput,
+  );
+  ok(res, result);
 }

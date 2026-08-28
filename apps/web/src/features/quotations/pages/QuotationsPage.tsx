@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Download, Eye, FileText, Pencil, Plus, Search, Send, Trash2, X } from 'lucide-react';
+import {
+  CircleCheckBig,
+  Download,
+  Eye,
+  FileText,
+  Pencil,
+  Plus,
+  Search,
+  Send,
+  Trash2,
+  X,
+} from 'lucide-react';
 import {
   formatRs,
   QUOTATION_STATUS_LABELS,
@@ -28,6 +39,7 @@ import {
 } from '../api/quotation-api';
 import { QuotationPreview } from '../components/QuotationPreview';
 import { SendQuotationModal } from '../components/SendQuotationModal';
+import { OutcomeModal } from '../components/OutcomeModal';
 
 const PAGE_SIZE = 25;
 
@@ -59,6 +71,7 @@ export default function QuotationsPage() {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<QuotationSummary | null>(null);
   const [sending, setSending] = useState<QuotationSummary | null>(null);
+  const [deciding, setDeciding] = useState<QuotationSummary | null>(null);
 
   const debouncedSearch = useDebounce(search, 300);
   const deleteQuotation = useDeleteQuotation();
@@ -250,6 +263,7 @@ export default function QuotationsPage() {
                           quotation={quotation}
                           onPreview={() => setPreviewId(quotation.id)}
                           onSend={() => setSending(quotation)}
+                          onOutcome={() => setDeciding(quotation)}
                           onDelete={() => setDeleting(quotation)}
                         />
                       </td>
@@ -290,6 +304,7 @@ export default function QuotationsPage() {
                     quotation={quotation}
                     onPreview={() => setPreviewId(quotation.id)}
                     onSend={() => setSending(quotation)}
+                    onOutcome={() => setDeciding(quotation)}
                     onDelete={() => setDeleting(quotation)}
                   />
                 </li>
@@ -336,6 +351,7 @@ export default function QuotationsPage() {
         }}
       />
       <SendQuotationModal quotation={sending} onClose={() => setSending(null)} />
+      <OutcomeModal quotation={deciding} onClose={() => setDeciding(null)} />
 
       <Modal
         open={deleting !== null}
@@ -365,11 +381,13 @@ function RowActions({
   quotation,
   onPreview,
   onSend,
+  onOutcome,
   onDelete,
 }: {
   quotation: QuotationSummary;
   onPreview: () => void;
   onSend: () => void;
+  onOutcome: () => void;
   onDelete: () => void;
 }) {
   /*
@@ -407,6 +425,22 @@ function RowActions({
       >
         <Eye className="size-4" />
       </button>
+      {/*
+        Only offered once a quotation has actually gone out. There is no answer
+        to record on a draft nobody has seen, and winning it would create a
+        customer and jobs off the back of an unsent document.
+      */}
+      {quotation.status !== 'DRAFT' ? (
+        <button
+          type="button"
+          onClick={onOutcome}
+          title="Record the answer"
+          aria-label={`Record the answer for quotation ${quotation.number}`}
+          className={iconClass}
+        >
+          <CircleCheckBig className="size-4" />
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={onSend}

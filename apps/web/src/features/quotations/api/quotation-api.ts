@@ -6,6 +6,8 @@ import type {
   Quotation,
   QuotationEmail as QuotationEmailRecord,
   QuotationStatus,
+  RecordOutcomeInput,
+  RecordOutcomeResult,
   QuotationSummary,
   SendQuotationInput,
   SendQuotationResult,
@@ -147,5 +149,28 @@ export function useQuotationEmails(id: string | null) {
     queryKey: quotationKeys.emails(id ?? ''),
     queryFn: () => request<QuotationEmailRecord[]>({ url: `/quotations/${id}/emails` }),
     enabled: id !== null,
+  });
+}
+
+/**
+ * Records the customer's answer.
+ *
+ * Winning creates the customer and their jobs, so this invalidates those
+ * caches too — the customer list is genuinely different afterwards.
+ */
+export function useRecordOutcome() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, ...input }: RecordOutcomeInput & { id: string }) =>
+      request<RecordOutcomeResult>({
+        url: `/quotations/${id}/outcome`,
+        method: 'POST',
+        data: input,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: quotationKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['customers'] });
+    },
   });
 }

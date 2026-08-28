@@ -11,7 +11,15 @@ import {
   type QuotationItem,
   type QuotationItemInput,
   type QuotationSummary,
+  METPET_DENSITY,
+  METPET_MICRON_PER_LAYER,
+  PET_DENSITY,
+  PET_MICRON_PER_LAYER,
+  JOB_KIND_LABELS,
+  POUCH_TYPE_LABELS,
   type QuotationEmail as QuotationEmailRecord,
+  type RecordOutcomeInput,
+  type RecordOutcomeResult,
   type SendQuotationInput,
   type SendQuotationResult,
   type UpdateQuotationInput,
@@ -21,6 +29,7 @@ import { prisma } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
 import { getSettings } from '../settings/settings.service.js';
 import { getRateMap } from '../materials/material.service.js';
+import { nextJobCode } from '../customers/customer.service.js';
 import { env } from '../../config/env.js';
 import { sendEmail } from '../../lib/mailer.js';
 import { renderQuotationPdf } from './quotation-pdf.js';
@@ -125,6 +134,8 @@ function toQuotation(row: QuotationRow): Quotation {
     mobile: row.mobile,
     email: row.email,
     gstNumber: row.gstNumber,
+    decidedAt: row.decidedAt ? row.decidedAt.toISOString() : null,
+    lostReason: row.lostReason,
     cylinderRate: toNumber(row.cylinderRate),
     gstPercent: toNumber(row.gstPercent),
     materialAdvancePercent: toNumber(row.materialAdvancePercent),
@@ -570,4 +581,143 @@ export async function listQuotationEmails(id: string): Promise<QuotationEmailRec
     sentBy: row.sentBy,
     createdAt: row.createdAt.toISOString(),
   }));
+}
+
+/**
+ * Records the customer's answer, and — on a win — turns the quotation into
+ * standing records.
+ *
+ * A won quotation is the moment an enquiry becomes a real customer with real
+ * jobs, and doing that by hand means retyping a specification that is already
+ * on screen. So winning it:
+ *
+ *   1. attaches the quotation to a customer, creating one from its own
+ *      snapshot if it was never linked to the master;
+ *   2. adds each line as a job on that customer, so the next quotation can be
+ *      prefilled from it.
+ *
+ * A job the customer already has under the same name is left alone and
+ * reported, never overwritten. That makes winning the same quotation twice
+ * harmless, and protects a job record the office has been maintaining from
+ * being flattened by a quotation line, which carries far fewer fields.
+ *
+ * Losing records why. "We lost it" teaches nothing a year later.
+ */
+export async function recordOutcome(
+  id: string,
+  input: RecordOutcomeInput,
+): Promise<RecordOutcomeResult> {
+  const quotation = await getQuotationById(id);
+  const decidedAt = new Date();
+
+  if (input.outcome === 'LOST') {
+    await prisma.quotation.update({
+      where: { id },
+      data: { status: 'LOST', lostReason: input.lostReason, decidedAt },
+    });
+    return {
+      status: 'LOST',
+      customerId: quotation.customerId,
+      customerCreated: false,
+      jobsCreated: [],
+      jobsSkipped: [],
+    };
+  }
+
+  return prisma.$transaction(async (tx) => {
+    let customerId = quotation.customerId;
+    let customerCreated = false;
+
+    if (customerId === null) {
+      // Reuse a company of the same name rather than making a second one —
+      // companyName is unique, and the same name means the same firm.
+      const existing = await tx.customer.findUnique({
+        where: { companyName: quotation.customerName },
+        select: { id: true },
+      });
+      if (existing) {
+        customerId = existing.id;
+      } else {
+        const created = await tx.customer.create({
+          data: {
+            companyName: quotation.customerName,
+            address:
+              [quotation.addressLine1, quotation.addressLine2, quotation.addressLine3]
+                .map((line) => line.trim())
+                .filter((line) => line && line !== 'NA')
+                .join(', ') || 'NA',
+            mobile: quotation.mobile || 'NA',
+            email: quotation.email || 'NA',
+            gstNumber: quotation.gstNumber || 'NA',
+            source: 'SHEET',
+            sourceRaw: `Created when quotation #${quotation.number} was won`,
+            isVerified: true,
+          },
+          select: { id: true },
+        });
+        customerId = created.id;
+        customerCreated = true;
+      }
+    }
+
+    const held = await tx.job.findMany({
+      where: { customerId },
+      select: { jobName: true },
+    });
+    const heldNames = new Set(held.map((job) => job.jobName.trim().toLowerCase()));
+
+    const jobsCreated: string[] = [];
+    const jobsSkipped: string[] = [];
+    const takenCodes = new Set<string>();
+
+    for (const item of quotation.items) {
+      const key = item.jobName.trim().toLowerCase();
+      if (heldNames.has(key)) {
+        jobsSkipped.push(item.jobName);
+        continue;
+      }
+      heldNames.add(key);
+
+      const petMicron = PET_MICRON_PER_LAYER;
+      const metPetMicron = item.layer === 3 ? METPET_MICRON_PER_LAYER : null;
+
+      await tx.job.create({
+        data: {
+          jobCode: await nextJobCode(tx, takenCodes),
+          jobName: item.jobName,
+          // 0 means "not from the imported spreadsheet", the same marker the
+          // customer editor uses for a job added by hand.
+          sourceRow: 0,
+          customerId,
+          customerSource: 'EXPLICIT',
+          needsCustomer: false,
+          // A roll has no pouch style; the jobs table predates the enum and
+          // stores 'NA' for anything unknown.
+          pouchType: item.pouchType ? POUCH_TYPE_LABELS[item.pouchType] : 'NA',
+          jobType: JOB_KIND_LABELS[item.jobKind],
+          layer: item.layer,
+          petMicron,
+          metPetMicron,
+          polyMicron: item.polyMicron,
+          designOpenWidth: item.widthMm,
+          designHeight: item.heightMm,
+          totalCylinders: item.cylinderCount,
+          petGsm: round(petMicron * PET_DENSITY, 3),
+          metPetGsm: metPetMicron === null ? null : round(metPetMicron * METPET_DENSITY, 3),
+          // Only known when a film was chosen; the density comes from it.
+          polyGsm: null,
+          // The imported jobs table stores this as text, not a number.
+          pouchesPerKg: String(item.pouchesPerKg),
+        },
+      });
+      jobsCreated.push(item.jobName);
+    }
+
+    await tx.quotation.update({
+      where: { id },
+      data: { status: 'WON', lostReason: '', decidedAt, customerId },
+    });
+
+    return { status: 'WON' as const, customerId, customerCreated, jobsCreated, jobsSkipped };
+  });
 }

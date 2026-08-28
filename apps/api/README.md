@@ -11,6 +11,7 @@ quotation PDFs.
 - [Calculations](#calculations) ← the part worth reading
 - [Data model](#data-model)
 - [Sending quotations by email](#sending-quotations-by-email)
+- [Winning and losing](#winning-and-losing)
 - [CORS](#cors)
 - [Scripts](#scripts)
 
@@ -261,17 +262,18 @@ every view.
 
 ### Quotations
 
-| Method | Path                      | Notes                                                    |
-| ------ | ------------------------- | -------------------------------------------------------- |
-| GET    | `/quotations`             | Search by number, customer or job name; filter by status |
-| GET    | `/quotations/next-number` | The number the next quotation will get                   |
-| GET    | `/quotations/:id`         | Full document with all lines                             |
-| GET    | `/quotations/:id/pdf`     | The PDF. `?inline=1` displays, otherwise downloads       |
-| POST   | `/quotations`             | Create; prices and costs every line                      |
-| PATCH  | `/quotations/:id`         | Update; **re-prices the whole document**                 |
-| POST   | `/quotations/:id/send`    | Email it to the customer with the PDF attached           |
-| GET    | `/quotations/:id/emails`  | Every recorded send, newest first                        |
-| DELETE | `/quotations/:id`         | Delete; lines cascade                                    |
+| Method | Path                      | Notes                                                              |
+| ------ | ------------------------- | ------------------------------------------------------------------ |
+| GET    | `/quotations`             | Search by number, customer or job name; filter by status           |
+| GET    | `/quotations/next-number` | The number the next quotation will get                             |
+| GET    | `/quotations/:id`         | Full document with all lines                                       |
+| GET    | `/quotations/:id/pdf`     | The PDF. `?inline=1` displays, otherwise downloads                 |
+| POST   | `/quotations`             | Create; prices and costs every line                                |
+| PATCH  | `/quotations/:id`         | Update; **re-prices the whole document**                           |
+| POST   | `/quotations/:id/send`    | Email it to the customer with the PDF attached                     |
+| GET    | `/quotations/:id/emails`  | Every recorded send, newest first                                  |
+| POST   | `/quotations/:id/outcome` | Record won or lost — see [Winning and losing](#winning-and-losing) |
+| DELETE | `/quotations/:id`         | Delete; lines cascade                                              |
 
 **A new company is created with the quotation.** `POST /quotations` with
 `saveAsCustomer: true` and no `customerId` adds the company to the customer
@@ -610,16 +612,16 @@ no effect; they are not in the input schema at all.
 Full diagram and column reference: [`docs/database-schema.md`](../../docs/database-schema.md).
 Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 
-| Table              | Holds                                                                            |
-| ------------------ | -------------------------------------------------------------------------------- |
-| `customers`        | Companies that order. Text fields use `'NA'` where the imported sheet was blank. |
-| `jobs`             | Products and their full 55-column specification.                                 |
-| `quotations`       | Customer-facing documents. Totals frozen at save.                                |
-| `quotation_items`  | One priced line, with its costing.                                               |
-| `materials`        | The rate catalogue, with density for films.                                      |
-| `material_rates`   | One material's price on one date — one row per active material per day.          |
-| `quotation_emails` | One recorded attempt to email a quotation — recipients, subject, who sent it.    |
-| `app_settings`     | Editable rates and costing defaults.                                             |
+| Table              | Holds                                                                                     |
+| ------------------ | ----------------------------------------------------------------------------------------- |
+| `customers`        | Companies that order. Text fields use `'NA'` where the imported sheet was blank.          |
+| `jobs`             | Products and their full 55-column specification.                                          |
+| `quotations`       | Customer-facing documents. Totals frozen at save; `lost_reason` says why a loss was lost. |
+| `quotation_items`  | One priced line, with its costing.                                                        |
+| `materials`        | The rate catalogue, with density for films.                                               |
+| `material_rates`   | One material's price on one date — one row per active material per day.                   |
+| `quotation_emails` | One recorded attempt to email a quotation — recipients, subject, who sent it.             |
+| `app_settings`     | Editable rates and costing defaults.                                                      |
 
 Two deliberate choices:
 
@@ -634,6 +636,57 @@ production history or a sent quotation.
 Money and quantities are `Decimal`, never `Float` — this system computes costs
 and variance, and floating point drift in a costing engine is a silent
 correctness bug.
+
+---
+
+## Winning and losing
+
+`POST /quotations/:id/outcome` records what the customer said. It takes
+`{ outcome: 'WON' | 'LOST', lostReason }`.
+
+This is a separate endpoint rather than a status change through `PATCH`, because
+winning has consequences. They belong behind a deliberate action, not a dropdown
+someone might brush past while editing something else.
+
+### Winning turns an enquiry into standing records
+
+A won quotation is the moment an enquiry becomes a real customer with real jobs,
+and doing that by hand means retyping a specification already on the screen. So
+winning:
+
+1. **Attaches the quotation to a customer**, creating one from the quotation's
+   own snapshot — name, address, mobile, email, GSTIN — if it was never linked
+   to the master. A company of the same name is reused, never duplicated.
+2. **Adds each line as a job** on that customer, so the next quotation for them
+   can be prefilled from it. The line's kind, pouch style, layers, micron,
+   design size and cylinder count carry across, and PET/MET PET GSM are derived.
+
+The response says exactly what happened, rather than a bare success:
+
+```json
+{
+  "status": "WON",
+  "customerId": "...",
+  "customerCreated": true,
+  "jobsCreated": ["Winmark Chips 100g", "Winmark Roll"],
+  "jobsSkipped": []
+}
+```
+
+**A job the customer already holds under the same name is left alone and
+reported, never overwritten.** Two things follow. Winning the same quotation
+twice is harmless — the second time creates nothing. And a job record the office
+has been maintaining cannot be flattened by a quotation line, which carries far
+fewer of the job's fields.
+
+### Losing records why
+
+`lostReason` is **required** on a loss and cleared on a win. "We lost it"
+teaches nothing a year later; "price 8% over the incumbent" is the entire reason
+for asking. The three-character minimum is not a quality bar — it only stops an
+empty box being submitted by reflex.
+
+`decidedAt` timestamps either answer.
 
 ---
 

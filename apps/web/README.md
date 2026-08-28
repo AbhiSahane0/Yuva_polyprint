@@ -169,7 +169,12 @@ returns to the "needs a customer" worklist.
 ### Quotations — `/quotations`
 
 List with search by number, customer or job name, and Draft / Sent / Won / Lost
-filters. Each row previews, downloads, edits or deletes.
+filters.
+
+Each row previews, records the outcome, emails, downloads, edits or deletes.
+The outcome tick is hidden on drafts — the status a quotation moves through is
+Draft → Sent → Won or Lost, and the last step needs the customer to have seen it
+first.
 
 ### Quotation form — `/quotations/new`, `/quotations/:id/edit`
 
@@ -227,6 +232,31 @@ A 3-layer job is costed as PET + **MET PET** + poly, each on its own rate, so
 the margin shown accounts for the metallised ply being dearer than plain PET.
 Set that rate on the Rates screen; without it the strip reports no cost at all
 rather than a flattering one.
+
+### Record the outcome — won or lost
+
+The tick on a row asks what the customer said. It appears **only once a
+quotation has been sent**: there is no answer to record on a draft nobody has
+seen, and winning one would create a customer off the back of an unsent
+document.
+
+**Accepted** does more than change a badge, so the dialog says what it is about
+to do before it does it — the company is added to your customers if they are not
+there already, and every job on the quotation is added to their record. Jobs
+they already hold are left alone. The toast afterwards reports what actually
+happened rather than a generic "saved":
+
+> Quotation #122 won · Winmark Snacks LLP added to customers · 2 jobs added
+
+That means the customer list and job records are genuinely different afterwards,
+so both caches are refreshed.
+
+**Rejected** asks why, and will not save without it. A line is enough — price,
+lead time, went to a competitor. "We lost it" tells nobody anything a year
+later, and the reason is the whole value of recording the outcome at all.
+
+Winning after a loss clears the old reason, so a quotation never carries a
+stale explanation.
 
 ### Send a quotation
 

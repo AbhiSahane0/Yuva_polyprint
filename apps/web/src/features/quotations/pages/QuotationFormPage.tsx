@@ -376,7 +376,12 @@ export default function QuotationFormPage() {
           <div
             role="radiogroup"
             aria-label="Customer"
-            className="border-ink-200 mb-4 inline-flex rounded-[var(--radius-md)] border p-0.5"
+            /*
+              w-fit and self-start: the section lays its children out in a
+              stretching column, so inline-flex alone still spanned the full
+              width and the two buttons floated in a long empty box.
+            */
+            className="border-ink-200 mb-4 flex w-fit self-start rounded-[var(--radius-md)] border p-0.5"
           >
             {(
               [
@@ -391,7 +396,7 @@ export default function QuotationFormPage() {
                 aria-checked={customerMode === mode}
                 onClick={() => changeCustomerMode(mode)}
                 className={cn(
-                  'cursor-pointer rounded-[var(--radius-sm)] px-3.5 py-1.5 text-sm font-medium transition-colors',
+                  'cursor-pointer rounded-[var(--radius-sm)] px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors',
                   customerMode === mode
                     ? 'bg-brand-600 text-white'
                     : 'text-ink-600 hover:bg-ink-100',

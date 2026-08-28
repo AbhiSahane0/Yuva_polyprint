@@ -112,7 +112,10 @@ function deriveJobValues(job: Omit<CustomerJobInput, 'id'>) {
  * month, so new codes follow the same shape and the client's existing habits
  * keep working.
  */
-async function nextJobCode(tx: Prisma.TransactionClient, taken: Set<string>): Promise<string> {
+export async function nextJobCode(
+  tx: Prisma.TransactionClient,
+  taken: Set<string>,
+): Promise<string> {
   const now = new Date();
   const prefix = `YPP${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
 
