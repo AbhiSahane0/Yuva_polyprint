@@ -53,3 +53,28 @@ export const LAYER_STRUCTURE: Record<number, string[]> = {
   2: ['PET', 'Poly'],
   3: ['PET', 'MET PET', 'Poly'],
 };
+
+/**
+ * How a line is priced.
+ *
+ * Rolls and most pouches are sold by weight. Standup and standup-zipper pouches
+ * are sold by the piece — the converting work dominates their cost, so the
+ * trade quotes them per pouch and the customer's order is written in pieces.
+ */
+export const PRICING_BASES = ['PER_KG', 'PER_POUCH'] as const;
+export type PricingBasis = (typeof PRICING_BASES)[number];
+
+/** The styles the trade prices by the piece. */
+const PER_POUCH_STYLES: readonly PouchType[] = ['STANDUP', 'STANDUP_ZIPPER'];
+
+/**
+ * Which basis a line uses.
+ *
+ * Derived from the pouch style rather than chosen separately, so the two can
+ * never disagree — changing the style reprices the line, which is correct: a
+ * standup pouch is not sold the way a centre-seal one is.
+ */
+export function pricingBasisFor(jobKind: JobKind, pouchType: PouchType | null): PricingBasis {
+  if (jobKind === 'ROLL' || pouchType === null) return 'PER_KG';
+  return PER_POUCH_STYLES.includes(pouchType) ? 'PER_POUCH' : 'PER_KG';
+}
