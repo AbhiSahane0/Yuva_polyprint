@@ -410,6 +410,21 @@ export function renderQuotationHtml(quotation: Quotation): string {
     </tr>
   </table>
 
+  ${(() => {
+    /*
+     * The cylinder total includes transport, so a customer checking it as
+     * cylinders x cost-per-cylinder lands short by exactly the transport and
+     * concludes the quotation is wrong. Say so — but only when transport was
+     * actually charged, so a document that carries none is not cluttered by a
+     * note about it.
+     */
+    const transport = quotation.items.reduce((sum, item) => sum + item.transportCost, 0);
+    if (transport <= 0) return '';
+    return `<div class="closing">Cylinder cost includes ${esc(
+      formatRs(transport),
+    )} transport.</div>`;
+  })()}
+
   <div class="closing">We look forward to your valued order and assure you of our best quality and service at all times.</div>
 
   ${show(quotation.notes) ? `<div class="closing"><b>Note:</b> ${esc(quotation.notes)}</div>` : ''}

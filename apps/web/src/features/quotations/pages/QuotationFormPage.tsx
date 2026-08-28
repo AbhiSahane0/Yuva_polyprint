@@ -1001,7 +1001,23 @@ export default function QuotationFormPage() {
                       <Field
                         label="Total cylinder cost"
                         htmlFor={`items.${index}.tcc`}
-                        hint="Calculated"
+                        /*
+                         * Show the working, not just the answer. Transport is
+                         * added to this total, so anyone checking it as
+                         * cylinders × cost-per-cylinder lands short by exactly
+                         * the transport and concludes the figure is wrong.
+                         */
+                        hint={
+                          computed
+                            ? `${formatNumber(num(watchedItem?.cylinderCount))} × ${formatRs(
+                                computed.costPerCylinder,
+                              )}${
+                                num(watchedItem?.transportCost) > 0
+                                  ? ` + ${formatRs(num(watchedItem?.transportCost))} transport`
+                                  : ''
+                              }`
+                            : 'Calculated'
+                        }
                       >
                         <ReadOnlyValue
                           value={computed ? formatRs(computed.totalCylinderCost) : null}

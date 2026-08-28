@@ -392,11 +392,48 @@ cosmetic: the 1 Kg Paneer Bag line reads **24,930** on the client's document,
 and multiplying the unrounded 99.716 gives 24,929. The spreadsheet rounds
 first, so we do too.
 
-**5. Printing total**
+**5. Printing total** — and this depends on the pouch style:
 
 ```
-totalAmount = quantityKg × ratePerKg
+Standup and standup zipper   totalAmount = quantityPouches × ratePerPouch
+Everything else, and rolls   totalAmount = quantityKg × ratePerKg
 ```
+
+**Standup and standup-zipper pouches are sold by the piece.** The converting
+work dominates their cost, so the trade quotes them per pouch and the customer's
+order is written in pieces. Every other style, and every roll, stays per kg.
+
+The basis is **derived from the style, never chosen** — `pricingBasisFor()` in
+`@yuva/shared` — so the two cannot disagree, and the server derives it again
+rather than trusting the client. A request cannot ask for a standup pouch to be
+priced by weight.
+
+**Both units are stored on every line.** On a per-pouch line the weight is
+worked back from pouches-per-kg, because the film is ordered against it; on a
+per-kg line the rate one pouch works out at is derived. That way lines on a
+mixed quotation can be compared, and nothing downstream has to recompute.
+
+```
+per pouch:  quantityKg = quantityPouches ÷ pouchesPerKg
+            ratePerKg  = totalAmount ÷ quantityKg
+per kg:     ratePerPouch = totalAmount ÷ totalPouches
+```
+
+Worked example — 50,000 standup pouches, 420 × 260 mm, 3 layer, 45µ poly, at
+₹4.20 each:
+
+```
+pouches/kg = 107.48
+totalAmount = 50,000 × 4.20        = ₹2,10,000
+quantityKg  = 50,000 ÷ 107.48      = 465.203 kg
+ratePerKg   = 2,10,000 ÷ 465.203   = ₹451.42
+```
+
+On the printed quotation a per-pouch line shows its pouch count under Order Qty
+and reads `4.20 /pc` in the rate cell. The Order Qty **total** is only summed
+when every line shares a basis — adding kilograms to pouches would print a
+number the customer could check and find wrong, so a mixed document shows a dash
+there. The money totals are unaffected; those are always rupees.
 
 **6. Cylinder** — the +80 is the mounting allowance:
 
@@ -407,8 +444,15 @@ costPerCylinder       = (cylinderWidth × cylinderCircumference ÷ 100) × cylin
 totalCylinderCost     = costPerCylinder × cylinderCount + transportCost
 ```
 
+**Transport is part of this total.** It is the one term that is not derived from
+the cylinder's size, so checking the figure as cylinders × cost-per-cylinder
+comes up short by exactly the transport and looks like an error. A line with
+4 cylinders at ₹9,085 and ₹100 transport totals **₹36,440**, not ₹36,340. The
+form spells the sum out beneath the field, and the PDF says so under the totals
+whenever any transport was charged.
+
 Worked example, 5 Kg Paneer Bag, 670 × 460 mm, 60µ poly, 2 layer, 250 kg at
-₹295, repeat 1 × 1, 4 cylinders:
+₹295, repeat 1 × 1, 4 cylinders, no transport:
 
 ```
 micron            = 12 + 60 + 2 = 74
