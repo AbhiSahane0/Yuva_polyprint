@@ -218,6 +218,18 @@ Other reveals a box to say what it is — the option is worthless otherwise.
 Switching a line to Roll clears the style rather than raising an error, so
 changing your mind is not something you then have to tidy up.
 
+#### Standup pouches are quoted per piece
+
+The quantity and rate boxes change with the pouch style. **Standup** and
+**Standup zipper** are sold by the piece, so those lines ask for a pouch count
+and a rate per pouch, and show the weight worked back beside them — the film is
+still ordered by weight. Every other style, and every roll, asks for kilograms
+as before.
+
+The two pairs **swap** rather than sitting side by side, because only one of
+them is ever the one being quoted on. Which applies is decided by the style, not
+chosen separately, so the form cannot show a basis the server will not use.
+
 #### What is calculated
 
 Per line you enter size, quantity and rate; **micron, pouches per kg, total
@@ -232,6 +244,21 @@ A 3-layer job is costed as PET + **MET PET** + poly, each on its own rate, so
 the margin shown accounts for the metallised ply being dearer than plain PET.
 Set that rate on the Rates screen; without it the strip reports no cost at all
 rather than a flattering one.
+
+Underneath, each ply is listed with the rate it was costed against:
+
+> PET 16.8 GSM · Rs. 210.00 · MET PET 16.8 GSM · Rs. 258.00 · Poly 42.3 GSM · Rs. 185.00
+
+Rates are fetched from the Rates screen automatically, as of the quotation's
+date. A margin is only worth trusting if the working behind it can be seen, and
+a component with **no rate that day says so** in red rather than going blank —
+so the office knows what to go and enter.
+
+**The cylinder total shows its sum.** Transport is added to it, so the hint
+under the field reads `4 × Rs. 9,085 + Rs. 100 transport`. Without that, anyone
+checking the figure as cylinders × cost-per-cylinder lands short by exactly the
+transport and concludes it is wrong. The PDF carries the same note under the
+totals whenever transport was charged.
 
 ### Record the outcome — won or lost
 

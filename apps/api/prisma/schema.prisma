@@ -18,6 +18,14 @@ datasource db {
   provider = "postgresql"
 }
 
+/// How a quotation line is sold.
+enum PricingBasis {
+  /// Rolls and most pouch styles.
+  PER_KG
+  /// Standup and standup-zipper pouches, which the trade quotes per piece.
+  PER_POUCH
+}
+
 /// What the customer physically receives.
 enum JobKind {
   /// Printed film on the reel.
@@ -305,16 +313,24 @@ model QuotationItem {
   filmMaterial   Material? @relation(fields: [filmMaterialId], references: [id], onDelete: SetNull)
 
   // ---- Inputs -------------------------------------------------------------
-  layer         Int
-  widthMm       Decimal @map("width_mm") @db.Decimal(10, 2)
-  heightMm      Decimal @map("height_mm") @db.Decimal(10, 2)
-  polyMicron    Decimal @map("poly_micron") @db.Decimal(10, 2)
-  quantityKg    Decimal @map("quantity_kg") @db.Decimal(12, 3)
-  ratePerKg     Decimal @map("rate_per_kg") @db.Decimal(12, 2)
-  repeatWidth   Decimal @map("repeat_width") @db.Decimal(10, 2)
-  repeatHeight  Decimal @map("repeat_height") @db.Decimal(10, 2)
-  cylinderCount Int     @map("cylinder_count")
-  transportCost Decimal @default(0) @map("transport_cost") @db.Decimal(12, 2)
+  layer        Int
+  widthMm      Decimal      @map("width_mm") @db.Decimal(10, 2)
+  heightMm     Decimal      @map("height_mm") @db.Decimal(10, 2)
+  polyMicron   Decimal      @map("poly_micron") @db.Decimal(10, 2)
+  /// Derived from the pouch style; stored so a saved line keeps the basis it
+  /// was priced on even if the style is edited later.
+  pricingBasis PricingBasis @default(PER_KG) @map("pricing_basis")
+
+  /// Both units are always populated — one typed, the other worked out — so
+  /// the PDF, the totals and the job records can each read what they need.
+  quantityKg      Decimal @map("quantity_kg") @db.Decimal(12, 3)
+  ratePerKg       Decimal @map("rate_per_kg") @db.Decimal(12, 2)
+  quantityPouches Int     @default(0) @map("quantity_pouches")
+  ratePerPouch    Decimal @default(0) @map("rate_per_pouch") @db.Decimal(12, 4)
+  repeatWidth     Decimal @map("repeat_width") @db.Decimal(10, 2)
+  repeatHeight    Decimal @map("repeat_height") @db.Decimal(10, 2)
+  cylinderCount   Int     @map("cylinder_count")
+  transportCost   Decimal @default(0) @map("transport_cost") @db.Decimal(12, 2)
 
   // ---- Computed, stored so the document is immutable ----------------------
   micron                Decimal @db.Decimal(10, 2)

@@ -17,6 +17,8 @@ export function round(value: number, dp = 2): number {
   return Math.round((value + Number.EPSILON) * factor) / factor;
 }
 
+import type { PricingBasis } from '../constants/job.js';
+
 export const LAYER_OPTIONS = [2, 3] as const;
 export type LayerCount = (typeof LAYER_OPTIONS)[number];
 
@@ -35,8 +37,14 @@ export interface QuotationItemInputs {
   widthMm: number;
   heightMm: number;
   polyMicron: number;
+  /** How this line is sold. Derived from the pouch style, never chosen. */
+  pricingBasis?: PricingBasis;
+  /** Entered on a per-kg line; derived on a per-pouch one. */
   quantityKg: number;
   ratePerKg: number;
+  /** Entered on a per-pouch line; derived on a per-kg one. */
+  quantityPouches?: number;
+  ratePerPouch?: number;
   repeatWidth: number;
   repeatHeight: number;
   cylinderCount: number;
@@ -48,6 +56,13 @@ export interface QuotationItemComputed {
   pouchesPerKg: number;
   totalPouches: number;
   totalAmount: number;
+  /**
+   * Both units, whichever was typed. A per-pouch line still reports the weight
+   * — the film is ordered by it — and a per-kg line still reports what a single
+   * pouch works out at.
+   */
+  quantityKg: number;
+  ratePerKg: number;
   cylinderWidth: number;
   cylinderCircumference: number;
   costPerCylinder: number;
@@ -72,9 +87,36 @@ export function computeItem(
 
   const areaTerm = ((input.widthMm * input.heightMm) / 100) * micron * factor;
   const pouchesPerKg = areaTerm > 0 ? round(1000 / (areaTerm / 10000), 2) : 0;
-  const totalPouches = round(pouchesPerKg * input.quantityKg, 0);
 
-  const totalAmount = round(input.quantityKg * input.ratePerKg, 2);
+  /*
+   * Standup and standup-zipper pouches are sold by the piece, everything else
+   * by weight. On a per-pouch line the office types a pouch count and a rate
+   * per pouch, and the weight is worked back from pouches-per-kg — that is the
+   * figure the film is ordered against, so it still has to exist.
+   */
+  const basis = input.pricingBasis ?? 'PER_KG';
+  const perPouch = basis === 'PER_POUCH';
+
+  const quantityPouches = perPouch ? Math.max(0, Math.round(input.quantityPouches ?? 0)) : 0;
+  const quantityKg = perPouch
+    ? pouchesPerKg > 0
+      ? round(quantityPouches / pouchesPerKg, 3)
+      : 0
+    : input.quantityKg;
+
+  const totalPouches = perPouch ? quantityPouches : round(pouchesPerKg * input.quantityKg, 0);
+
+  const totalAmount = perPouch
+    ? round(quantityPouches * (input.ratePerPouch ?? 0), 2)
+    : round(input.quantityKg * input.ratePerKg, 2);
+
+  // The equivalent rate in the other unit, so lines on a mixed quotation can
+  // still be compared with each other.
+  const ratePerKg = perPouch
+    ? quantityKg > 0
+      ? round(totalAmount / quantityKg, 2)
+      : 0
+    : input.ratePerKg;
 
   const cylinderWidth = round(input.widthMm * input.repeatWidth + 80, 2);
   const cylinderCircumference = round(input.heightMm * input.repeatHeight, 2);
@@ -89,6 +131,8 @@ export function computeItem(
     pouchesPerKg,
     totalPouches,
     totalAmount,
+    quantityKg,
+    ratePerKg,
     cylinderWidth,
     cylinderCircumference,
     costPerCylinder,

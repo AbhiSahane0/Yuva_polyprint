@@ -4,11 +4,15 @@ import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import {
+  type CreateQuotationFormValues,
+  type CreateQuotationInput,
   DEFAULT_TERMS,
   JOB_KINDS,
   JOB_KIND_LABELS,
+  type JobKind,
   POUCH_TYPES,
   POUCH_TYPE_LABELS,
+  type PouchType,
   QUOTATION_STATUS_LABELS,
   computeItem,
   computeMargin,
@@ -17,9 +21,8 @@ import {
   createQuotationSchema,
   formatNumber,
   formatRs,
+  pricingBasisFor,
   quotationStatusSchema,
-  type CreateQuotationFormValues,
-  type CreateQuotationInput,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -52,6 +55,8 @@ const BLANK_ITEM = {
   polyMicron: '',
   quantityKg: '',
   ratePerKg: '',
+  quantityPouches: '',
+  ratePerPouch: '',
   repeatWidth: 1,
   repeatHeight: 1,
   cylinderCount: 4,
@@ -153,6 +158,8 @@ export default function QuotationFormPage() {
         polyMicron: item.polyMicron,
         quantityKg: item.quantityKg,
         ratePerKg: item.ratePerKg,
+        quantityPouches: item.quantityPouches,
+        ratePerPouch: item.ratePerPouch,
         repeatWidth: item.repeatWidth,
         repeatHeight: item.repeatHeight,
         cylinderCount: item.cylinderCount,
@@ -261,6 +268,12 @@ export default function QuotationFormPage() {
     const rows = (watched.items ?? []).map((item) =>
       computeItem(
         {
+          pricingBasis: pricingBasisFor(
+            (item?.jobKind as JobKind) ?? 'POUCH',
+            (item?.pouchType as PouchType) || null,
+          ),
+          quantityPouches: num(item?.quantityPouches),
+          ratePerPouch: num(item?.ratePerPouch),
           layer: num(item?.layer) || 2,
           widthMm: num(item?.widthMm),
           heightMm: num(item?.heightMm),
@@ -286,7 +299,7 @@ export default function QuotationFormPage() {
     );
 
     // Material cost, mirroring the server so the margin is visible before saving.
-    const costs = (watched.items ?? []).map((item) => {
+    const costs = (watched.items ?? []).map((item, index) => {
       const film = item?.filmMaterialId ? materialById.get(String(item.filmMaterialId)) : undefined;
       const result = computeMaterialCostPerKg({
         layer: num(item?.layer) || 2,
@@ -304,7 +317,14 @@ export default function QuotationFormPage() {
       });
       return {
         ...result,
-        marginPercent: computeMargin(num(item?.ratePerKg), result.costPerKg),
+        /*
+         * Margin is taken against the COMPUTED rate per kg, not the typed one.
+         * A per-pouch line never fills the per-kg box in — the office types a
+         * rate per pouch — so reading the field directly showed no margin at
+         * all on exactly the lines this feature added. `rows` has the rate
+         * resolved for whichever basis the line uses.
+         */
+        marginPercent: computeMargin(rows[index]?.ratePerKg ?? 0, result.costPerKg),
       };
     });
 
@@ -540,6 +560,14 @@ export default function QuotationFormPage() {
               const computed = live.rows[index];
               const cost = live.costs[index];
               const itemErrors = errors.items?.[index];
+              const watchedItem = watched.items?.[index];
+              // Derived from the style, never chosen — the same rule the server
+              // applies, so the form cannot show a basis the API will not use.
+              const perPouch =
+                pricingBasisFor(
+                  (watchedItem?.jobKind as JobKind) ?? 'POUCH',
+                  (watchedItem?.pouchType as PouchType) || null,
+                ) === 'PER_POUCH';
               return (
                 <li
                   key={field.id}
@@ -742,37 +770,105 @@ export default function QuotationFormPage() {
                       </Field>
                     </div>
 
-                    <div className="sm:col-span-3">
-                      <Field
-                        label="Quantity"
-                        htmlFor={`items.${index}.quantityKg`}
-                        hint="kg"
-                        required
-                        error={itemErrors?.quantityKg?.message}
-                      >
-                        <Input
-                          id={`items.${index}.quantityKg`}
-                          inputMode="decimal"
-                          invalid={Boolean(itemErrors?.quantityKg)}
-                          {...register(`items.${index}.quantityKg`)}
-                        />
-                      </Field>
-                    </div>
-                    <div className="sm:col-span-3">
-                      <Field
-                        label="Rate per kg"
-                        htmlFor={`items.${index}.ratePerKg`}
-                        required
-                        error={itemErrors?.ratePerKg?.message}
-                      >
-                        <Input
-                          id={`items.${index}.ratePerKg`}
-                          inputMode="decimal"
-                          invalid={Boolean(itemErrors?.ratePerKg)}
-                          {...register(`items.${index}.ratePerKg`)}
-                        />
-                      </Field>
-                    </div>
+                    {/*
+                      Standup and standup-zipper pouches are sold by the piece,
+                      so those lines ask for a pouch count and a rate per pouch,
+                      and show the weight worked back from it. Every other style
+                      and every roll is sold by weight, unchanged. The boxes
+                      swap rather than sitting side by side, because only one
+                      pair is ever the one being quoted on.
+                    */}
+                    {perPouch ? (
+                      <>
+                        <div className="sm:col-span-3">
+                          <Field
+                            label="Quantity"
+                            htmlFor={`items.${index}.quantityPouches`}
+                            hint="pouches"
+                            required
+                            error={itemErrors?.quantityPouches?.message}
+                          >
+                            <Input
+                              id={`items.${index}.quantityPouches`}
+                              inputMode="numeric"
+                              invalid={Boolean(itemErrors?.quantityPouches)}
+                              {...register(`items.${index}.quantityPouches`)}
+                            />
+                          </Field>
+                        </div>
+                        <div className="sm:col-span-3">
+                          <Field
+                            label="Rate per pouch"
+                            htmlFor={`items.${index}.ratePerPouch`}
+                            required
+                            error={itemErrors?.ratePerPouch?.message}
+                          >
+                            <Input
+                              id={`items.${index}.ratePerPouch`}
+                              inputMode="decimal"
+                              invalid={Boolean(itemErrors?.ratePerPouch)}
+                              {...register(`items.${index}.ratePerPouch`)}
+                            />
+                          </Field>
+                        </div>
+                        <div className="sm:col-span-3">
+                          <Field
+                            label="Weight"
+                            htmlFor={`items.${index}.kgOut`}
+                            hint="kg — the film is ordered by this"
+                          >
+                            <ReadOnlyValue
+                              value={computed ? `${formatNumber(computed.quantityKg, 3)} kg` : null}
+                            />
+                          </Field>
+                        </div>
+                        <div className="sm:col-span-3">
+                          <Field
+                            label="Works out at"
+                            htmlFor={`items.${index}.rateOut`}
+                            hint="per kg"
+                          >
+                            <ReadOnlyValue
+                              value={computed ? formatRs(computed.ratePerKg, 2) : null}
+                            />
+                          </Field>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="sm:col-span-3">
+                          <Field
+                            label="Quantity"
+                            htmlFor={`items.${index}.quantityKg`}
+                            hint="kg"
+                            required
+                            error={itemErrors?.quantityKg?.message}
+                          >
+                            <Input
+                              id={`items.${index}.quantityKg`}
+                              inputMode="decimal"
+                              invalid={Boolean(itemErrors?.quantityKg)}
+                              {...register(`items.${index}.quantityKg`)}
+                            />
+                          </Field>
+                        </div>
+                        <div className="sm:col-span-3">
+                          <Field
+                            label="Rate per kg"
+                            htmlFor={`items.${index}.ratePerKg`}
+                            required
+                            error={itemErrors?.ratePerKg?.message}
+                          >
+                            <Input
+                              id={`items.${index}.ratePerKg`}
+                              inputMode="decimal"
+                              invalid={Boolean(itemErrors?.ratePerKg)}
+                              {...register(`items.${index}.ratePerKg`)}
+                            />
+                          </Field>
+                        </div>
+                      </>
+                    )}
                     <div className="sm:col-span-3">
                       <Field
                         label="Film"
@@ -905,7 +1001,23 @@ export default function QuotationFormPage() {
                       <Field
                         label="Total cylinder cost"
                         htmlFor={`items.${index}.tcc`}
-                        hint="Calculated"
+                        /*
+                         * Show the working, not just the answer. Transport is
+                         * added to this total, so anyone checking it as
+                         * cylinders × cost-per-cylinder lands short by exactly
+                         * the transport and concludes the figure is wrong.
+                         */
+                        hint={
+                          computed
+                            ? `${formatNumber(num(watchedItem?.cylinderCount))} × ${formatRs(
+                                computed.costPerCylinder,
+                              )}${
+                                num(watchedItem?.transportCost) > 0
+                                  ? ` + ${formatRs(num(watchedItem?.transportCost))} transport`
+                                  : ''
+                              }`
+                            : 'Calculated'
+                        }
                       >
                         <ReadOnlyValue
                           value={computed ? formatRs(computed.totalCylinderCost) : null}
@@ -954,6 +1066,33 @@ export default function QuotationFormPage() {
                               </span>
                             </>
                           )}
+                        </div>
+                      ) : null}
+
+                      {/*
+                        The plies the cost is built from, with the rate each was
+                        costed against. A 3-layer structure is PET + MET PET +
+                        Poly, and the metallised ply is dearer — showing the
+                        working is what makes a margin figure trustworthy
+                        instead of a number to be taken on faith. Rates come
+                        from the Rates screen automatically, as of the
+                        quotation's date.
+                      */}
+                      {cost && cost.breakdown.length > 0 ? (
+                        <div className="text-ink-500 mt-2 flex flex-wrap gap-x-4 gap-y-1 px-4 text-xs">
+                          {cost.breakdown.map((part) => (
+                            <span key={part.component} className="tabular-nums">
+                              <span className="text-ink-700 font-medium">{part.component}</span>{' '}
+                              {formatNumber(part.gsm, 1)} GSM ·{' '}
+                              {part.rate === null ? (
+                                // Naming the gap beats a blank: the office can
+                                // go and enter the rate that is missing.
+                                <span className="text-danger-600">no rate today</span>
+                              ) : (
+                                formatRs(part.rate, 2)
+                              )}
+                            </span>
+                          ))}
                         </div>
                       ) : null}
                     </div>

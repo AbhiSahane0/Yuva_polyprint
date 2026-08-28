@@ -97,10 +97,28 @@ export function renderQuotationHtml(quotation: Quotation): string {
         <td class="r">${formatNumber(item.widthMm)}</td>
         <td class="r">${formatNumber(item.heightMm)}</td>
         <td class="r">${formatNumber(item.micron)}</td>
-        <td class="r">${formatNumber(item.pouchesPerKg)}</td>
-        <td class="r">${formatNumber(item.quantityKg)}</td>
+        <td class="r">${
+          /*
+           * Two decimals, because this is a multiplier the customer checks
+           * against the total. Rounded to a whole number it stops reconciling:
+           * 29.67 prints as 30, and 30 × 100 kg suggests 3,000 pouches where
+           * the line correctly reads 2,967.
+           */
+          formatNumber(item.pouchesPerKg, 2)
+        }</td>
+        <td class="r">${
+          // Order quantity in the unit the line was quoted in: pouches for a
+          // standup, kilograms for everything else.
+          item.pricingBasis === 'PER_POUCH'
+            ? formatNumber(item.quantityPouches)
+            : formatNumber(item.quantityKg)
+        }</td>
         <td class="r">${formatNumber(item.totalPouches)}</td>
-        <td class="r">${formatNumber(item.ratePerKg, 2)}</td>
+        <td class="r">${
+          item.pricingBasis === 'PER_POUCH'
+            ? `${formatNumber(item.ratePerPouch, 2)} /pc`
+            : formatNumber(item.ratePerKg, 2)
+        }</td>
         <td class="r">${formatRs(item.totalAmount)}</td>
         <td class="r">${formatNumber(item.cylinderWidth)}</td>
         <td class="r">${formatNumber(item.cylinderCircumference)}</td>
@@ -347,7 +365,20 @@ export function renderQuotationHtml(quotation: Quotation): string {
     <tfoot>
       <tr>
         <td colspan="7" class="c">Total</td>
-        <td class="r">${formatNumber(quotation.items.reduce((s, i) => s + i.quantityKg, 0))}</td>
+        <td class="r">${(() => {
+          /*
+           * Only total this column when every line is quoted in the same unit.
+           * A document mixing kilograms and pouches has no meaningful sum here,
+           * and printing one would invite the customer to check it and find it
+           * wrong. The money totals below are unaffected — they are always
+           * rupees.
+           */
+          const bases = new Set(quotation.items.map((i) => i.pricingBasis));
+          if (bases.size !== 1) return '&mdash;';
+          return bases.has('PER_POUCH')
+            ? formatNumber(quotation.items.reduce((sum, i) => sum + i.quantityPouches, 0))
+            : formatNumber(quotation.items.reduce((sum, i) => sum + i.quantityKg, 0));
+        })()}</td>
         <td></td>
         <td></td>
         <td class="r">${formatRs(quotation.materialSubtotal)}</td>
@@ -386,6 +417,21 @@ export function renderQuotationHtml(quotation: Quotation): string {
       <td class="amt red">${formatRs(quotation.totalAdvance)}</td>
     </tr>
   </table>
+
+  ${(() => {
+    /*
+     * The cylinder total includes transport, so a customer checking it as
+     * cylinders x cost-per-cylinder lands short by exactly the transport and
+     * concludes the quotation is wrong. Say so — but only when transport was
+     * actually charged, so a document that carries none is not cluttered by a
+     * note about it.
+     */
+    const transport = quotation.items.reduce((sum, item) => sum + item.transportCost, 0);
+    if (transport <= 0) return '';
+    return `<div class="closing">Cylinder cost includes ${esc(
+      formatRs(transport),
+    )} transport.</div>`;
+  })()}
 
   <div class="closing">We look forward to your valued order and assure you of our best quality and service at all times.</div>
 
