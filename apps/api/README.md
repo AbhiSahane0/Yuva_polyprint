@@ -266,18 +266,18 @@ every view.
 
 ### Quotations
 
-| Method | Path                      | Notes                                                              |
-| ------ | ------------------------- | ------------------------------------------------------------------ |
-| GET    | `/quotations`             | Search by number, customer or job name; filter by status           |
-| GET    | `/quotations/next-number` | The number the next quotation will get                             |
-| GET    | `/quotations/:id`         | Full document with all lines                                       |
-| GET    | `/quotations/:id/pdf`     | The PDF. `?inline=1` displays, otherwise downloads                 |
-| POST   | `/quotations`             | Create; prices and costs every line                                |
-| PATCH  | `/quotations/:id`         | Update; **re-prices the whole document**                           |
-| POST   | `/quotations/:id/send`    | Email it to the customer with the PDF attached                     |
-| GET    | `/quotations/:id/emails`  | Every recorded send, newest first                                  |
-| POST   | `/quotations/:id/outcome` | Record won or lost — see [Winning and losing](#winning-and-losing) |
-| DELETE | `/quotations/:id`         | Delete; lines cascade                                              |
+| Method | Path                      | Notes                                                                                                                 |
+| ------ | ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/quotations`             | Search by number, customer or job name; filter by status. Ordered Draft → Sent → Won → Lost, newest first within each |
+| GET    | `/quotations/next-number` | The number the next quotation will get                                                                                |
+| GET    | `/quotations/:id`         | Full document with all lines                                                                                          |
+| GET    | `/quotations/:id/pdf`     | The PDF. `?inline=1` displays, otherwise downloads                                                                    |
+| POST   | `/quotations`             | Create; prices and costs every line                                                                                   |
+| PATCH  | `/quotations/:id`         | Update; **re-prices the whole document**                                                                              |
+| POST   | `/quotations/:id/send`    | Email it to the customer with the PDF attached                                                                        |
+| GET    | `/quotations/:id/emails`  | Every recorded send, newest first                                                                                     |
+| POST   | `/quotations/:id/outcome` | Record won or lost — see [Winning and losing](#winning-and-losing)                                                    |
+| DELETE | `/quotations/:id`         | Delete; lines cascade                                                                                                 |
 
 **A new company is created with the quotation.** `POST /quotations` with
 `saveAsCustomer: true` and no `customerId` adds the company to the customer
