@@ -197,3 +197,24 @@ export const sendQuotationSchema = z.object({
 });
 
 export type SendQuotationInput = z.infer<typeof sendQuotationSchema>;
+
+/*
+ * Recording the customer's answer.
+ *
+ * A reason is required on a loss and refused on a win. "We lost it" teaches
+ * nothing a year later; "price was 8% over the incumbent" is the whole reason
+ * for asking. Three characters is not a quality bar — it only stops an empty
+ * box being submitted by reflex.
+ */
+export const recordOutcomeSchema = z
+  .object({
+    outcome: z.enum(['WON', 'LOST']),
+    lostReason: z.string().trim().max(500).default(''),
+  })
+  .refine((value) => value.outcome !== 'LOST' || value.lostReason.length >= 3, {
+    message: 'Say briefly why it was turned down',
+    path: ['lostReason'],
+  })
+  .transform((value) => (value.outcome === 'WON' ? { ...value, lostReason: '' } : value));
+
+export type RecordOutcomeInput = z.infer<typeof recordOutcomeSchema>;

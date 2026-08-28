@@ -3,6 +3,7 @@ import {
   createQuotationSchema,
   idParamSchema,
   listQuotationsQuerySchema,
+  recordOutcomeSchema,
   sendQuotationSchema,
   updateQuotationSchema,
 } from '@yuva/shared';
@@ -42,6 +43,18 @@ router.get(
   '/:id/emails',
   validate({ params: idParamSchema }),
   asyncHandler(controller.emailHistory),
+);
+
+/*
+ * Recording the answer is its own endpoint rather than a status change through
+ * PATCH, because winning has consequences: it creates the customer and their
+ * jobs. Those belong behind a deliberate action, not a dropdown someone might
+ * brush past while editing something else.
+ */
+router.post(
+  '/:id/outcome',
+  validate({ params: idParamSchema, body: recordOutcomeSchema }),
+  asyncHandler(controller.recordOutcome),
 );
 
 router.delete('/:id', validate({ params: idParamSchema }), asyncHandler(controller.remove));

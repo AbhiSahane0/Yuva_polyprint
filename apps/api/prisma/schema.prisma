@@ -254,6 +254,14 @@ model Quotation {
   /// Set the first time the quotation is marked as sent.
   sentAt DateTime? @map("sent_at")
 
+  /// When the customer's answer was recorded, won or lost.
+  decidedAt DateTime? @map("decided_at")
+
+  /// Why the customer said no. Only meaningful on a LOST quotation, and the
+  /// point of recording an outcome at all — "we lost it" teaches nothing;
+  /// "price was 8% over the incumbent" does.
+  lostReason String @default("") @map("lost_reason")
+
   items  QuotationItem[]
   emails QuotationEmail[]
 
