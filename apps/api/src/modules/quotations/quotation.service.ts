@@ -204,9 +204,18 @@ function priceQuotation(
       position: index + 1,
       cost: {
         materialCostPerKg,
+        /*
+         * Both figures come from `computed`, never from the raw input.
+         *
+         * A per-pouch line leaves quantityKg and ratePerKg at zero — the office
+         * types a pouch count and a rate per pouch, and the engine works the
+         * weight and the equivalent rate back out. Reading the input here
+         * multiplied the cost by zero and asked for a margin on a rate of zero,
+         * so every standup line stored no cost and no margin at all.
+         */
         materialCost:
-          materialCostPerKg === null ? null : round(materialCostPerKg * item.quantityKg, 2),
-        marginPercent: computeMargin(item.ratePerKg, materialCostPerKg),
+          materialCostPerKg === null ? null : round(materialCostPerKg * computed.quantityKg, 2),
+        marginPercent: computeMargin(computed.ratePerKg, materialCostPerKg),
       },
     };
   });
@@ -234,6 +243,51 @@ function priceQuotation(
  * The client's existing series is already past #118, so the counter starts
  * from the highest number present rather than from 1.
  */
+/**
+ * How many times to re-attempt a save that lost the race for a number.
+ *
+ * `nextQuotationNumber` reads MAX(number) + 1, and under Postgres' default READ
+ * COMMITTED two saves landing together read the same maximum; one commits and
+ * the other dies on the unique constraint, losing the user's work behind an
+ * opaque 500.
+ *
+ * Retrying is the right shape of fix here. The number is the client's own paper
+ * series, so it must stay sequential and gapless — a random id or a sequence
+ * would not do. Serialising instead, with an advisory lock, was measurably
+ * worse: holding a lock for the length of a transaction also pins a database
+ * connection, so a burst exhausted the pool and failed even harder.
+ *
+ * Eight attempts is far more than an office of this size will ever need.
+ */
+const NUMBER_CLASH_RETRIES = 8;
+
+/**
+ * True when a write failed because another save took the number first.
+ *
+ * Prisma reports which column collided in two different places depending on how
+ * it reached the database. Through a driver adapter — which this app uses — the
+ * classic `meta.target` is absent and the field list sits under
+ * `meta.driverAdapterError.cause.constraint.fields` instead. Both are checked,
+ * so this keeps working if the adapter is ever dropped.
+ *
+ * Narrowing to the `number` column matters: `companyName` is unique too, and a
+ * genuine duplicate-company error must surface rather than be retried eight
+ * times and then surface anyway.
+ */
+function isQuotationNumberClash(error: unknown): boolean {
+  const e = error as {
+    code?: string;
+    meta?: {
+      target?: unknown;
+      driverAdapterError?: { cause?: { constraint?: { fields?: unknown } } };
+    };
+  };
+  if (e?.code !== 'P2002') return false;
+
+  const candidates = [e.meta?.target, e.meta?.driverAdapterError?.cause?.constraint?.fields];
+  return candidates.some((c) => (Array.isArray(c) ? c.includes('number') : c === 'number'));
+}
+
 async function nextQuotationNumber(tx: Prisma.TransactionClient): Promise<number> {
   const [latest, settings] = await Promise.all([
     tx.quotation.findFirst({ orderBy: { number: 'desc' }, select: { number: true } }),
@@ -304,109 +358,122 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
   const costing = await loadCostingContext(input.date);
   const { priced, totals } = priceQuotation(input.items, rates, costing);
 
-  const id = await prisma.$transaction(async (tx) => {
-    const number = await nextQuotationNumber(tx);
+  /*
+   * Retried rather than serialised. Each attempt is a short, independent
+   * transaction, so concurrent saves stay parallel and none of them holds a
+   * database connection while waiting on another.
+   */
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const id = await prisma.$transaction(async (tx) => {
+        const number = await nextQuotationNumber(tx);
 
-    /*
-     * "New company" adds to the customer master as the quotation saves, so the
-     * next enquiry finds it under "Existing company" rather than being retyped.
-     *
-     * Inside the same transaction as the quotation: a customer created for a
-     * quotation that then failed to save would be a ghost record nobody asked
-     * for. An existing company of the same name is reused rather than
-     * duplicated — companyName is unique, and the office typing a name that
-     * already exists means the same firm, not a second one.
-     */
-    let customerId = input.customerId ?? null;
-    if (customerId === null && input.saveAsCustomer) {
-      const existing = await tx.customer.findUnique({
-        where: { companyName: input.customerName },
-        select: { id: true },
-      });
-      customerId =
-        existing?.id ??
-        (
-          await tx.customer.create({
-            data: {
-              companyName: input.customerName,
-              // The quotation's address is three free-text lines; the customer
-              // master keeps one. Joining them loses nothing a human reads.
-              address:
-                [input.addressLine1, input.addressLine2, input.addressLine3]
-                  .map((line) => line.trim())
-                  .filter(Boolean)
-                  .join(', ') || 'NA',
-              mobile: input.mobile || 'NA',
-              email: input.email || 'NA',
-              gstNumber: input.gstNumber || 'NA',
-              source: 'SHEET',
-              // What the record was built from. There is no spreadsheet row
-              // behind this one, so it says where it really came from.
-              sourceRaw: `Created from quotation for ${input.customerName}`,
-              // Typed in by hand, so it is as checked as it will ever be.
-              isVerified: true,
-            },
+        /*
+         * "New company" adds to the customer master as the quotation saves, so the
+         * next enquiry finds it under "Existing company" rather than being retyped.
+         *
+         * Inside the same transaction as the quotation: a customer created for a
+         * quotation that then failed to save would be a ghost record nobody asked
+         * for. An existing company of the same name is reused rather than
+         * duplicated — companyName is unique, and the office typing a name that
+         * already exists means the same firm, not a second one.
+         */
+        let customerId = input.customerId ?? null;
+        if (customerId === null && input.saveAsCustomer) {
+          const existing = await tx.customer.findUnique({
+            where: { companyName: input.customerName },
             select: { id: true },
-          })
-        ).id;
+          });
+          customerId =
+            existing?.id ??
+            (
+              await tx.customer.create({
+                data: {
+                  companyName: input.customerName,
+                  // The quotation's address is three free-text lines; the customer
+                  // master keeps one. Joining them loses nothing a human reads.
+                  address:
+                    [input.addressLine1, input.addressLine2, input.addressLine3]
+                      .map((line) => line.trim())
+                      .filter(Boolean)
+                      .join(', ') || 'NA',
+                  mobile: input.mobile || 'NA',
+                  email: input.email || 'NA',
+                  gstNumber: input.gstNumber || 'NA',
+                  source: 'SHEET',
+                  // What the record was built from. There is no spreadsheet row
+                  // behind this one, so it says where it really came from.
+                  sourceRaw: `Created from quotation for ${input.customerName}`,
+                  // Typed in by hand, so it is as checked as it will ever be.
+                  isVerified: true,
+                },
+                select: { id: true },
+              })
+            ).id;
+        }
+
+        const created = await tx.quotation.create({
+          data: {
+            number,
+            date: new Date(input.date),
+            status: input.status,
+            customerId,
+            customerName: input.customerName,
+            addressLine1: input.addressLine1,
+            addressLine2: input.addressLine2,
+            addressLine3: input.addressLine3,
+            mobile: input.mobile,
+            email: input.email,
+            gstNumber: input.gstNumber,
+            ...rates,
+            ...totals,
+            terms: input.terms.length > 0 ? input.terms : DEFAULT_TERMS,
+            notes: input.notes,
+            ...(input.status === 'SENT' ? { sentAt: new Date() } : {}),
+            items: {
+              create: priced.map((entry) => ({
+                position: entry.position,
+                jobId: entry.input.jobId ?? null,
+                jobName: entry.input.jobName,
+                jobKind: entry.input.jobKind,
+                pouchType: entry.input.pouchType,
+                pouchTypeNote: entry.input.pouchTypeNote,
+                layer: entry.input.layer,
+                widthMm: entry.input.widthMm,
+                heightMm: entry.input.heightMm,
+                polyMicron: entry.input.polyMicron,
+                pricingBasis: pricingBasisFor(entry.input.jobKind, entry.input.pouchType),
+                /*
+                 * quantityKg and ratePerKg arrive with the `...entry.computed`
+                 * spread below, already resolved for whichever basis this line
+                 * uses — listing them here as well would be dead code that TS
+                 * rightly flags as overwritten.
+                 */
+                quantityPouches: entry.computed.totalPouches,
+                ratePerPouch: entry.computed.costPerPouch,
+                repeatWidth: entry.input.repeatWidth,
+                repeatHeight: entry.input.repeatHeight,
+                cylinderCount: entry.input.cylinderCount,
+                transportCost: entry.input.transportCost,
+                filmMaterialId: entry.input.filmMaterialId ?? null,
+                ...entry.computed,
+                ...entry.cost,
+              })),
+            },
+          },
+          select: { id: true },
+        });
+
+        return created.id;
+      });
+
+      return await getQuotationById(id);
+    } catch (error) {
+      if (!isQuotationNumberClash(error) || attempt >= NUMBER_CLASH_RETRIES) throw error;
+      // Stagger the retries so two losers do not collide again in step.
+      await new Promise((resolve) => setTimeout(resolve, 15 * attempt + Math.random() * 25));
     }
-
-    const created = await tx.quotation.create({
-      data: {
-        number,
-        date: new Date(input.date),
-        status: input.status,
-        customerId,
-        customerName: input.customerName,
-        addressLine1: input.addressLine1,
-        addressLine2: input.addressLine2,
-        addressLine3: input.addressLine3,
-        mobile: input.mobile,
-        email: input.email,
-        gstNumber: input.gstNumber,
-        ...rates,
-        ...totals,
-        terms: input.terms.length > 0 ? input.terms : DEFAULT_TERMS,
-        notes: input.notes,
-        ...(input.status === 'SENT' ? { sentAt: new Date() } : {}),
-        items: {
-          create: priced.map((entry) => ({
-            position: entry.position,
-            jobId: entry.input.jobId ?? null,
-            jobName: entry.input.jobName,
-            jobKind: entry.input.jobKind,
-            pouchType: entry.input.pouchType,
-            pouchTypeNote: entry.input.pouchTypeNote,
-            layer: entry.input.layer,
-            widthMm: entry.input.widthMm,
-            heightMm: entry.input.heightMm,
-            polyMicron: entry.input.polyMicron,
-            pricingBasis: pricingBasisFor(entry.input.jobKind, entry.input.pouchType),
-            /*
-             * quantityKg and ratePerKg arrive with the `...entry.computed`
-             * spread below, already resolved for whichever basis this line
-             * uses — listing them here as well would be dead code that TS
-             * rightly flags as overwritten.
-             */
-            quantityPouches: entry.computed.totalPouches,
-            ratePerPouch: entry.computed.costPerPouch,
-            repeatWidth: entry.input.repeatWidth,
-            repeatHeight: entry.input.repeatHeight,
-            cylinderCount: entry.input.cylinderCount,
-            transportCost: entry.input.transportCost,
-            filmMaterialId: entry.input.filmMaterialId ?? null,
-            ...entry.computed,
-            ...entry.cost,
-          })),
-        },
-      },
-      select: { id: true },
-    });
-
-    return created.id;
-  });
-
-  return getQuotationById(id);
+  }
 }
 
 export async function updateQuotation(id: string, input: UpdateQuotationInput): Promise<Quotation> {
