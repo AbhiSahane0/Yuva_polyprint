@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  Activity,
+  // Activity,
   Boxes,
   FileText,
   IndianRupee,
@@ -49,7 +49,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     group: 'Administration',
     items: [
       { to: '/users', label: 'Users', icon: ShieldCheck, adminOnly: true },
-      { to: '/monitor', label: 'Sign-in log', icon: Activity, adminOnly: true },
+      // { to: '/monitor', label: 'Sign-in log', icon: Activity, adminOnly: true },
     ],
   },
 ];
