@@ -924,6 +924,74 @@ alternative, because some clients render nothing else.
 
 ---
 
+## Sign-in monitor
+
+`GET /api/monitor` — a single read-only page answering one question: who has
+been signing in, and when.
+
+Open it by hand in a browser. There is no button for it anywhere in the app and
+no link to it, because it is not part of anybody's daily work:
+
+```
+https://yuva-polyprint-api.vercel.app/api/monitor
+```
+
+That URL is the front end's, and Vercel forwards `/api/*` straight to the API on
+Render, so the page comes from the API without being on a second domain. Hitting
+Render directly works too.
+
+The page shows two tables, every time in **India Standard Time**:
+
+- **Users — last sign-in.** One row per account: name, role, whether the account
+  is still active, the last time they signed in, and how many sessions they have
+  open right now. Sorted by most recent sign-in, with accounts nobody has ever
+  used at the bottom.
+- **Sessions open now.** One row per live session: when it started, when that
+  browser last made a request, and when it expires.
+
+Add `?format=json` to get the same snapshot in the usual API envelope, for a
+script rather than a browser.
+
+### Signing in to it
+
+The page uses **HTTP Basic authentication against an existing administrator
+account** — the browser prompts for a username and password, and the same
+credentials that sign in to the app work here.
+
+That choice is deliberate. The page is opened directly rather than by the front
+end, so there is no session token to send; a browser, on the other hand, knows
+how to answer a Basic challenge and then repeats the credentials by itself on
+every refresh. So there is no second password to invent, no environment variable
+to configure, and no secret sitting in the URL where it would end up in
+bookmarks and browser history.
+
+Two consequences worth knowing:
+
+- Only **administrators** get in. A valid non-admin account is refused exactly
+  like a wrong password — the reply never distinguishes the two.
+- The browser holds those credentials until it is **closed**, so open the page
+  on a machine you trust, and close the browser afterwards on one you share.
+
+Attempts are rate-limited to ten failures per quarter of an hour, on their own
+counter rather than the login form's — otherwise a few mistyped passwords here
+would use up the allowance the whole office needs to sign in, since one office
+sits behind one IP address.
+
+### How far back it goes
+
+The two tables answer different spans, and it matters which one is being read:
+
+- **Last sign-in** is a single column on the user record. It is overwritten on
+  every sign-in and never deleted, so it is always current but keeps no history.
+- **Sessions** last seven days and are removed once they expire, so that table
+  covers roughly the past week and no further.
+
+Nothing records a full sign-in history — there is no login audit table. If that
+is ever wanted, it would be a new table written at the same moment
+`lastLoginAt` is stamped, and this page would grow a third section.
+
+---
+
 ## CORS
 
 `CORS_ORIGINS` is a comma-separated allowlist. Entries may contain `*`, which

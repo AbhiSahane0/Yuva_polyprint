@@ -48,6 +48,26 @@ export function toPublicUser(row: {
 }
 
 /**
+ * Checks a username and password, without starting a session.
+ *
+ * Sign-in is not the only thing that has to test a password: the monitor page
+ * authenticates on every request over HTTP Basic and never holds a session.
+ * Both go through here so the constant-time shape below exists once.
+ *
+ * Deactivated accounts fail like a wrong password, and the dummy hash keeps an
+ * unknown username as slow as a known one — without it the reply comes back
+ * immediately for names that do not exist, which is enough to enumerate them.
+ */
+export async function verifyCredentials(username: string, password: string): Promise<User | null> {
+  const user = await prisma.user.findUnique({ where: { username } });
+
+  const ok = await verifyPassword(password, user?.passwordHash ?? DUMMY_HASH);
+  if (!user || !ok || !user.isActive) return null;
+
+  return toPublicUser(user);
+}
+
+/**
  * Signs a user in.
  *
  * Every failure — unknown user, wrong password, deactivated account — returns
@@ -55,10 +75,8 @@ export function toPublicUser(row: {
  * whoever is guessing which half of the pair to keep working on.
  */
 export async function login(input: LoginInput): Promise<LoginResult> {
-  const user = await prisma.user.findUnique({ where: { username: input.username } });
-
-  const ok = await verifyPassword(input.password, user?.passwordHash ?? DUMMY_HASH);
-  if (!user || !ok || !user.isActive) {
+  const user = await verifyCredentials(input.username, input.password);
+  if (!user) {
     throw ApiError.unauthorized('Incorrect username or password');
   }
 
@@ -73,7 +91,7 @@ export async function login(input: LoginInput): Promise<LoginResult> {
     prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } }),
   ]);
 
-  return { token, user: toPublicUser({ ...user, lastLoginAt: new Date() }) };
+  return { token, user: { ...user, lastLoginAt: new Date().toISOString() } };
 }
 
 /**

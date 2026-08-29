@@ -35,3 +35,18 @@ describe('application shell', () => {
     expect(response.headers['x-powered-by']).toBeUndefined();
   });
 });
+
+describe('sign-in monitor', () => {
+  it('challenges a request that carries no credentials', async () => {
+    const response = await request(app).get('/api/monitor');
+
+    expect(response.status).toBe(401);
+    expect(response.headers['www-authenticate']).toContain('Basic realm=');
+  });
+
+  it('challenges a bearer token, which is not what this endpoint accepts', async () => {
+    const response = await request(app).get('/api/monitor').set('Authorization', 'Bearer abc123');
+
+    expect(response.status).toBe(401);
+  });
+});
