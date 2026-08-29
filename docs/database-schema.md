@@ -35,12 +35,20 @@ erDiagram
     JobCustomerSource customer_source
     boolean needs_customer
   }
+  login_events {
+    text id PK
+    text user_id FK
+  }
   material_rates {
     text id PK
     text material_id FK
   }
   materials {
     text id PK
+  }
+  quotation_emails {
+    text id PK
+    text quotation_id FK
   }
   quotation_items {
     text id PK
@@ -64,12 +72,22 @@ erDiagram
     decimal grand_with_gst
     decimal total_advance
   }
+  sessions {
+    text id PK
+    text user_id FK
+  }
+  users {
+    text id PK
+  }
   customers ||--o{ jobs : "customer_id"
   customers ||--o{ quotations : "customer_id"
   quotations ||--|{ quotation_items : "quotation_id"
   jobs ||--o{ quotation_items : "job_id"
   materials ||--o{ quotation_items : "film_material_id"
   materials ||--|{ material_rates : "material_id"
+  users ||--|{ sessions : "user_id"
+  quotations ||--|{ quotation_emails : "quotation_id"
+  users ||--o{ login_events : "user_id"
 ```
 
 ## Tables
@@ -77,12 +95,16 @@ erDiagram
 | Table | Columns | Rows | Purpose |
 | --- | ---: | ---: | --- |
 | `app_settings` | 3 | 0 | Editable rates: cylinder rate, GST %, advance %. |
-| `customers` | 15 | 68 | Companies that order from Yuva Polyprint. |
+| `customers` | 16 | 68 | Companies that order from Yuva Polyprint. |
 | `jobs` | 55 | 414 | Products and their full engineering specification. |
-| `material_rates` | 6 | 16 |  |
-| `materials` | 9 | 16 |  |
-| `quotation_items` | 29 | 5 | One priced line on a quotation. |
-| `quotations` | 29 | 3 | Customer-facing quotations, with totals frozen at save. |
+| `login_events` | 7 | 18 |  |
+| `material_rates` | 6 | 66 |  |
+| `materials` | 9 | 17 |  |
+| `quotation_emails` | 8 | 0 |  |
+| `quotation_items` | 35 | 5 | One priced line on a quotation. |
+| `quotations` | 32 | 3 | Customer-facing quotations, with totals frozen at save. |
+| `sessions` | 6 | 18 |  |
+| `users` | 10 | 2 |  |
 
 ## Relationships
 
@@ -94,6 +116,9 @@ erDiagram
 | `quotation_items.job_id` | `jobs.id` | SET NULL | Set when a line was prefilled from a saved job spec. |
 | `quotation_items.film_material_id` | `materials.id` | SET NULL |  |
 | `material_rates.material_id` | `materials.id` | CASCADE |  |
+| `sessions.user_id` | `users.id` | CASCADE |  |
+| `quotation_emails.quotation_id` | `quotations.id` | CASCADE |  |
+| `login_events.user_id` | `users.id` | SET NULL |  |
 
 ## Enums
 
@@ -101,7 +126,10 @@ erDiagram
 | --- | --- |
 | `CustomerSource` | `SHEET`, `BRAND_INFERRED` |
 | `JobCustomerSource` | `EXPLICIT`, `INFERRED`, `NONE` |
+| `JobKind` | `ROLL`, `POUCH` |
 | `MaterialCategory` | `FILM`, `INK`, `ADHESIVE`, `SOLVENT`, `CONSUMABLE` |
+| `PouchType` | `STANDUP`, `STANDUP_ZIPPER`, `ZIPPER`, `SPOUT`, `CENTRE_SEAL`, `THREE_SIDE_SEAL`, `OTHER` |
+| `PricingBasis` | `PER_KG`, `PER_POUCH` |
 | `QuotationStatus` | `DRAFT`, `SENT`, `WON`, `LOST` |
 
 ## Full column reference
@@ -133,6 +161,7 @@ erDiagram
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
 | `source` | `CustomerSource` (enum) |  |  |
+| `gst_number` | `text` |  |  |
 
 ### `jobs`
 
@@ -194,6 +223,18 @@ erDiagram
 | `customer_source` | `JobCustomerSource` (enum) |  |  |
 | `needs_customer` | `boolean` |  |  |
 
+### `login_events`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `user_id` | `text` | ✓ | FK → `users.id` |
+| `username` | `text` |  |  |
+| `display_name` | `text` |  |  |
+| `ip_address` | `text` | ✓ |  |
+| `user_agent` | `text` | ✓ |  |
+| `created_at` | `timestamp` |  |  |
+
 ### `material_rates`
 
 | Column | Type | Null | Key |
@@ -218,6 +259,19 @@ erDiagram
 | `sort_order` | `integer` |  |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
+
+### `quotation_emails`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `quotation_id` | `text` |  | FK → `quotations.id` |
+| `to` | `text[]` | ✓ |  |
+| `cc` | `text[]` | ✓ |  |
+| `subject` | `text` |  |  |
+| `provider_id` | `text` | ✓ |  |
+| `sent_by` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
 
 ### `quotation_items`
 
@@ -252,6 +306,12 @@ erDiagram
 | `margin_percent` | `decimal(6,2)` | ✓ |  |
 | `material_cost` | `decimal(14,2)` | ✓ |  |
 | `material_cost_per_kg` | `decimal(12,4)` | ✓ |  |
+| `job_kind` | `JobKind` (enum) |  |  |
+| `pouch_type` | `PouchType` (enum) | ✓ |  |
+| `pouch_type_note` | `text` |  |  |
+| `pricing_basis` | `PricingBasis` (enum) |  |  |
+| `quantity_pouches` | `integer` |  |  |
+| `rate_per_pouch` | `decimal(12,4)` |  |  |
 
 ### `quotations`
 
@@ -284,6 +344,35 @@ erDiagram
 | `terms` | `text[]` | ✓ |  |
 | `notes` | `text` |  |  |
 | `sent_at` | `timestamp` | ✓ |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+| `gst_number` | `text` |  |  |
+| `decided_at` | `timestamp` | ✓ |  |
+| `lost_reason` | `text` |  |  |
+
+### `sessions`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `token_hash` | `text` |  | unique |
+| `user_id` | `text` |  | FK → `users.id` |
+| `expires_at` | `timestamp` |  |  |
+| `last_seen_at` | `timestamp` |  |  |
+| `created_at` | `timestamp` |  |  |
+
+### `users`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `username` | `text` |  | unique |
+| `password_hash` | `text` |  |  |
+| `display_name` | `text` |  |  |
+| `is_admin` | `boolean` |  |  |
+| `is_active` | `boolean` |  |  |
+| `modules` | `text[]` | ✓ |  |
+| `last_login_at` | `timestamp` | ✓ |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
 

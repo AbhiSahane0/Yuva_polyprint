@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { ok } from '../../utils/api-response.js';
 import { verifyCredentials } from '../auth/auth.service.js';
 import { renderMonitorPage } from './monitor-page.js';
-import { getMonitorSnapshot } from './monitor.service.js';
+import { DEFAULT_HISTORY_LIMIT, getMonitorSnapshot } from './monitor.service.js';
 
 /*
  * HTTP Basic, not a bearer token.
@@ -74,7 +74,16 @@ export async function monitor(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const snapshot = await getMonitorSnapshot();
+  /*
+   * ?limit= how many sign-ins of history to show. Anything unparseable falls
+   * back to the default rather than erroring — this page is typed by hand into
+   * an address bar, and a typo should still render something useful. The
+   * service clamps the value to its own ceiling.
+   */
+  const requested = Number(req.query.limit);
+  const snapshot = await getMonitorSnapshot(
+    Number.isFinite(requested) && requested > 0 ? requested : DEFAULT_HISTORY_LIMIT,
+  );
 
   /*
    * Overrides helmet's default policy for this one response. The page has no

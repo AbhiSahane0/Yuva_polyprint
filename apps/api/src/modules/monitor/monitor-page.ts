@@ -61,6 +61,42 @@ export function formatAgo(date: Date | null, now: Date): string {
   return days === 1 ? 'yesterday' : `${days} days ago`;
 }
 
+/**
+ * A short label for a user agent — Chrome on Windows, Safari on iOS, and so on.
+ *
+ * It is a guess from a handful of well-known tokens and nothing more, so it
+ * says nothing at all rather than something wrong when the string is not one it
+ * recognises. The header is stored whole; `?format=json` returns it verbatim.
+ *
+ * Order matters: Edge and Opera both claim to be Chrome, and Chrome claims to
+ * be Safari, so the most specific test has to come first.
+ */
+export function describeAgent(userAgent: string | null): string {
+  if (!userAgent) return '—';
+
+  const browsers: [RegExp, string][] = [
+    [/Edg\//, 'Edge'],
+    [/OPR\/|Opera/, 'Opera'],
+    [/Chrome\//, 'Chrome'],
+    [/Firefox\//, 'Firefox'],
+    [/Safari\//, 'Safari'],
+    [/curl\//, 'curl'],
+  ];
+  const platforms: [RegExp, string][] = [
+    [/Android/, 'Android'],
+    [/iPhone|iPad|iPod/, 'iOS'],
+    [/Windows/, 'Windows'],
+    [/Mac OS X|Macintosh/, 'Mac'],
+    [/Linux/, 'Linux'],
+  ];
+
+  const browser = browsers.find(([pattern]) => pattern.test(userAgent))?.[1] ?? '';
+  const platform = platforms.find(([pattern]) => pattern.test(userAgent))?.[1] ?? '';
+
+  if (browser && platform) return `${browser} on ${platform}`;
+  return browser || platform || '—';
+}
+
 /** Escapes user-supplied text — display names and usernames are typed by hand. */
 function esc(value: string | number): string {
   return String(value)
@@ -99,7 +135,8 @@ const STYLES = `
   .tag-user { background: #f3f4f6; color: #4b5563; }
   .tag-off { background: #fef2f2; color: #b91c1c; }
   .empty { padding: 20px 14px; color: #6b7280; }
-  .foot { margin-top: 28px; color: #9ca3af; font-size: 12px; }
+  .foot { margin-top: 16px; color: #9ca3af; font-size: 12px; }
+  .foot code { font-size: 12px; background: #eef0f3; padding: 1px 5px; border-radius: 4px; }
   @media (prefers-color-scheme: dark) {
     body { color: #e6e7ea; background: #101114; }
     .card { background: #17181c; border-color: #26282e; }
@@ -109,6 +146,7 @@ const STYLES = `
     .tag-admin { background: #1e1b4b; color: #c7d2fe; }
     .tag-user { background: #24262c; color: #c9ccd3; }
     .tag-off { background: #3f1d1d; color: #fca5a5; }
+    .foot code { background: #24262c; }
   }
 `;
 
@@ -156,6 +194,31 @@ export function renderMonitorPage(snapshot: MonitorSnapshot): string {
     )
     .join('');
 
+  const historyRows = snapshot.history
+    .map(
+      (event) => `
+        <tr>
+          <td>
+            <div class="name">${esc(event.displayName)}${
+              event.accountExists ? '' : ' <span class="sub">(account removed)</span>'
+            }</div>
+            <div class="sub">${esc(event.username)}</div>
+          </td>
+          <td>${esc(formatIst(event.at))}</td>
+          <td class="sub">${esc(formatAgo(event.at, generatedAt))}</td>
+          <td class="sub">${esc(event.ipAddress ?? '—')}</td>
+          <td class="sub">${esc(describeAgent(event.userAgent))}</td>
+        </tr>`,
+    )
+    .join('');
+
+  const shown = snapshot.history.length;
+  const historyNote =
+    shown < snapshot.historyTotal
+      ? `Showing the ${shown} most recent of ${snapshot.historyTotal} sign-ins. ` +
+        `Add <code>?limit=${Math.min(snapshot.historyTotal, 1000)}</code> to the address for more.`
+      : `${shown} sign-in${shown === 1 ? '' : 's'} on record — all of them.`;
+
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -196,9 +259,26 @@ export function renderMonitorPage(snapshot: MonitorSnapshot): string {
     }
   </div>
 
+  <h2>Sign-in history</h2>
+  <div class="card">
+    ${
+      shown === 0
+        ? '<p class="empty">No sign-ins recorded yet.</p>'
+        : `<table>
+      <thead>
+        <tr><th>User</th><th>Signed in (IST)</th><th></th><th>From</th><th>Device</th></tr>
+      </thead>
+      <tbody>${historyRows}</tbody>
+    </table>`
+    }
+  </div>
+  <p class="foot">${historyNote}</p>
+
   <p class="foot">
-    Sessions last seven days and are deleted once they expire, so this list covers
-    the past week. &ldquo;Last sign-in&rdquo; above is kept permanently, one value per user.
+    Every successful sign-in is recorded permanently, so the history above goes back
+    to the day this was switched on. Sessions expire after seven days and are then
+    deleted, so &ldquo;open now&rdquo; only ever shows the current week. Failed attempts
+    are not recorded.
   </p>
 </main>
 </body>

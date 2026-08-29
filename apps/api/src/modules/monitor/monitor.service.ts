@@ -26,16 +26,38 @@ export interface MonitorSession {
   expiresAt: Date;
 }
 
+export interface MonitorLogin {
+  username: string;
+  displayName: string;
+  at: Date;
+  ipAddress: string | null;
+  userAgent: string | null;
+  /** False once the account has been deleted — the names above are a snapshot. */
+  accountExists: boolean;
+}
+
 export interface MonitorSnapshot {
   generatedAt: Date;
   users: MonitorUser[];
   sessions: MonitorSession[];
+  history: MonitorLogin[];
+  /** Sign-ins on record in total, which is usually more than `history` holds. */
+  historyTotal: number;
+  /** How many were asked for, so the page can say when it is showing a slice. */
+  historyLimit: number;
 }
 
-export async function getMonitorSnapshot(): Promise<MonitorSnapshot> {
-  const generatedAt = new Date();
+/** Newest sign-ins shown by default, and the ceiling on `?limit=`. */
+export const DEFAULT_HISTORY_LIMIT = 100;
+export const MAX_HISTORY_LIMIT = 1000;
 
-  const [users, sessions] = await Promise.all([
+export async function getMonitorSnapshot(
+  historyLimit: number = DEFAULT_HISTORY_LIMIT,
+): Promise<MonitorSnapshot> {
+  const generatedAt = new Date();
+  const limit = Math.min(Math.max(Math.trunc(historyLimit) || 0, 1), MAX_HISTORY_LIMIT);
+
+  const [users, sessions, history, historyTotal] = await Promise.all([
     prisma.user.findMany({
       select: {
         username: true,
@@ -61,6 +83,19 @@ export async function getMonitorSnapshot(): Promise<MonitorSnapshot> {
       },
       orderBy: { createdAt: 'desc' },
     }),
+    prisma.loginEvent.findMany({
+      select: {
+        username: true,
+        displayName: true,
+        createdAt: true,
+        ipAddress: true,
+        userAgent: true,
+        userId: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    }),
+    prisma.loginEvent.count(),
   ]);
 
   const sessionsPerUser = new Map<string, number>();
@@ -84,5 +119,15 @@ export async function getMonitorSnapshot(): Promise<MonitorSnapshot> {
       lastSeenAt: session.lastSeenAt,
       expiresAt: session.expiresAt,
     })),
+    history: history.map((event) => ({
+      username: event.username,
+      displayName: event.displayName,
+      at: event.createdAt,
+      ipAddress: event.ipAddress,
+      userAgent: event.userAgent,
+      accountExists: event.userId !== null,
+    })),
+    historyTotal,
+    historyLimit: limit,
   };
 }

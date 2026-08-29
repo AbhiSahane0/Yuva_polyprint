@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatAgo, formatIst, renderMonitorPage } from './monitor-page.js';
+import { describeAgent, formatAgo, formatIst, renderMonitorPage } from './monitor-page.js';
 
 describe('monitor page', () => {
   describe('formatIst', () => {
@@ -71,6 +71,9 @@ describe('monitor page', () => {
             expiresAt: new Date('2026-09-03T04:00:00Z'),
           },
         ],
+        history: [],
+        historyTotal: 0,
+        historyLimit: 100,
       });
 
       expect(html).toContain('Sudeep Hase');
@@ -80,7 +83,14 @@ describe('monitor page', () => {
     });
 
     it('says plainly when nobody is signed in', () => {
-      const html = renderMonitorPage({ generatedAt, users: [], sessions: [] });
+      const html = renderMonitorPage({
+        generatedAt,
+        users: [],
+        sessions: [],
+        history: [],
+        historyTotal: 0,
+        historyLimit: 100,
+      });
 
       expect(html).toContain('Nobody is signed in.');
     });
@@ -99,10 +109,114 @@ describe('monitor page', () => {
           },
         ],
         sessions: [],
+        history: [],
+        historyTotal: 0,
+        historyLimit: 100,
       });
 
       expect(html).not.toContain('<script>alert(1)</script>');
       expect(html).toContain('&lt;script&gt;');
+    });
+  });
+
+  describe('describeAgent', () => {
+    it('names the browser and the platform together', () => {
+      expect(
+        describeAgent(
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36',
+        ),
+      ).toBe('Chrome on Windows');
+    });
+
+    it('is not fooled by browsers that claim to be Chrome or Safari', () => {
+      const edge =
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36 Edg/128.0';
+      const safari =
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+
+      expect(describeAgent(edge)).toBe('Edge on Windows');
+      expect(describeAgent(safari)).toBe('Safari on iOS');
+    });
+
+    it('says nothing rather than something wrong', () => {
+      expect(describeAgent(null)).toBe('—');
+      expect(describeAgent('some-internal-tool/1.0')).toBe('—');
+    });
+  });
+
+  describe('sign-in history', () => {
+    const generatedAt = new Date('2026-08-27T13:12:00Z');
+    const base = { generatedAt, users: [], sessions: [] };
+
+    it('lists each sign-in with where it came from', () => {
+      const html = renderMonitorPage({
+        ...base,
+        history: [
+          {
+            username: 'sudeep',
+            displayName: 'Sudeep Hase',
+            at: new Date('2026-08-27T04:00:00Z'),
+            ipAddress: '203.0.113.9',
+            userAgent: 'Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/128.0 Safari/537.36',
+            accountExists: true,
+          },
+        ],
+        historyTotal: 1,
+        historyLimit: 100,
+      });
+
+      expect(html).toContain('27 Aug 2026, 9:30 am');
+      expect(html).toContain('203.0.113.9');
+      expect(html).toContain('Chrome on Mac');
+      expect(html).toContain('1 sign-in on record');
+    });
+
+    it('says when it is showing only a slice, and how to ask for more', () => {
+      const html = renderMonitorPage({
+        ...base,
+        history: [
+          {
+            username: 'sudeep',
+            displayName: 'Sudeep Hase',
+            at: new Date('2026-08-27T04:00:00Z'),
+            ipAddress: null,
+            userAgent: null,
+            accountExists: true,
+          },
+        ],
+        historyTotal: 480,
+        historyLimit: 1,
+      });
+
+      expect(html).toContain('Showing the 1 most recent of 480 sign-ins');
+      expect(html).toContain('?limit=480');
+    });
+
+    it('marks a sign-in whose account has since been deleted', () => {
+      const html = renderMonitorPage({
+        ...base,
+        history: [
+          {
+            username: 'gone',
+            displayName: 'Former Staff',
+            at: new Date('2026-08-27T04:00:00Z'),
+            ipAddress: null,
+            userAgent: null,
+            accountExists: false,
+          },
+        ],
+        historyTotal: 1,
+        historyLimit: 100,
+      });
+
+      expect(html).toContain('Former Staff');
+      expect(html).toContain('(account removed)');
+    });
+
+    it('says plainly when nothing has been recorded yet', () => {
+      const html = renderMonitorPage({ ...base, history: [], historyTotal: 0, historyLimit: 100 });
+
+      expect(html).toContain('No sign-ins recorded yet.');
     });
   });
 });

@@ -785,6 +785,9 @@ Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 | `material_rates`   | One material's price on one date — one row per active material per day.                   |
 | `quotation_emails` | One recorded attempt to email a quotation — recipients, subject, who sent it.             |
 | `app_settings`     | Editable rates and costing defaults.                                                      |
+| `users`            | Accounts, their password hash and which modules each may reach.                           |
+| `sessions`         | Live sign-ins. Deleted on expiry, so this table is always "right now".                    |
+| `login_events`     | Every successful sign-in, kept permanently. Survives the account being deleted.           |
 
 Two deliberate choices:
 
@@ -948,9 +951,16 @@ The page shows two tables, every time in **India Standard Time**:
   used at the bottom.
 - **Sessions open now.** One row per live session: when it started, when that
   browser last made a request, and when it expires.
+- **Sign-in history.** Every successful sign-in ever recorded, newest first: who,
+  when, the address it came from and a short description of the browser.
+
+The history shows the 100 most recent by default and says so when there are more.
+`?limit=500` asks for a bigger slice, up to 1000. A value that is not a number
+is ignored rather than refused — this address is typed by hand.
 
 Add `?format=json` to get the same snapshot in the usual API envelope, for a
-script rather than a browser.
+script rather than a browser. The full user-agent string is in there; the page
+only shows the short version of it.
 
 ### Signing in to it
 
@@ -977,18 +987,49 @@ counter rather than the login form's — otherwise a few mistyped passwords here
 would use up the allowance the whole office needs to sign in, since one office
 sits behind one IP address.
 
-### How far back it goes
+### How far back each table goes
 
-The two tables answer different spans, and it matters which one is being read:
+The three answer different spans, and it matters which one is being read:
 
-- **Last sign-in** is a single column on the user record. It is overwritten on
-  every sign-in and never deleted, so it is always current but keeps no history.
-- **Sessions** last seven days and are removed once they expire, so that table
-  covers roughly the past week and no further.
+- **Last sign-in** is a single column on the user record, overwritten every
+  time. Always current, keeps no history.
+- **Sessions** last seven days and are deleted once they expire, so that table
+  is only ever "the current week".
+- **Sign-in history** is `login_events`, and nothing removes a row. It goes back
+  to the day the table was created.
 
-Nothing records a full sign-in history — there is no login audit table. If that
-is ever wanted, it would be a new table written at the same moment
-`lastLoginAt` is stamped, and this page would grow a third section.
+Signing in writes all three inside one transaction, so they cannot disagree.
+
+### What the history records, and what it does not
+
+Each row keeps the username and display name **as they stood at that moment**,
+alongside a nullable link to the account. Renaming a user therefore does not
+rewrite their past, and deleting one does not erase it — the foreign key is
+`ON DELETE SET NULL`, and the page marks those rows "account removed". This is
+the same reasoning as `quotation_emails.sent_by`.
+
+The address is whatever Express resolves under `trust proxy`, and the browser
+description is a guess from a handful of well-known tokens — it says nothing
+rather than something wrong when it does not recognise the string.
+
+**Only successful sign-ins are recorded.** Failed attempts are not, deliberately:
+the interesting failure is a sustained one, and that is what the rate limiter is
+for. Adding them would mean storing attempted usernames, which are frequently
+someone's mistyped password.
+
+Nothing prunes the table. At an office of this size that is a few rows a day and
+will not need attention for years.
+
+### Where the first rows came from
+
+The table shipped empty, which would have left the page blank on the day it went
+live even though people had plainly been signing in. A second migration seeds it
+from the sessions that already existed — each one is a real sign-in with a real
+timestamp, so the previous week was recovered exactly.
+
+Those backfilled rows carry no address or browser, because neither was ever
+recorded, and their names are the account's current ones rather than a snapshot.
+They are the only rows in the table of which that is true.
 
 ---
 
