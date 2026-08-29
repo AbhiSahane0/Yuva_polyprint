@@ -18,6 +18,7 @@ const QuotationsPage = lazy(() => import('@/features/quotations/pages/Quotations
 const RatesPage = lazy(() => import('@/features/rates/pages/RatesPage'));
 const QuotationFormPage = lazy(() => import('@/features/quotations/pages/QuotationFormPage'));
 const UsersPage = lazy(() => import('@/features/users/pages/UsersPage'));
+const MonitorPage = lazy(() => import('@/features/monitor/pages/MonitorPage'));
 
 function PageFallback() {
   return <LoadingState />;
@@ -58,7 +59,7 @@ function homeFor(user: User | null): string {
  */
 function mayVisit(user: User | null, path: string): boolean {
   const segment = path.split('/')[1] ?? '';
-  if (segment === 'users') return user?.isAdmin === true;
+  if (segment === 'users' || segment === 'monitor') return user?.isAdmin === true;
   if (isAppModule(segment)) return canAccess(user, segment);
   return false;
 }
@@ -129,6 +130,14 @@ function AppRoutes() {
             element={
               <RequireAdmin>
                 <UsersPage />
+              </RequireAdmin>
+            }
+          />
+          <Route
+            path="/monitor"
+            element={
+              <RequireAdmin>
+                <MonitorPage />
               </RequireAdmin>
             }
           />

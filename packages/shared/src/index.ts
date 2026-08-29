@@ -20,6 +20,7 @@ export * from './types/customer.js';
 export * from './types/quotation.js';
 export * from './types/material.js';
 export * from './types/user.js';
+export * from './types/monitor.js';
 
 export * from './lib/quotation-math.js';
 export * from './lib/material-cost.js';

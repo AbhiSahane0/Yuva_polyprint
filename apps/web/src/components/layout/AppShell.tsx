@@ -1,6 +1,16 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Boxes, FileText, IndianRupee, LogOut, Menu, ShieldCheck, Users, X } from 'lucide-react';
+import {
+  Activity,
+  Boxes,
+  FileText,
+  IndianRupee,
+  LogOut,
+  Menu,
+  ShieldCheck,
+  Users,
+  X,
+} from 'lucide-react';
 import type { AppModule } from '@yuva/shared';
 import { cn } from '@/lib/utils';
 import { Logo } from '@/components/ui/Logo';
@@ -37,7 +47,10 @@ const NAV: { group: string; items: NavItem[] }[] = [
   },
   {
     group: 'Administration',
-    items: [{ to: '/users', label: 'Users', icon: ShieldCheck, adminOnly: true }],
+    items: [
+      { to: '/users', label: 'Users', icon: ShieldCheck, adminOnly: true },
+      { to: '/monitor', label: 'Sign-in log', icon: Activity, adminOnly: true },
+    ],
   },
 ];
 

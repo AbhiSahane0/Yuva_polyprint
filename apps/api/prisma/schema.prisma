@@ -461,7 +461,8 @@ model User {
 
   lastLoginAt DateTime? @map("last_login_at")
 
-  sessions Session[]
+  sessions    Session[]
+  loginEvents LoginEvent[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -491,6 +492,40 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+/// One successful sign-in, kept for good.
+///
+/// `Session` answers "who is signed in right now" and is deleted the moment it
+/// expires. This answers "who has ever signed in", and nothing removes a row —
+/// which is the whole point of having both.
+///
+/// The name is copied in rather than only referenced, because users are deleted
+/// outright and the history should outlive the account it describes. The same
+/// reasoning as `QuotationEmail.sentBy`.
+model LoginEvent {
+  id String @id @default(cuid())
+
+  /// Null once the account is deleted; the snapshots below still name them.
+  userId String? @map("user_id")
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  /// Username and display name as they stood at the moment of signing in.
+  username    String
+  displayName String @map("display_name")
+
+  /// Whoever was in front of the browser. Behind a proxy this is the address
+  /// Express resolves under `trust proxy` — see app.ts. Null when it cannot be
+  /// determined; a sign-in is never refused for want of these.
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  /// The monitor page reads this newest-first, and only ever by date.
+  @@index([createdAt])
+  @@index([userId])
+  @@map("login_events")
 }
 
 /// One attempt to email a quotation to somebody.

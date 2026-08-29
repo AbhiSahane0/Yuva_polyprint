@@ -8,6 +8,12 @@ import { ApiError } from '../../utils/api-error.js';
 /** How long a sign-in lasts. Long enough for a working week. */
 const SESSION_DAYS = 7;
 
+/*
+ * A user agent is client-supplied and unbounded. Truncating keeps a hostile or
+ * merely absurd header from turning every sign-in into a large row.
+ */
+const MAX_CONTEXT_LENGTH = 512;
+
 /**
  * A dummy hash, verified against when the username does not exist.
  *
@@ -48,32 +54,74 @@ export function toPublicUser(row: {
 }
 
 /**
+ * Checks a username and password, without starting a session.
+ *
+ * Sign-in is not the only thing that has to test a password: the monitor page
+ * authenticates on every request over HTTP Basic and never holds a session.
+ * Both go through here so the constant-time shape below exists once.
+ *
+ * Deactivated accounts fail like a wrong password, and the dummy hash keeps an
+ * unknown username as slow as a known one — without it the reply comes back
+ * immediately for names that do not exist, which is enough to enumerate them.
+ */
+export async function verifyCredentials(username: string, password: string): Promise<User | null> {
+  const user = await prisma.user.findUnique({ where: { username } });
+
+  const ok = await verifyPassword(password, user?.passwordHash ?? DUMMY_HASH);
+  if (!user || !ok || !user.isActive) return null;
+
+  return toPublicUser(user);
+}
+
+/** Where a sign-in came from. Both are best-effort and may be absent. */
+export interface LoginContext {
+  ipAddress?: string | undefined;
+  userAgent?: string | undefined;
+}
+
+/**
  * Signs a user in.
  *
  * Every failure — unknown user, wrong password, deactivated account — returns
  * the same message. Saying "no such user" or "this account is disabled" tells
  * whoever is guessing which half of the pair to keep working on.
+ *
+ * Three things are written, and they answer three different questions:
+ * the session is "who is signed in now", `lastLoginAt` is "when was this
+ * account last used", and the login event is "who has ever signed in". Only the
+ * last of those is kept permanently.
  */
-export async function login(input: LoginInput): Promise<LoginResult> {
-  const user = await prisma.user.findUnique({ where: { username: input.username } });
-
-  const ok = await verifyPassword(input.password, user?.passwordHash ?? DUMMY_HASH);
-  if (!user || !ok || !user.isActive) {
+export async function login(input: LoginInput, context: LoginContext = {}): Promise<LoginResult> {
+  const user = await verifyCredentials(input.username, input.password);
+  if (!user) {
     throw ApiError.unauthorized('Incorrect username or password');
   }
 
   const token = randomBytes(32).toString('base64url');
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + SESSION_DAYS * 24 * 60 * 60 * 1000);
 
   await prisma.$transaction([
     prisma.session.create({ data: { tokenHash: hashToken(token), userId: user.id, expiresAt } }),
-    prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }),
+    prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: now } }),
+    prisma.loginEvent.create({
+      data: {
+        userId: user.id,
+        // Snapshots: renaming the account later must not rewrite its history.
+        username: user.username,
+        displayName: user.displayName,
+        ipAddress: context.ipAddress?.slice(0, MAX_CONTEXT_LENGTH) ?? null,
+        userAgent: context.userAgent?.slice(0, MAX_CONTEXT_LENGTH) ?? null,
+        createdAt: now,
+      },
+    }),
     // Housekeeping: expired rows are dead weight and this is the one moment we
-    // know we are already writing to the table.
-    prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } }),
+    // know we are already writing to the table. Login events are never swept —
+    // an audit trail that quietly forgets is not one.
+    prisma.session.deleteMany({ where: { expiresAt: { lt: now } } }),
   ]);
 
-  return { token, user: toPublicUser({ ...user, lastLoginAt: new Date() }) };
+  return { token, user: { ...user, lastLoginAt: now.toISOString() } };
 }
 
 /**

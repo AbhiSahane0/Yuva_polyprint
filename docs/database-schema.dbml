@@ -14,12 +14,32 @@ Enum JobCustomerSource {
   NONE
 }
 
+Enum JobKind {
+  ROLL
+  POUCH
+}
+
 Enum MaterialCategory {
   FILM
   INK
   ADHESIVE
   SOLVENT
   CONSUMABLE
+}
+
+Enum PouchType {
+  STANDUP
+  STANDUP_ZIPPER
+  ZIPPER
+  SPOUT
+  CENTRE_SEAL
+  THREE_SIDE_SEAL
+  OTHER
+}
+
+Enum PricingBasis {
+  PER_KG
+  PER_POUCH
 }
 
 Enum QuotationStatus {
@@ -53,6 +73,7 @@ Table customers {
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
   source CustomerSource [not null, default: `'SHEET'::"CustomerSource"`]
+  gst_number text [not null, default: `'NA'`]
 
   Note: '68 row(s) at time of generation'
 }
@@ -117,6 +138,18 @@ Table jobs {
   Note: '414 row(s) at time of generation'
 }
 
+Table login_events {
+  id text [pk]
+  user_id text
+  username text [not null]
+  display_name text [not null]
+  ip_address text
+  user_agent text
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+
+  Note: '18 row(s) at time of generation'
+}
+
 Table material_rates {
   id text [pk]
   material_id text [unique, not null]
@@ -125,7 +158,7 @@ Table material_rates {
   entered_by text [not null, default: `'Office'`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '16 row(s) at time of generation'
+  Note: '66 row(s) at time of generation'
 }
 
 Table materials {
@@ -139,7 +172,20 @@ Table materials {
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
 
-  Note: '16 row(s) at time of generation'
+  Note: '17 row(s) at time of generation'
+}
+
+Table quotation_emails {
+  id text [pk]
+  quotation_id text [not null]
+  to text[]
+  cc text[]
+  subject text [not null]
+  provider_id text
+  sent_by text [not null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+
+  Note: '0 row(s) at time of generation'
 }
 
 Table quotation_items {
@@ -172,6 +218,12 @@ Table quotation_items {
   margin_percent decimal(6,2)
   material_cost decimal(14,2)
   material_cost_per_kg decimal(12,4)
+  job_kind JobKind [not null, default: `'POUCH'::"JobKind"`]
+  pouch_type PouchType
+  pouch_type_note text [not null, default: `''`]
+  pricing_basis PricingBasis [not null, default: `'PER_KG'::"PricingBasis"`]
+  quantity_pouches integer [not null, default: `0`]
+  rate_per_pouch decimal(12,4) [not null, default: `0`]
 
   Note: '5 row(s) at time of generation'
 }
@@ -206,8 +258,37 @@ Table quotations {
   sent_at timestamp
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
+  gst_number text [not null, default: `'NA'`]
+  decided_at timestamp
+  lost_reason text [not null, default: `''`]
 
   Note: '3 row(s) at time of generation'
+}
+
+Table sessions {
+  id text [pk]
+  token_hash text [unique, not null]
+  user_id text [not null]
+  expires_at timestamp [not null]
+  last_seen_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+
+  Note: '18 row(s) at time of generation'
+}
+
+Table users {
+  id text [pk]
+  username text [unique, not null]
+  password_hash text [not null]
+  display_name text [not null]
+  is_admin boolean [not null, default: `false`]
+  is_active boolean [not null, default: `true`]
+  modules text[] [default: `ARRAY[]::text[]`]
+  last_login_at timestamp
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+
+  Note: '2 row(s) at time of generation'
 }
 
 Ref: jobs.customer_id > customers.id [delete: set null]
@@ -216,3 +297,6 @@ Ref: quotation_items.quotation_id > quotations.id [delete: cascade]
 Ref: quotation_items.job_id > jobs.id [delete: set null]
 Ref: quotation_items.film_material_id > materials.id [delete: set null]
 Ref: material_rates.material_id > materials.id [delete: cascade]
+Ref: sessions.user_id > users.id [delete: cascade]
+Ref: quotation_emails.quotation_id > quotations.id [delete: cascade]
+Ref: login_events.user_id > users.id [delete: set null]

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import authRoutes from '../modules/auth/auth.routes.js';
 import customerRoutes from '../modules/customers/customer.routes.js';
 import materialRoutes from '../modules/materials/material.routes.js';
+import monitorRoutes from '../modules/monitor/monitor.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
 import settingsRoutes from '../modules/settings/settings.routes.js';
 import userRoutes from '../modules/users/user.routes.js';
@@ -37,8 +38,9 @@ router.use('/materials', authenticate, materialRoutes);
 
 router.use('/settings', authenticate, settingsRoutes);
 
-/** Administrators only — the router applies that guard to itself. */
+/** Administrators only — each router applies that guard to itself. */
 router.use('/users', userRoutes);
+router.use('/monitor', monitorRoutes);
 
 /* ---------------------------------------------------------------------------
  * Further module routes are registered here as each is scoped in and built:

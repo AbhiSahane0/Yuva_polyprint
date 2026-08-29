@@ -785,6 +785,9 @@ Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 | `material_rates`   | One material's price on one date — one row per active material per day.                   |
 | `quotation_emails` | One recorded attempt to email a quotation — recipients, subject, who sent it.             |
 | `app_settings`     | Editable rates and costing defaults.                                                      |
+| `users`            | Accounts, their password hash and which modules each may reach.                           |
+| `sessions`         | Live sign-ins. Deleted on expiry, so this table is always "right now".                    |
+| `login_events`     | Every successful sign-in, kept permanently. Survives the account being deleted.           |
 
 Two deliberate choices:
 
@@ -923,6 +926,71 @@ company really can be called "Smith & Sons". Every message carries a plain-text
 alternative, because some clients render nothing else.
 
 ---
+
+## Sign-in monitor
+
+`GET /api/monitor` — a read-only snapshot of who has been using the system.
+Administrators only, over the ordinary session; the browser screen that renders
+it is documented in [the web README](../web/README.md).
+
+Returns three things, all timestamps ISO in UTC — the screen converts to IST:
+
+- **`users`** — one row per account: role, whether it is still active, the last
+  time it was used, and how many sessions it has open. Ordered by most recent
+  sign-in, with accounts nobody has ever used last.
+- **`sessions`** — one row per live session: when it started, when that browser
+  last made a request, when it expires.
+- **`history`** — every successful sign-in, newest first, with the address it
+  came from and the browser that made it.
+
+`?limit=` how many history rows to return: 100 by default, 1000 at most. A value
+that is not a number falls back to the default rather than erroring.
+`historyTotal` always reports the true count, so the screen can say when it is
+showing a slice.
+
+### How far back each part goes
+
+The three answer different spans, and it matters which one is being read:
+
+- **`users[].lastLoginAt`** is a single column, overwritten every time. Always
+  current, keeps no history.
+- **`sessions`** last seven days and are deleted once they expire, so that list
+  is only ever "the current week".
+- **`history`** is `login_events`, and nothing removes a row. It goes back to
+  the day the table was created.
+
+Signing in writes all three inside one transaction, so they cannot disagree.
+
+### What the history records, and what it does not
+
+Each row keeps the username and display name **as they stood at that moment**,
+alongside a nullable link to the account. Renaming a user therefore does not
+rewrite their past, and deleting one does not erase it — the foreign key is
+`ON DELETE SET NULL`, and those rows come back with `accountExists: false`. Same
+reasoning as `quotation_emails.sent_by`.
+
+The address is whatever Express resolves under `trust proxy`. The user agent is
+stored whole and truncated at 512 characters, because it is client-supplied and
+unbounded; the screen shows a short description derived from it.
+
+**Only successful sign-ins are recorded.** Failed attempts are not, deliberately:
+the interesting failure is a sustained one, and that is what the login rate
+limiter answers. Recording them would mean storing attempted usernames, which
+are frequently somebody's mistyped password.
+
+Nothing prunes the table. At an office of this size that is a few rows a day and
+will not need attention for years.
+
+### Where the first rows came from
+
+The table shipped empty, which would have left the screen blank on the day it
+went live even though people had plainly been signing in. A second migration
+seeds it from the sessions that already existed — each one is a real sign-in
+with a real timestamp, so the previous week was recovered exactly.
+
+Those backfilled rows carry no address or browser, because neither was ever
+recorded, and their names are the account's current ones rather than a snapshot.
+They are the only rows in the table of which that is true.
 
 ## CORS
 

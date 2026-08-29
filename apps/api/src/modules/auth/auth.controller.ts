@@ -4,7 +4,12 @@ import { ok } from '../../utils/api-response.js';
 import * as authService from './auth.service.js';
 
 export async function login(req: Request, res: Response) {
-  const result = await authService.login(req.body as LoginInput);
+  // Recorded against the sign-in, for the monitor page. `req.ip` is resolved
+  // through the proxy Express is told to trust in app.ts.
+  const result = await authService.login(req.body as LoginInput, {
+    ipAddress: req.ip,
+    userAgent: req.get('user-agent'),
+  });
   ok(res, result);
 }
 
