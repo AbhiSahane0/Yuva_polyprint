@@ -37,15 +37,15 @@ describe('application shell', () => {
 });
 
 describe('sign-in monitor', () => {
-  it('challenges a request that carries no credentials', async () => {
+  it('refuses a request with no session', async () => {
     const response = await request(app).get('/api/monitor');
 
     expect(response.status).toBe(401);
-    expect(response.headers['www-authenticate']).toContain('Basic realm=');
+    expect(response.body).toMatchObject({ success: false });
   });
 
-  it('challenges a bearer token, which is not what this endpoint accepts', async () => {
-    const response = await request(app).get('/api/monitor').set('Authorization', 'Bearer abc123');
+  it('refuses a token that resolves to nothing', async () => {
+    const response = await request(app).get('/api/monitor').set('Authorization', 'Bearer nonsense');
 
     expect(response.status).toBe(401);
   });

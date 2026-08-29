@@ -929,74 +929,35 @@ alternative, because some clients render nothing else.
 
 ## Sign-in monitor
 
-`GET /api/monitor` — a single read-only page answering one question: who has
-been signing in, and when.
+`GET /api/monitor` — a read-only snapshot of who has been using the system.
+Administrators only, over the ordinary session; the browser screen that renders
+it is documented in [the web README](../web/README.md).
 
-Open it by hand in a browser. There is no button for it anywhere in the app and
-no link to it, because it is not part of anybody's daily work:
+Returns three things, all timestamps ISO in UTC — the screen converts to IST:
 
-```
-https://yuva-polyprint-api.vercel.app/api/monitor
-```
+- **`users`** — one row per account: role, whether it is still active, the last
+  time it was used, and how many sessions it has open. Ordered by most recent
+  sign-in, with accounts nobody has ever used last.
+- **`sessions`** — one row per live session: when it started, when that browser
+  last made a request, when it expires.
+- **`history`** — every successful sign-in, newest first, with the address it
+  came from and the browser that made it.
 
-That URL is the front end's, and Vercel forwards `/api/*` straight to the API on
-Render, so the page comes from the API without being on a second domain. Hitting
-Render directly works too.
+`?limit=` how many history rows to return: 100 by default, 1000 at most. A value
+that is not a number falls back to the default rather than erroring.
+`historyTotal` always reports the true count, so the screen can say when it is
+showing a slice.
 
-The page shows two tables, every time in **India Standard Time**:
-
-- **Users — last sign-in.** One row per account: name, role, whether the account
-  is still active, the last time they signed in, and how many sessions they have
-  open right now. Sorted by most recent sign-in, with accounts nobody has ever
-  used at the bottom.
-- **Sessions open now.** One row per live session: when it started, when that
-  browser last made a request, and when it expires.
-- **Sign-in history.** Every successful sign-in ever recorded, newest first: who,
-  when, the address it came from and a short description of the browser.
-
-The history shows the 100 most recent by default and says so when there are more.
-`?limit=500` asks for a bigger slice, up to 1000. A value that is not a number
-is ignored rather than refused — this address is typed by hand.
-
-Add `?format=json` to get the same snapshot in the usual API envelope, for a
-script rather than a browser. The full user-agent string is in there; the page
-only shows the short version of it.
-
-### Signing in to it
-
-The page uses **HTTP Basic authentication against an existing administrator
-account** — the browser prompts for a username and password, and the same
-credentials that sign in to the app work here.
-
-That choice is deliberate. The page is opened directly rather than by the front
-end, so there is no session token to send; a browser, on the other hand, knows
-how to answer a Basic challenge and then repeats the credentials by itself on
-every refresh. So there is no second password to invent, no environment variable
-to configure, and no secret sitting in the URL where it would end up in
-bookmarks and browser history.
-
-Two consequences worth knowing:
-
-- Only **administrators** get in. A valid non-admin account is refused exactly
-  like a wrong password — the reply never distinguishes the two.
-- The browser holds those credentials until it is **closed**, so open the page
-  on a machine you trust, and close the browser afterwards on one you share.
-
-Attempts are rate-limited to ten failures per quarter of an hour, on their own
-counter rather than the login form's — otherwise a few mistyped passwords here
-would use up the allowance the whole office needs to sign in, since one office
-sits behind one IP address.
-
-### How far back each table goes
+### How far back each part goes
 
 The three answer different spans, and it matters which one is being read:
 
-- **Last sign-in** is a single column on the user record, overwritten every
-  time. Always current, keeps no history.
-- **Sessions** last seven days and are deleted once they expire, so that table
+- **`users[].lastLoginAt`** is a single column, overwritten every time. Always
+  current, keeps no history.
+- **`sessions`** last seven days and are deleted once they expire, so that list
   is only ever "the current week".
-- **Sign-in history** is `login_events`, and nothing removes a row. It goes back
-  to the day the table was created.
+- **`history`** is `login_events`, and nothing removes a row. It goes back to
+  the day the table was created.
 
 Signing in writes all three inside one transaction, so they cannot disagree.
 
@@ -1005,33 +966,31 @@ Signing in writes all three inside one transaction, so they cannot disagree.
 Each row keeps the username and display name **as they stood at that moment**,
 alongside a nullable link to the account. Renaming a user therefore does not
 rewrite their past, and deleting one does not erase it — the foreign key is
-`ON DELETE SET NULL`, and the page marks those rows "account removed". This is
-the same reasoning as `quotation_emails.sent_by`.
+`ON DELETE SET NULL`, and those rows come back with `accountExists: false`. Same
+reasoning as `quotation_emails.sent_by`.
 
-The address is whatever Express resolves under `trust proxy`, and the browser
-description is a guess from a handful of well-known tokens — it says nothing
-rather than something wrong when it does not recognise the string.
+The address is whatever Express resolves under `trust proxy`. The user agent is
+stored whole and truncated at 512 characters, because it is client-supplied and
+unbounded; the screen shows a short description derived from it.
 
 **Only successful sign-ins are recorded.** Failed attempts are not, deliberately:
-the interesting failure is a sustained one, and that is what the rate limiter is
-for. Adding them would mean storing attempted usernames, which are frequently
-someone's mistyped password.
+the interesting failure is a sustained one, and that is what the login rate
+limiter answers. Recording them would mean storing attempted usernames, which
+are frequently somebody's mistyped password.
 
 Nothing prunes the table. At an office of this size that is a few rows a day and
 will not need attention for years.
 
 ### Where the first rows came from
 
-The table shipped empty, which would have left the page blank on the day it went
-live even though people had plainly been signing in. A second migration seeds it
-from the sessions that already existed — each one is a real sign-in with a real
-timestamp, so the previous week was recovered exactly.
+The table shipped empty, which would have left the screen blank on the day it
+went live even though people had plainly been signing in. A second migration
+seeds it from the sessions that already existed — each one is a real sign-in
+with a real timestamp, so the previous week was recovered exactly.
 
 Those backfilled rows carry no address or browser, because neither was ever
 recorded, and their names are the account's current ones rather than a snapshot.
 They are the only rows in the table of which that is true.
-
----
 
 ## CORS
 

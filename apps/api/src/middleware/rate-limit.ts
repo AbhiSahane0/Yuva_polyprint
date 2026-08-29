@@ -41,26 +41,6 @@ export const authRateLimiter = rateLimit({
 });
 
 /**
- * The sign-in monitor, which also tests a password and so is also worth
- * guarding.
- *
- * Its own instance rather than a share of the login limiter: both are keyed by
- * IP, and one office sits behind one address, so a few fumbled attempts on this
- * page would otherwise use up the allowance the whole works needs to sign in.
- */
-export const monitorRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  skipSuccessfulRequests: true,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-  skip: () => env.isTest,
-  handler: (_req, res) => {
-    res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json(tooManyRequests);
-  },
-});
-
-/**
  * Sending quotations by email.
  *
  * Every call costs money at the provider and renders a PDF with Chromium

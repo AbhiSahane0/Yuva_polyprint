@@ -119,6 +119,36 @@ the person makes that record ambiguous. Deactivating keeps the history, blocks
 sign-in, and drops their sessions on the spot. You cannot deactivate or delete
 your own account, and the API refuses to let the last administrator be demoted.
 
+### Sign-in log — `/monitor` (administrators only)
+
+Who has been using the system, and when. Read-only — there is nothing to click
+except **Refresh**, and it refetches by itself whenever the tab is focused again.
+
+Three sections:
+
+- **Accounts** — every account with the last time it was used, and a badge on
+  anyone signed in right now.
+- **Signed in now** — one row per live session, so a person signed in on both a
+  desk machine and a phone appears twice. That is the point: two rows means two
+  browsers, not two people.
+- **Sign-in history** — every successful sign-in, grouped under a date heading.
+  A flat list of several hundred timestamps is unreadable, and the question the
+  office actually asks is "who was in on Tuesday".
+
+Each history row shows the browser and the address it came from. The browser
+description is a guess from a handful of well-known tokens and shows nothing at
+all rather than something wrong when it does not recognise one.
+
+**Times are India Standard Time**, formatted from a fixed +05:30 offset rather
+than the browser's locale, and the page says so at the top. A laptop that
+travelled, or one with its clock region set wrongly, would otherwise quietly
+answer a different question from the machine next to it. India has never
+observed daylight saving, so the fixed offset is exact for every date.
+
+Rows without an address or browser are the ones recovered from existing sessions
+when the log was first switched on — see [the API README](../api/README.md) for
+what that backfill did and did not know.
+
 ### Customers — `/customers`
 
 The list of every customer, with search across company, contact, mobile,

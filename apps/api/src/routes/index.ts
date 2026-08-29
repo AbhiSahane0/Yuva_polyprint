@@ -16,23 +16,14 @@ import { authenticate, requireModule } from '../middleware/authenticate.js';
 const router = Router();
 
 /*
- * Signing in is the only thing you can do without credentials. Everything
+ * Signing in is the only thing you can do without being signed in. Everything
  * below requires a session, and most of it requires access to a named module.
- * The one exception is /monitor, which takes an administrator's username and
- * password on the request itself instead.
  *
  * The guards live here, on the one page that lists the whole API surface,
  * rather than inside each module's routes. A module added without a guard is
  * visible in this diff; a guard forgotten three files away is not.
  */
 router.use('/auth', authRoutes);
-
-/*
- * The sign-in monitor is opened by hand in a browser, so it authenticates over
- * HTTP Basic rather than a session — see the module for why. It carries its own
- * administrator check for the same reason.
- */
-router.use('/monitor', monitorRoutes);
 
 router.use('/customers', authenticate, requireModule('customers'), customerRoutes);
 router.use('/quotations', authenticate, requireModule('quotations'), quotationRoutes);
@@ -47,8 +38,9 @@ router.use('/materials', authenticate, materialRoutes);
 
 router.use('/settings', authenticate, settingsRoutes);
 
-/** Administrators only — the router applies that guard to itself. */
+/** Administrators only — each router applies that guard to itself. */
 router.use('/users', userRoutes);
+router.use('/monitor', monitorRoutes);
 
 /* ---------------------------------------------------------------------------
  * Further module routes are registered here as each is scoped in and built:
