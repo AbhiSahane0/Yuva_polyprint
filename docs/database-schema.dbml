@@ -147,7 +147,7 @@ Table login_events {
   user_agent text
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '18 row(s) at time of generation'
+  Note: '25 row(s) at time of generation'
 }
 
 Table material_rates {
@@ -158,7 +158,7 @@ Table material_rates {
   entered_by text [not null, default: `'Office'`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '66 row(s) at time of generation'
+  Note: '117 row(s) at time of generation'
 }
 
 Table materials {
@@ -188,44 +188,85 @@ Table quotation_emails {
   Note: '0 row(s) at time of generation'
 }
 
+Table quotation_item_layers {
+  id text [pk]
+  item_id text [unique, not null]
+  position integer [unique, not null]
+  material_id text
+  material_name text [not null]
+  micron decimal(10,2) [not null]
+  density decimal(6,4)
+  rate_per_kg decimal(12,2)
+  gsm decimal(10,3) [not null]
+
+  Note: '12 row(s) at time of generation'
+}
+
+Table quotation_item_quantities {
+  id text [pk]
+  item_id text [unique, not null]
+  tier_id text [not null]
+  position integer [unique, not null]
+  quantity_kg decimal(12,3) [not null]
+  rate_per_kg decimal(12,2) [not null]
+  quantity_pouches integer [not null, default: `0`]
+  rate_per_pouch decimal(12,4) [not null, default: `0`]
+  total_pouches decimal(14,2) [not null]
+  total_amount decimal(14,2) [not null]
+  cost_per_pouch decimal(12,4) [not null]
+  material_cost decimal(14,2)
+  margin_percent decimal(6,2)
+
+  Note: '5 row(s) at time of generation'
+}
+
 Table quotation_items {
   id text [pk]
   quotation_id text [not null]
   position integer [not null]
   job_id text
   job_name text [not null]
-  layer integer [not null]
   width_mm decimal(10,2) [not null]
   height_mm decimal(10,2) [not null]
-  poly_micron decimal(10,2) [not null]
-  quantity_kg decimal(12,3) [not null]
-  rate_per_kg decimal(12,2) [not null]
   repeat_width decimal(10,2) [not null]
   repeat_height decimal(10,2) [not null]
   cylinder_count integer [not null]
   transport_cost decimal(12,2) [not null, default: `0`]
   micron decimal(10,2) [not null]
   pouches_per_kg decimal(12,2) [not null]
-  total_pouches decimal(14,2) [not null]
-  total_amount decimal(14,2) [not null]
   cylinder_width decimal(10,2) [not null]
   cylinder_circumference decimal(10,2) [not null]
   cost_per_cylinder decimal(14,2) [not null]
   total_cylinder_cost decimal(14,2) [not null]
-  cost_per_pouch decimal(12,4) [not null]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
-  film_material_id text
-  margin_percent decimal(6,2)
-  material_cost decimal(14,2)
   material_cost_per_kg decimal(12,4)
   job_kind JobKind [not null, default: `'POUCH'::"JobKind"`]
   pouch_type PouchType
   pouch_type_note text [not null, default: `''`]
   pricing_basis PricingBasis [not null, default: `'PER_KG'::"PricingBasis"`]
-  quantity_pouches integer [not null, default: `0`]
-  rate_per_pouch decimal(12,4) [not null, default: `0`]
+  charge_cylinders boolean [not null, default: `true`]
+  composite_gsm decimal(10,3) [not null, default: `0`]
 
   Note: '5 row(s) at time of generation'
+}
+
+Table quotation_tiers {
+  id text [pk]
+  quotation_id text [unique, not null]
+  position integer [unique, not null]
+  material_subtotal decimal(14,2) [not null]
+  material_with_gst decimal(14,2) [not null]
+  cylinder_subtotal decimal(14,2) [not null]
+  cylinder_with_gst decimal(14,2) [not null]
+  grand_subtotal decimal(14,2) [not null]
+  grand_with_gst decimal(14,2) [not null]
+  material_advance decimal(14,2) [not null]
+  cylinder_advance decimal(14,2) [not null]
+  total_advance decimal(14,2) [not null]
+  total_quantity_kg decimal(14,3) [not null]
+  total_pouches decimal(14,2) [not null]
+
+  Note: '3 row(s) at time of generation'
 }
 
 Table quotations {
@@ -244,15 +285,6 @@ Table quotations {
   gst_percent decimal(5,2) [not null]
   material_advance_percent decimal(5,2) [not null]
   cylinder_advance_percent decimal(5,2) [not null]
-  material_subtotal decimal(14,2) [not null]
-  material_with_gst decimal(14,2) [not null]
-  cylinder_subtotal decimal(14,2) [not null]
-  cylinder_with_gst decimal(14,2) [not null]
-  grand_subtotal decimal(14,2) [not null]
-  grand_with_gst decimal(14,2) [not null]
-  material_advance decimal(14,2) [not null]
-  cylinder_advance decimal(14,2) [not null]
-  total_advance decimal(14,2) [not null]
   terms text[]
   notes text [not null, default: `''`]
   sent_at timestamp
@@ -261,6 +293,10 @@ Table quotations {
   gst_number text [not null, default: `'NA'`]
   decided_at timestamp
   lost_reason text [not null, default: `''`]
+  version integer [unique, not null, default: `1`]
+  root_id text
+  is_latest boolean [not null, default: `true`]
+  won_tier_id text [unique]
 
   Note: '3 row(s) at time of generation'
 }
@@ -273,7 +309,7 @@ Table sessions {
   last_seen_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '18 row(s) at time of generation'
+  Note: '25 row(s) at time of generation'
 }
 
 Table users {
@@ -295,8 +331,14 @@ Ref: jobs.customer_id > customers.id [delete: set null]
 Ref: quotations.customer_id > customers.id [delete: set null]
 Ref: quotation_items.quotation_id > quotations.id [delete: cascade]
 Ref: quotation_items.job_id > jobs.id [delete: set null]
-Ref: quotation_items.film_material_id > materials.id [delete: set null]
 Ref: material_rates.material_id > materials.id [delete: cascade]
 Ref: sessions.user_id > users.id [delete: cascade]
 Ref: quotation_emails.quotation_id > quotations.id [delete: cascade]
 Ref: login_events.user_id > users.id [delete: set null]
+Ref: quotations.root_id > quotations.id [delete: cascade]
+Ref: quotations.won_tier_id > quotation_tiers.id [delete: set null]
+Ref: quotation_tiers.quotation_id > quotations.id [delete: cascade]
+Ref: quotation_item_layers.item_id > quotation_items.id [delete: cascade]
+Ref: quotation_item_layers.material_id > materials.id [delete: set null]
+Ref: quotation_item_quantities.item_id > quotation_items.id [delete: cascade]
+Ref: quotation_item_quantities.tier_id > quotation_tiers.id [delete: cascade]

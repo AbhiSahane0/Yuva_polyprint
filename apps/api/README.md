@@ -10,7 +10,9 @@ quotation PDFs.
 - [Endpoints](#endpoints)
 - [Calculations](#calculations) ← the part worth reading
   - [The vocabulary](#the-vocabulary)
-  - [2 layer versus 3 layer](#2-layer-versus-3-layer)
+  - [The laminate, ply by ply](#the-laminate-ply-by-ply)
+  - [Quantity tiers](#quantity-tiers)
+  - [Versions](#versions)
   - [Reading a printed quotation](#reading-a-printed-quotation)
   - [What is frozen, and what moves](#what-is-frozen-and-what-moves)
 - [Data model](#data-model)
@@ -266,18 +268,25 @@ every view.
 
 ### Quotations
 
-| Method | Path                      | Notes                                                                                                                 |
-| ------ | ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/quotations`             | Search by number, customer or job name; filter by status. Ordered Draft → Sent → Won → Lost, newest first within each |
-| GET    | `/quotations/next-number` | The number the next quotation will get                                                                                |
-| GET    | `/quotations/:id`         | Full document with all lines                                                                                          |
-| GET    | `/quotations/:id/pdf`     | The PDF. `?inline=1` displays, otherwise downloads                                                                    |
-| POST   | `/quotations`             | Create; prices and costs every line                                                                                   |
-| PATCH  | `/quotations/:id`         | Update; **re-prices the whole document**                                                                              |
-| POST   | `/quotations/:id/send`    | Email it to the customer with the PDF attached                                                                        |
-| GET    | `/quotations/:id/emails`  | Every recorded send, newest first                                                                                     |
-| POST   | `/quotations/:id/outcome` | Record won or lost — see [Winning and losing](#winning-and-losing)                                                    |
-| DELETE | `/quotations/:id`         | Delete; lines cascade                                                                                                 |
+| Method | Path                       | Notes                                                                                                                 |
+| ------ | -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/quotations`              | Search by number, customer or job name; filter by status. Ordered Draft → Sent → Won → Lost, newest first within each |
+| GET    | `/quotations/next-number`  | The number the next quotation will get                                                                                |
+| GET    | `/quotations/:id`          | Full document with all lines                                                                                          |
+| GET    | `/quotations/:id/pdf`      | The PDF. `?inline=1` displays, otherwise downloads                                                                    |
+| POST   | `/quotations`              | Create; prices and costs every line                                                                                   |
+| PATCH  | `/quotations/:id`          | Update; **re-prices the whole document**                                                                              |
+| POST   | `/quotations/:id/send`     | Email it to the customer with the PDF attached                                                                        |
+| GET    | `/quotations/:id/emails`   | Every recorded send, newest first                                                                                     |
+| POST   | `/quotations/:id/outcome`  | Record won or lost — see [Winning and losing](#winning-and-losing)                                                    |
+| POST   | `/quotations/:id/versions` | Revise it: same number, next version, as a draft                                                                      |
+| GET    | `/quotations/:id/versions` | Every version of that number, newest first                                                                            |
+| DELETE | `/quotations/:id`          | Delete; lines cascade                                                                                                 |
+
+**The list shows only the current version of each number.** A revision keeps the
+number, so without that filter repricing would grow a second row reading "121"
+with different totals — the confusion versioning exists to prevent. Earlier
+versions stay reachable through `GET /quotations/:id/versions`.
 
 **A new company is created with the quotation.** `POST /quotations` with
 `saveAsCustomer: true` and no `customerId` adds the company to the customer
@@ -355,84 +364,150 @@ real quotation #118 by tests (`packages/shared/src/lib/quotation-math.test.ts`).
 
 Every figure on a quotation traces back to these. Worth reading once.
 
-| Term               | What it is                                                                                                                                                                         |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Micron (µ)**     | Thickness of a film ply. One thousandth of a millimetre.                                                                                                                           |
-| **Density**        | Weight of a film per unit volume, g/cm³. What turns a thickness into a weight.                                                                                                     |
-| **GSM**            | Grams per square metre — `microns × density`. The unit everything is costed in, because film is bought by weight.                                                                  |
-| **Composite GSM**  | All the plies added together: the weight of one square metre of the finished laminate.                                                                                             |
-| **PET**            | The printed outer ply. 12µ in every structure this works produces.                                                                                                                 |
-| **MET PET**        | Metallised PET — the same 12µ film with a thin aluminium coating. A barrier against moisture, oxygen and light, and what makes a pouch silver inside. Only in a 3-layer structure. |
-| **Poly**           | The inner sealing ply. Its thickness and grade are chosen per job; the **Film** dropdown picks which one, and its density and rate come from that choice.                          |
-| **Adhesive**       | Bonds the plies. Adds 2µ and its own GSM.                                                                                                                                          |
-| **Yield factor**   | A wastage allowance applied when working out pouches per kilogram.                                                                                                                 |
-| **Pouches per kg** | How many pouches a kilogram of finished film yields. Falls as the film gets thicker.                                                                                               |
-| **Repeat**         | How many times the design wraps around the cylinder. Sets the engraved area, and so the cylinder's cost.                                                                           |
+| Term               | What it is                                                                                                                                                                                            |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Micron (µ)**     | Thickness of a film ply. One thousandth of a millimetre.                                                                                                                                              |
+| **Density**        | Weight of a film per unit volume, g/cm³. What turns a thickness into a weight.                                                                                                                        |
+| **GSM**            | Grams per square metre — `microns × density`. The unit everything is costed in, because film is bought by weight.                                                                                     |
+| **Composite GSM**  | All the plies added together: the weight of one square metre of the finished laminate.                                                                                                                |
+| **PET**            | The printed outer ply. 12µ in every structure this works produces.                                                                                                                                    |
+| **MET PET**        | Metallised PET — the same 12µ film with a thin aluminium coating. A barrier against moisture, oxygen and light, and what makes a pouch silver inside. Usually the middle ply of a three-ply laminate. |
+| **Poly**           | The inner sealing ply. Its thickness and grade are chosen per job; the **Film** dropdown picks which one, and its density and rate come from that choice.                                             |
+| **Adhesive**       | Bonds the plies. Adds 2µ and its own GSM.                                                                                                                                                             |
+| **Yield factor**   | A wastage allowance applied when working out pouches per kilogram.                                                                                                                                    |
+| **Pouches per kg** | How many pouches a kilogram of finished film yields. Falls as the film gets thicker.                                                                                                                  |
+| **Repeat**         | How many times the design wraps around the cylinder. Sets the engraved area, and so the cylinder's cost.                                                                                              |
 
-### 2 layer versus 3 layer
+### The laminate, ply by ply
 
-The layer count is one field, but it moves **three** things: the thickness, the
-wastage allowance, and what the material costs.
+A quotation line states its own structure. Each ply carries a material and a
+thickness, and the engine turns that into weight through the material's density:
 
 ```
-2 layer:  PET + Poly              micron = 12 + poly + 2       factor 1.1
-3 layer:  PET + MET PET + Poly    micron = 12 + 12 + poly + 2  factor 1.2
+GSM = microns × density        (12µ PET at 1.4 g/cm³ = 16.8 GSM)
 ```
 
-The same 420 × 260 pouch with 45µ poly, 250 kg ordered, priced at ₹300/kg:
+Two or three plies is what this works produces; the schema allows four, so a
+foil laminate can be quoted the day it is first asked for rather than after a
+release.
 
-|                | 2 layer        | 3 layer                  |
-| -------------- | -------------- | ------------------------ |
-| Structure      | PET + Poly     | PET + **MET PET** + Poly |
-| Micron         | 59             | 71                       |
-| Yield factor   | 1.1            | 1.2                      |
-| Pouches per kg | 141.10         | **107.48**               |
-| 250 kg yields  | 35,275 pouches | **26,870 pouches**       |
-| Composite      | 63.4 GSM       | 80.2 GSM                 |
-| Cost per kg    | ₹215.32        | **₹224.26**              |
-| Margin at ₹300 | 28.23%         | **25.25%**               |
+> **This used to be a single choice.** "2 layer" or "3 layer" selected a fixed
+> structure — one PET at 12µ, a metallised PET on a 3-layer job, and whichever
+> film the office picked for the sealant. Correct for today's jobs, but the
+> client could not read what he was quoting off that control, and a 19-micron
+> PET or a foil ply needed a developer. Quotations saved before the change keep
+> their stored figures; the migration reconstructed their plies from the
+> structure that was assumed.
+
+The layer **count** still moves two things on its own:
+
+```
+micron = every ply + 2µ adhesive          (flat, not per bond)
+yield factor: 2 plies 1.1, 3 or more 1.2
+```
+
+The adhesive is a single 2µ whatever the ply count. A three-ply laminate is
+glued twice and ought to carry twice as much, but the client's spreadsheet adds
+one either way and every imported job matches it — changing it would move
+pouches-per-kg on every 3-layer line ever quoted.
+
+The same 420 × 260 pouch with a 45µ sealant, 250 kg ordered at ₹300/kg:
+
+|                | PET + Poly     | PET + MET PET + Poly |
+| -------------- | -------------- | -------------------- |
+| Micron         | 59             | 71                   |
+| Yield factor   | 1.1            | 1.2                  |
+| Pouches per kg | 141.10         | **107.48**           |
+| 250 kg yields  | 35,275 pouches | **26,870 pouches**   |
+| Composite      | 63.4 GSM       | 80.2 GSM             |
+| Cost per kg    | ₹215.32        | **₹224.26**          |
+| Margin at ₹300 | 28.23%         | **25.25%**           |
 
 **Thicker film means fewer pouches per kilogram.** The same 250 kg yields about
-24% fewer three-layer pouches. Quoting per kilogram at an unchanged rate
-therefore earns the same money for materially fewer pouches, which is why the
-customer's cost per piece rises even when the rate per kg has not moved.
+24% fewer three-ply pouches. Quoting per kilogram at an unchanged rate therefore
+earns the same money for materially fewer pouches, which is why the customer's
+cost per piece rises even when the rate per kg has not moved.
 
 The cost per kilogram rises too, because MET PET is dearer than the plain PET
 beside it. At the same selling rate the margin drops about three points.
 
-> **This was wrong until recently.** A 3-layer job was costed as _two plain PET
-> plies_, both at the PET rate. Thickness was unaffected, so quoted prices and
-> pouch counts were always right — but the cost was understated and every
-> 3-layer margin read a few points better than reality. Quotations saved before
-> that fix keep their stored figures; only new and re-priced lines use the
-> corrected costing.
+**A ply the office left unchosen makes the line uncostable, not free.** So does
+a material with no density recorded — it cannot be turned into a weight. Either
+way the line reports no cost and no margin rather than an average of whatever
+happened to be left, which is what it used to do: dropping the sealant out of a
+two-ply structure discarded three quarters of the pouch's weight and reported a
+confident, much higher figure.
+
+### Quantity tiers
+
+A line can be priced at up to three quantities, and the document carries totals
+for each. Every line on one quotation must be priced at the same number of
+quantities — they are columns on one document, and a line with three where
+another has two would leave a hole no total could describe.
+
+The arithmetic splits in two, which is the point:
+
+```
+geometry   thickness, pouches per kg, the cylinders   — the same at every quantity
+money      order quantity, rate, amount, margin       — one set per quantity
+```
+
+**The cylinders cost the same in every column.** They do not scale with the
+order, so they are costed once and spread across whichever quantity is being
+looked at — which is exactly why the price per pouch falls as the quantity
+rises. That is a real effect the customer can check, not a discount typed in by
+hand.
+
+### Versions
+
+The office reprices rather than renumbers. The customer already has "QUO-124" on
+their desk, and a second document with a different number reads as a second
+offer rather than a corrected one — so a revision keeps the number and takes the
+next version.
+
+```
+QUO-124 v1   sent, superseded      isLatest false
+QUO-124 v2   draft, current        isLatest true
+```
+
+A revision is an **exact copy**: plies, quantities, tiers, totals, the rates it
+was costed against and the date it carries. Nothing is repriced on the way in,
+because pressing "new version" should not silently move a figure the customer
+has already been quoted. It reprices on the first save, which is the point at
+which the office has decided what they are changing.
+
+It starts as a **draft**, and does not inherit the answer recorded against the
+version it came from — carrying either across would misreport what was agreed.
+
+Deleting is careful about both of those. Deleting the current version promotes
+the highest survivor, or the number would vanish from the list while its history
+sat there unreachable; and because revisions hang off the first version through
+a cascading key, deletion re-parents the survivors first, so removing an old v1
+cannot destroy the live v3.
 
 ### Quotation line
 
-Given: **roll or pouch** (and for a pouch, its style), layers (2 or 3), width
-and height in mm, poly micron, quantity in kg, rate per kg, repeat width and
-height, cylinder count, optional transport cost.
+Given: **roll or pouch** (and for a pouch, its style), the plies with their
+materials and thicknesses, width and height in mm, one to three quantities with
+their rates, repeat width and height, cylinder count, optional transport cost,
+and whether this design's cylinders are being charged for.
 
 Roll or pouch is recorded, not calculated — it changes what the customer
 receives, not what the line costs. A roll carries no pouch style; the schema
 clears it rather than rejecting the combination, so switching a line from pouch
 to roll is not an error the user then has to tidy up.
 
-**1. Total micron** — each PET ply is 12µ and adhesive adds 2µ:
+**1. Total micron** — every ply, plus one 2µ adhesive:
 
 ```
-2 layer:  PET + poly              micron = 12 + poly + 2
-3 layer:  PET + MET PET + poly    micron = 12 + 12 + poly + 2
+PET 12 + Poly 45              micron = 59
+PET 12 + MET PET 12 + Poly 60 micron = 86
 ```
 
-The two structures differ by a metallised PET ply. It is the same 12µ, so the
-arithmetic here is unchanged — but it is a different material, which is why
-[Material cost](#material-cost-and-margin) prices it separately.
-
-**2. Yield factor** — 3-layer film wastes more:
+**2. Yield factor** — more plies waste more:
 
 ```
-2 layer: 1.1     3 layer: 1.2
+2 plies: 1.1     3 or more: 1.2
 ```
 
 **3. Pouches per kg** — how many pouches a kilogram of film yields:
@@ -516,6 +591,19 @@ comes up short by exactly the transport and looks like an error. A line with
 form spells the sum out beneath the field, and the PDF says so under the totals
 whenever any transport was charged.
 
+**Cylinders are charged per design, not per customer.** A line for a design
+whose cylinders are already in the works sets `chargeCylinders: false`, and the
+total becomes zero — transport included, because there is nothing to deliver.
+The cost per cylinder is still reported, so the office can see what a new set
+would cost if one were damaged.
+
+The rule is deliberately not "existing customer, no cylinders". A customer of
+ten years ordering a new pouch still needs a set engraved, and the printed terms
+have always said exactly that: _"each job/design requires a separate cylinder"_,
+and _"cylinder charges are one-time and reusable for repeat orders (same
+design)"_. Keying it to the customer would quote ₹0 for cylinders that must
+actually be cut.
+
 Worked example, 5 Kg Paneer Bag, 670 × 460 mm, 60µ poly, 2 layer, 250 kg at
 ₹295, repeat 1 × 1, 4 cylinders, no transport:
 
@@ -557,22 +645,22 @@ and the total now use it.
 Every column on the document, and where its number comes from. **Typed** means
 someone entered it; everything else is worked out.
 
-| Column                   | Source                                                                |
-| ------------------------ | --------------------------------------------------------------------- |
-| Job Name                 | Typed                                                                 |
-| Layer                    | Typed — 2 or 3, see [2 layer versus 3 layer](#2-layer-versus-3-layer) |
-| Job Size, Width × Height | Typed, in mm                                                          |
-| Micron                   | `12 (+12 if 3 layer) + poly + 2`                                      |
-| No. of Pouch Per kg      | `1000 ÷ ((W×H÷100 × micron × factor) ÷ 10000)`, to 2 decimals         |
-| Order Qty                | Typed. **Kilograms**, or **pouches** on a standup line                |
-| Total Pouches            | `pouches/kg × kg`, or the typed count on a standup line               |
-| Rate /Kg                 | Typed. Reads `4.20 /pc` on a standup line, which is priced per piece  |
-| Total Rs.                | `kg × rate/kg`, or `pouches × rate/pouch`                             |
-| Cylinder Size, Width     | `job width × repeat width + 80` — the 80 is mounting allowance        |
-| Cylinder Size, Circum    | `job height × repeat height`                                          |
-| No. of Cylinder          | Typed                                                                 |
-| Cost Per Cylinder        | `(cyl width × circum ÷ 100) × cylinder rate`                          |
-| Total Cylinder Cost      | `cost per cylinder × count` **+ transport**                           |
+| Column                   | Source                                                                   |
+| ------------------------ | ------------------------------------------------------------------------ |
+| Job Name                 | Typed                                                                    |
+| Layer                    | How many plies, see [The laminate, ply by ply](#the-laminate-ply-by-ply) |
+| Job Size, Width × Height | Typed, in mm                                                             |
+| Micron                   | every ply + 2µ adhesive                                                  |
+| No. of Pouch Per kg      | `1000 ÷ ((W×H÷100 × micron × factor) ÷ 10000)`, to 2 decimals            |
+| Order Qty                | Typed. **Kilograms**, or **pouches** on a standup line                   |
+| Total Pouches            | `pouches/kg × kg`, or the typed count on a standup line                  |
+| Rate /Kg                 | Typed. Reads `4.20 /pc` on a standup line, which is priced per piece     |
+| Total Rs.                | `kg × rate/kg`, or `pouches × rate/pouch`                                |
+| Cylinder Size, Width     | `job width × repeat width + 80` — the 80 is mounting allowance           |
+| Cylinder Size, Circum    | `job height × repeat height`                                             |
+| No. of Cylinder          | Typed                                                                    |
+| Cost Per Cylinder        | `(cyl width × circum ÷ 100) × cylinder rate`                             |
+| Total Cylinder Cost      | `cost per cylinder × count` **+ transport**                              |
 
 Three of these do not reconcile the way a reader first expects, and each has
 caught someone out:
@@ -585,6 +673,17 @@ caught someone out:
   reader checks against the total. As a whole number it stops reconciling —
   29.67 shown as 30 makes `30 × 100 kg` look like 3,000 pouches where the line
   correctly reads 2,967.
+- **A line priced at several quantities prints one row per quantity.** The
+  table is already sixteen columns on a 194mm page, so the quantities go down
+  rather than across — and a job's geometry and its cylinders do not vary by
+  quantity anyway, so those cells span the rows and only the money repeats.
+  Totals follow the same shape: one row per quantity, with the cylinder count
+  and cost spanned across them rather than repeated, because repeating the same
+  figure down a column reads as being charged for it three times.
+- **The summary transposes** when there is more than one quantity — a column
+  each, with cylinders on a single row because they cost the same in all of
+  them. That side-by-side comparison is the whole reason for quoting tiers and
+  does not work stacked. A single-quantity document keeps the original layout.
 - **Order Qty is not always kilograms.** A standup or standup-zipper line is
   quoted per piece, so that cell holds a pouch count. When a document mixes the
   two, the Order Qty **total shows a dash** — adding kilograms to pouches would
@@ -620,21 +719,25 @@ Ink and adhesive are laid down by weight already, so their GSM comes from
 settings rather than from a thickness.
 
 ```
-petGsm       = 12 × 1.4                      one plain PET ply, always
-metpetGsm    = layers = 3 ? 12 × 1.4 : 0     the metallised middle ply
-polyGsm      = polyMicron × the chosen film's density
+plyGsm       = ply micron × that material's density      once per ply
 inkGsm       = settings.inkGsm
 adhesiveGsm  = settings.adhesiveGsm
-compositeGsm = petGsm + metpetGsm + polyGsm + inkGsm + adhesiveGsm
+compositeGsm = Σ plyGsm + inkGsm + adhesiveGsm
 
 costPerKg = Σ(componentGsm × componentRate) ÷ compositeGsm
 margin %  = (sellingRate − costPerKg) ÷ sellingRate × 100
 ```
 
-**The middle ply of a 3-layer structure is metallised PET, not a second plain
-one.** Same 12µ and the same density, so quoted prices and pouch counts are
-identical either way — but it is a different material at a different price, and
-it is costed against its own rate (`MET PET 12µm`, set on the Rates screen).
+Every ply is costed against **its own material's rate**, so a metallised PET is
+priced as MET PET and not as the plain PET beside it — same 12µ and the same
+density, so quoted prices and pouch counts are identical either way, but a
+different material at a different price.
+
+**A ply with no material chosen, or a material with no density recorded, stops
+the whole line being costed.** It cannot be turned into a weight, so including
+it is impossible and excluding it would report an average of the remaining plies
+as though it were the laminate. Both cases return no cost and no margin, exactly
+as a missing rate does.
 
 Worked example — 2-layer, 60µ poly on PE 60µm (density 0.94, ₹190), PET ₹210,
 ink ₹610, adhesive ₹480, selling at ₹295/kg:
@@ -775,19 +878,22 @@ no effect; they are not in the input schema at all.
 Full diagram and column reference: [`docs/database-schema.md`](../../docs/database-schema.md).
 Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 
-| Table              | Holds                                                                                     |
-| ------------------ | ----------------------------------------------------------------------------------------- |
-| `customers`        | Companies that order. Text fields use `'NA'` where the imported sheet was blank.          |
-| `jobs`             | Products and their full 55-column specification.                                          |
-| `quotations`       | Customer-facing documents. Totals frozen at save; `lost_reason` says why a loss was lost. |
-| `quotation_items`  | One priced line, with its costing.                                                        |
-| `materials`        | The rate catalogue, with density for films.                                               |
-| `material_rates`   | One material's price on one date — one row per active material per day.                   |
-| `quotation_emails` | One recorded attempt to email a quotation — recipients, subject, who sent it.             |
-| `app_settings`     | Editable rates and costing defaults.                                                      |
-| `users`            | Accounts, their password hash and which modules each may reach.                           |
-| `sessions`         | Live sign-ins. Deleted on expiry, so this table is always "right now".                    |
-| `login_events`     | Every successful sign-in, kept permanently. Survives the account being deleted.           |
+| Table                       | Holds                                                                                     |
+| --------------------------- | ----------------------------------------------------------------------------------------- |
+| `customers`                 | Companies that order. Text fields use `'NA'` where the imported sheet was blank.          |
+| `jobs`                      | Products and their full 55-column specification.                                          |
+| `quotations`                | Customer-facing documents. Totals frozen at save; `lost_reason` says why a loss was lost. |
+| `quotation_items`           | One priced line: its design, its geometry and its cylinders.                              |
+| `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted.    |
+| `quotation_item_quantities` | One line's figures at one quoted quantity.                                                |
+| `quotation_tiers`           | One quoted quantity and the document totals at it.                                        |
+| `materials`                 | The rate catalogue, with density for films.                                               |
+| `material_rates`            | One material's price on one date — one row per active material per day.                   |
+| `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.             |
+| `app_settings`              | Editable rates and costing defaults.                                                      |
+| `users`                     | Accounts, their password hash and which modules each may reach.                           |
+| `sessions`                  | Live sign-ins. Deleted on expiry, so this table is always "right now".                    |
+| `login_events`              | Every successful sign-in, kept permanently. Survives the account being deleted.           |
 
 Two deliberate choices:
 
@@ -797,7 +903,15 @@ until the client confirms the correct codes.
 
 **Nothing cascades except quotation lines.** Deleting a customer sets
 `customer_id` to null on their jobs and quotations rather than destroying
-production history or a sent quotation.
+production history or a sent quotation. A line's plies and quantities do cascade
+with the line, and a quantity also cascades with its tier — they describe it and
+have no meaning apart from it.
+
+**A ply keeps its own copy of what it was costed against.** The material link is
+there for reporting, but the name, density and rate are snapshotted onto the row:
+a quotation is a document, and the rate it was costed against must not move when
+the rates screen is updated tomorrow. Retiring a material sets the link to null
+and leaves the history readable.
 
 Money and quantities are `Decimal`, never `Float` — this system computes costs
 and variance, and floating point drift in a costing engine is a silent
@@ -824,8 +938,16 @@ winning:
    own snapshot — name, address, mobile, email, GSTIN — if it was never linked
    to the master. A company of the same name is reused, never duplicated.
 2. **Adds each line as a job** on that customer, so the next quotation for them
-   can be prefilled from it. The line's kind, pouch style, layers, micron,
-   design size and cylinder count carry across, and PET/MET PET GSM are derived.
+   can be prefilled from it. The line's kind, pouch style, ply count, micron,
+   design size and cylinder count carry across, along with each ply's thickness
+   and GSM.
+
+The jobs table predates stated plies: it has three fixed slots, for the printed
+ply, an optional metallised one, and the sealant. A line's plies map onto them by
+position — outermost first, sealant last, anything between into the middle. A
+four-ply laminate therefore loses its third ply _in the jobs record_. That is the
+jobs table's limitation, not the quotation's: the quotation itself keeps every
+ply, and the job is only ever a starting point for the next enquiry.
 
 The response says exactly what happened, rather than a bare success:
 

@@ -50,16 +50,35 @@ erDiagram
     text id PK
     text quotation_id FK
   }
+  quotation_item_layers {
+    text id PK
+    text item_id FK
+    integer position
+    text material_id FK
+    decimal rate_per_kg
+  }
+  quotation_item_quantities {
+    text id PK
+    text item_id FK
+    text tier_id FK
+    integer position
+    decimal quantity_kg
+    decimal rate_per_kg
+    decimal total_amount
+  }
   quotation_items {
     text id PK
     text quotation_id FK
     integer position
     text job_id FK
     text job_name
-    decimal quantity_kg
-    decimal rate_per_kg
-    decimal total_amount
-    text film_material_id FK
+  }
+  quotation_tiers {
+    text id PK
+    text quotation_id FK
+    integer position
+    decimal grand_with_gst
+    decimal total_advance
   }
   quotations {
     text id PK
@@ -69,8 +88,8 @@ erDiagram
     text customer_id FK
     text customer_name
     text mobile
-    decimal grand_with_gst
-    decimal total_advance
+    text root_id FK
+    text won_tier_id FK
   }
   sessions {
     text id PK
@@ -83,11 +102,17 @@ erDiagram
   customers ||--o{ quotations : "customer_id"
   quotations ||--|{ quotation_items : "quotation_id"
   jobs ||--o{ quotation_items : "job_id"
-  materials ||--o{ quotation_items : "film_material_id"
   materials ||--|{ material_rates : "material_id"
   users ||--|{ sessions : "user_id"
   quotations ||--|{ quotation_emails : "quotation_id"
   users ||--o{ login_events : "user_id"
+  quotations ||--o{ quotations : "root_id"
+  quotation_tiers ||--o{ quotations : "won_tier_id"
+  quotations ||--|{ quotation_tiers : "quotation_id"
+  quotation_items ||--|{ quotation_item_layers : "item_id"
+  materials ||--o{ quotation_item_layers : "material_id"
+  quotation_items ||--|{ quotation_item_quantities : "item_id"
+  quotation_tiers ||--|{ quotation_item_quantities : "tier_id"
 ```
 
 ## Tables
@@ -97,13 +122,16 @@ erDiagram
 | `app_settings` | 3 | 0 | Editable rates: cylinder rate, GST %, advance %. |
 | `customers` | 16 | 68 | Companies that order from Yuva Polyprint. |
 | `jobs` | 55 | 414 | Products and their full engineering specification. |
-| `login_events` | 7 | 18 |  |
-| `material_rates` | 6 | 66 |  |
+| `login_events` | 7 | 25 |  |
+| `material_rates` | 6 | 117 |  |
 | `materials` | 9 | 17 |  |
 | `quotation_emails` | 8 | 0 |  |
-| `quotation_items` | 35 | 5 | One priced line on a quotation. |
-| `quotations` | 32 | 3 | Customer-facing quotations, with totals frozen at save. |
-| `sessions` | 6 | 18 |  |
+| `quotation_item_layers` | 9 | 12 |  |
+| `quotation_item_quantities` | 13 | 5 |  |
+| `quotation_items` | 25 | 5 | One priced line on a quotation. |
+| `quotation_tiers` | 14 | 3 |  |
+| `quotations` | 27 | 3 | Customer-facing quotations, with totals frozen at save. |
+| `sessions` | 6 | 25 |  |
 | `users` | 10 | 2 |  |
 
 ## Relationships
@@ -114,11 +142,17 @@ erDiagram
 | `quotations.customer_id` | `customers.id` | SET NULL | Links a quotation to the customer master; the printed details are snapshot on the quotation itself. |
 | `quotation_items.quotation_id` | `quotations.id` | CASCADE | Lines belong to their quotation and are removed with it. |
 | `quotation_items.job_id` | `jobs.id` | SET NULL | Set when a line was prefilled from a saved job spec. |
-| `quotation_items.film_material_id` | `materials.id` | SET NULL |  |
 | `material_rates.material_id` | `materials.id` | CASCADE |  |
 | `sessions.user_id` | `users.id` | CASCADE |  |
 | `quotation_emails.quotation_id` | `quotations.id` | CASCADE |  |
 | `login_events.user_id` | `users.id` | SET NULL |  |
+| `quotations.root_id` | `quotations.id` | CASCADE |  |
+| `quotations.won_tier_id` | `quotation_tiers.id` | SET NULL |  |
+| `quotation_tiers.quotation_id` | `quotations.id` | CASCADE |  |
+| `quotation_item_layers.item_id` | `quotation_items.id` | CASCADE |  |
+| `quotation_item_layers.material_id` | `materials.id` | SET NULL |  |
+| `quotation_item_quantities.item_id` | `quotation_items.id` | CASCADE |  |
+| `quotation_item_quantities.tier_id` | `quotation_tiers.id` | CASCADE |  |
 
 ## Enums
 
@@ -273,6 +307,38 @@ erDiagram
 | `sent_by` | `text` |  |  |
 | `created_at` | `timestamp` |  |  |
 
+### `quotation_item_layers`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `item_id` | `text` |  | FK → `quotation_items.id` |
+| `position` | `integer` |  | unique |
+| `material_id` | `text` | ✓ | FK → `materials.id` |
+| `material_name` | `text` |  |  |
+| `micron` | `decimal(10,2)` |  |  |
+| `density` | `decimal(6,4)` | ✓ |  |
+| `rate_per_kg` | `decimal(12,2)` | ✓ |  |
+| `gsm` | `decimal(10,3)` |  |  |
+
+### `quotation_item_quantities`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `item_id` | `text` |  | FK → `quotation_items.id` |
+| `tier_id` | `text` |  | FK → `quotation_tiers.id` |
+| `position` | `integer` |  | unique |
+| `quantity_kg` | `decimal(12,3)` |  |  |
+| `rate_per_kg` | `decimal(12,2)` |  |  |
+| `quantity_pouches` | `integer` |  |  |
+| `rate_per_pouch` | `decimal(12,4)` |  |  |
+| `total_pouches` | `decimal(14,2)` |  |  |
+| `total_amount` | `decimal(14,2)` |  |  |
+| `cost_per_pouch` | `decimal(12,4)` |  |  |
+| `material_cost` | `decimal(14,2)` | ✓ |  |
+| `margin_percent` | `decimal(6,2)` | ✓ |  |
+
 ### `quotation_items`
 
 | Column | Type | Null | Key |
@@ -282,36 +348,45 @@ erDiagram
 | `position` | `integer` |  |  |
 | `job_id` | `text` | ✓ | FK → `jobs.id` |
 | `job_name` | `text` |  |  |
-| `layer` | `integer` |  |  |
 | `width_mm` | `decimal(10,2)` |  |  |
 | `height_mm` | `decimal(10,2)` |  |  |
-| `poly_micron` | `decimal(10,2)` |  |  |
-| `quantity_kg` | `decimal(12,3)` |  |  |
-| `rate_per_kg` | `decimal(12,2)` |  |  |
 | `repeat_width` | `decimal(10,2)` |  |  |
 | `repeat_height` | `decimal(10,2)` |  |  |
 | `cylinder_count` | `integer` |  |  |
 | `transport_cost` | `decimal(12,2)` |  |  |
 | `micron` | `decimal(10,2)` |  |  |
 | `pouches_per_kg` | `decimal(12,2)` |  |  |
-| `total_pouches` | `decimal(14,2)` |  |  |
-| `total_amount` | `decimal(14,2)` |  |  |
 | `cylinder_width` | `decimal(10,2)` |  |  |
 | `cylinder_circumference` | `decimal(10,2)` |  |  |
 | `cost_per_cylinder` | `decimal(14,2)` |  |  |
 | `total_cylinder_cost` | `decimal(14,2)` |  |  |
-| `cost_per_pouch` | `decimal(12,4)` |  |  |
 | `created_at` | `timestamp` |  |  |
-| `film_material_id` | `text` | ✓ | FK → `materials.id` |
-| `margin_percent` | `decimal(6,2)` | ✓ |  |
-| `material_cost` | `decimal(14,2)` | ✓ |  |
 | `material_cost_per_kg` | `decimal(12,4)` | ✓ |  |
 | `job_kind` | `JobKind` (enum) |  |  |
 | `pouch_type` | `PouchType` (enum) | ✓ |  |
 | `pouch_type_note` | `text` |  |  |
 | `pricing_basis` | `PricingBasis` (enum) |  |  |
-| `quantity_pouches` | `integer` |  |  |
-| `rate_per_pouch` | `decimal(12,4)` |  |  |
+| `charge_cylinders` | `boolean` |  |  |
+| `composite_gsm` | `decimal(10,3)` |  |  |
+
+### `quotation_tiers`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `quotation_id` | `text` |  | FK → `quotations.id` |
+| `position` | `integer` |  | unique |
+| `material_subtotal` | `decimal(14,2)` |  |  |
+| `material_with_gst` | `decimal(14,2)` |  |  |
+| `cylinder_subtotal` | `decimal(14,2)` |  |  |
+| `cylinder_with_gst` | `decimal(14,2)` |  |  |
+| `grand_subtotal` | `decimal(14,2)` |  |  |
+| `grand_with_gst` | `decimal(14,2)` |  |  |
+| `material_advance` | `decimal(14,2)` |  |  |
+| `cylinder_advance` | `decimal(14,2)` |  |  |
+| `total_advance` | `decimal(14,2)` |  |  |
+| `total_quantity_kg` | `decimal(14,3)` |  |  |
+| `total_pouches` | `decimal(14,2)` |  |  |
 
 ### `quotations`
 
@@ -332,15 +407,6 @@ erDiagram
 | `gst_percent` | `decimal(5,2)` |  |  |
 | `material_advance_percent` | `decimal(5,2)` |  |  |
 | `cylinder_advance_percent` | `decimal(5,2)` |  |  |
-| `material_subtotal` | `decimal(14,2)` |  |  |
-| `material_with_gst` | `decimal(14,2)` |  |  |
-| `cylinder_subtotal` | `decimal(14,2)` |  |  |
-| `cylinder_with_gst` | `decimal(14,2)` |  |  |
-| `grand_subtotal` | `decimal(14,2)` |  |  |
-| `grand_with_gst` | `decimal(14,2)` |  |  |
-| `material_advance` | `decimal(14,2)` |  |  |
-| `cylinder_advance` | `decimal(14,2)` |  |  |
-| `total_advance` | `decimal(14,2)` |  |  |
 | `terms` | `text[]` | ✓ |  |
 | `notes` | `text` |  |  |
 | `sent_at` | `timestamp` | ✓ |  |
@@ -349,6 +415,10 @@ erDiagram
 | `gst_number` | `text` |  |  |
 | `decided_at` | `timestamp` | ✓ |  |
 | `lost_reason` | `text` |  |  |
+| `version` | `integer` |  | unique |
+| `root_id` | `text` | ✓ | FK → `quotations.id` |
+| `is_latest` | `boolean` |  |  |
+| `won_tier_id` | `text` | ✓ | FK → `quotation_tiers.id` |
 
 ### `sessions`
 

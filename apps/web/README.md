@@ -208,89 +208,129 @@ The outcome tick is hidden on drafts — the status a quotation moves through is
 Draft → Sent → Won or Lost, and the last step needs the customer to have seen it
 first.
 
+**One row per quotation number, showing its current version.** A revision keeps
+the number, so listing every version would put two rows reading "121" side by
+side with different totals — the confusion versioning exists to prevent. Earlier
+versions are reached through the dropdown in the preview.
+
 ### Quotation form — `/quotations/new`, `/quotations/:id/edit`
 
-#### Who it is for
+Five steps, not one long scroll:
 
-**Existing company** or **New company** is chosen first, as two separate paths
-rather than one field that behaves differently depending on what is typed into
-it — which of the two you are doing is a decision the office makes before they
-start.
+```
+1 Customer   2 Details   3 Jobs   4 Terms   5 Review
+```
 
-- **Existing** makes the customer name a **searchable text box**. With dozens of
+The steps are genuinely sequential — a job cannot be priced before the customer
+is known, and nothing can be reviewed before there are jobs — so **Next**
+validates only the step you are on and nothing else. Completed steps are
+clickable to go back; nothing is submitted until the last one, so leaving and
+returning costs nothing.
+
+The old single page put customer, jobs, terms and totals on one scroll. It
+worked, but never said how much was left or what still needed doing.
+
+#### 1. Who it is for
+
+**Existing company** or **New company**, chosen as two separate paths rather
+than one field that behaves differently depending on what is typed into it —
+which of the two you are doing is a decision the office makes before they start.
+
+- **Existing** makes the company name a **searchable text box**. With dozens of
   companies, typing three letters beats scrolling a list, and it stays a text
-  field so an unusual name can still be typed. Choosing one fills in the
-  address, mobile, email and GST number.
+  field so an unusual name can still be typed. Choosing one fills in the address,
+  mobile, email and GST number on the next step.
 - **New** gives plain boxes, and the company is **added to your customer list
   when the quotation saves** — so the next enquiry finds it under Existing
-  instead of being retyped. A name that already exists is reused, not
-  duplicated.
+  instead of being retyped. A name that already exists is reused, not duplicated.
 
-Switching between the two **clears the block**. Leaving a half-filled form
-behind is how a new company inherits the previous one's GST number.
+Switching between the two **clears the link**. Leaving a half-filled form behind
+is how a new company inherits the previous one's GST number.
 
-**GST number** is recorded here and printed on the quotation, because the
-customer's accounts team needs it to claim input credit.
+#### 3. What the customer receives
 
-#### Each job, in two parts
+A grid of pictures rather than a dropdown. The office is picking a construction,
+and recognising one is easier than matching it to a name:
 
-A job card is split, because the office fills it in as two jobs:
+> Standup · Standup zipper · Zipper · Spout · Centre seal · Three side seal ·
+> Other · Roll
 
-| Printing & pouching                                                           | Cylinder                                                     |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Type (roll or pouch), pouch style, layers, size, micron, quantity, rate, film | Repeat width and height, number of cylinders, transport cost |
+**Each card says how that style is priced** — "Priced per pouch" on standup and
+standup zipper, "Priced per kg" on the rest. That choice silently drives the
+whole rest of the form, and it used to be discoverable only two steps later.
+Choosing Other reveals a box to say what it is; choosing Roll clears the pouch
+style rather than raising an error.
 
-They are quoted and paid for separately — cylinders are one-time and 100%
-advance — which one long row of boxes hid.
+The drawings ship with the app. To use photographs of the real pouches instead,
+drop files into `public/pouches/` — `standup.png`, `standup-zipper.png`,
+`zipper.png`, `spout.png`, `centre-seal.png`, `three-side-seal.png`,
+`other.png`, `roll.png` — and they appear automatically. There is no code to
+edit and nothing to register: a name that is not there falls back to the
+drawing, so a half-finished set never breaks the picker. Straight-on, roughly
+4:5, transparent or white background works best, though any ratio is safe.
+Change `ARTWORK_EXT` in `PouchIcon.tsx` if the files are `.webp` or `.jpg`.
 
-**Type** is Roll or Pouch. A pouch also asks its style: Standup, Standup zipper,
-Zipper, Spout, Centre seal, Three side seal, or Other. The style field only
-appears for a pouch rather than sitting greyed out on a roll, and choosing
-Other reveals a box to say what it is — the option is worthless otherwise.
-Switching a line to Roll clears the style rather than raising an error, so
-changing your mind is not something you then have to tidy up.
+#### The structure, ply by ply
 
-#### Standup pouches are quoted per piece
+Each ply gets its own row: a material and a thickness, with its density shown
+beside it. **2 / 3 / 4 layer** adds or removes rows rather than swapping the
+form, so moving from two plies to three keeps everything already typed and only
+asks for the new one. The outermost and the sealant are labelled, because those
+are the two the office actually thinks about.
 
-The quantity and rate boxes change with the pouch style. **Standup** and
-**Standup zipper** are sold by the piece, so those lines ask for a pouch count
-and a rate per pouch, and show the weight worked back beside them — the film is
-still ordered by weight. Every other style, and every roll, asks for kilograms
-as before.
+> This replaces a single **Film** dropdown that set only the sealant, with the
+> printed PET and the metallised ply assumed. The client could not read what he
+> was quoting off that control.
 
-The two pairs **swap** rather than sitting side by side, because only one of
-them is ever the one being quoted on. Which applies is decided by the style, not
-chosen separately, so the form cannot show a basis the server will not use.
+**A ply left unchosen makes the line uncostable, not free** — the strip says
+"Not costed — every ply needs a film" rather than showing an average of whatever
+is left.
 
-#### What is calculated
+#### Quantities
 
-Per line you enter size, quantity and rate; **micron, pouches per kg, total
-pouches, cylinder size and cylinder cost are calculated and shown read-only**.
-Choosing a **Film** adds a cost strip:
+One to three per line, each with its own quantity and rate, and its result
+alongside:
 
-> Material cost **Rs. 213.45/kg** (77.5 GSM) · Margin **27.7%**
+> **Rs. 1,45,000** · 25,000 pouches · **31.2% margin**
 
-Margin under 10% turns red. Document totals update live at the bottom.
+Margin under 15% turns amber. Which pair you type is decided by the
+construction, not chosen here — standup and standup zipper ask for a pouch count
+and a rate per pouch, everything else for kilograms — and the other unit is
+worked back and shown beside it, because the film is ordered by weight either
+way.
 
-A 3-layer job is costed as PET + **MET PET** + poly, each on its own rate, so
-the margin shown accounts for the metallised ply being dearer than plain PET.
-Set that rate on the Rates screen; without it the strip reports no cost at all
-rather than a flattering one.
+Every job on one quotation must be priced at the same number of quantities. They
+are columns on one document, and a job with three where another has two would
+leave a hole no total could describe.
 
-Underneath, each ply is listed with the rate it was costed against:
+#### Cylinders
 
-> PET 16.8 GSM · Rs. 210.00 · MET PET 16.8 GSM · Rs. 258.00 · Poly 42.3 GSM · Rs. 185.00
+Repeat width and height, the number of cylinders, and transport. **Charge for
+cylinders (new design)** is a tick: clear it for a design whose cylinders are
+already in the works and the total goes to zero, transport included, because
+there is nothing to deliver. The cost per cylinder stays visible so the office
+can see what a new set would cost.
 
-Rates are fetched from the Rates screen automatically, as of the quotation's
-date. A margin is only worth trusting if the working behind it can be seen, and
-a component with **no rate that day says so** in red rather than going blank —
-so the office knows what to go and enter.
+It is per design, not per customer. A customer of ten years ordering a new pouch
+still needs a set engraved — which is what the printed terms have always said.
 
 **The cylinder total shows its sum.** Transport is added to it, so the hint
 under the field reads `4 × Rs. 9,085 + Rs. 100 transport`. Without that, anyone
 checking the figure as cylinders × cost-per-cylinder lands short by exactly the
 transport and concludes it is wrong. The PDF carries the same note under the
 totals whenever transport was charged.
+
+#### 5. Review
+
+What the customer will see: every job at every quantity, the cylinders on their
+own row, and the total including GST.
+
+The cylinder row is **identical in every column** — they do not scale with the
+order. That is the whole reason for quoting more than one quantity, and it only
+reads as a comparison side by side.
+
+Then **Save as draft**, which keeps it editable, or **Save and send**, which
+opens the printed quotation so it can be checked before it goes out.
 
 ### Record the outcome — won or lost
 
@@ -379,6 +419,25 @@ empty grey box in an iframe but falls back to real content in an object. An
 **Open in tab** button is always present, because a browser can load the viewer
 and still fail to paint, in which case the embed looks blank while the object
 counts as loaded and the fallback never fires.
+
+#### Versions
+
+**New version** creates a revision: the same quotation number, the next version,
+as a draft. The version it came from stays exactly as the customer received it.
+
+A **Version** dropdown appears above the document once there is more than one —
+one option is furniture. Switching reloads the PDF for that version without
+disturbing the page underneath.
+
+Earlier versions are **read-only**. Edit, Send and New version only appear on
+the current one, for two reasons: an earlier version is a record of what went
+out, and re-sending it would put a superseded price back in front of the
+customer. It also could not have worked — the list looks the row up among the
+ones on screen, and superseded versions are deliberately not there.
+
+Nothing is repriced when a revision is created. It copies plies, quantities,
+tiers and totals verbatim, because pressing the button should not silently move
+a figure the customer has already been quoted; it reprices on the first save.
 
 ### Rates — `/rates`
 
