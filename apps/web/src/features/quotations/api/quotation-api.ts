@@ -85,7 +85,14 @@ export function useCreateQuotationVersion() {
     mutationFn: (id: string) =>
       request<Quotation>({ url: `/quotations/${id}/versions`, method: 'POST' }),
     onSuccess: (quotation) => {
-      queryClient.invalidateQueries({ queryKey: quotationKeys.lists() });
+      /*
+       * Everything, not just the list. A revision changes which version is the
+       * current one, and it also changes the answer to "what versions are
+       * there" — which the preview's dropdown asks under the id it was opened
+       * with, not under the new one. Invalidating the list alone left that
+       * dropdown showing one version when there were two.
+       */
+      queryClient.invalidateQueries({ queryKey: quotationKeys.all });
       queryClient.setQueryData(quotationKeys.detail(quotation.id), quotation);
     },
   });
