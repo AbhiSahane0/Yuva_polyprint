@@ -219,8 +219,25 @@ model Quotation {
   id String @id @default(cuid())
 
   /// Sequential, human-facing number. Continues the client's existing series.
-  number Int      @unique
+  /// Not unique on its own — a revision keeps the number and bumps the version.
+  number Int
   date   DateTime @db.Date
+
+  /// Revisions of one quotation. The office reprices rather than renumbers: the
+  /// customer already has "QUO-124" on their desk, and a second document with a
+  /// different number reads as a second offer rather than a corrected one.
+  version Int @default(1)
+
+  /// The first version, which every later one hangs off. Null on v1 itself.
+  rootId String?    @map("root_id")
+  root   Quotation? @relation("QuotationVersions", fields: [rootId], references: [id], onDelete: Cascade)
+
+  versions Quotation[] @relation("QuotationVersions")
+
+  /// True for the newest version of a number. Denormalised so the list stays a
+  /// plain filter rather than a correlated subquery against every row; written
+  /// in the same transaction that creates a revision, so it cannot drift.
+  isLatest Boolean @default(true) @map("is_latest")
 
   status QuotationStatus @default(DRAFT)
 
@@ -244,16 +261,8 @@ model Quotation {
   materialAdvancePercent Decimal @map("material_advance_percent") @db.Decimal(5, 2)
   cylinderAdvancePercent Decimal @map("cylinder_advance_percent") @db.Decimal(5, 2)
 
-  /// Stored totals, so a saved document never recomputes.
-  materialSubtotal Decimal @map("material_subtotal") @db.Decimal(14, 2)
-  materialWithGst  Decimal @map("material_with_gst") @db.Decimal(14, 2)
-  cylinderSubtotal Decimal @map("cylinder_subtotal") @db.Decimal(14, 2)
-  cylinderWithGst  Decimal @map("cylinder_with_gst") @db.Decimal(14, 2)
-  grandSubtotal    Decimal @map("grand_subtotal") @db.Decimal(14, 2)
-  grandWithGst     Decimal @map("grand_with_gst") @db.Decimal(14, 2)
-  materialAdvance  Decimal @map("material_advance") @db.Decimal(14, 2)
-  cylinderAdvance  Decimal @map("cylinder_advance") @db.Decimal(14, 2)
-  totalAdvance     Decimal @map("total_advance") @db.Decimal(14, 2)
+  /// Totals live on the tiers, because a quotation may carry two or three
+  /// quantities side by side and each one has its own.
 
   /// Printed terms. Stored per quotation so wording can change over time.
   terms String[]
@@ -270,15 +279,60 @@ model Quotation {
   /// "price was 8% over the incumbent" does.
   lostReason String @default("") @map("lost_reason")
 
+  /// Which quantity the customer accepted. Only set on a WON quotation — with
+  /// three prices on one document, "won" alone does not say what was agreed.
+  wonTierId String?        @unique @map("won_tier_id")
+  wonTier   QuotationTier? @relation("WonTier", fields: [wonTierId], references: [id], onDelete: SetNull)
+
+  tiers  QuotationTier[]  @relation("QuotationTiers")
   items  QuotationItem[]
   emails QuotationEmail[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@unique([number, version])
   @@index([customerId])
   @@index([status])
+  @@index([number])
+  @@index([isLatest])
   @@map("quotations")
+}
+
+/// One quantity a quotation is priced at.
+///
+/// The customer is shown two or three order sizes side by side so they can see
+/// what ordering more does to the unit price. The cylinders cost the same
+/// whichever they choose — that is the whole reason the per-pouch figure falls.
+model QuotationTier {
+  id String @id @default(cuid())
+
+  quotationId String    @map("quotation_id")
+  quotation   Quotation @relation("QuotationTiers", fields: [quotationId], references: [id], onDelete: Cascade)
+
+  /// 1, 2, 3 — the order the columns are printed in, smallest first.
+  position Int
+
+  /// Stored totals, so a saved document never recomputes.
+  materialSubtotal Decimal @map("material_subtotal") @db.Decimal(14, 2)
+  materialWithGst  Decimal @map("material_with_gst") @db.Decimal(14, 2)
+  cylinderSubtotal Decimal @map("cylinder_subtotal") @db.Decimal(14, 2)
+  cylinderWithGst  Decimal @map("cylinder_with_gst") @db.Decimal(14, 2)
+  grandSubtotal    Decimal @map("grand_subtotal") @db.Decimal(14, 2)
+  grandWithGst     Decimal @map("grand_with_gst") @db.Decimal(14, 2)
+  materialAdvance  Decimal @map("material_advance") @db.Decimal(14, 2)
+  cylinderAdvance  Decimal @map("cylinder_advance") @db.Decimal(14, 2)
+  totalAdvance     Decimal @map("total_advance") @db.Decimal(14, 2)
+
+  /// Summed across the lines, for the header of the printed column.
+  totalQuantityKg Decimal @map("total_quantity_kg") @db.Decimal(14, 3)
+  totalPouches    Decimal @map("total_pouches") @db.Decimal(14, 2)
+
+  quantities QuotationItemQuantity[]
+  wonBy      Quotation?              @relation("WonTier")
+
+  @@unique([quotationId, position])
+  @@map("quotation_tiers")
 }
 
 /// One priced line on a quotation.
@@ -307,19 +361,97 @@ model QuotationItem {
   /// Free text, only meaningful when pouchType is OTHER.
   pouchTypeNote String @default("") @map("pouch_type_note")
 
-  /// The film this line is costed against. Optional: a quotation can be priced
-  /// without a material cost, and retiring a material must not erase old lines.
-  filmMaterialId String?   @map("film_material_id")
-  filmMaterial   Material? @relation(fields: [filmMaterialId], references: [id], onDelete: SetNull)
-
-  // ---- Inputs -------------------------------------------------------------
-  layer        Int
+  // ---- The design --------------------------------------------------------
   widthMm      Decimal      @map("width_mm") @db.Decimal(10, 2)
   heightMm     Decimal      @map("height_mm") @db.Decimal(10, 2)
-  polyMicron   Decimal      @map("poly_micron") @db.Decimal(10, 2)
   /// Derived from the pouch style; stored so a saved line keeps the basis it
   /// was priced on even if the style is edited later.
   pricingBasis PricingBasis @default(PER_KG) @map("pricing_basis")
+
+  // ---- Cylinders ----------------------------------------------------------
+  repeatWidth   Decimal @map("repeat_width") @db.Decimal(10, 2)
+  repeatHeight  Decimal @map("repeat_height") @db.Decimal(10, 2)
+  cylinderCount Int     @map("cylinder_count")
+  transportCost Decimal @default(0) @map("transport_cost") @db.Decimal(12, 2)
+
+  /// False when this design's cylinders already exist in the works, so nothing
+  /// is charged for them. Per design, not per customer: a customer of ten years
+  /// ordering a new pouch still needs a new set engraved, and the printed terms
+  /// say so — "each job/design requires a separate cylinder".
+  chargeCylinders Boolean @default(true) @map("charge_cylinders")
+
+  // ---- Computed geometry, the same at every quantity ----------------------
+  micron                Decimal @db.Decimal(10, 2)
+  pouchesPerKg          Decimal @map("pouches_per_kg") @db.Decimal(12, 2)
+  cylinderWidth         Decimal @map("cylinder_width") @db.Decimal(10, 2)
+  cylinderCircumference Decimal @map("cylinder_circumference") @db.Decimal(10, 2)
+  costPerCylinder       Decimal @map("cost_per_cylinder") @db.Decimal(14, 2)
+  totalCylinderCost     Decimal @map("total_cylinder_cost") @db.Decimal(14, 2)
+
+  // ---- Material costing, from the rates that applied on the quotation date --
+  /// Null when a ply was left unchosen, or no rate existed for it that day.
+  materialCostPerKg Decimal? @map("material_cost_per_kg") @db.Decimal(12, 4)
+  /// Weight of one square metre of the finished laminate.
+  compositeGsm      Decimal  @default(0) @map("composite_gsm") @db.Decimal(10, 3)
+
+  layers     QuotationItemLayer[]
+  quantities QuotationItemQuantity[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([quotationId])
+  @@map("quotation_items")
+}
+
+/// One ply of a line's laminate.
+///
+/// Replaces the old fixed structure — one PET, a metallised PET on a 3-layer
+/// job, then whichever film was picked for the sealant. That was what the works
+/// produces today rather than what it can produce, and a 19-micron PET or a
+/// foil ply needed a developer. The plies are now stated on the quotation.
+///
+/// Everything is snapshotted alongside the material link, because a quotation
+/// is a document: the rate it was costed against must not move when the rate
+/// screen is updated tomorrow, and retiring a material must not erase history.
+model QuotationItemLayer {
+  id String @id @default(cuid())
+
+  itemId String        @map("item_id")
+  item   QuotationItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  /// 1 is the outermost, printed ply.
+  position Int
+
+  materialId String?   @map("material_id")
+  material   Material? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+
+  materialName String   @map("material_name")
+  micron       Decimal  @db.Decimal(10, 2)
+  /// g/cm³ as it stood. Null when the material has none recorded, in which case
+  /// the line cannot be costed at all rather than costed as if the ply weighed
+  /// nothing.
+  density      Decimal? @db.Decimal(6, 4)
+  ratePerKg    Decimal? @map("rate_per_kg") @db.Decimal(12, 2)
+  /// micron × density, stored so the printed breakdown needs no arithmetic.
+  gsm          Decimal  @db.Decimal(10, 3)
+
+  @@unique([itemId, position])
+  @@index([materialId])
+  @@map("quotation_item_layers")
+}
+
+/// One line's figures at one quantity.
+model QuotationItemQuantity {
+  id String @id @default(cuid())
+
+  itemId String        @map("item_id")
+  item   QuotationItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  tierId String        @map("tier_id")
+  tier   QuotationTier @relation(fields: [tierId], references: [id], onDelete: Cascade)
+
+  /// Matches the tier's position; kept so a line orders without a join.
+  position Int
 
   /// Both units are always populated — one typed, the other worked out — so
   /// the PDF, the totals and the job records can each read what they need.
@@ -327,33 +459,18 @@ model QuotationItem {
   ratePerKg       Decimal @map("rate_per_kg") @db.Decimal(12, 2)
   quantityPouches Int     @default(0) @map("quantity_pouches")
   ratePerPouch    Decimal @default(0) @map("rate_per_pouch") @db.Decimal(12, 4)
-  repeatWidth     Decimal @map("repeat_width") @db.Decimal(10, 2)
-  repeatHeight    Decimal @map("repeat_height") @db.Decimal(10, 2)
-  cylinderCount   Int     @map("cylinder_count")
-  transportCost   Decimal @default(0) @map("transport_cost") @db.Decimal(12, 2)
 
-  // ---- Computed, stored so the document is immutable ----------------------
-  micron                Decimal @db.Decimal(10, 2)
-  pouchesPerKg          Decimal @map("pouches_per_kg") @db.Decimal(12, 2)
-  totalPouches          Decimal @map("total_pouches") @db.Decimal(14, 2)
-  totalAmount           Decimal @map("total_amount") @db.Decimal(14, 2)
-  cylinderWidth         Decimal @map("cylinder_width") @db.Decimal(10, 2)
-  cylinderCircumference Decimal @map("cylinder_circumference") @db.Decimal(10, 2)
-  costPerCylinder       Decimal @map("cost_per_cylinder") @db.Decimal(14, 2)
-  totalCylinderCost     Decimal @map("total_cylinder_cost") @db.Decimal(14, 2)
-  costPerPouch          Decimal @map("cost_per_pouch") @db.Decimal(12, 4)
+  totalPouches Decimal @map("total_pouches") @db.Decimal(14, 2)
+  totalAmount  Decimal @map("total_amount") @db.Decimal(14, 2)
+  costPerPouch Decimal @map("cost_per_pouch") @db.Decimal(12, 4)
 
-  // ---- Material costing, from the rates that applied on the quotation date --
-  /// Null when no film was chosen, or no rate existed for it that day.
-  materialCostPerKg Decimal? @map("material_cost_per_kg") @db.Decimal(12, 4)
-  materialCost      Decimal? @map("material_cost") @db.Decimal(14, 2)
-  /// (selling - cost) / selling, as a percentage.
-  marginPercent     Decimal? @map("margin_percent") @db.Decimal(6, 2)
+  /// Cost and margin at this quantity. Null when the line could not be costed.
+  materialCost  Decimal? @map("material_cost") @db.Decimal(14, 2)
+  marginPercent Decimal? @map("margin_percent") @db.Decimal(6, 2)
 
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([quotationId])
-  @@map("quotation_items")
+  @@unique([itemId, position])
+  @@index([tierId])
+  @@map("quotation_item_quantities")
 }
 
 /// Editable system settings — cylinder rate, GST %, default advance rates.
@@ -396,8 +513,10 @@ model Material {
   isActive  Boolean @default(true) @map("is_active")
   sortOrder Int     @default(0) @map("sort_order")
 
-  rates          MaterialRate[]
-  quotationItems QuotationItem[]
+  rates               MaterialRate[]
+  /// Plies quoted against this material. The link is nullable on that side, so
+  /// retiring a material leaves old quotations readable.
+  quotationItemLayers QuotationItemLayer[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
