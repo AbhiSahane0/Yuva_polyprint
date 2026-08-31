@@ -143,7 +143,9 @@ const createQuotationBaseSchema = z.object({
    * the next enquiry finds it under "Existing company" instead of being retyped.
    */
   saveAsCustomer: z.boolean().default(false),
-  customerName: z.string().trim().min(2, 'Customer name is required').max(200),
+  /* "Required" is untrue once a single character has been typed, which is what
+   * this rule actually rejects — so the message says what to do instead. */
+  customerName: z.string().trim().min(2, 'Enter the company name').max(200),
   addressLine1: z.string().trim().max(200).default(''),
   addressLine2: z.string().trim().max(200).default(''),
   addressLine3: z.string().trim().max(200).default(''),

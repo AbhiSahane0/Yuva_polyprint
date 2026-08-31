@@ -14,6 +14,7 @@ import {
   type CreateQuotationFormValues,
   type CreateQuotationInput,
   DEFAULT_TERMS,
+  MAX_PAGE_SIZE,
   type ItemGeometry,
   type MaterialCostResult,
   PET_MICRON_PER_LAYER,
@@ -138,7 +139,6 @@ export default function QuotationFormPage() {
   // Only asked for on a new quotation; an existing one already has its number.
   const { data: nextNumber } = useNextQuotationNumber(!isEdit);
   const { data: existing, isPending: loadingExisting } = useQuotation(id ?? null);
-  const { data: customerPage } = useCustomers({ page: 1, pageSize: 200 });
   const { data: materials } = useMaterials();
 
   const createQuotation = useCreateQuotation();
@@ -168,6 +168,21 @@ export default function QuotationFormPage() {
   const { control, register, handleSubmit, setValue, trigger, formState, reset } = form;
   const items = useFieldArray({ control, name: 'items' });
   const watched = useWatch({ control });
+
+  /*
+   * Searched on the server, not filtered in the browser.
+   *
+   * This asked for 200 in a page — over MAX_PAGE_SIZE, so the request was
+   * rejected and the suggestions list was silently empty: typing a company name
+   * offered nothing at all. Capping it at 100 would have fixed today's symptom
+   * and reintroduced it the day the works passes a hundred customers, so the
+   * typed name goes to the API as a search term instead.
+   */
+  const { data: customerPage } = useCustomers({
+    page: 1,
+    pageSize: MAX_PAGE_SIZE,
+    q: customerMode === 'existing' ? (watched.customerName ?? '') : '',
+  });
 
   const customerId = (watched.customerId ?? null) as string | null;
   const { data: chosenCustomer } = useCustomer(customerMode === 'existing' ? customerId : null);
