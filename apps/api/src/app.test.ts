@@ -37,16 +37,15 @@ describe('application shell', () => {
 });
 
 describe('sign-in monitor', () => {
+  /*
+   * Only the no-credentials case belongs here. Anything that presents a token
+   * has to be looked up in the sessions table, and these tests run without a
+   * database — the guard itself is covered in middleware/authenticate.test.ts.
+   */
   it('refuses a request with no session', async () => {
     const response = await request(app).get('/api/monitor');
 
     expect(response.status).toBe(401);
     expect(response.body).toMatchObject({ success: false });
-  });
-
-  it('refuses a token that resolves to nothing', async () => {
-    const response = await request(app).get('/api/monitor').set('Authorization', 'Bearer nonsense');
-
-    expect(response.status).toBe(401);
   });
 });
