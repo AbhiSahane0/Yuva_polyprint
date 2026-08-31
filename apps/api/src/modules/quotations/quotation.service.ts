@@ -2,6 +2,7 @@ import {
   computeItem,
   computeMargin,
   computeMaterialCostPerKg,
+  type LayerInput,
   computeTotals,
   DEFAULT_TERMS,
   round,
@@ -184,13 +185,40 @@ function priceQuotation(
     // Costed against the rates in force on the quotation's date, and stored, so
     // the margin a quotation was accepted on never moves when prices do.
     const film = item.filmMaterialId ? costing.byId.get(item.filmMaterialId) : undefined;
+
+    /*
+     * The plies, assembled from the structure this works produces by default.
+     * The office states them per line from the next stage onward; until then
+     * this reproduces exactly what was costed before — one PET, a metallised
+     * PET on a 3-layer job, then the film chosen for the sealant ply.
+     */
+    const layers: LayerInput[] = [
+      {
+        name: 'PET',
+        micron: PET_MICRON_PER_LAYER,
+        density: PET_DENSITY,
+        ratePerKg: costing.petRate,
+      },
+      ...(item.layer === 3
+        ? [
+            {
+              name: 'MET PET',
+              micron: METPET_MICRON_PER_LAYER,
+              density: METPET_DENSITY,
+              ratePerKg: costing.metpetRate,
+            },
+          ]
+        : []),
+      {
+        name: film?.name ?? 'Poly',
+        micron: item.polyMicron,
+        density: film?.density ? Number(film.density) : null,
+        ratePerKg: costing.rateOfId(item.filmMaterialId ?? null),
+      },
+    ];
+
     const material = computeMaterialCostPerKg({
-      layer: item.layer,
-      polyMicron: item.polyMicron,
-      polyDensity: film?.density ? Number(film.density) : null,
-      petRate: costing.petRate,
-      metpetRate: costing.metpetRate,
-      polyRate: costing.rateOfId(item.filmMaterialId ?? null),
+      layers,
       inkRate: costing.inkRate,
       adhesiveRate: costing.adhesiveRate,
       inkGsm: costing.settings.inkGsm,

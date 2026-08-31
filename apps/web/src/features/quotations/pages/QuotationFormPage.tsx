@@ -17,6 +17,11 @@ import {
   computeItem,
   computeMargin,
   computeMaterialCostPerKg,
+  METPET_DENSITY,
+  METPET_MICRON_PER_LAYER,
+  PET_DENSITY,
+  PET_MICRON_PER_LAYER,
+  type LayerInput,
   computeTotals,
   createQuotationSchema,
   formatNumber,
@@ -301,14 +306,37 @@ export default function QuotationFormPage() {
     // Material cost, mirroring the server so the margin is visible before saving.
     const costs = (watched.items ?? []).map((item, index) => {
       const film = item?.filmMaterialId ? materialById.get(String(item.filmMaterialId)) : undefined;
+      // Same plies the server assembles, so the margin shown here is the one
+      // that gets saved.
+      const layers: LayerInput[] = [
+        {
+          name: 'PET',
+          micron: PET_MICRON_PER_LAYER,
+          density: PET_DENSITY,
+          ratePerKg: byName.get(settings?.defaultPetMaterial ?? 'PET 12µm')?.currentRate ?? null,
+        },
+        ...(num(item?.layer) === 3
+          ? [
+              {
+                name: 'MET PET',
+                micron: METPET_MICRON_PER_LAYER,
+                density: METPET_DENSITY,
+                ratePerKg:
+                  byName.get(settings?.defaultMetpetMaterial ?? 'MET PET 12µm')?.currentRate ??
+                  null,
+              },
+            ]
+          : []),
+        {
+          name: film?.name ?? 'Poly',
+          micron: num(item?.polyMicron),
+          density: film?.density ?? null,
+          ratePerKg: film?.currentRate ?? null,
+        },
+      ];
+
       const result = computeMaterialCostPerKg({
-        layer: num(item?.layer) || 2,
-        polyMicron: num(item?.polyMicron),
-        polyDensity: film?.density ?? null,
-        petRate: byName.get(settings?.defaultPetMaterial ?? 'PET 12µm')?.currentRate ?? null,
-        metpetRate:
-          byName.get(settings?.defaultMetpetMaterial ?? 'MET PET 12µm')?.currentRate ?? null,
-        polyRate: film?.currentRate ?? null,
+        layers,
         inkRate: byName.get(settings?.defaultInkMaterial ?? 'Ink — Black')?.currentRate ?? null,
         adhesiveRate:
           byName.get(settings?.defaultAdhesiveMaterial ?? 'Adhesive — PU')?.currentRate ?? null,
