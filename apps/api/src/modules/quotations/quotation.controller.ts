@@ -76,6 +76,23 @@ export async function emailHistory(req: Request, res: Response) {
   ok(res, await quotationService.listQuotationEmails(req.params.id as string));
 }
 
+/**
+ * A revision of an existing quotation — same number, next version.
+ *
+ * A POST because it creates a document, and 201 because it creates a new one
+ * rather than changing the one in the path.
+ */
+export async function createVersion(req: Request, res: Response) {
+  const quotation = await quotationService.createQuotationVersion(req.params.id as string);
+  created(res, quotation);
+}
+
+/** Every version of this quotation's number, newest first. */
+export async function versions(req: Request, res: Response) {
+  const rows = await quotationService.listQuotationVersions(req.params.id as string);
+  ok(res, rows);
+}
+
 /** Records the customer's answer; a win creates the customer and their jobs. */
 export async function recordOutcome(req: Request, res: Response) {
   const result = await quotationService.recordOutcome(

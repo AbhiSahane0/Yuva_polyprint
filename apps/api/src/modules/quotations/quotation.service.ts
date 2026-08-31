@@ -174,6 +174,10 @@ async function loadCostingContext(onDate: string) {
   };
 }
 
+/** Child rows come back in insertion order otherwise, which is not their order. */
+const byPosition = <T extends { position: number }>(rows: T[]): T[] =>
+  [...rows].sort((a, b) => a.position - b.position);
+
 /** yyyy-mm-dd, so the client never has to deal with timezone drift. */
 const toISODate = (date: Date): string => date.toISOString().slice(0, 10);
 
@@ -432,7 +436,16 @@ export async function listQuotations(query: ListQuotationsQuery) {
   }
   if (query.status) filters.push({ status: query.status });
 
-  const where: Prisma.QuotationWhereInput = filters.length > 0 ? { AND: filters } : {};
+  /*
+   * Only the current version of each number. A revision keeps the number, so
+   * without this the list grows a second row every time somebody reprices —
+   * and two rows reading "121" with different totals is precisely the confusion
+   * versioning exists to prevent. Superseded versions are still reachable
+   * through GET /quotations/:id/versions.
+   */
+  filters.push({ isLatest: true });
+
+  const where: Prisma.QuotationWhereInput = { AND: filters };
 
   const [rows, total] = await Promise.all([
     prisma.quotation.findMany({
@@ -650,9 +663,6 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
       input.cylinderAdvancePercent ?? toNumber(existing.cylinderAdvancePercent),
   };
 
-  const byPosition = <T extends { position: number }>(rows: T[]): T[] =>
-    [...rows].sort((a, b) => a.position - b.position);
-
   // Reprice from whichever line set applies — the new one if sent, else the stored one.
   const items: QuotationItemInput[] =
     input.items ??
@@ -801,11 +811,233 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
   return getQuotationById(id);
 }
 
+/**
+ * A revision of an existing quotation.
+ *
+ * The office reprices rather than renumbers. The customer already has QUO-124
+ * on their desk, and a second document with a different number reads as a
+ * second offer rather than a corrected one — so a revision keeps the number and
+ * takes the next version, and only the newest of them appears in the list.
+ *
+ * Everything is copied exactly as it stands: plies, quantities, tiers, totals,
+ * the rates it was costed against and the date it carries. Nothing is repriced
+ * on the way in, because pressing "new version" should not silently move a
+ * figure the customer has already been quoted. It reprices on the first save,
+ * against whatever date the revision then carries — which is the point at which
+ * the office has decided what they are changing.
+ */
+export async function createQuotationVersion(id: string): Promise<Quotation> {
+  const source = await prisma.quotation.findUnique({
+    where: { id },
+    include: QUOTATION_INCLUDE,
+  });
+  if (!source) throw ApiError.notFound('Quotation not found');
+
+  /* Every revision hangs off the first version, not off the one it was made from. */
+  const rootId = source.rootId ?? source.id;
+
+  /*
+   * Retried on a clash, the same as a new quotation. Two people revising the
+   * same document at once both read the same highest version, and one of them
+   * loses on the (number, version) constraint.
+   */
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const createdId = await prisma.$transaction(async (tx) => {
+        const latest = await tx.quotation.findFirst({
+          where: { number: source.number },
+          orderBy: { version: 'desc' },
+          select: { version: true },
+        });
+        const version = (latest?.version ?? source.version) + 1;
+
+        // Exactly one version of a number is ever the current one.
+        await tx.quotation.updateMany({
+          where: { number: source.number },
+          data: { isLatest: false },
+        });
+
+        const created = await tx.quotation.create({
+          data: {
+            number: source.number,
+            version,
+            rootId,
+            isLatest: true,
+            /*
+             * A revision starts as a draft. It has not been sent, and the answer
+             * recorded against the version it came from is not its answer —
+             * carrying either across would misreport what the customer agreed.
+             */
+            status: 'DRAFT',
+            date: source.date,
+            customerId: source.customerId,
+            customerName: source.customerName,
+            addressLine1: source.addressLine1,
+            addressLine2: source.addressLine2,
+            addressLine3: source.addressLine3,
+            mobile: source.mobile,
+            email: source.email,
+            gstNumber: source.gstNumber,
+            cylinderRate: source.cylinderRate,
+            gstPercent: source.gstPercent,
+            materialAdvancePercent: source.materialAdvancePercent,
+            cylinderAdvancePercent: source.cylinderAdvancePercent,
+            terms: source.terms,
+            notes: source.notes,
+            tiers: {
+              create: byPosition(source.tiers).map((tier) => ({
+                position: tier.position,
+                materialSubtotal: tier.materialSubtotal,
+                materialWithGst: tier.materialWithGst,
+                cylinderSubtotal: tier.cylinderSubtotal,
+                cylinderWithGst: tier.cylinderWithGst,
+                grandSubtotal: tier.grandSubtotal,
+                grandWithGst: tier.grandWithGst,
+                materialAdvance: tier.materialAdvance,
+                cylinderAdvance: tier.cylinderAdvance,
+                totalAdvance: tier.totalAdvance,
+                totalQuantityKg: tier.totalQuantityKg,
+                totalPouches: tier.totalPouches,
+              })),
+            },
+          },
+          select: { id: true, tiers: { select: { id: true, position: true } } },
+        });
+
+        const tierIdAt = new Map(created.tiers.map((tier) => [tier.position, tier.id]));
+
+        for (const item of byPosition(source.items)) {
+          await tx.quotationItem.create({
+            data: {
+              quotationId: created.id,
+              position: item.position,
+              jobId: item.jobId,
+              jobName: item.jobName,
+              jobKind: item.jobKind,
+              pouchType: item.pouchType,
+              pouchTypeNote: item.pouchTypeNote,
+              widthMm: item.widthMm,
+              heightMm: item.heightMm,
+              pricingBasis: item.pricingBasis,
+              repeatWidth: item.repeatWidth,
+              repeatHeight: item.repeatHeight,
+              cylinderCount: item.cylinderCount,
+              transportCost: item.transportCost,
+              chargeCylinders: item.chargeCylinders,
+              micron: item.micron,
+              pouchesPerKg: item.pouchesPerKg,
+              cylinderWidth: item.cylinderWidth,
+              cylinderCircumference: item.cylinderCircumference,
+              costPerCylinder: item.costPerCylinder,
+              totalCylinderCost: item.totalCylinderCost,
+              materialCostPerKg: item.materialCostPerKg,
+              compositeGsm: item.compositeGsm,
+              layers: {
+                create: byPosition(item.layers).map((layer) => ({
+                  position: layer.position,
+                  materialId: layer.materialId,
+                  materialName: layer.materialName,
+                  micron: layer.micron,
+                  density: layer.density,
+                  ratePerKg: layer.ratePerKg,
+                  gsm: layer.gsm,
+                })),
+              },
+              quantities: {
+                create: byPosition(item.quantities).map((quantity) => ({
+                  position: quantity.position,
+                  tierId: tierIdAt.get(quantity.position)!,
+                  quantityKg: quantity.quantityKg,
+                  ratePerKg: quantity.ratePerKg,
+                  quantityPouches: quantity.quantityPouches,
+                  ratePerPouch: quantity.ratePerPouch,
+                  totalPouches: quantity.totalPouches,
+                  totalAmount: quantity.totalAmount,
+                  costPerPouch: quantity.costPerPouch,
+                  materialCost: quantity.materialCost,
+                  marginPercent: quantity.marginPercent,
+                })),
+              },
+            },
+            select: { id: true },
+          });
+        }
+
+        return created.id;
+      });
+
+      return await getQuotationById(createdId);
+    } catch (error) {
+      if (!isQuotationNumberClash(error) || attempt >= NUMBER_CLASH_RETRIES) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 15 * attempt + Math.random() * 25));
+    }
+  }
+}
+
+/** Every version of one quotation number, newest first. */
+export async function listQuotationVersions(id: string): Promise<QuotationSummary[]> {
+  const source = await prisma.quotation.findUnique({
+    where: { id },
+    select: { number: true },
+  });
+  if (!source) throw ApiError.notFound('Quotation not found');
+
+  const rows = await prisma.quotation.findMany({
+    where: { number: source.number },
+    orderBy: { version: 'desc' },
+    include: QUOTATION_INCLUDE,
+  });
+  return rows.map(toSummary);
+}
+
 export async function deleteQuotation(id: string): Promise<{ id: string }> {
-  const existing = await prisma.quotation.findUnique({ where: { id }, select: { id: true } });
+  const existing = await prisma.quotation.findUnique({
+    where: { id },
+    select: { id: true, number: true, version: true, isLatest: true, rootId: true },
+  });
   if (!existing) throw ApiError.notFound('Quotation not found');
-  // Items cascade.
-  await prisma.quotation.delete({ where: { id } });
+
+  await prisma.$transaction(async (tx) => {
+    /*
+     * Revisions hang off the first version through a cascading foreign key, so
+     * deleting the root would take every later version with it — somebody
+     * tidying away an old v1 would silently destroy the live v3. Re-parent
+     * first: the oldest survivor becomes the root and the rest follow it, and
+     * the cascade then has nothing to reach.
+     */
+    if (existing.rootId === null) {
+      const heir = await tx.quotation.findFirst({
+        where: { rootId: id },
+        orderBy: { version: 'asc' },
+        select: { id: true },
+      });
+      if (heir) {
+        await tx.quotation.update({ where: { id: heir.id }, data: { rootId: null } });
+        await tx.quotation.updateMany({ where: { rootId: id }, data: { rootId: heir.id } });
+      }
+    }
+
+    // Items, layers, quantities and tiers all cascade with the quotation.
+    await tx.quotation.delete({ where: { id } });
+
+    /*
+     * Exactly one version of a number is the current one, and the list shows
+     * only that. Deleting the current one has to promote the highest survivor,
+     * or the number disappears from the list while its earlier versions sit
+     * there unreachable.
+     */
+    if (existing.isLatest) {
+      const survivor = await tx.quotation.findFirst({
+        where: { number: existing.number },
+        orderBy: { version: 'desc' },
+        select: { id: true },
+      });
+      if (survivor) {
+        await tx.quotation.update({ where: { id: survivor.id }, data: { isLatest: true } });
+      }
+    }
+  });
+
   return { id };
 }
 

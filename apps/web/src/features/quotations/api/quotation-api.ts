@@ -73,6 +73,33 @@ export function useCreateQuotation() {
   });
 }
 
+/**
+ * A revision of an existing quotation — same number, next version.
+ *
+ * Invalidates the list because creating one changes which version is the
+ * current one, and the list only ever shows that.
+ */
+export function useCreateQuotationVersion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      request<Quotation>({ url: `/quotations/${id}/versions`, method: 'POST' }),
+    onSuccess: (quotation) => {
+      queryClient.invalidateQueries({ queryKey: quotationKeys.lists() });
+      queryClient.setQueryData(quotationKeys.detail(quotation.id), quotation);
+    },
+  });
+}
+
+/** Every version of one quotation's number, newest first. */
+export function useQuotationVersions(id: string | null) {
+  return useQuery({
+    queryKey: [...quotationKeys.detail(id ?? ''), 'versions'],
+    queryFn: () => request<QuotationSummary[]>({ url: `/quotations/${id}/versions` }),
+    enabled: Boolean(id),
+  });
+}
+
 export function useUpdateQuotation() {
   const queryClient = useQueryClient();
   return useMutation({
