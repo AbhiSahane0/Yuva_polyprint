@@ -86,24 +86,35 @@ const STEP_FIELDS: (keyof CreateQuotationFormValues)[][] = [
 
 type ItemValues = NonNullable<CreateQuotationFormValues['items']>[number];
 
-/** A two-ply structure, which is what most enquiries turn out to be. */
-const BLANK_ITEM = {
+/**
+ * A design nobody has specified yet.
+ *
+ * Defined once, because two paths need it: a line added from scratch, and a
+ * line switched back to "new design" after a saved job was picked. If those
+ * drifted apart, one of them would leave the previous job's dimensions behind.
+ */
+const BLANK_DESIGN = {
   jobName: '',
-  jobKind: 'POUCH',
-  pouchType: 'STANDUP',
-  pouchTypeNote: '',
   widthMm: '',
   heightMm: '',
   layers: [
     { materialId: null, micron: PET_MICRON_PER_LAYER },
     { materialId: null, micron: 50 },
   ],
-  quantities: [{ quantityKg: '', ratePerKg: '', quantityPouches: '', ratePerPouch: '' }],
   repeatWidth: 1,
   repeatHeight: 1,
   cylinderCount: 4,
   transportCost: 0,
   chargeCylinders: true,
+} as const;
+
+/** A two-ply structure, which is what most enquiries turn out to be. */
+const BLANK_ITEM = {
+  ...BLANK_DESIGN,
+  jobKind: 'POUCH',
+  pouchType: 'STANDUP',
+  pouchTypeNote: '',
+  quantities: [{ quantityKg: '', ratePerKg: '', quantityPouches: '', ratePerPouch: '' }],
 } as unknown as ItemValues;
 
 const num = (value: unknown): number => {
@@ -719,9 +730,34 @@ function JobCard({
   /** Copies a saved job's specification onto this line. */
   function applyJob(jobId: string) {
     const job = jobs.find((candidate) => candidate.id === jobId);
+
+    /*
+     * "New design" starts clean. Leaving the previous job's name and dimensions
+     * behind is how a new design gets saved under an existing job's name, which
+     * is far harder to notice than an empty box.
+     *
+     * The quantities are left alone: what to charge is the office's decision
+     * about this order, not part of the design being described.
+     */
     if (!job) {
       setValue(`items.${index}.jobId`, null, { shouldDirty: true });
+      setValue(`items.${index}.jobName`, BLANK_DESIGN.jobName, { shouldDirty: true });
       setValue(`items.${index}.chargeCylinders`, true, { shouldDirty: true });
+      setValue(
+        `items.${index}.layers`,
+        BLANK_DESIGN.layers.map((layer) => ({ ...layer })) as unknown as ItemValues['layers'],
+        { shouldDirty: true },
+      );
+      for (const field of [
+        'widthMm',
+        'heightMm',
+        'repeatWidth',
+        'repeatHeight',
+        'cylinderCount',
+        'transportCost',
+      ] as const) {
+        setNumber(setValue, `items.${index}.${field}`, BLANK_DESIGN[field]);
+      }
       return;
     }
 

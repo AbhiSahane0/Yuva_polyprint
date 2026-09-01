@@ -302,6 +302,13 @@ retyped.
 thicknesses but never recorded which film was used, and guessing one would put a
 rate behind a margin nobody chose.
 
+Switching back to **— New design —** clears the design: name, size, structure,
+repeats and cylinder count all return to their defaults. Leaving the previous
+job's details behind is how a new design gets saved under an existing job's
+name, which is far harder to notice than an empty box. **The quantities are
+kept** — what to charge is a decision about this order, not part of the design
+being described.
+
 Note that 18 of the 414 imported jobs carry no size or thickness at all. Picking
 one of those fills in only its name — that is missing data from the original
 spreadsheet, not a failed prefill.
