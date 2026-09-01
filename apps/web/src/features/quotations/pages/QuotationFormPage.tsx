@@ -13,6 +13,7 @@ import { ArrowLeft, ArrowRight, Building2, Check, Plus, Trash2, UserPlus } from 
 import {
   type CreateQuotationFormValues,
   type CreateQuotationInput,
+  type CustomerJob,
   DEFAULT_TERMS,
   MAX_PAGE_SIZE,
   type ItemGeometry,
@@ -33,7 +34,7 @@ import {
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { Field, FieldSection, Input, ReadOnlyValue, Textarea } from '@/components/ui/Field';
+import { Field, FieldSection, Input, ReadOnlyValue, Select, Textarea } from '@/components/ui/Field';
 import { Combobox } from '@/components/ui/Combobox';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
@@ -115,6 +116,21 @@ interface Film {
   name: string;
   density: number | null;
   currentRate: number | null;
+}
+
+/**
+ * Writes a number onto a form field that the schema will coerce.
+ *
+ * The form holds these as strings while they are being typed, so the value goes
+ * in as one — setting a raw number leaves react-hook-form and the input element
+ * disagreeing about the field's type.
+ */
+function setNumber(
+  setValue: UseFormSetValue<CreateQuotationFormValues>,
+  path: string,
+  value: number | string,
+) {
+  setValue(path as never, String(value) as never, { shouldDirty: true });
 }
 
 /** Everything the screen works out about one line, mirroring the server. */
@@ -424,74 +440,77 @@ export default function QuotationFormPage() {
       <form onSubmit={(event) => event.preventDefault()} className="flex flex-col gap-5">
         {step === 0 ? (
           <FieldSection title="Who is this for?">
-            <div className="col-span-12 flex flex-wrap gap-2">
-              {(
-                [
-                  ['existing', 'Existing company', Building2],
-                  ['new', 'New company', UserPlus],
-                ] as const
-              ).map(([mode, label, Icon]) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => {
-                    setCustomerMode(mode);
-                    setValue('customerId', null);
-                    if (mode === 'new') setValue('customerName', '');
-                  }}
-                  className={cn(
-                    'focus-visible:ring-brand-500 inline-flex items-center gap-2 rounded-[var(--radius-md)] border px-3.5 py-2 text-sm font-medium transition focus-visible:ring-2 focus-visible:outline-none',
-                    customerMode === mode
-                      ? 'border-brand-500 bg-brand-50 text-brand-700'
-                      : 'border-ink-200 text-ink-600 hover:bg-ink-50 bg-white',
-                  )}
-                >
-                  <Icon className="size-4" />
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className="col-span-12 sm:col-span-8">
-              {customerMode === 'existing' ? (
-                <Field
-                  label="Company"
-                  htmlFor="customerId"
-                  hint="Type to search"
-                  error={formState.errors.customerName?.message}
-                >
-                  <Combobox
-                    id="customerName"
-                    options={customers.map((customer) => customer.companyName)}
-                    registration={register('customerName')}
-                    value={watched.customerName ?? ''}
-                    invalid={Boolean(formState.errors.customerName)}
-                    placeholder="Search companies…"
-                    onPick={(name) => {
-                      setValue('customerName', name, { shouldValidate: true });
-                      // The name is what the office types; the link to the
-                      // customer record follows from it.
-                      setValue(
-                        'customerId',
-                        customers.find((customer) => customer.companyName === name)?.id ?? null,
-                      );
+            {/* FieldSection stacks its children, so the grid has to be here. */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+              <div className="flex flex-wrap gap-2 sm:col-span-12">
+                {(
+                  [
+                    ['existing', 'Existing company', Building2],
+                    ['new', 'New company', UserPlus],
+                  ] as const
+                ).map(([mode, label, Icon]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => {
+                      setCustomerMode(mode);
+                      setValue('customerId', null);
+                      if (mode === 'new') setValue('customerName', '');
                     }}
-                  />
-                </Field>
-              ) : (
-                <Field
-                  label="Company name"
-                  htmlFor="customerName"
-                  hint="Added to the customer list when this saves"
-                  error={formState.errors.customerName?.message}
-                >
-                  <Input
-                    id="customerName"
-                    invalid={Boolean(formState.errors.customerName)}
-                    {...register('customerName')}
-                  />
-                </Field>
-              )}
+                    className={cn(
+                      'focus-visible:ring-brand-500 inline-flex items-center gap-2 rounded-[var(--radius-md)] border px-3.5 py-2 text-sm font-medium transition focus-visible:ring-2 focus-visible:outline-none',
+                      customerMode === mode
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-ink-200 text-ink-600 hover:bg-ink-50 bg-white',
+                    )}
+                  >
+                    <Icon className="size-4" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="sm:col-span-7">
+                {customerMode === 'existing' ? (
+                  <Field
+                    label="Company"
+                    htmlFor="customerId"
+                    hint="Type to search"
+                    error={formState.errors.customerName?.message}
+                  >
+                    <Combobox
+                      id="customerName"
+                      options={customers.map((customer) => customer.companyName)}
+                      registration={register('customerName')}
+                      value={watched.customerName ?? ''}
+                      invalid={Boolean(formState.errors.customerName)}
+                      placeholder="Search companies…"
+                      onPick={(name) => {
+                        setValue('customerName', name, { shouldValidate: true });
+                        // The name is what the office types; the link to the
+                        // customer record follows from it.
+                        setValue(
+                          'customerId',
+                          customers.find((customer) => customer.companyName === name)?.id ?? null,
+                        );
+                      }}
+                    />
+                  </Field>
+                ) : (
+                  <Field
+                    label="Company name"
+                    htmlFor="customerName"
+                    hint="Added to the customer list when this saves"
+                    error={formState.errors.customerName?.message}
+                  >
+                    <Input
+                      id="customerName"
+                      invalid={Boolean(formState.errors.customerName)}
+                      {...register('customerName')}
+                    />
+                  </Field>
+                )}
+              </div>
             </div>
           </FieldSection>
         ) : null}
@@ -505,35 +524,40 @@ export default function QuotationFormPage() {
                 : 'Typed once — the company joins the customer list when this saves.'
             }
           >
-            <div className="col-span-12 sm:col-span-6">
-              <Field label="Address" htmlFor="addressLine1">
-                <Input id="addressLine1" {...register('addressLine1')} />
-              </Field>
-            </div>
-            <div className="col-span-6 sm:col-span-3">
-              <Field label="City" htmlFor="addressLine2">
-                <Input id="addressLine2" {...register('addressLine2')} />
-              </Field>
-            </div>
-            <div className="col-span-6 sm:col-span-3">
-              <Field label="District" htmlFor="addressLine3">
-                <Input id="addressLine3" {...register('addressLine3')} />
-              </Field>
-            </div>
-            <div className="col-span-6 sm:col-span-4">
-              <Field label="Mobile" htmlFor="mobile">
-                <Input id="mobile" {...register('mobile')} />
-              </Field>
-            </div>
-            <div className="col-span-6 sm:col-span-4">
-              <Field label="Email" htmlFor="email" hint="Used when sending the quotation">
-                <Input id="email" type="email" {...register('email')} />
-              </Field>
-            </div>
-            <div className="col-span-12 sm:col-span-4">
-              <Field label="GST number" htmlFor="gstNumber">
-                <Input id="gstNumber" {...register('gstNumber')} />
-              </Field>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+              {/* The address is the one genuinely long field here; everything
+                  else is a phone number or a code, and a box the width of the
+                  page invites the eye to expect far more than it should. */}
+              <div className="sm:col-span-8">
+                <Field label="Address" htmlFor="addressLine1">
+                  <Input id="addressLine1" {...register('addressLine1')} />
+                </Field>
+              </div>
+              <div className="sm:col-span-4">
+                <Field label="City" htmlFor="addressLine2">
+                  <Input id="addressLine2" {...register('addressLine2')} />
+                </Field>
+              </div>
+              <div className="sm:col-span-4">
+                <Field label="District" htmlFor="addressLine3">
+                  <Input id="addressLine3" {...register('addressLine3')} />
+                </Field>
+              </div>
+              <div className="sm:col-span-3">
+                <Field label="Mobile" htmlFor="mobile">
+                  <Input id="mobile" inputMode="tel" {...register('mobile')} />
+                </Field>
+              </div>
+              <div className="sm:col-span-5">
+                <Field label="Email" htmlFor="email" hint="Used when sending the quotation">
+                  <Input id="email" type="email" {...register('email')} />
+                </Field>
+              </div>
+              <div className="sm:col-span-4">
+                <Field label="GST number" htmlFor="gstNumber">
+                  <Input id="gstNumber" {...register('gstNumber')} />
+                </Field>
+              </div>
             </div>
           </FieldSection>
         ) : null}
@@ -548,6 +572,7 @@ export default function QuotationFormPage() {
                 register={register}
                 setValue={setValue}
                 films={films}
+                jobs={chosenCustomer?.jobs ?? []}
                 item={watched.items?.[index] as Partial<ItemValues> | undefined}
                 cost={costed[index]}
                 errors={formState.errors.items?.[index] as JobErrors | undefined}
@@ -573,30 +598,32 @@ export default function QuotationFormPage() {
             title="Terms and notes"
             description="Printed at the foot of the quotation. Edits apply to this document only."
           >
-            <div className="col-span-12 sm:col-span-4">
-              <Field label="Quotation date" htmlFor="date" error={formState.errors.date?.message}>
-                <Input id="date" type="date" {...register('date')} />
-              </Field>
-            </div>
-            <div className="col-span-12">
-              <Field label="Terms" htmlFor="terms" hint="One per line">
-                <Textarea
-                  id="terms"
-                  rows={7}
-                  defaultValue={(watched.terms ?? DEFAULT_TERMS).join('\n')}
-                  onChange={(event) =>
-                    setValue(
-                      'terms',
-                      event.target.value.split('\n').filter((line) => line.trim().length > 0),
-                    )
-                  }
-                />
-              </Field>
-            </div>
-            <div className="col-span-12">
-              <Field label="Notes" htmlFor="notes" hint="Optional">
-                <Textarea id="notes" rows={3} {...register('notes')} />
-              </Field>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+              <div className="sm:col-span-3">
+                <Field label="Quotation date" htmlFor="date" error={formState.errors.date?.message}>
+                  <Input id="date" type="date" {...register('date')} />
+                </Field>
+              </div>
+              <div className="sm:col-span-12">
+                <Field label="Terms" htmlFor="terms" hint="One per line">
+                  <Textarea
+                    id="terms"
+                    rows={7}
+                    defaultValue={(watched.terms ?? DEFAULT_TERMS).join('\n')}
+                    onChange={(event) =>
+                      setValue(
+                        'terms',
+                        event.target.value.split('\n').filter((line) => line.trim().length > 0),
+                      )
+                    }
+                  />
+                </Field>
+              </div>
+              <div className="sm:col-span-12">
+                <Field label="Notes" htmlFor="notes" hint="Optional">
+                  <Textarea id="notes" rows={3} {...register('notes')} />
+                </Field>
+              </div>
             </div>
           </FieldSection>
         ) : null}
@@ -656,6 +683,7 @@ function JobCard({
   register,
   setValue,
   films,
+  jobs,
   item,
   cost,
   errors,
@@ -667,6 +695,8 @@ function JobCard({
   register: UseFormRegister<CreateQuotationFormValues>;
   setValue: UseFormSetValue<CreateQuotationFormValues>;
   films: Film[];
+  /** The chosen customer's saved jobs. Empty for a new company. */
+  jobs: CustomerJob[];
   item: Partial<ItemValues> | undefined;
   cost: ItemCosting | undefined;
   errors: JobErrors | undefined;
@@ -676,7 +706,53 @@ function JobCard({
   const jobKind = (item?.jobKind ?? 'POUCH') as 'POUCH' | 'ROLL';
   const pouchType = (item?.pouchType || null) as PouchType | null;
   const basis = pricingBasisFor(jobKind, pouchType);
-  const chargeCylinders = item?.chargeCylinders !== false;
+
+  /*
+   * A line prefilled from a saved job is a repeat of a design the works has
+   * already cut cylinders for, so it is not quoted for them and the whole
+   * section goes away — there is nothing on it to decide. Typing a new job name
+   * for the same customer brings it back, because a new design genuinely does
+   * need a new set, whoever is ordering it.
+   */
+  const fromSavedJob = Boolean(item?.jobId);
+
+  /** Copies a saved job's specification onto this line. */
+  function applyJob(jobId: string) {
+    const job = jobs.find((candidate) => candidate.id === jobId);
+    if (!job) {
+      setValue(`items.${index}.jobId`, null, { shouldDirty: true });
+      setValue(`items.${index}.chargeCylinders`, true, { shouldDirty: true });
+      return;
+    }
+
+    setValue(`items.${index}.jobId`, job.id, { shouldDirty: true });
+    setValue(`items.${index}.jobName`, job.jobName, { shouldDirty: true });
+    setValue(`items.${index}.chargeCylinders`, false, { shouldDirty: true });
+
+    if (job.designOpenWidth) setNumber(setValue, `items.${index}.widthMm`, job.designOpenWidth);
+    if (job.designHeight) setNumber(setValue, `items.${index}.heightMm`, job.designHeight);
+    if (job.totalCylinders) {
+      setNumber(setValue, `items.${index}.cylinderCount`, job.totalCylinders);
+    }
+
+    /*
+     * The jobs table keeps three fixed thicknesses — the printed ply, an
+     * optional metallised one, and the sealant. Rebuild the structure from
+     * whichever of them the job has; the materials are left for the office to
+     * confirm, because the job record never stored which film was used.
+     */
+    const microns = [job.petMicron, job.metPetMicron, job.polyMicron]
+      .map((value) => Number(value ?? 0))
+      .filter((value) => value > 0);
+
+    if (microns.length >= 2) {
+      setValue(
+        `items.${index}.layers`,
+        microns.map((micron) => ({ materialId: null, micron })) as ItemValues['layers'],
+        { shouldDirty: true },
+      );
+    }
+  }
 
   return (
     <section className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4 shadow-[var(--shadow-card)] sm:p-5">
@@ -694,8 +770,36 @@ function JobCard({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-12 gap-4">
-        <div className="col-span-12 sm:col-span-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-12">
+        {/*
+          A customer with jobs on record gets to pick one rather than retype it.
+          Choosing one fills in the size, the structure and the cylinder count,
+          and marks the line as a repeat so it is not quoted for cylinders.
+        */}
+        {jobs.length > 0 ? (
+          <div className="col-span-2 sm:col-span-5">
+            <Field
+              label="Saved job"
+              htmlFor={`items.${index}.jobId`}
+              hint={`${jobs.length} on record for this customer`}
+            >
+              <Select
+                id={`items.${index}.jobId`}
+                value={item?.jobId ?? ''}
+                onChange={(event) => applyJob(event.target.value)}
+              >
+                <option value="">— New design —</option>
+                {jobs.map((job) => (
+                  <option key={job.id} value={job.id}>
+                    {job.jobName}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+        ) : null}
+
+        <div className={cn('col-span-2', jobs.length > 0 ? 'sm:col-span-4' : 'sm:col-span-5')}>
           <Field
             label="Job name"
             htmlFor={`items.${index}.jobName`}
@@ -708,7 +812,7 @@ function JobCard({
             />
           </Field>
         </div>
-        <div className="col-span-6 sm:col-span-3">
+        <div className="sm:col-span-2">
           <Field
             label="Width"
             htmlFor={`items.${index}.widthMm`}
@@ -723,7 +827,7 @@ function JobCard({
             />
           </Field>
         </div>
-        <div className="col-span-6 sm:col-span-3">
+        <div className="sm:col-span-2">
           <Field
             label="Height"
             htmlFor={`items.${index}.heightMm`}
@@ -739,7 +843,7 @@ function JobCard({
           </Field>
         </div>
 
-        <div className="col-span-12">
+        <div className="col-span-2 sm:col-span-12">
           <p className="text-ink-500 mb-2 text-xs font-semibold tracking-wide uppercase">
             What the customer receives
           </p>
@@ -756,7 +860,7 @@ function JobCard({
         </div>
 
         {pouchType === 'OTHER' ? (
-          <div className="col-span-12 sm:col-span-6">
+          <div className="col-span-2 sm:col-span-5">
             <Field
               label="Describe it"
               htmlFor={`items.${index}.pouchTypeNote`}
@@ -770,7 +874,7 @@ function JobCard({
           </div>
         ) : null}
 
-        <div className="col-span-12">
+        <div className="col-span-2 sm:col-span-12">
           <LayerFields
             control={control}
             register={register}
@@ -780,7 +884,7 @@ function JobCard({
           />
         </div>
 
-        <div className="col-span-12">
+        <div className="col-span-2 sm:col-span-12">
           <QuantityFields
             control={control}
             register={register}
@@ -791,97 +895,80 @@ function JobCard({
           />
         </div>
 
-        <div className="col-span-12">
-          <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <span className="text-ink-500 text-xs font-semibold tracking-wide uppercase">
-                Cylinders
-              </span>
-              {/*
-               * Per design, not per customer. A customer of ten years ordering a
-               * new pouch still needs a new set engraved — which is what the
-               * printed terms have always said.
-               */}
-              <label className="text-ink-600 flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="accent-brand-600 size-4"
-                  {...register(`items.${index}.chargeCylinders`)}
-                />
-                Charge for cylinders (new design)
-              </label>
-            </div>
-
-            <div className="grid grid-cols-12 gap-3">
-              <div className="col-span-6 sm:col-span-3">
-                <Field label="Repeat width" htmlFor={`items.${index}.repeatWidth`}>
-                  <Input
-                    id={`items.${index}.repeatWidth`}
-                    inputMode="decimal"
-                    {...register(`items.${index}.repeatWidth`)}
-                  />
-                </Field>
-              </div>
-              <div className="col-span-6 sm:col-span-3">
-                <Field label="Repeat height" htmlFor={`items.${index}.repeatHeight`}>
-                  <Input
-                    id={`items.${index}.repeatHeight`}
-                    inputMode="decimal"
-                    {...register(`items.${index}.repeatHeight`)}
-                  />
-                </Field>
-              </div>
-              <div className="col-span-6 sm:col-span-3">
-                <Field
-                  label="Cylinders"
-                  htmlFor={`items.${index}.cylinderCount`}
-                  hint="One per colour"
-                >
-                  <Input
-                    id={`items.${index}.cylinderCount`}
-                    inputMode="numeric"
-                    {...register(`items.${index}.cylinderCount`)}
-                  />
-                </Field>
-              </div>
-              <div className="col-span-6 sm:col-span-3">
-                <Field label="Transport" htmlFor={`items.${index}.transportCost`} hint="Optional">
-                  <Input
-                    id={`items.${index}.transportCost`}
-                    inputMode="decimal"
-                    disabled={!chargeCylinders}
-                    {...register(`items.${index}.transportCost`)}
-                  />
-                </Field>
+        {fromSavedJob ? (
+          <div className="col-span-2 sm:col-span-12">
+            <p className="border-ink-200 text-ink-500 rounded-[var(--radius-md)] border border-dashed px-3 py-2.5 text-sm">
+              Repeat of a saved design —{' '}
+              <strong className="text-ink-800">no cylinder charge</strong>. Cylinders for{' '}
+              {item?.jobName || 'this job'} are already in the works.
+            </p>
+          </div>
+        ) : (
+          <div className="col-span-2 sm:col-span-12">
+            <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <span className="text-ink-500 text-xs font-semibold tracking-wide uppercase">
+                  Cylinders
+                </span>
+                <span className="text-ink-400 text-xs">New design — charged once</span>
               </div>
 
-              <div className="col-span-12 sm:col-span-6">
-                <Field
-                  label="Cost per cylinder"
-                  htmlFor={`items.${index}.costPerCylinder`}
-                  hint="Calculated"
-                >
-                  <ReadOnlyValue value={formatRs(cost?.geometry.costPerCylinder ?? 0)} />
-                </Field>
-              </div>
-              <div className="col-span-12 sm:col-span-6">
-                <Field
-                  label="Cylinder total"
-                  htmlFor={`items.${index}.totalCylinderCost`}
-                  hint={
-                    chargeCylinders
-                      ? 'Charged on this quotation'
-                      : 'This design already has cylinders'
-                  }
-                >
-                  <ReadOnlyValue value={formatRs(cost?.geometry.totalCylinderCost ?? 0)} />
-                </Field>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-12">
+                <div className="sm:col-span-2">
+                  <Field label="Repeat width" htmlFor={`items.${index}.repeatWidth`}>
+                    <Input
+                      id={`items.${index}.repeatWidth`}
+                      inputMode="decimal"
+                      {...register(`items.${index}.repeatWidth`)}
+                    />
+                  </Field>
+                </div>
+                <div className="sm:col-span-2">
+                  <Field label="Repeat height" htmlFor={`items.${index}.repeatHeight`}>
+                    <Input
+                      id={`items.${index}.repeatHeight`}
+                      inputMode="decimal"
+                      {...register(`items.${index}.repeatHeight`)}
+                    />
+                  </Field>
+                </div>
+                <div className="sm:col-span-2">
+                  <Field
+                    label="Cylinders"
+                    htmlFor={`items.${index}.cylinderCount`}
+                    hint="One per colour"
+                  >
+                    <Input
+                      id={`items.${index}.cylinderCount`}
+                      inputMode="numeric"
+                      {...register(`items.${index}.cylinderCount`)}
+                    />
+                  </Field>
+                </div>
+                <div className="sm:col-span-3">
+                  <Field label="Transport" htmlFor={`items.${index}.transportCost`} hint="Optional">
+                    <Input
+                      id={`items.${index}.transportCost`}
+                      inputMode="decimal"
+                      {...register(`items.${index}.transportCost`)}
+                    />
+                  </Field>
+                </div>
+                <div className="sm:col-span-3">
+                  <Field
+                    label="Cylinder total"
+                    htmlFor={`items.${index}.totalCylinderCost`}
+                    hint={`${item?.cylinderCount ?? 0} × ${formatRs(cost?.geometry.costPerCylinder ?? 0)}`}
+                  >
+                    <ReadOnlyValue value={formatRs(cost?.geometry.totalCylinderCost ?? 0)} />
+                  </Field>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
-        <div className="col-span-12">
+        <div className="col-span-2 sm:col-span-12">
           <div className="border-ink-200 text-ink-600 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-[var(--radius-md)] border border-dashed px-3 py-2.5 text-sm">
             <span>
               Structure{' '}

@@ -85,8 +85,8 @@ export function QuantityFields({
           const result = results[index];
 
           return (
-            <div key={field.id} className="grid grid-cols-12 items-end gap-2">
-              <div className="col-span-6 sm:col-span-3">
+            <div key={field.id} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-12">
+              <div className="col-span-1 sm:col-span-2">
                 <Field
                   label={`Quantity ${index + 1}`}
                   htmlFor={`items.${itemIndex}.quantities.${index}.${quantityField}`}
@@ -102,7 +102,7 @@ export function QuantityFields({
                 </Field>
               </div>
 
-              <div className="col-span-6 sm:col-span-3">
+              <div className="col-span-1 sm:col-span-2">
                 <Field
                   label={`Rate ${index + 1}`}
                   htmlFor={`items.${itemIndex}.quantities.${index}.${rateField}`}
@@ -123,7 +123,7 @@ export function QuantityFields({
                * choosing a price here and the margin is the thing they are
                * actually watching.
                */}
-              <div className="col-span-10 sm:col-span-5">
+              <div className="col-span-2 sm:col-span-7">
                 <div className="text-ink-500 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 pb-2 text-xs">
                   {result ? (
                     <>
@@ -154,7 +154,7 @@ export function QuantityFields({
                 </div>
               </div>
 
-              <div className="col-span-2 pb-2 sm:col-span-1">
+              <div className="col-span-2 pb-2.5 sm:col-span-1">
                 {fields.length > 1 ? (
                   <button
                     type="button"

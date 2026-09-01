@@ -16,8 +16,15 @@ import { cn } from '@/lib/utils';
  * moving 2 → 3 keeps everything already typed and only asks for the new ply.
  */
 
-/** What the works laminates. Four is the engine's ceiling, not a common order. */
-const LAYER_COUNTS = [2, 3, 4] as const;
+/**
+ * What the works laminates.
+ *
+ * Two and three, which is what it produces. The engine and the schema handle
+ * four, so a foil laminate can be quoted the day it is genuinely needed — it is
+ * simply not offered here, because an option nobody uses is one more thing to
+ * read past on every job.
+ */
+const LAYER_COUNTS = [2, 3] as const;
 
 interface Film {
   id: string;
@@ -97,8 +104,8 @@ export function LayerFields({
           const film = filmId ? filmById.get(filmId) : undefined;
 
           return (
-            <div key={field.id} className="grid grid-cols-12 items-end gap-2">
-              <div className="col-span-12 sm:col-span-6">
+            <div key={field.id} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-12">
+              <div className="col-span-2 sm:col-span-5">
                 <Field
                   label={`Layer ${index + 1}`}
                   htmlFor={`items.${itemIndex}.layers.${index}.materialId`}
@@ -119,7 +126,7 @@ export function LayerFields({
                 </Field>
               </div>
 
-              <div className="col-span-6 sm:col-span-3">
+              <div className="col-span-1 sm:col-span-2">
                 <Field
                   label="Thickness"
                   htmlFor={`items.${itemIndex}.layers.${index}.micron`}
@@ -135,7 +142,7 @@ export function LayerFields({
                 </Field>
               </div>
 
-              <div className="text-ink-500 col-span-6 pb-2 text-xs sm:col-span-3">
+              <div className="text-ink-500 col-span-1 pb-2.5 text-xs sm:col-span-5">
                 {/*
                  * The weight this ply contributes. Shown per row because it is
                  * the number that explains the cost — the sealant is usually
