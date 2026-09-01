@@ -273,7 +273,7 @@ Change `ARTWORK_EXT` in `PouchIcon.tsx` if the files are `.webp` or `.jpg`.
 #### The structure, ply by ply
 
 Each ply gets its own row: a material and a thickness, with its density shown
-beside it. **2 / 3 / 4 layer** adds or removes rows rather than swapping the
+beside it. **2 layer / 3 layer** adds or removes rows rather than swapping the
 form, so moving from two plies to three keeps everything already typed and only
 asks for the new one. The outermost and the sealant are labelled, because those
 are the two the office actually thinks about.
@@ -282,9 +282,29 @@ are the two the office actually thinks about.
 > printed PET and the metallised ply assumed. The client could not read what he
 > was quoting off that control.
 
+Only two and three are offered, which is what the works produces. The engine and
+the schema handle four, so a foil laminate can be quoted the day it is genuinely
+needed — it is simply not on screen, because an option nobody uses is one more
+thing to read past on every job.
+
 **A ply left unchosen makes the line uncostable, not free** — the strip says
 "Not costed — every ply needs a film" rather than showing an average of whatever
 is left.
+
+#### Repeat or new design
+
+A customer with jobs on record gets a **Saved job** dropdown on each line, with
+**— New design —** at the top. Choosing a saved job fills in the name, the size,
+the structure and the cylinder count, so a repeat order is picked rather than
+retyped.
+
+**The materials are deliberately left blank.** The jobs table records
+thicknesses but never recorded which film was used, and guessing one would put a
+rate behind a margin nobody chose.
+
+Note that 18 of the 414 imported jobs carry no size or thickness at all. Picking
+one of those fills in only its name — that is missing data from the original
+spreadsheet, not a failed prefill.
 
 #### Quantities
 
@@ -305,14 +325,20 @@ leave a hole no total could describe.
 
 #### Cylinders
 
-Repeat width and height, the number of cylinders, and transport. **Charge for
-cylinders (new design)** is a tick: clear it for a design whose cylinders are
-already in the works and the total goes to zero, transport included, because
-there is nothing to deliver. The cost per cylinder stays visible so the office
-can see what a new set would cost.
+**The section appears only for a new design.** Pick a saved job and it goes
+away entirely, replaced by a line saying so:
 
-It is per design, not per customer. A customer of ten years ordering a new pouch
-still needs a set engraved — which is what the printed terms have always said.
+> Repeat of a saved design — **no cylinder charge**. Cylinders for ADF Plain 1kg.
+> are already in the works.
+
+Choose **— New design —** and it comes back, with repeat width and height, the
+number of cylinders, and transport.
+
+**It follows the design, not the customer.** A customer of ten years ordering a
+new pouch still needs a set engraved, which is exactly what the printed terms
+say — so the trigger is which job the line is for, not who is ordering it.
+Keying it to the customer would have made those cylinders quietly
+unchargeable.
 
 **The cylinder total shows its sum.** Transport is added to it, so the hint
 under the field reads `4 × Rs. 9,085 + Rs. 100 transport`. Without that, anyone

@@ -597,6 +597,11 @@ total becomes zero — transport included, because there is nothing to deliver.
 The cost per cylinder is still reported, so the office can see what a new set
 would cost if one were damaged.
 
+The form derives the flag rather than asking for it: a line prefilled from one of
+the customer's saved jobs is a repeat and sets it false, and choosing "new
+design" sets it true. The API takes whichever value it is sent, so a client that
+knows better can say so.
+
 The rule is deliberately not "existing customer, no cylinders". A customer of
 ten years ordering a new pouch still needs a set engraved, and the printed terms
 have always said exactly that: _"each job/design requires a separate cylinder"_,
