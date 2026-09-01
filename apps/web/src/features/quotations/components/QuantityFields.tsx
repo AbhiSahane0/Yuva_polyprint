@@ -17,8 +17,14 @@ import { cn } from '@/lib/utils';
  * breath, and answers it honestly: the cylinders cost the same in every column,
  * so the per-pouch figure genuinely falls as the order grows.
  *
- * Which pair is typed depends on the construction, not on a choice made here —
- * standup and standup-zipper are sold by the piece, everything else by weight.
+ * **Kilogram or pouches is chosen here.** The style suggests it — the trade
+ * quotes a standup pouch per piece and a centre-seal one by weight — but that
+ * suggestion used to be the only answer available, and a customer who orders
+ * standup pouches by the kilogram could not be quoted the way they buy.
+ *
+ * Whichever unit is chosen, only that pair is asked for. The other is worked
+ * back and shown beside the result, because the film is ordered by weight
+ * however it is sold.
  */
 
 /** What each quantity works out to, computed live so nothing is a surprise. */
@@ -35,6 +41,7 @@ export function QuantityFields({
   register,
   itemIndex,
   pricingBasis,
+  onBasisChange,
   results,
   errors,
 }: {
@@ -42,6 +49,11 @@ export function QuantityFields({
   register: UseFormRegister<CreateQuotationFormValues>;
   itemIndex: number;
   pricingBasis: PricingBasis;
+  /**
+   * Absent on a roll, where the switch is not shown at all — a reel has no
+   * pouches to count, so offering the choice would be offering a mistake.
+   */
+  onBasisChange?: ((next: PricingBasis) => void) | undefined;
   /** One per row, in order. Absent entries render as blanks, not zeroes. */
   results: (QuantityResult | undefined)[];
   errors?: Record<string, { message?: string } | undefined>[];
@@ -62,10 +74,39 @@ export function QuantityFields({
           <Layers3 className="size-3.5" aria-hidden />
           Quantities
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-ink-400 text-xs">
-            {perPouch ? 'Sold per pouch' : 'Sold per kilogram'}
-          </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {onBasisChange ? (
+            <div
+              className="flex items-center gap-1"
+              role="group"
+              aria-label="How this line is sold"
+            >
+              <span className="text-ink-400 mr-1 text-xs">Sold by</span>
+              {(
+                [
+                  ['PER_KG', 'Kilogram'],
+                  ['PER_POUCH', 'Pouches'],
+                ] as const
+              ).map(([basis, label]) => (
+                <button
+                  key={basis}
+                  type="button"
+                  aria-pressed={pricingBasis === basis}
+                  onClick={() => onBasisChange(basis)}
+                  className={cn(
+                    'focus-visible:ring-brand-500 rounded-[var(--radius-sm)] border px-2.5 py-1 text-xs font-medium transition focus-visible:ring-2 focus-visible:outline-none',
+                    pricingBasis === basis
+                      ? 'border-brand-500 bg-brand-50 text-brand-700'
+                      : 'border-ink-200 text-ink-600 hover:bg-ink-50 bg-white',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="text-ink-400 text-xs">Sold per kilogram</span>
+          )}
           {fields.length < 3 ? (
             <button
               type="button"

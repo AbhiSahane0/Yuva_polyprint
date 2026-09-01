@@ -151,8 +151,31 @@ const BLANK_ITEM = {
   jobKind: 'POUCH',
   pouchType: 'STANDUP',
   pouchTypeNote: '',
+  // The trade convention for a standup pouch, which the office can change on
+  // the line — see the switch in the Quantities panel.
+  pricingBasis: pricingBasisFor('POUCH', 'STANDUP'),
   quantities: [{ quantityKg: '', ratePerKg: '', quantityPouches: '', ratePerPouch: '' }],
 } as unknown as ItemValues;
+
+/**
+ * How a line is sold — what the office chose, or the convention if they never
+ * touched the switch.
+ *
+ * One place, because the live costing and the form controls have to agree on
+ * it: if they disagreed, the margin shown while choosing a price would not be
+ * the one that gets stored.
+ */
+function basisOf(
+  item: { jobKind?: unknown; pouchType?: unknown; pricingBasis?: unknown } | undefined,
+): PricingBasis {
+  const jobKind = (item?.jobKind ?? 'POUCH') as 'POUCH' | 'ROLL';
+  const pouchType = (item?.pouchType || null) as PouchType | null;
+  const chosen = (item?.pricingBasis || null) as PricingBasis | null;
+
+  // A reel has no pouches to count, whatever was stored against it.
+  if (jobKind === 'ROLL') return 'PER_KG';
+  return chosen ?? pricingBasisFor(jobKind, pouchType);
+}
 
 const num = (value: unknown): number => {
   const parsed = Number(value);
@@ -294,6 +317,9 @@ export default function QuotationFormPage() {
         jobKind: item.jobKind,
         pouchType: item.pouchType,
         pouchTypeNote: item.pouchTypeNote,
+        // Taken from the stored line, not re-derived: a quotation sold by the
+        // kilogram must not silently become a per-piece one on reopening.
+        pricingBasis: item.pricingBasis,
         widthMm: item.widthMm,
         heightMm: item.heightMm,
         layers: item.layers.map((layer) => ({
@@ -346,9 +372,7 @@ export default function QuotationFormPage() {
    */
   const costed: ItemCosting[] = useMemo(() => {
     return (watched.items ?? []).map((item) => {
-      const jobKind = (item?.jobKind ?? 'POUCH') as 'POUCH' | 'ROLL';
-      const pouchType = (item?.pouchType || null) as PouchType | null;
-      const basis = pricingBasisFor(jobKind, pouchType);
+      const basis = basisOf(item);
 
       const layers = (item?.layers ?? []).map((layer) => {
         const film = layer?.materialId ? filmById.get(String(layer.materialId)) : undefined;
@@ -621,6 +645,7 @@ export default function QuotationFormPage() {
                 register={register}
                 setValue={setValue}
                 films={films}
+                cylinderRate={cylinderRate}
                 jobs={chosenCustomer?.jobs ?? []}
                 item={watched.items?.[index] as Partial<ItemValues> | undefined}
                 cost={costed[index]}
@@ -705,6 +730,7 @@ function JobCard({
   register,
   setValue,
   films,
+  cylinderRate,
   jobs,
   item,
   cost,
@@ -717,6 +743,8 @@ function JobCard({
   register: UseFormRegister<CreateQuotationFormValues>;
   setValue: UseFormSetValue<CreateQuotationFormValues>;
   films: Film[];
+  /** Rupees per 100 mm² of engraved area, from settings. */
+  cylinderRate: number;
   /** The chosen customer's saved jobs. Empty for a new company. */
   jobs: CustomerJob[];
   item: Partial<ItemValues> | undefined;
@@ -727,7 +755,7 @@ function JobCard({
 }) {
   const jobKind = (item?.jobKind ?? 'POUCH') as 'POUCH' | 'ROLL';
   const pouchType = (item?.pouchType || null) as PouchType | null;
-  const basis = pricingBasisFor(jobKind, pouchType);
+  const basis = basisOf(item);
 
   /*
    * A line prefilled from a saved job is a repeat of a design the works has
@@ -911,6 +939,18 @@ function JobCard({
                   shouldDirty: true,
                   shouldValidate: true,
                 });
+                /*
+                 * The style resets the unit to the trade's convention for it.
+                 * Changing what the line IS is a bigger decision than how it is
+                 * sold, and landing on the conventional answer is what someone
+                 * who never touches the switch expects — a roll, in particular,
+                 * has no pouches to count.
+                 */
+                setValue(
+                  `items.${index}.pricingBasis`,
+                  pricingBasisFor(choice.jobKind, choice.pouchType) as ItemValues['pricingBasis'],
+                  { shouldDirty: true },
+                );
               }}
             >
               {CONSTRUCTIONS.map((option) => (
@@ -954,6 +994,15 @@ function JobCard({
             register={register}
             itemIndex={index}
             pricingBasis={basis}
+            onBasisChange={
+              jobKind === 'ROLL'
+                ? undefined
+                : (next) =>
+                    setValue(`items.${index}.pricingBasis`, next as ItemValues['pricingBasis'], {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+            }
             results={cost?.quantities ?? []}
             errors={errors?.quantities as never}
           />
@@ -978,7 +1027,7 @@ function JobCard({
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-12">
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-3">
                   <Field label="Repeat width" htmlFor={`items.${index}.repeatWidth`}>
                     <Input
                       id={`items.${index}.repeatWidth`}
@@ -987,7 +1036,7 @@ function JobCard({
                     />
                   </Field>
                 </div>
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-3">
                   <Field label="Repeat height" htmlFor={`items.${index}.repeatHeight`}>
                     <Input
                       id={`items.${index}.repeatHeight`}
@@ -996,7 +1045,7 @@ function JobCard({
                     />
                   </Field>
                 </div>
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-3">
                   <Field
                     label="Cylinders"
                     htmlFor={`items.${index}.cylinderCount`}
@@ -1018,11 +1067,62 @@ function JobCard({
                     />
                   </Field>
                 </div>
+                {/*
+                  The working, not just the answer.
+                  
+                  A cylinder is charged by the area it is engraved over, so the
+                  size comes first: width is the pouch across the repeat plus an
+                  80mm margin for the gripper, circumference is the pouch down
+                  the repeat. These were dropped when the form became a wizard,
+                  which left the office with a total and no way to see where it
+                  came from — and no way to spot a repeat typed wrong.
+                */}
                 <div className="sm:col-span-3">
                   <Field
-                    label="Cylinder total"
+                    label="Cylinder width"
+                    htmlFor={`items.${index}.cylinderWidth`}
+                    hint={`${formatNumber(num(item?.widthMm))} × ${formatNumber(num(item?.repeatWidth))} + 80 margin`}
+                  >
+                    <ReadOnlyValue value={formatNumber(cost?.geometry.cylinderWidth ?? 0)} />
+                  </Field>
+                </div>
+                <div className="sm:col-span-3">
+                  <Field
+                    label="Cylinder circumference"
+                    htmlFor={`items.${index}.cylinderCircumference`}
+                    hint={`${formatNumber(num(item?.heightMm))} × ${formatNumber(num(item?.repeatHeight))}`}
+                  >
+                    <ReadOnlyValue
+                      value={formatNumber(cost?.geometry.cylinderCircumference ?? 0)}
+                    />
+                  </Field>
+                </div>
+                <div className="sm:col-span-3">
+                  <Field
+                    label="Cost per cylinder"
+                    htmlFor={`items.${index}.costPerCylinder`}
+                    hint={`area ÷ 100 × ${formatRs(cylinderRate, 2)}`}
+                  >
+                    <ReadOnlyValue value={formatRs(cost?.geometry.costPerCylinder ?? 0)} />
+                  </Field>
+                </div>
+                <div className="sm:col-span-3">
+                  <Field
+                    label="Total cylinder cost"
                     htmlFor={`items.${index}.totalCylinderCost`}
-                    hint={`${item?.cylinderCount ?? 0} × ${formatRs(cost?.geometry.costPerCylinder ?? 0)}`}
+                    /*
+                     * Transport is part of this total, so anyone checking it as
+                     * cylinders × cost-per-cylinder lands short by exactly the
+                     * transport and concludes the figure is wrong. The wizard
+                     * dropped that half of the hint; the PDF never did.
+                     */
+                    hint={`${formatNumber(num(item?.cylinderCount))} × ${formatRs(
+                      cost?.geometry.costPerCylinder ?? 0,
+                    )}${
+                      num(item?.transportCost) > 0
+                        ? ` + ${formatRs(num(item?.transportCost))} transport`
+                        : ''
+                    }`}
                   >
                     <ReadOnlyValue value={formatRs(cost?.geometry.totalCylinderCost ?? 0)} />
                   </Field>

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { JOB_KINDS, POUCH_TYPES, pricingBasisFor } from '../constants/job.js';
+import { JOB_KINDS, POUCH_TYPES, PRICING_BASES, pricingBasisFor } from '../constants/job.js';
 import { paginationQuerySchema } from './common.js';
 
 export const quotationStatusSchema = z.enum(['DRAFT', 'SENT', 'WON', 'LOST']);
@@ -47,6 +47,20 @@ export const quotationItemSchema = z
     pouchType: z.enum(POUCH_TYPES).nullable().default(null),
     pouchTypeNote: z.string().trim().max(120).default(''),
 
+    /**
+     * Whether this line is ordered by weight or by the piece.
+     *
+     * Chosen on the line. The style suggests it — the trade quotes a standup
+     * pouch per piece and a centre-seal one by weight — but the suggestion was
+     * the only answer available before, and a customer who orders standup
+     * pouches by the kilogram had no way to be quoted the way they buy.
+     *
+     * Null means "whatever the style conventionally is", which is how a
+     * request that predates the choice, or one that simply does not care, gets
+     * the old behaviour exactly.
+     */
+    pricingBasis: z.enum(PRICING_BASES).nullable().default(null),
+
     widthMm: positiveNumber('Width'),
     heightMm: positiveNumber('Height'),
 
@@ -82,9 +96,22 @@ export const quotationItemSchema = z
    * make switching Pouch to Roll an error the user has to clear — the style is
    * dropped, so the stored line always matches what the form is showing.
    */
-  .transform((item) =>
-    item.jobKind === 'ROLL' ? { ...item, pouchType: null, pouchTypeNote: '' } : item,
-  )
+  .transform((item) => {
+    const line = item.jobKind === 'ROLL' ? { ...item, pouchType: null, pouchTypeNote: '' } : item;
+
+    /*
+     * A roll is film on a reel: there are no pouches to count, so the choice is
+     * not offered and cannot be smuggled in through the API either. Everything
+     * else takes what the office chose, falling back to the trade convention.
+     */
+    return {
+      ...line,
+      pricingBasis:
+        line.jobKind === 'ROLL'
+          ? ('PER_KG' as const)
+          : (line.pricingBasis ?? pricingBasisFor(line.jobKind, line.pouchType)),
+    };
+  })
   .refine((item) => item.jobKind !== 'POUCH' || item.pouchType !== null, {
     message: 'Choose the pouch type',
     path: ['pouchType'],
@@ -102,7 +129,7 @@ export const quotationItemSchema = z
    * the first one.
    */
   .superRefine((item, ctx) => {
-    const perPouch = pricingBasisFor(item.jobKind, item.pouchType) === 'PER_POUCH';
+    const perPouch = item.pricingBasis === 'PER_POUCH';
 
     item.quantities.forEach((quantity, index) => {
       const checks: [boolean, string, string][] = perPouch

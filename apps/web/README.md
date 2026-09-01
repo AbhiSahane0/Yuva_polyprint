@@ -262,11 +262,11 @@ One dropdown beside the job's name and size:
 > Standup · Standup zipper · Zipper · Spout pouch · Centre seal ·
 > Three side seal · Other · Roll
 
-**The hint under it says how that style is priced** — "Priced per pouch" on
-standup and standup zipper, "Priced per kg" on the rest. That choice silently
-drives the whole rest of the form, and it used to be discoverable only two steps
-later. Choosing Other reveals a box to say what it is; choosing Roll clears the
-pouch style rather than raising an error.
+**The hint under it says how the line is priced** — "Priced per pouch" or
+"Priced per kg". Picking a style sets that to the trade's convention for it, and
+the switch in the Quantities panel changes it. Choosing Other reveals a box to
+say what it is; choosing Roll clears the pouch style rather than raising an
+error, and forces kilograms.
 
 > A grid of eight drawn pouches sat here before. It read as decoration rather
 > than a control, and it pushed the fields that matter below the fold on every
@@ -340,11 +340,26 @@ alongside:
 
 > **Rs. 1,45,000** · 25,000 pouches · **31.2% margin**
 
-Margin under 15% turns amber. Which pair you type is decided by the
-construction, not chosen here — standup and standup zipper ask for a pouch count
-and a rate per pouch, everything else for kilograms — and the other unit is
-worked back and shown beside it, because the film is ordered by weight either
-way.
+Margin under 15% turns amber.
+
+**Kilogram or Pouches is chosen here**, on the switch in the panel header:
+
+```
+QUANTITIES              Sold by [ Kilogram | Pouches ]     Add a quantity
+```
+
+Only the chosen pair is asked for — kg and rate per kg, or pouches and rate per
+pouch — and the other unit is worked back and shown beside the result, because
+the film is ordered by weight however it is sold.
+
+The style seeds it: standup and standup zipper start on Pouches, everything else
+on Kilogram, which is what the trade does. Changing the style resets the switch
+to that style's convention, so anyone who never touches it gets the conventional
+answer. A **roll has no switch** — there are no pouches on a reel to count.
+
+> This used to be decided entirely by the style, with no way to override it. A
+> customer who orders standup pouches by the kilogram could not be quoted the
+> way they actually buy.
 
 Every job on one quotation must be priced at the same number of quantities. They
 are columns on one document, and a job with three where another has two would

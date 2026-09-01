@@ -547,18 +547,27 @@ the line correctly reads 2,967.
 **5. Printing total** — and this depends on the pouch style:
 
 ```
-Standup and standup zipper   totalAmount = quantityPouches × ratePerPouch
-Everything else, and rolls   totalAmount = quantityKg × ratePerKg
+PER_POUCH   totalAmount = quantityPouches × ratePerPouch
+PER_KG      totalAmount = quantityKg      × ratePerKg
 ```
 
-**Standup and standup-zipper pouches are sold by the piece.** The converting
-work dominates their cost, so the trade quotes them per pouch and the customer's
-order is written in pieces. Every other style, and every roll, stays per kg.
+**The basis is chosen on the line**, and stored on it as `pricingBasis`. A line
+that does not state one takes the convention for its style — standup and
+standup-zipper by the piece, because the converting work dominates their cost
+and the trade writes those orders in pieces; everything else by weight. That is
+`pricingBasisFor()` in `@yuva/shared`, and it is the schema's default, not its
+rule.
 
-The basis is **derived from the style, never chosen** — `pricingBasisFor()` in
-`@yuva/shared` — so the two cannot disagree, and the server derives it again
-rather than trusting the client. A request cannot ask for a standup pouch to be
-priced by weight.
+> It used to be the rule: derived from the style and never chosen, with the
+> server re-deriving it rather than trusting the client. That refused a real
+> order — a customer who buys standup pouches by the kilogram — so the office
+> now decides, and the choice travels with the line.
+
+**A roll is still forced to `PER_KG`**, in the schema's transform, whatever the
+request asks for. There are no pouches on a reel to count. Note that the reprice
+path in `updateQuotation` carries the stored basis forward explicitly: a PATCH
+that does not resend the lines must not flip them back to their style's
+convention.
 
 **Both units are stored on every line.** On a per-pouch line the weight is
 worked back from pouches-per-kg, because the film is ordered against it; on a

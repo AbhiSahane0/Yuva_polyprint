@@ -18,7 +18,6 @@ import {
   type QuotationSummary,
   JOB_KIND_LABELS,
   POUCH_TYPE_LABELS,
-  pricingBasisFor,
   type QuotationEmail as QuotationEmailRecord,
   type RecordOutcomeInput,
   type RecordOutcomeResult,
@@ -244,10 +243,12 @@ function priceQuotation(
 ) {
   const priced = items.map((item, index) => {
     /*
-     * The basis is derived from the style rather than trusted from the client,
-     * so a request cannot ask for a standup pouch to be priced by weight.
+     * How the line is sold, as the office chose it on the form. The schema has
+     * already resolved it: a line that did not say takes the convention for its
+     * style, and a roll is forced to weight whatever the request asked for,
+     * because a reel has no pouches to count.
      */
-    const pricingBasis = pricingBasisFor(item.jobKind, item.pouchType);
+    const pricingBasis = item.pricingBasis;
 
     /*
      * The plies as the office stated them, each costed against its own
@@ -672,6 +673,14 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
       jobKind: item.jobKind,
       pouchType: item.pouchType,
       pouchTypeNote: item.pouchTypeNote,
+      /*
+       * Carried through explicitly. It used to be re-derived from the style on
+       * every reprice, which was harmless while the style was the only thing
+       * that decided it — now that the office chooses, dropping it here would
+       * flip a standup pouch sold by the kilogram back to per-piece on any
+       * patch that did not resend the lines.
+       */
+      pricingBasis: item.pricingBasis,
       widthMm: toNumber(item.widthMm),
       heightMm: toNumber(item.heightMm),
       layers: byPosition(item.layers).map((layer) => ({
@@ -680,8 +689,8 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
       })),
       /*
        * Fed back as stored, both units populated. Which pair is actually read
-       * depends on the pricing basis, which is derived from the pouch style —
-       * so handing back the derived half of the pair is harmless.
+       * depends on the pricing basis above, so handing back the derived half of
+       * the pair is harmless.
        */
       quantities: byPosition(item.quantities).map((quantity) => ({
         quantityKg: toNumber(quantity.quantityKg),

@@ -37,7 +37,7 @@ export interface QuotationItemInputs {
   widthMm: number;
   heightMm: number;
   polyMicron: number;
-  /** How this line is sold. Derived from the pouch style, never chosen. */
+  /** How this line is sold — the office's choice, defaulting to weight. */
   pricingBasis?: PricingBasis;
   /** Entered on a per-kg line; derived on a per-pouch one. */
   quantityKg: number;
@@ -89,10 +89,10 @@ export function computeItem(
   const pouchesPerKg = areaTerm > 0 ? round(1000 / (areaTerm / 10000), 2) : 0;
 
   /*
-   * Standup and standup-zipper pouches are sold by the piece, everything else
-   * by weight. On a per-pouch line the office types a pouch count and a rate
-   * per pouch, and the weight is worked back from pouches-per-kg — that is the
-   * figure the film is ordered against, so it still has to exist.
+   * On a per-pouch line the office types a pouch count and a rate per pouch,
+   * and the weight is worked back from pouches-per-kg — that is the figure the
+   * film is ordered against, so it still has to exist. A per-kg line works the
+   * pouch count back the same way, for the same reason in reverse.
    */
   const basis = input.pricingBasis ?? 'PER_KG';
   const perPouch = basis === 'PER_POUCH';
