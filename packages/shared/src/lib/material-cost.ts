@@ -146,3 +146,28 @@ export function computeMargin(sellingPerKg: number, costPerKg: number | null): n
   if (costPerKg === null || sellingPerKg <= 0) return null;
   return round(((sellingPerKg - costPerKg) / sellingPerKg) * 100, 2);
 }
+
+/**
+ * The gauge a film's own name states, in microns.
+ *
+ * Every film in the rates master is named with its thickness — "PET 12µm",
+ * "PE 60µm", "PVC / PETG 45µm" — because a 12µ PET and a 19µ PET are bought,
+ * stocked and priced as two different materials. The name is therefore the
+ * authority on thickness, and the quotation stopped asking for it a second
+ * time: choosing the film sets the micron, so the two cannot disagree. Typing
+ * them separately is how quotation #123 came to carry a "PET 19µm" ply
+ * recorded at 60 microns.
+ *
+ * Null when the name states no gauge — "PP Woven" — which the caller has to
+ * handle. Returning zero instead would quietly under-weigh the laminate and
+ * report a confident, wrong cost per kilogram.
+ */
+export function micronFromFilmName(name: string): number | null {
+  // The first number that is followed by a micron unit, so a name carrying an
+  // unrelated figure ahead of the gauge is not mistaken for one.
+  const match = /(\d+(?:\.\d+)?)\s*(?:µ|mic)/i.exec(name);
+  if (!match) return null;
+
+  const micron = Number(match[1]);
+  return Number.isFinite(micron) && micron > 0 ? micron : null;
+}

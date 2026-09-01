@@ -372,7 +372,7 @@ Every figure on a quotation traces back to these. Worth reading once.
 | **Composite GSM**  | All the plies added together: the weight of one square metre of the finished laminate.                                                                                                                |
 | **PET**            | The printed outer ply. 12µ in every structure this works produces.                                                                                                                                    |
 | **MET PET**        | Metallised PET — the same 12µ film with a thin aluminium coating. A barrier against moisture, oxygen and light, and what makes a pouch silver inside. Usually the middle ply of a three-ply laminate. |
-| **Poly**           | The inner sealing ply. Its thickness and grade are chosen per job; the **Film** dropdown picks which one, and its density and rate come from that choice.                                             |
+| **Poly**           | The inner sealing ply. Its grade is chosen per job; picking the film sets its thickness, density and rate together, because the film's name states its gauge.                                         |
 | **Adhesive**       | Bonds the plies. Adds 2µ and its own GSM.                                                                                                                                                             |
 | **Yield factor**   | A wastage allowance applied when working out pouches per kilogram.                                                                                                                                    |
 | **Pouches per kg** | How many pouches a kilogram of finished film yields. Falls as the film gets thicker.                                                                                                                  |
@@ -398,6 +398,18 @@ release.
 > PET or a foil ply needed a developer. Quotations saved before the change keep
 > their stored figures; the migration reconstructed their plies from the
 > structure that was assumed.
+
+**The thickness is the film's, not a separate figure.** Every film in the rates
+master is named with its gauge — `PET 12µm`, `PE 60µm` — because a 12µ PET and a
+19µ PET are two different materials at two different prices. The web form reads
+the micron off the chosen film's name (`micronFromFilmName` in `@yuva/shared`)
+rather than asking for it a second time, so the two cannot disagree; quotation
+#123 carries a "PET 19µm" ply recorded at 60 microns from when they could.
+
+The API is unchanged by this: `micron` is still per-ply on the request and still
+what is stored and costed. Deriving it is a decision the form makes, so an
+import or a correction can still state a gauge the catalogue does not name — and
+so a film named without one (`PP Woven`, specified by GSM) stays quotable.
 
 The layer **count** still moves two things on its own:
 

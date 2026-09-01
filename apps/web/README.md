@@ -215,10 +215,10 @@ versions are reached through the dropdown in the preview.
 
 ### Quotation form — `/quotations/new`, `/quotations/:id/edit`
 
-Five steps, not one long scroll:
+Four steps, not one long scroll:
 
 ```
-1 Customer   2 Details   3 Jobs   4 Terms   5 Review
+1 Customer   2 Details   3 Jobs   4 Review
 ```
 
 The steps are genuinely sequential — a job cannot be priced before the customer
@@ -229,6 +229,14 @@ returning costs nothing.
 
 The old single page put customer, jobs, terms and totals on one scroll. It
 worked, but never said how much was left or what still needed doing.
+
+**There is no Terms step.** The terms were the same six lines on every quotation
+this works has ever sent, and a seven-row textarea asking to confirm them was a
+step the office had to walk past on the way to the totals. They are printed from
+the company's standard set, and the date is simply today — the office's today,
+taken from the local calendar rather than from UTC, because a night shift keying
+a quotation at one in the morning would otherwise date it yesterday. An older
+quotation that carries edited terms keeps them when it is edited.
 
 #### 1. Who it is for
 
@@ -247,45 +255,54 @@ which of the two you are doing is a decision the office makes before they start.
 Switching between the two **clears the link**. Leaving a half-filled form behind
 is how a new company inherits the previous one's GST number.
 
-#### 3. What the customer receives
+#### 3. What it is
 
-A grid of pictures rather than a dropdown. The office is picking a construction,
-and recognising one is easier than matching it to a name:
+One dropdown beside the job's name and size:
 
-> Standup · Standup zipper · Zipper · Spout · Centre seal · Three side seal ·
-> Other · Roll
+> Standup · Standup zipper · Zipper · Spout pouch · Centre seal ·
+> Three side seal · Other · Roll
 
-**Each card says how that style is priced** — "Priced per pouch" on standup and
-standup zipper, "Priced per kg" on the rest. That choice silently drives the
-whole rest of the form, and it used to be discoverable only two steps later.
-Choosing Other reveals a box to say what it is; choosing Roll clears the pouch
-style rather than raising an error.
+**The hint under it says how that style is priced** — "Priced per pouch" on
+standup and standup zipper, "Priced per kg" on the rest. That choice silently
+drives the whole rest of the form, and it used to be discoverable only two steps
+later. Choosing Other reveals a box to say what it is; choosing Roll clears the
+pouch style rather than raising an error.
 
-The drawings ship with the app. To use photographs of the real pouches instead,
-drop files into `public/pouches/` — `standup.png`, `standup-zipper.png`,
-`zipper.png`, `spout.png`, `centre-seal.png`, `three-side-seal.png`,
-`other.png`, `roll.png` — and they appear automatically. There is no code to
-edit and nothing to register: a name that is not there falls back to the
-drawing, so a half-finished set never breaks the picker. Straight-on, roughly
-4:5, transparent or white background works best, though any ratio is safe.
-Change `ARTWORK_EXT` in `PouchIcon.tsx` if the files are `.webp` or `.jpg`.
+> A grid of eight drawn pouches sat here before. It read as decoration rather
+> than a control, and it pushed the fields that matter below the fold on every
+> single job.
 
 #### The structure, ply by ply
 
-Each ply gets its own row: a material and a thickness, with its density shown
-beside it. **2 layer / 3 layer** adds or removes rows rather than swapping the
-form, so moving from two plies to three keeps everything already typed and only
-asks for the new one. The outermost and the sealant are labelled, because those
-are the two the office actually thinks about.
+Each ply gets its own row: **choose a film, and that is the whole row**. Its
+gauge, density and GSM are shown beside it. **2 layer / 3 layer** adds or
+removes rows rather than swapping the form, so moving from two plies to three
+keeps everything already typed and only asks for the new one. The outermost and
+the sealant are labelled, because those are the two the office actually thinks
+about.
 
 > This replaces a single **Film** dropdown that set only the sealant, with the
 > printed PET and the metallised ply assumed. The client could not read what he
 > was quoting off that control.
 
-Only two and three are offered, which is what the works produces. The engine and
-the schema handle four, so a foil laminate can be quoted the day it is genuinely
-needed — it is simply not on screen, because an option nobody uses is one more
-thing to read past on every job.
+**There is no thickness box.** Every film in the rates master is named with its
+gauge — `PET 12µm`, `PE 60µm`, `PVC / PETG 45µm` — because a 12µ PET and a 19µ
+PET are bought, stocked and priced as two different materials. The film _is_ the
+thickness, so choosing it sets the micron and the two cannot disagree. Typing
+them separately is how quotation #123 came to carry a "PET 19µm" ply recorded at
+60 microns.
+
+The consequence worth knowing: **a gauge the works wants to quote has to exist
+in the rates master.** A 70µ polythene needs `PE 70µm` adding under Rates, which
+is where a new film belongs anyway — it has its own price. The one film named
+without a gauge, `PP Woven`, is specified by GSM rather than thickness, and it
+alone still shows a thickness box; guessing at it would silently under-weigh the
+laminate and report a confident, wrong cost per kilogram.
+
+Only two and three plies are offered, which is what the works produces. The
+engine and the schema handle four, so a foil laminate can be quoted the day it
+is genuinely needed — it is simply not on screen, because an option nobody uses
+is one more thing to read past on every job.
 
 **A ply left unchosen makes the line uncostable, not free** — the strip says
 "Not costed — every ply needs a film" rather than showing an average of whatever
@@ -300,7 +317,10 @@ retyped.
 
 **The materials are deliberately left blank.** The jobs table records
 thicknesses but never recorded which film was used, and guessing one would put a
-rate behind a margin nobody chose.
+rate behind a margin nobody chose. The prefilled gauge is shown on the row as
+`12µ · Film not chosen`, so a figure already driving pouches-per-kg is not
+hidden behind the empty dropdown; naming the film replaces it with that film's
+own gauge.
 
 Switching back to **— New design —** clears the design: name, size, structure,
 repeats and cylinder count all return to their defaults. Leaving the previous
@@ -353,10 +373,15 @@ checking the figure as cylinders × cost-per-cylinder lands short by exactly the
 transport and concludes it is wrong. The PDF carries the same note under the
 totals whenever transport was charged.
 
-#### 5. Review
+#### 4. Review
 
 What the customer will see: every job at every quantity, the cylinders on their
 own row, and the total including GST.
+
+**Notes** live here, at the foot of the review. They lost their step along with
+the terms but not their purpose — a line about a sample or a delivery week
+belongs on the document, and this is the last screen before it goes out. Left
+empty, nothing is printed.
 
 The cylinder row is **identical in every column** — they do not scale with the
 order. That is the whole reason for quoting more than one quantity, and it only

@@ -14,11 +14,12 @@ import {
   type CreateQuotationFormValues,
   type CreateQuotationInput,
   type CustomerJob,
-  DEFAULT_TERMS,
   MAX_PAGE_SIZE,
   type ItemGeometry,
   type MaterialCostResult,
   PET_MICRON_PER_LAYER,
+  POUCH_TYPES,
+  POUCH_TYPE_LABELS,
   type PouchType,
   type PricingBasis,
   computeItemGeometry,
@@ -49,7 +50,6 @@ import {
   useUpdateQuotation,
 } from '../api/quotation-api';
 import { QuotationPreview } from '../components/QuotationPreview';
-import { ConstructionPicker } from '../components/ConstructionPicker';
 import { LayerFields } from '../components/LayerFields';
 import { QuantityFields, type QuantityResult } from '../components/QuantityFields';
 import { StepIndicator, type Step } from '../components/StepIndicator';
@@ -71,7 +71,6 @@ const STEPS: Step[] = [
   { id: 'customer', label: 'Customer' },
   { id: 'details', label: 'Details' },
   { id: 'jobs', label: 'Jobs' },
-  { id: 'terms', label: 'Terms' },
   { id: 'review', label: 'Review' },
 ];
 
@@ -80,8 +79,46 @@ const STEP_FIELDS: (keyof CreateQuotationFormValues)[][] = [
   ['customerName'],
   ['addressLine1', 'addressLine2', 'addressLine3', 'mobile', 'email', 'gstNumber'],
   ['items'],
-  ['date', 'notes'],
   [],
+];
+
+/**
+ * Today, as the office's calendar has it.
+ *
+ * Not `toISOString().slice(0, 10)`, which is the date in UTC: this works runs a
+ * night shift, and between midnight and half past five in the morning IST that
+ * reads yesterday. A quotation dated the day before it was written is the kind
+ * of error nobody catches until a customer queries it.
+ */
+function today(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * What a line is, as one choice.
+ *
+ * A grid of drawings sat here before. It read as decoration rather than a
+ * control, and it pushed the fields that matter below the fold on every job.
+ * The choice itself still carries weight — the style decides whether the line
+ * is sold by the kilogram or by the piece — so the basis is spelled out beside
+ * the box rather than left to be discovered on the next step.
+ */
+const CONSTRUCTIONS: {
+  value: string;
+  label: string;
+  jobKind: 'POUCH' | 'ROLL';
+  pouchType: PouchType | null;
+}[] = [
+  ...POUCH_TYPES.map((pouchType) => ({
+    value: `POUCH:${pouchType}`,
+    label: POUCH_TYPE_LABELS[pouchType],
+    jobKind: 'POUCH' as const,
+    pouchType,
+  })),
+  { value: 'ROLL:', label: 'Roll', jobKind: 'ROLL' as const, pouchType: null },
 ];
 
 type ItemValues = NonNullable<CreateQuotationFormValues['items']>[number];
@@ -175,7 +212,7 @@ export default function QuotationFormPage() {
     resolver: zodResolver(createQuotationSchema),
     mode: 'onBlur',
     defaultValues: {
-      date: new Date().toISOString().slice(0, 10),
+      date: today(),
       customerId: null,
       saveAsCustomer: false,
       customerName: '',
@@ -186,7 +223,8 @@ export default function QuotationFormPage() {
       email: '',
       gstNumber: '',
       status: 'DRAFT',
-      terms: DEFAULT_TERMS,
+      // Terms are the company's standard set and no longer editable per
+      // document — the schema supplies them when the field is left out.
       notes: '',
       items: [BLANK_ITEM],
     },
@@ -604,47 +642,20 @@ export default function QuotationFormPage() {
           </div>
         ) : null}
 
+        {/*
+          There is no terms step. The terms were the same six lines on every
+          quotation this works has ever sent, and a seven-row textarea asking to
+          confirm them was a step the office had to walk past to reach the
+          totals. They are the company's standard set now, printed from the
+          schema, and the date is simply today.
+        */}
         {step === 3 ? (
-          <FieldSection
-            title="Terms and notes"
-            description="Printed at the foot of the quotation. Edits apply to this document only."
-          >
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
-              <div className="sm:col-span-3">
-                <Field label="Quotation date" htmlFor="date" error={formState.errors.date?.message}>
-                  <Input id="date" type="date" {...register('date')} />
-                </Field>
-              </div>
-              <div className="sm:col-span-12">
-                <Field label="Terms" htmlFor="terms" hint="One per line">
-                  <Textarea
-                    id="terms"
-                    rows={7}
-                    defaultValue={(watched.terms ?? DEFAULT_TERMS).join('\n')}
-                    onChange={(event) =>
-                      setValue(
-                        'terms',
-                        event.target.value.split('\n').filter((line) => line.trim().length > 0),
-                      )
-                    }
-                  />
-                </Field>
-              </div>
-              <div className="sm:col-span-12">
-                <Field label="Notes" htmlFor="notes" hint="Optional">
-                  <Textarea id="notes" rows={3} {...register('notes')} />
-                </Field>
-              </div>
-            </div>
-          </FieldSection>
-        ) : null}
-
-        {step === 4 ? (
           <ReviewStep
             items={(watched.items ?? []) as Partial<ItemValues>[]}
             costed={costed}
             tierTotals={tierTotals}
             gstPercent={settings?.gstPercent ?? 18}
+            register={register}
           />
         ) : null}
 
@@ -835,7 +846,7 @@ function JobCard({
           </div>
         ) : null}
 
-        <div className={cn('col-span-2', jobs.length > 0 ? 'sm:col-span-4' : 'sm:col-span-5')}>
+        <div className={cn('col-span-2', jobs.length > 0 ? 'sm:col-span-4' : 'sm:col-span-6')}>
           <Field
             label="Job name"
             htmlFor={`items.${index}.jobName`}
@@ -879,20 +890,36 @@ function JobCard({
           </Field>
         </div>
 
-        <div className="col-span-2 sm:col-span-12">
-          <p className="text-ink-500 mb-2 text-xs font-semibold tracking-wide uppercase">
-            What the customer receives
-          </p>
-          <ConstructionPicker
-            value={{ jobKind, pouchType }}
-            onChange={(next) => {
-              setValue(`items.${index}.jobKind`, next.jobKind as ItemValues['jobKind']);
-              setValue(`items.${index}.pouchType`, next.pouchType as ItemValues['pouchType']);
-            }}
-          />
-          {errors?.pouchType?.message ? (
-            <p className="text-danger-600 mt-2 text-sm">{errors.pouchType.message}</p>
-          ) : null}
+        <div className="col-span-2 sm:col-span-4">
+          <Field
+            label="What it is"
+            htmlFor={`items.${index}.pouchType`}
+            hint={basis === 'PER_POUCH' ? 'Priced per pouch' : 'Priced per kg'}
+            error={errors?.pouchType?.message}
+          >
+            <Select
+              id={`items.${index}.pouchType`}
+              value={`${jobKind}:${pouchType ?? ''}`}
+              invalid={Boolean(errors?.pouchType)}
+              onChange={(event) => {
+                const choice = CONSTRUCTIONS.find((option) => option.value === event.target.value);
+                if (!choice) return;
+                setValue(`items.${index}.jobKind`, choice.jobKind as ItemValues['jobKind'], {
+                  shouldDirty: true,
+                });
+                setValue(`items.${index}.pouchType`, choice.pouchType as ItemValues['pouchType'], {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
+              }}
+            >
+              {CONSTRUCTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
         </div>
 
         {pouchType === 'OTHER' ? (
@@ -914,6 +941,7 @@ function JobCard({
           <LayerFields
             control={control}
             register={register}
+            setValue={setValue}
             itemIndex={index}
             films={films}
             errors={errors?.layers as never}
@@ -1043,11 +1071,13 @@ function ReviewStep({
   costed,
   tierTotals,
   gstPercent,
+  register,
 }: {
   items: Partial<ItemValues>[];
   costed: ItemCosting[];
   tierTotals: ReturnType<typeof computeTotals>[];
   gstPercent: number;
+  register: UseFormRegister<CreateQuotationFormValues>;
 }) {
   return (
     <div className="flex flex-col gap-5">
@@ -1122,6 +1152,24 @@ function ReviewStep({
           </table>
         </div>
       </section>
+
+      {/*
+        Notes lost their step along with the terms, but not their purpose: a
+        line about a sample or a delivery week belongs on the document, and this
+        is the last screen before it goes out. Left empty, nothing is printed.
+      */}
+      <FieldSection
+        title="Anything to add?"
+        description="Optional. Printed under the totals on the quotation."
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+          <div className="sm:col-span-12">
+            <Field label="Notes" htmlFor="notes">
+              <Textarea id="notes" rows={3} {...register('notes')} />
+            </Field>
+          </div>
+        </div>
+      </FieldSection>
 
       <p className="text-ink-500 text-sm">
         Saving as a draft keeps it editable. Saving and sending opens the printed quotation so you

@@ -1,6 +1,12 @@
-import { useFieldArray, type Control, type UseFormRegister } from 'react-hook-form';
+import {
+  useFieldArray,
+  useWatch,
+  type Control,
+  type UseFormRegister,
+  type UseFormSetValue,
+} from 'react-hook-form';
 import { Layers } from 'lucide-react';
-import { formatNumber, type CreateQuotationFormValues } from '@yuva/shared';
+import { formatNumber, micronFromFilmName, type CreateQuotationFormValues } from '@yuva/shared';
 import { Field, Input, Select } from '@/components/ui/Field';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +20,14 @@ import { cn } from '@/lib/utils';
  *
  * Choosing the count adds or removes rows rather than swapping the form, so
  * moving 2 → 3 keeps everything already typed and only asks for the new ply.
+ *
+ * There is no thickness box. Every film in the rates master is named with its
+ * gauge — a 12µ PET and a 19µ PET are two separate materials, bought and priced
+ * separately — so the film IS the thickness, and asking for it again only
+ * created a way for the two to disagree. Choosing the film sets the micron; the
+ * row shows what it set. A film whose name states no gauge is the one exception
+ * and asks for the figure, because guessing at it would silently under-weigh
+ * the laminate and report a confident, wrong cost.
  */
 
 /**
@@ -42,12 +56,14 @@ function roleOf(index: number, total: number): string {
 export function LayerFields({
   control,
   register,
+  setValue,
   itemIndex,
   films,
   errors,
 }: {
   control: Control<CreateQuotationFormValues>;
   register: UseFormRegister<CreateQuotationFormValues>;
+  setValue: UseFormSetValue<CreateQuotationFormValues>;
   itemIndex: number;
   films: Film[];
   errors?: { micron?: { message?: string } }[];
@@ -56,6 +72,13 @@ export function LayerFields({
     control,
     name: `items.${itemIndex}.layers`,
   });
+
+  /*
+   * Watched rather than read off `fields`, which is a snapshot taken when the
+   * array last changed: picking a film does not change the array, so the row
+   * would go on describing whatever was chosen before it.
+   */
+  const layers = useWatch({ control, name: `items.${itemIndex}.layers` }) ?? [];
 
   const filmById = new Map(films.map((film) => [film.id, film]));
 
@@ -68,6 +91,25 @@ export function LayerFields({
       return;
     }
     for (let i = fields.length - 1; i >= next; i -= 1) remove(i);
+  }
+
+  /** Picking a film carries its gauge onto the ply. */
+  function chooseFilm(index: number, filmId: string) {
+    setValue(`items.${itemIndex}.layers.${index}.materialId`, filmId || null, {
+      shouldDirty: true,
+    });
+
+    const film = filmId ? filmById.get(filmId) : undefined;
+    const micron = film ? micronFromFilmName(film.name) : null;
+    if (micron === null) return;
+
+    // As a string: the form holds these while they are being typed, and the
+    // schema coerces on submit. Writing a raw number leaves react-hook-form
+    // and the input element disagreeing about the field's type.
+    setValue(`items.${itemIndex}.layers.${index}.micron`, String(micron) as never, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
   }
 
   return (
@@ -100,8 +142,13 @@ export function LayerFields({
 
       <div className="flex flex-col gap-2.5">
         {fields.map((field, index) => {
-          const filmId = (field as { materialId?: string | null }).materialId ?? null;
+          const layer = layers[index];
+          const filmId = (layer?.materialId ?? null) as string | null;
           const film = filmId ? filmById.get(filmId) : undefined;
+          const micron = Number(layer?.micron ?? 0);
+
+          // The one case the film cannot answer: a name that states no gauge.
+          const needsMicron = Boolean(film) && micronFromFilmName(film!.name) === null;
 
           return (
             <div key={field.id} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-12">
@@ -113,7 +160,8 @@ export function LayerFields({
                 >
                   <Select
                     id={`items.${itemIndex}.layers.${index}.materialId`}
-                    {...register(`items.${itemIndex}.layers.${index}.materialId`)}
+                    value={filmId ?? ''}
+                    onChange={(event) => chooseFilm(index, event.target.value)}
                   >
                     <option value="">— Choose a film —</option>
                     {films.map((option) => (
@@ -126,34 +174,77 @@ export function LayerFields({
                 </Field>
               </div>
 
-              <div className="col-span-1 sm:col-span-2">
-                <Field
-                  label="Thickness"
-                  htmlFor={`items.${itemIndex}.layers.${index}.micron`}
-                  hint="micron"
-                  error={errors?.[index]?.micron?.message}
-                >
-                  <Input
-                    id={`items.${itemIndex}.layers.${index}.micron`}
-                    inputMode="decimal"
-                    invalid={Boolean(errors?.[index]?.micron)}
-                    {...register(`items.${itemIndex}.layers.${index}.micron`)}
-                  />
-                </Field>
+              {needsMicron ? (
+                <div className="col-span-1 sm:col-span-2">
+                  <Field
+                    label="Thickness"
+                    htmlFor={`items.${itemIndex}.layers.${index}.micron`}
+                    hint="micron"
+                    error={errors?.[index]?.micron?.message}
+                  >
+                    <Input
+                      id={`items.${itemIndex}.layers.${index}.micron`}
+                      inputMode="decimal"
+                      invalid={Boolean(errors?.[index]?.micron)}
+                      {...register(`items.${itemIndex}.layers.${index}.micron`)}
+                    />
+                  </Field>
+                </div>
+              ) : null}
+
+              {/*
+               * What the chosen film contributes: its gauge, and the density
+               * that turns the gauge into weight. Shown per row because this is
+               * the pair that explains the cost — the sealant is usually four
+               * times the PET and dominates the average.
+               */}
+              <div
+                className={cn(
+                  'text-ink-500 pb-2.5 text-xs',
+                  needsMicron ? 'col-span-1 sm:col-span-5' : 'col-span-2 sm:col-span-7',
+                )}
+              >
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                  {micron > 0 && !needsMicron ? (
+                    <span className="text-ink-800 font-medium tabular-nums">
+                      {formatNumber(micron)}µ
+                    </span>
+                  ) : null}
+                  {/*
+                   * A line prefilled from a saved job arrives with the job's
+                   * thickness but no film — the jobs table never recorded which
+                   * one was used. Saying only "not chosen" would hide a figure
+                   * that is already driving the cost, and picking a film here
+                   * replaces it with the film's own gauge.
+                   */}
+                  {!filmId ? (
+                    <span>Film not chosen</span>
+                  ) : (
+                    <>
+                      <span>
+                        {film?.density
+                          ? `${formatNumber(film.density, 2)} g/cm³`
+                          : 'No density recorded'}
+                      </span>
+                      {micron > 0 && film?.density ? (
+                        <span className="tabular-nums">
+                          {formatNumber(micron * film.density, 1)} GSM
+                        </span>
+                      ) : null}
+                    </>
+                  )}
+                </span>
               </div>
 
-              <div className="text-ink-500 col-span-1 pb-2.5 text-xs sm:col-span-5">
-                {/*
-                 * The weight this ply contributes. Shown per row because it is
-                 * the number that explains the cost — the sealant is usually
-                 * four times the PET and dominates the average.
-                 */}
-                {film?.density
-                  ? `${formatNumber(film.density, 2)} g/cm³`
-                  : filmId
-                    ? 'No density recorded'
-                    : 'Not chosen'}
-              </div>
+              {/*
+               * A gauge the film cannot state is still a validation error worth
+               * surfacing, and there is no input here to hang it on.
+               */}
+              {!needsMicron && errors?.[index]?.micron?.message ? (
+                <p className="text-danger-600 col-span-2 text-xs sm:col-span-12">
+                  {errors[index]!.micron!.message}
+                </p>
+              ) : null}
             </div>
           );
         })}
