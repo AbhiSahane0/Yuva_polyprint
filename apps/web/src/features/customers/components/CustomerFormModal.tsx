@@ -15,6 +15,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Field, FieldSection, Input, Textarea } from '@/components/ui/Field';
 import { toast } from '@/lib/toast';
 import { ApiClientError } from '@/lib/api-client';
+import { GstinField } from '@/features/gstin/components/GstinField';
 import { useCreateCustomer, useCustomer, useUpdateCustomer } from '../api/customer-api';
 import { JobCard } from './JobCard';
 
@@ -255,24 +256,38 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
               </Field>
             </div>
 
-            <div className="sm:col-span-4">
-              <Field
-                label="GST number"
-                htmlFor="gstNumber"
-                hint="Carried onto their quotations"
+            <div className="sm:col-span-8">
+              {/*
+                Verifying fills in the name and address from the registry, so a
+                new customer is one paste rather than six fields — and the name
+                is spelled the way it will appear on their invoice rather than
+                the way somebody typed it off an email signature.
+              */}
+              <GstinField
+                registration={register('gstNumber')}
+                value={watch('gstNumber') ?? ''}
                 error={errors.gstNumber?.message}
-              >
-                {/* Upper-cased by the schema — it is printed and read back aloud. */}
-                <Input
-                  id="gstNumber"
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                  spellCheck={false}
-                  placeholder="27ABCDE1234F1Z5"
-                  invalid={Boolean(errors.gstNumber)}
-                  {...register('gstNumber')}
-                />
-              </Field>
+                onApply={(lookup) => {
+                  const set = (
+                    field: 'companyName' | 'address' | 'city' | 'district',
+                    value: string | null,
+                  ) => {
+                    // Never blank a field the office already filled in: the
+                    // registry leaves plenty of these empty, and an empty
+                    // answer is not a correction.
+                    if (value) setValue(field, value, { shouldDirty: true, shouldValidate: true });
+                  };
+                  // Trade name first: a proprietorship registers under its
+                  // proprietor's own name, so the legal name of "Yuva
+                  // Polyprint" is "ANAND KISAN HASE". That is what a GST
+                  // invoice must carry and not what the office calls them.
+                  set('companyName', lookup.tradeName ?? lookup.legalName);
+                  set('address', lookup.address);
+                  set('city', lookup.city);
+                  set('district', lookup.district);
+                  toast.success('Filled in from the GST registry');
+                }}
+              />
             </div>
 
             <div className="sm:col-span-4">

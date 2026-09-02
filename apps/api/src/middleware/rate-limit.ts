@@ -48,6 +48,25 @@ export const authRateLimiter = rateLimit({
  * is per-IP, which for one office is effectively per-company — the intent is to
  * bound a runaway loop, not to ration ordinary work.
  */
+/**
+ * GSTIN lookups.
+ *
+ * Every uncached one spends a paid credit at the provider, so this bounds the
+ * damage a stuck retry loop can do to the account's balance. It is generous
+ * against real use — the office looks a GSTIN up once per new customer, a
+ * handful of times a week — and tight against a script.
+ */
+export const gstinRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 120,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skip: () => env.isTest,
+  handler: (_req, res) => {
+    res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json(tooManyRequests);
+  },
+});
+
 export const emailRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 60,

@@ -186,8 +186,66 @@ PET + Poly + Adhesive") and Pouches per kg ("From design size and composite
 GSM"). The two calculated ones update live as you type. The server recomputes
 on save regardless; the live figure is feedback, not the source of truth.
 
-**GST number** sits with the contact details and is carried onto every
-quotation raised for that customer.
+#### GST number
+
+Sits with the contact details, is carried onto every quotation raised for that
+customer, and is checked in two quite different ways.
+
+**The format check is free and runs as you type.** A GSTIN carries its own check
+digit, so a typed one can be verified offline with no network and no cost:
+
+```
+27  AIGPH5992Q  1  Z  D
+─┬  ─────┬────  ┬  ┬  ┬
+ │       │      │  │  └── check digit, Luhn mod 36 over the first 14
+ │       │      │  └───── 'Z', reserved
+ │       │      └──────── registrations this PAN holds in this state
+ │       └─────────────── the holder's PAN
+ └─────────────────────── state code
+```
+
+Measured exhaustively, this catches **100% of single-character typos** and
+**100% of adjacent transpositions** — which is essentially the whole realistic
+error space for a number copied off a letterhead. It also names the likeliest
+cause rather than saying "invalid": reading a GSTIN off paper confuses 0/O and
+1/I constantly, and where each is legal is not obvious.
+
+A **blank** GST number is not an error. Registration is not compulsory below the
+turnover threshold, so plenty of genuine small customers have none.
+
+**The registry lookup costs money and happens only on Verify.** Never on blur,
+never on mount, never on a retry. It answers what arithmetic cannot — was this
+number ever issued, to whom, and is it still live — and returns the legal name,
+trade name, registered address, constitution, taxpayer type and status.
+
+**Use these details** fills in the company name, address, city and district
+from what came back, so a new customer is one paste rather than six fields. It
+never blanks a field you have already filled in — the registry leaves plenty of
+these empty, and an empty answer is not a correction.
+
+> **It fills in the trade name, not the legal one.** A proprietorship registers
+> under its proprietor, so Yuva's own GSTIN returns `ANAND KISAN HASE` as the
+> legal name and `YUVA POLYPRINT AND PACKAGING INDUSTRIES` as the trade name.
+> Putting the first into a customer list would leave a row nobody recognises.
+> The panel shows it as **Registered as** when the two differ, because that is
+> the name a GST invoice has to carry — which Invoicing will need and the
+> customer list does not.
+
+**E-way bill blocked** appears beside the status when it applies. It is separate
+from being Cancelled: a registration can be Active and still blocked for
+non-filing, which stops an e-way bill being raised — a delivery problem rather
+than a billing one.
+
+Every answer is **cached permanently by GSTIN**, so a credit is spent once per
+customer and never again. The panel says whether you are looking at a fresh
+check or an old one, because the status is the one field that goes stale.
+
+> Anything other than **Active** is the whole point of having looked. Quoting a
+> cancelled registration is survivable; invoicing one costs the customer their
+> input tax credit. The re-check belongs in Invoicing, not here.
+
+The same field appears on the quotation wizard's Details step, because a new
+company is created from there too.
 
 `NA` never appears in the UI. The imported data is full of it, so the table
 shows a muted dash and edit boxes open blank. Clearing a box saves it back as
@@ -208,89 +266,233 @@ The outcome tick is hidden on drafts — the status a quotation moves through is
 Draft → Sent → Won or Lost, and the last step needs the customer to have seen it
 first.
 
+**One row per quotation number, showing its current version.** A revision keeps
+the number, so listing every version would put two rows reading "121" side by
+side with different totals — the confusion versioning exists to prevent. Earlier
+versions are reached through the dropdown in the preview.
+
 ### Quotation form — `/quotations/new`, `/quotations/:id/edit`
 
-#### Who it is for
+Four steps, not one long scroll:
 
-**Existing company** or **New company** is chosen first, as two separate paths
-rather than one field that behaves differently depending on what is typed into
-it — which of the two you are doing is a decision the office makes before they
-start.
+```
+1 Customer   2 Details   3 Jobs   4 Review
+```
 
-- **Existing** makes the customer name a **searchable text box**. With dozens of
+The steps are genuinely sequential — a job cannot be priced before the customer
+is known, and nothing can be reviewed before there are jobs — so **Next**
+validates only the step you are on and nothing else. Completed steps are
+clickable to go back; nothing is submitted until the last one, so leaving and
+returning costs nothing.
+
+The old single page put customer, jobs, terms and totals on one scroll. It
+worked, but never said how much was left or what still needed doing.
+
+**There is no Terms step.** The terms were the same six lines on every quotation
+this works has ever sent, and a seven-row textarea asking to confirm them was a
+step the office had to walk past on the way to the totals. They are printed from
+the company's standard set, and the date is simply today — the office's today,
+taken from the local calendar rather than from UTC, because a night shift keying
+a quotation at one in the morning would otherwise date it yesterday. An older
+quotation that carries edited terms keeps them when it is edited.
+
+#### 1. Who it is for
+
+**Existing company** or **New company**, chosen as two separate paths rather
+than one field that behaves differently depending on what is typed into it —
+which of the two you are doing is a decision the office makes before they start.
+
+- **Existing** makes the company name a **searchable text box**. With dozens of
   companies, typing three letters beats scrolling a list, and it stays a text
-  field so an unusual name can still be typed. Choosing one fills in the
-  address, mobile, email and GST number.
+  field so an unusual name can still be typed. Choosing one fills in the address,
+  mobile, email and GST number on the next step.
 - **New** gives plain boxes, and the company is **added to your customer list
   when the quotation saves** — so the next enquiry finds it under Existing
-  instead of being retyped. A name that already exists is reused, not
-  duplicated.
+  instead of being retyped. A name that already exists is reused, not duplicated.
 
-Switching between the two **clears the block**. Leaving a half-filled form
-behind is how a new company inherits the previous one's GST number.
+Switching between the two **clears the link**. Leaving a half-filled form behind
+is how a new company inherits the previous one's GST number.
 
-**GST number** is recorded here and printed on the quotation, because the
-customer's accounts team needs it to claim input credit.
+#### 3. What it is
 
-#### Each job, in two parts
+One dropdown beside the job's name and size:
 
-A job card is split, because the office fills it in as two jobs:
+> Standup · Standup zipper · Zipper · Spout pouch · Centre seal ·
+> Three side seal · Other · Roll
 
-| Printing & pouching                                                           | Cylinder                                                     |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Type (roll or pouch), pouch style, layers, size, micron, quantity, rate, film | Repeat width and height, number of cylinders, transport cost |
+**The hint under it says how the line is priced** — "Priced per pouch" or
+"Priced per kg". Picking a style sets that to the trade's convention for it, and
+the switch in the Quantities panel changes it. Choosing Other reveals a box to
+say what it is; choosing Roll clears the pouch style rather than raising an
+error, and forces kilograms.
 
-They are quoted and paid for separately — cylinders are one-time and 100%
-advance — which one long row of boxes hid.
+> A grid of eight drawn pouches sat here before. It read as decoration rather
+> than a control, and it pushed the fields that matter below the fold on every
+> single job.
 
-**Type** is Roll or Pouch. A pouch also asks its style: Standup, Standup zipper,
-Zipper, Spout, Centre seal, Three side seal, or Other. The style field only
-appears for a pouch rather than sitting greyed out on a roll, and choosing
-Other reveals a box to say what it is — the option is worthless otherwise.
-Switching a line to Roll clears the style rather than raising an error, so
-changing your mind is not something you then have to tidy up.
+#### The structure, ply by ply
 
-#### Standup pouches are quoted per piece
+Each ply gets its own row: **choose a film, and that is the whole row**. Its
+gauge, density and GSM are shown beside it. **2 layer / 3 layer** adds or
+removes rows rather than swapping the form, so moving from two plies to three
+keeps everything already typed and only asks for the new one. The outermost and
+the sealant are labelled, because those are the two the office actually thinks
+about.
 
-The quantity and rate boxes change with the pouch style. **Standup** and
-**Standup zipper** are sold by the piece, so those lines ask for a pouch count
-and a rate per pouch, and show the weight worked back beside them — the film is
-still ordered by weight. Every other style, and every roll, asks for kilograms
-as before.
+> This replaces a single **Film** dropdown that set only the sealant, with the
+> printed PET and the metallised ply assumed. The client could not read what he
+> was quoting off that control.
 
-The two pairs **swap** rather than sitting side by side, because only one of
-them is ever the one being quoted on. Which applies is decided by the style, not
-chosen separately, so the form cannot show a basis the server will not use.
+**There is no thickness box.** Every film in the rates master is named with its
+gauge — `PET 12µm`, `PE 60µm`, `PVC / PETG 45µm` — because a 12µ PET and a 19µ
+PET are bought, stocked and priced as two different materials. The film _is_ the
+thickness, so choosing it sets the micron and the two cannot disagree. Typing
+them separately is how quotation #123 came to carry a "PET 19µm" ply recorded at
+60 microns.
 
-#### What is calculated
+The consequence worth knowing: **a gauge the works wants to quote has to exist
+in the rates master.** A 70µ polythene needs `PE 70µm` adding under Rates, which
+is where a new film belongs anyway — it has its own price. The one film named
+without a gauge, `PP Woven`, is specified by GSM rather than thickness, and it
+alone still shows a thickness box; guessing at it would silently under-weigh the
+laminate and report a confident, wrong cost per kilogram.
 
-Per line you enter size, quantity and rate; **micron, pouches per kg, total
-pouches, cylinder size and cylinder cost are calculated and shown read-only**.
-Choosing a **Film** adds a cost strip:
+Only two and three plies are offered, which is what the works produces. The
+engine and the schema handle four, so a foil laminate can be quoted the day it
+is genuinely needed — it is simply not on screen, because an option nobody uses
+is one more thing to read past on every job.
 
-> Material cost **Rs. 213.45/kg** (77.5 GSM) · Margin **27.7%**
+**A ply left unchosen makes the line uncostable, not free** — the strip says
+"Not costed — every ply needs a film" rather than showing an average of whatever
+is left.
 
-Margin under 10% turns red. Document totals update live at the bottom.
+#### Repeat or new design
 
-A 3-layer job is costed as PET + **MET PET** + poly, each on its own rate, so
-the margin shown accounts for the metallised ply being dearer than plain PET.
-Set that rate on the Rates screen; without it the strip reports no cost at all
-rather than a flattering one.
+A customer with jobs on record gets a **Saved job** dropdown on each line, with
+**— New design —** at the top. Choosing a saved job fills in the name, the size,
+the structure and the cylinder count, so a repeat order is picked rather than
+retyped.
 
-Underneath, each ply is listed with the rate it was costed against:
+**The materials are deliberately left blank.** The jobs table records
+thicknesses but never recorded which film was used, and guessing one would put a
+rate behind a margin nobody chose. The prefilled gauge is shown on the row as
+`12µ · Film not chosen`, so a figure already driving pouches-per-kg is not
+hidden behind the empty dropdown; naming the film replaces it with that film's
+own gauge.
 
-> PET 16.8 GSM · Rs. 210.00 · MET PET 16.8 GSM · Rs. 258.00 · Poly 42.3 GSM · Rs. 185.00
+Switching back to **— New design —** clears the design: name, size, structure,
+repeats and cylinder count all return to their defaults. Leaving the previous
+job's details behind is how a new design gets saved under an existing job's
+name, which is far harder to notice than an empty box. **The quantities are
+kept** — what to charge is a decision about this order, not part of the design
+being described.
 
-Rates are fetched from the Rates screen automatically, as of the quotation's
-date. A margin is only worth trusting if the working behind it can be seen, and
-a component with **no rate that day says so** in red rather than going blank —
-so the office knows what to go and enter.
+Note that 18 of the 414 imported jobs carry no size or thickness at all. Picking
+one of those fills in only its name — that is missing data from the original
+spreadsheet, not a failed prefill.
+
+#### Quantities
+
+One to three per line, each with its own quantity and rate, and its result
+alongside:
+
+> **Rs. 1,45,000** · 25,000 pouches · **31.2% margin**
+
+Margin under 15% turns amber.
+
+**Kilogram or Pouches is chosen here**, on the switch in the panel header:
+
+```
+QUANTITIES              Sold by [ Kilogram | Pouches ]     Add a quantity
+```
+
+Only the chosen pair is asked for — kg and rate per kg, or pouches and rate per
+pouch — and the other unit is worked back and shown beside the result, because
+the film is ordered by weight however it is sold.
+
+The style seeds it: standup and standup zipper start on Pouches, everything else
+on Kilogram, which is what the trade does. Changing the style resets the switch
+to that style's convention, so anyone who never touches it gets the conventional
+answer. A **roll has no switch** — there are no pouches on a reel to count.
+
+> This used to be decided entirely by the style, with no way to override it. A
+> customer who orders standup pouches by the kilogram could not be quoted the
+> way they actually buy.
+
+Every job on one quotation must be priced at the same number of quantities. They
+are columns on one document, and a job with three where another has two would
+leave a hole no total could describe.
+
+#### Cylinders
+
+**The section appears only for a new design.** Pick a saved job and it goes
+away entirely, replaced by a line saying so:
+
+> Repeat of a saved design — **no cylinder charge**. Cylinders for ADF Plain 1kg.
+> are already in the works.
+
+Choose **— New design —** and it comes back, with repeat width and height, the
+number of cylinders, and transport.
+
+**It follows the design, not the customer.** A customer of ten years ordering a
+new pouch still needs a set engraved, which is exactly what the printed terms
+say — so the trigger is which job the line is for, not who is ordering it.
+Keying it to the customer would have made those cylinders quietly
+unchargeable.
 
 **The cylinder total shows its sum.** Transport is added to it, so the hint
 under the field reads `4 × Rs. 9,085 + Rs. 100 transport`. Without that, anyone
 checking the figure as cylinders × cost-per-cylinder lands short by exactly the
 transport and concludes it is wrong. The PDF carries the same note under the
 totals whenever transport was charged.
+
+#### Saved as you go
+
+For an **existing** customer, each step writes on the way out — and only what
+changed.
+
+| Leaving     | What it writes                                            |
+| ----------- | --------------------------------------------------------- |
+| **Details** | Corrected contact fields, back onto the customer record   |
+| **Jobs**    | Each line's design, and the returned job id onto the line |
+
+Every step diffs against a baseline of what the server holds, seeded from the
+customer and the designs they already have. **Touch nothing and nothing is
+called.** The baseline only advances once a write lands, so a failure is retried
+rather than swallowed, and stepping back and forward again costs nothing.
+
+Saving a design writes its **job id onto the line**. From then on the quotation
+points at a real job, and winning it will not create a second copy.
+
+> **Saving a new design does not make it a repeat.** It has an id now, but its
+> cylinders still have to be cut, so it stays charged. Only picking a job from
+> the **Saved job** dropdown means the cylinders already exist.
+
+A **half-typed line is not saved** — no name, no size, no job. The quotation
+still carries every field, and winning it creates whatever is missing.
+
+A failed save never costs you your place: the step advances with a warning,
+everything typed stays in the form, and the final Save writes the lot.
+
+This applies to existing customers only. A new company has no record to attach
+to until the quotation saves and creates one.
+
+#### 4. Review
+
+What the customer will see: every job at every quantity, the cylinders on their
+own row, and the total including GST.
+
+**Notes** live here, at the foot of the review. They lost their step along with
+the terms but not their purpose — a line about a sample or a delivery week
+belongs on the document, and this is the last screen before it goes out. Left
+empty, nothing is printed.
+
+The cylinder row is **identical in every column** — they do not scale with the
+order. That is the whole reason for quoting more than one quantity, and it only
+reads as a comparison side by side.
+
+Then **Save as draft**, which keeps it editable, or **Save and send**, which
+opens the printed quotation so it can be checked before it goes out.
 
 ### Record the outcome — won or lost
 
@@ -379,6 +581,25 @@ empty grey box in an iframe but falls back to real content in an object. An
 **Open in tab** button is always present, because a browser can load the viewer
 and still fail to paint, in which case the embed looks blank while the object
 counts as loaded and the fallback never fires.
+
+#### Versions
+
+**New version** creates a revision: the same quotation number, the next version,
+as a draft. The version it came from stays exactly as the customer received it.
+
+A **Version** dropdown appears above the document once there is more than one —
+one option is furniture. Switching reloads the PDF for that version without
+disturbing the page underneath.
+
+Earlier versions are **read-only**. Edit, Send and New version only appear on
+the current one, for two reasons: an earlier version is a record of what went
+out, and re-sending it would put a superseded price back in front of the
+customer. It also could not have worked — the list looks the row up among the
+ones on screen, and superseded versions are deliberately not there.
+
+Nothing is repriced when a revision is created. It copies plies, quantities,
+tiers and totals verbatim, because pressing the button should not silently move
+a figure the customer has already been quoted; it reprices on the first save.
 
 ### Rates — `/rates`
 

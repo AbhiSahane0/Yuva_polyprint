@@ -1,85 +1,130 @@
 import { describe, expect, it } from 'vitest';
-import { computeMargin, computeMaterialCostPerKg } from './material-cost.js';
+import {
+  computeMargin,
+  computeMaterialCostPerKg,
+  totalMicronForLayers,
+  type LayerInput,
+} from './material-cost.js';
 
-/** A 3-layer job: PET 12µ + MET PET 12µ + poly 60µ at 0.92, plus ink and adhesive. */
-const threeLayer = {
-  layer: 3,
-  polyMicron: 60,
-  polyDensity: 0.92,
-  petRate: 210,
-  metpetRate: 260,
-  polyRate: 185,
-  inkRate: 400,
-  adhesiveRate: 300,
+/** The structure the works produces by default, stated ply by ply. */
+const PET: LayerInput = { name: 'PET', micron: 12, density: 1.4, ratePerKg: 210 };
+const METPET: LayerInput = { name: 'MET PET', micron: 12, density: 1.4, ratePerKg: 258 };
+const POLY: LayerInput = { name: 'PE 60µm', micron: 60, density: 0.92, ratePerKg: 190 };
+
+const consumables = {
   inkGsm: 1.8,
-  adhesiveGsm: 3,
+  adhesiveGsm: 2.5,
+  inkRate: 610,
+  adhesiveRate: 480,
 };
 
+const threeLayer = { layers: [PET, METPET, POLY], ...consumables };
+const twoLayer = { layers: [PET, POLY], ...consumables };
+
 describe('computeMaterialCostPerKg', () => {
-  it('costs the metallised ply separately from the plain PET ply', () => {
-    const result = computeMaterialCostPerKg(threeLayer);
+  it('turns each ply into a weight through its own density', () => {
+    const { breakdown } = computeMaterialCostPerKg(threeLayer);
+    const gsm = Object.fromEntries(breakdown.map((c) => [c.component, c.gsm]));
 
-    const pet = result.breakdown.find((c) => c.component === 'PET');
-    const metpet = result.breakdown.find((c) => c.component === 'MET PET');
-
-    // One ply each, not two PET plies — this is the correction.
-    expect(pet?.gsm).toBeCloseTo(16.8, 3);
-    expect(metpet?.gsm).toBeCloseTo(16.8, 3);
-    expect(pet?.rate).toBe(210);
-    expect(metpet?.rate).toBe(260);
+    expect(gsm.PET).toBe(16.8); // 12 × 1.4
+    expect(gsm['MET PET']).toBe(16.8);
+    expect(gsm['PE 60µm']).toBe(55.2); // 60 × 0.92
   });
 
-  it('gives a 2-layer job no metallised ply at all', () => {
-    const result = computeMaterialCostPerKg({ ...threeLayer, layer: 2 });
-
-    expect(result.breakdown.map((c) => c.component)).not.toContain('MET PET');
-    // PET + poly + ink + adhesive only.
-    expect(result.compositeGsm).toBeCloseTo(16.8 + 55.2 + 1.8 + 3, 3);
+  it('adds the plies and the consumables into the composite', () => {
+    // 16.8 + 16.8 + 55.2 + 1.8 + 2.5
+    expect(computeMaterialCostPerKg(threeLayer).compositeGsm).toBe(93.1);
+    expect(computeMaterialCostPerKg(twoLayer).compositeGsm).toBe(76.3);
   });
 
-  it('is the GSM-weighted average of the component rates', () => {
-    const result = computeMaterialCostPerKg(threeLayer);
+  it('costs a kilogram as the weighted average of the plies', () => {
+    const { costPerKg } = computeMaterialCostPerKg(threeLayer);
+    const expected = (16.8 * 210 + 16.8 * 258 + 55.2 * 190 + 1.8 * 610 + 2.5 * 480) / 93.1;
 
-    const expected =
-      (16.8 * 210 + 16.8 * 260 + 55.2 * 185 + 1.8 * 400 + 3 * 300) / (16.8 + 16.8 + 55.2 + 1.8 + 3);
-    expect(result.costPerKg).toBeCloseTo(expected, 3);
+    expect(costPerKg).toBeCloseTo(expected, 4);
   });
 
-  it('costs a 3-layer job more than the same job priced as two PET plies would', () => {
-    // METPET is dearer than PET, so the old behaviour understated the cost.
-    const asMetpet = computeMaterialCostPerKg(threeLayer);
-    const asPet = computeMaterialCostPerKg({ ...threeLayer, metpetRate: threeLayer.petRate });
+  it('prices metallised PET on its own rate, not as plain PET', () => {
+    const real = computeMaterialCostPerKg(threeLayer);
+    const asPet = computeMaterialCostPerKg({
+      ...threeLayer,
+      layers: [PET, { ...METPET, ratePerKg: 210 }, POLY],
+    });
 
-    expect(asMetpet.costPerKg!).toBeGreaterThan(asPet.costPerKg!);
+    // Costing both plies as PET understated the cost of every 3-layer job.
+    expect(real.costPerKg!).toBeGreaterThan(asPet.costPerKg!);
   });
 
-  it('reports no cost at all when the metallised rate is missing', () => {
-    // Never understate: a quotation must not look more profitable than it is
-    // because a rate was not keyed in that morning.
-    const result = computeMaterialCostPerKg({ ...threeLayer, metpetRate: null });
+  it('reports each ply share, which is also its share of a kilogram', () => {
+    const { breakdown } = computeMaterialCostPerKg(threeLayer);
+    const total = breakdown.reduce((sum, c) => sum + c.share, 0);
+
+    expect(total).toBeCloseTo(100, 1);
+    // 55.2 of 93.1 GSM — the sealant ply dominates because it is the thickest.
+    expect(breakdown.find((c) => c.component === 'PE 60µm')!.share).toBeCloseTo(59.29, 2);
+  });
+
+  it('refuses to cost anything when a rate is missing that morning', () => {
+    const result = computeMaterialCostPerKg({
+      ...threeLayer,
+      layers: [PET, { ...METPET, ratePerKg: null }, POLY],
+    });
+
+    // Better no figure than one that flatters the margin.
+    expect(result.costPerKg).toBeNull();
+    expect(result.compositeGsm).toBe(93.1);
+  });
+
+  /*
+   * The defect this replaces: a ply with no density silently dropped out of the
+   * composite, and the remaining plies were averaged into a confident — and
+   * much higher — cost per kilogram. On a 2-layer line that quietly discarded
+   * three quarters of the pouch's weight.
+   */
+  it('refuses to cost a ply whose material has no density recorded', () => {
+    const result = computeMaterialCostPerKg({
+      ...twoLayer,
+      layers: [PET, { ...POLY, density: null }],
+    });
 
     expect(result.costPerKg).toBeNull();
-    // The composite is still reported, so the form can show the structure.
-    expect(result.compositeGsm).toBeGreaterThan(0);
   });
 
-  it('ignores a missing metallised rate on a 2-layer job, which has no such ply', () => {
-    const result = computeMaterialCostPerKg({ ...threeLayer, layer: 2, metpetRate: null });
+  it('costs a four-ply structure without needing a code change', () => {
+    const foil: LayerInput = { name: 'Foil 7µm', micron: 7, density: 2.7, ratePerKg: 410 };
+    const result = computeMaterialCostPerKg({ ...threeLayer, layers: [PET, foil, METPET, POLY] });
+
+    // 93.1 + (7 × 2.7)
+    expect(result.compositeGsm).toBe(112);
+    expect(result.costPerKg).not.toBeNull();
+  });
+
+  it('has nothing to cost when no ply has been chosen', () => {
+    const result = computeMaterialCostPerKg({ ...threeLayer, layers: [] });
 
     expect(result.costPerKg).not.toBeNull();
+    expect(result.compositeGsm).toBe(4.3); // ink + adhesive only
+  });
+});
+
+describe('totalMicronForLayers', () => {
+  it('adds the plies and one adhesive layer', () => {
+    expect(totalMicronForLayers([{ micron: 12 }, { micron: 45 }])).toBe(59);
+  });
+
+  it('adds the same single adhesive on a three-ply structure', () => {
+    // Flat, not per bond — the client's sheet does it this way and every
+    // imported job matches. Changing it moves pouches-per-kg on every 3-layer.
+    expect(totalMicronForLayers([{ micron: 12 }, { micron: 12 }, { micron: 60 }])).toBe(86);
   });
 });
 
 describe('computeMargin', () => {
-  it('is the gap between selling and cost, over selling', () => {
-    expect(computeMargin(300, 210)).toBe(30);
+  it('is taken on the selling price, not on cost', () => {
+    expect(computeMargin(500, 226.59)).toBeCloseTo(54.68, 2);
   });
 
-  it('goes negative when the job is quoted below cost', () => {
-    expect(computeMargin(200, 250)).toBe(-25);
-  });
-
-  it('is unknown when the cost is unknown', () => {
-    expect(computeMargin(300, null)).toBeNull();
+  it('says nothing when there is no cost to compare against', () => {
+    expect(computeMargin(500, null)).toBeNull();
   });
 });

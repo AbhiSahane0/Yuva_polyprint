@@ -6,6 +6,22 @@ import { z } from 'zod';
  * the process exits immediately with a readable report rather than failing
  * later with a confusing runtime error.
  */
+
+/**
+ * An optional setting, where blank means absent.
+ *
+ * `.optional()` alone accepts only `undefined`, and a `.env` file cannot
+ * express that — `KEY=` and `KEY=""` both arrive as an empty string, which
+ * then fails `.min(1)` and takes the whole process down at boot. Since
+ * `.env.example` ships exactly that for every credential nobody has yet, a
+ * developer copying it got a server that would not start and an error naming a
+ * key they had deliberately left blank.
+ */
+const optional = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    schema.optional(),
+  );
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(4000),
@@ -17,7 +33,7 @@ const envSchema = z.object({
    * and DDL that migrations need, so `prisma migrate` uses this when present
    * while the app keeps using the pooled DATABASE_URL. Unset on plain Postgres.
    */
-  DIRECT_URL: z.string().min(1).optional(),
+  DIRECT_URL: optional(z.string().min(1)),
 
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
 
@@ -26,7 +42,7 @@ const envSchema = z.object({
    * quotation" action reports that it is unavailable, so a developer without
    * credentials is not blocked from everything else.
    */
-  RESEND_API_KEY: z.string().min(1).optional(),
+  RESEND_API_KEY: optional(z.string().min(1)),
   /*
    * Must be an address Resend will send from. `onboarding@resend.dev` needs no
    * domain but only delivers to the Resend account owner; anything else has to
@@ -34,7 +50,22 @@ const envSchema = z.object({
    */
   MAIL_FROM: z.string().min(1).default('Yuva Polyprint <onboarding@resend.dev>'),
   /** Where replies go, if that should differ from the sender. */
-  MAIL_REPLY_TO: z.string().email().optional(),
+  MAIL_REPLY_TO: optional(z.string().email()),
+
+  /*
+   * GSTIN lookup. Optional, and deliberately so: without a key the format and
+   * check-digit validation still runs — that is the half that catches typos,
+   * and it is free — and only the "Verify" action reports itself unavailable.
+   * A developer without credentials is not blocked from anything else.
+   */
+  GSTIN_API_KEY: optional(z.string().min(1)),
+  /*
+   * The apex domain, not an `api.` subdomain — `api.gstinapi.in` does not
+   * resolve at all. Verified against the live service: an unauthenticated
+   * GET to `/v1/gstin/:gstin` here answers 401 asking for the x-api-key
+   * header, while `/api/v1/...` answers 404.
+   */
+  GSTIN_API_BASE_URL: z.string().url().default('https://gstinapi.in'),
 
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 

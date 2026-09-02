@@ -46,6 +46,17 @@ router.get(
 );
 
 /*
+ * A revision is a POST that creates a document rather than a PATCH that edits
+ * one: the version it came from stays exactly as the customer received it.
+ */
+router.post(
+  '/:id/versions',
+  validate({ params: idParamSchema }),
+  asyncHandler(controller.createVersion),
+);
+router.get('/:id/versions', validate({ params: idParamSchema }), asyncHandler(controller.versions));
+
+/*
  * Recording the answer is its own endpoint rather than a status change through
  * PATCH, because winning has consequences: it creates the customer and their
  * jobs. Those belong behind a deliberate action, not a dropdown someone might

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { JOB_KINDS, POUCH_TYPES, pricingBasisFor } from '../constants/job.js';
+import { JOB_KINDS, POUCH_TYPES, PRICING_BASES, pricingBasisFor } from '../constants/job.js';
 import { paginationQuerySchema } from './common.js';
 
 export const quotationStatusSchema = z.enum(['DRAFT', 'SENT', 'WON', 'LOST']);
@@ -18,14 +18,27 @@ const positiveNumber = (label: string) =>
 const zeroOrMore = (label: string) =>
   z.coerce.number({ message: `${label} is required` }).min(0, `${label} cannot be negative`);
 
+/** One ply of the laminate, as the office states it on the line. */
+export const quotationLayerSchema = z.object({
+  /** Null leaves the ply unchosen, which makes the line uncostable — not free. */
+  materialId: z.string().min(1).nullable().default(null),
+  micron: positiveNumber('Thickness'),
+});
+
+/** One quantity a line is priced at. */
+export const quotationQuantitySchema = z.object({
+  quantityKg: zeroOrMore('Quantity').default(0),
+  ratePerKg: zeroOrMore('Rate').default(0),
+  quantityPouches: zeroOrMore('Quantity').default(0),
+  ratePerPouch: zeroOrMore('Rate').default(0),
+});
+
 export const quotationItemSchema = z
   .object({
     /** Present when editing a line that already exists. */
     id: z.string().min(1).optional(),
     /** Set when the line was prefilled from an existing job. */
     jobId: z.string().min(1).nullable().optional(),
-    /** Which film this line is costed against; null leaves it uncosted. */
-    filmMaterialId: z.string().min(1).nullable().optional(),
 
     jobName: z.string().trim().min(1, 'Job name is required').max(200),
 
@@ -34,37 +47,71 @@ export const quotationItemSchema = z
     pouchType: z.enum(POUCH_TYPES).nullable().default(null),
     pouchTypeNote: z.string().trim().max(120).default(''),
 
-    layer: z.coerce
-      .number()
-      .int()
-      .refine((v) => v === 2 || v === 3, 'Choose 2 or 3 layers'),
+    /**
+     * Whether this line is ordered by weight or by the piece.
+     *
+     * Chosen on the line. The style suggests it — the trade quotes a standup
+     * pouch per piece and a centre-seal one by weight — but the suggestion was
+     * the only answer available before, and a customer who orders standup
+     * pouches by the kilogram had no way to be quoted the way they buy.
+     *
+     * Null means "whatever the style conventionally is", which is how a
+     * request that predates the choice, or one that simply does not care, gets
+     * the old behaviour exactly.
+     */
+    pricingBasis: z.enum(PRICING_BASES).nullable().default(null),
 
     widthMm: positiveNumber('Width'),
     heightMm: positiveNumber('Height'),
-    polyMicron: positiveNumber('Poly micron'),
-    /*
-     * Both pairs are optional here and reconciled by the refines below, because
-     * which one is required depends on the pouch style: standup and
-     * standup-zipper lines are typed in pouches, everything else in kilograms.
+
+    /**
+     * The structure, outermost ply first. Two or three in practice; the upper
+     * bound is four so a foil laminate does not need a release to quote.
      */
-    quantityKg: zeroOrMore('Quantity').default(0),
-    ratePerKg: zeroOrMore('Rate').default(0),
-    quantityPouches: zeroOrMore('Quantity').default(0),
-    ratePerPouch: zeroOrMore('Rate').default(0),
+    layers: z
+      .array(quotationLayerSchema)
+      .min(2, 'A laminate needs at least two plies')
+      .max(4, 'More than four plies is not something this works produces'),
+
+    /** One to three quantities, smallest first. */
+    quantities: z
+      .array(quotationQuantitySchema)
+      .min(1, 'Enter at least one quantity')
+      .max(3, 'Three quantities is the most a quotation can show'),
 
     repeatWidth: positiveNumber('Repeat width'),
     repeatHeight: positiveNumber('Repeat height'),
     cylinderCount: z.coerce.number().int().min(0, 'Cannot be negative'),
     transportCost: zeroOrMore('Transport cost').default(0),
+
+    /**
+     * False when this design's cylinders are already in the works. Per design,
+     * not per customer — a customer of ten years ordering a new pouch still
+     * needs a new set engraved.
+     */
+    chargeCylinders: z.boolean().default(true),
   })
   /*
    * A roll has no pouch style. Rather than reject the combination — which would
    * make switching Pouch to Roll an error the user has to clear — the style is
    * dropped, so the stored line always matches what the form is showing.
    */
-  .transform((item) =>
-    item.jobKind === 'ROLL' ? { ...item, pouchType: null, pouchTypeNote: '' } : item,
-  )
+  .transform((item) => {
+    const line = item.jobKind === 'ROLL' ? { ...item, pouchType: null, pouchTypeNote: '' } : item;
+
+    /*
+     * A roll is film on a reel: there are no pouches to count, so the choice is
+     * not offered and cannot be smuggled in through the API either. Everything
+     * else takes what the office chose, falling back to the trade convention.
+     */
+    return {
+      ...line,
+      pricingBasis:
+        line.jobKind === 'ROLL'
+          ? ('PER_KG' as const)
+          : (line.pricingBasis ?? pricingBasisFor(line.jobKind, line.pouchType)),
+    };
+  })
   .refine((item) => item.jobKind !== 'POUCH' || item.pouchType !== null, {
     message: 'Choose the pouch type',
     path: ['pouchType'],
@@ -74,29 +121,34 @@ export const quotationItemSchema = z
     path: ['pouchTypeNote'],
   })
   /*
-   * Whichever pair the line is priced on must be filled in. Checked here rather
-   * than with `positiveNumber` on the fields themselves, because a per-pouch
-   * line legitimately leaves the kilogram pair at zero and a per-kg line the
-   * pouch pair — requiring both would make every line fail.
+   * Whichever pair a line is priced on has to be filled in, at every quantity.
+   * Checked here rather than on the fields themselves because a per-pouch line
+   * legitimately leaves the kilogram pair at zero and a per-kg line the pouch
+   * pair — requiring both would make every line fail. superRefine rather than
+   * refine so the message lands on the quantity that is actually short, not on
+   * the first one.
    */
-  .refine(
-    (item) =>
-      pricingBasisFor(item.jobKind, item.pouchType) !== 'PER_POUCH' || item.quantityPouches > 0,
-    { message: 'Enter how many pouches', path: ['quantityPouches'] },
-  )
-  .refine(
-    (item) =>
-      pricingBasisFor(item.jobKind, item.pouchType) !== 'PER_POUCH' || item.ratePerPouch > 0,
-    { message: 'Enter the rate per pouch', path: ['ratePerPouch'] },
-  )
-  .refine(
-    (item) => pricingBasisFor(item.jobKind, item.pouchType) !== 'PER_KG' || item.quantityKg > 0,
-    { message: 'Enter the quantity in kg', path: ['quantityKg'] },
-  )
-  .refine(
-    (item) => pricingBasisFor(item.jobKind, item.pouchType) !== 'PER_KG' || item.ratePerKg > 0,
-    { message: 'Enter the rate per kg', path: ['ratePerKg'] },
-  );
+  .superRefine((item, ctx) => {
+    const perPouch = item.pricingBasis === 'PER_POUCH';
+
+    item.quantities.forEach((quantity, index) => {
+      const checks: [boolean, string, string][] = perPouch
+        ? [
+            [quantity.quantityPouches > 0, 'quantityPouches', 'Enter how many pouches'],
+            [quantity.ratePerPouch > 0, 'ratePerPouch', 'Enter the rate per pouch'],
+          ]
+        : [
+            [quantity.quantityKg > 0, 'quantityKg', 'Enter the quantity in kg'],
+            [quantity.ratePerKg > 0, 'ratePerKg', 'Enter the rate per kg'],
+          ];
+
+      for (const [ok, field, message] of checks) {
+        if (!ok) {
+          ctx.addIssue({ code: 'custom', message, path: ['quantities', index, field] });
+        }
+      }
+    });
+  });
 
 export const DEFAULT_TERMS = [
   'Cylinder charges are one-time and reusable for repeat orders (same design).',
@@ -107,7 +159,7 @@ export const DEFAULT_TERMS = [
   'Payment Terms: 100% advance for cylinders, 70% advance for material.',
 ];
 
-export const createQuotationSchema = z.object({
+const createQuotationBaseSchema = z.object({
   /** ISO date (yyyy-mm-dd) shown on the document. */
   date: z.string().min(1, 'Date is required'),
 
@@ -118,7 +170,9 @@ export const createQuotationSchema = z.object({
    * the next enquiry finds it under "Existing company" instead of being retyped.
    */
   saveAsCustomer: z.boolean().default(false),
-  customerName: z.string().trim().min(2, 'Customer name is required').max(200),
+  /* "Required" is untrue once a single character has been typed, which is what
+   * this rule actually rejects — so the message says what to do instead. */
+  customerName: z.string().trim().min(2, 'Enter the company name').max(200),
   addressLine1: z.string().trim().max(200).default(''),
   addressLine2: z.string().trim().max(200).default(''),
   addressLine3: z.string().trim().max(200).default(''),
@@ -140,7 +194,24 @@ export const createQuotationSchema = z.object({
   items: z.array(quotationItemSchema).min(1, 'Add at least one job').max(20),
 });
 
-export const updateQuotationSchema = createQuotationSchema.partial();
+export const createQuotationSchema = createQuotationBaseSchema
+  /*
+   * Every line has to be priced at the same number of quantities, because the
+   * quantities are columns on one document. A line with three and a line with
+   * two would leave a hole in the third column that no total could describe.
+   */
+  .refine((q) => new Set(q.items.map((item) => item.quantities.length)).size <= 1, {
+    message: 'Every job must be priced at the same quantities',
+    path: ['items'],
+  });
+
+/*
+ * `.partial()` cannot be called on a schema carrying a refinement, and the
+ * refinement above is one. The update shape is therefore the object without it:
+ * a partial update may legitimately omit `items` entirely, and when it does
+ * carry them the item schema still validates each one.
+ */
+export const updateQuotationSchema = createQuotationBaseSchema.partial();
 
 export const listQuotationsQuerySchema = paginationQuerySchema.extend({
   q: z.string().trim().max(200).optional(),

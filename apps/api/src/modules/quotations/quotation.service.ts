@@ -1,5 +1,4 @@
 import {
-  computeItem,
   computeMargin,
   computeMaterialCostPerKg,
   computeTotals,
@@ -10,14 +9,13 @@ import {
   type Quotation,
   type QuotationItem,
   type QuotationItemInput,
+  type QuotationItemLayer,
+  type QuotationItemQuantity,
+  type QuotationTier,
+  computeItemGeometry,
+  computeTier,
+  totalMicronForLayers,
   type QuotationSummary,
-  METPET_DENSITY,
-  METPET_MICRON_PER_LAYER,
-  PET_DENSITY,
-  PET_MICRON_PER_LAYER,
-  JOB_KIND_LABELS,
-  POUCH_TYPE_LABELS,
-  pricingBasisFor,
   type QuotationEmail as QuotationEmailRecord,
   type RecordOutcomeInput,
   type RecordOutcomeResult,
@@ -31,6 +29,7 @@ import { ApiError } from '../../utils/api-error.js';
 import { getSettings } from '../settings/settings.service.js';
 import { getRateMap } from '../materials/material.service.js';
 import { nextJobCode } from '../customers/customer.service.js';
+import { jobDataFromQuotationItem } from './quotation-job.js';
 import { env } from '../../config/env.js';
 import { sendEmail } from '../../lib/mailer.js';
 import { renderQuotationPdf } from './quotation-pdf.js';
@@ -40,45 +39,109 @@ import { buildQuotationEmail } from './quotation-email.js';
 const toNumber = (value: Prisma.Decimal | number | null): number =>
   value === null ? 0 : Number(value);
 
-type QuotationRow = Prisma.QuotationGetPayload<{ include: { items: true } }>;
+/*
+ * Everything a document needs, in one shape. The includes are deep because a
+ * quotation is read whole — the screen, the PDF and the email all want the same
+ * thing — and three round trips to assemble one document is worse than one.
+ */
+const QUOTATION_INCLUDE = {
+  tiers: { orderBy: { position: 'asc' } },
+  items: {
+    orderBy: { position: 'asc' },
+    include: {
+      layers: { orderBy: { position: 'asc' } },
+      quantities: { orderBy: { position: 'asc' } },
+    },
+  },
+} as const;
 
-function toItem(row: QuotationRow['items'][number]): QuotationItem {
+type QuotationRow = Prisma.QuotationGetPayload<{ include: typeof QUOTATION_INCLUDE }>;
+type ItemRow = QuotationRow['items'][number];
+
+function toLayer(row: ItemRow['layers'][number]): QuotationItemLayer {
   return {
-    id: row.id,
     position: row.position,
-    jobId: row.jobId,
-    filmMaterialId: row.filmMaterialId,
-    filmMaterialName: null,
-    jobName: row.jobName,
-    jobKind: row.jobKind,
-    pouchType: row.pouchType,
-    pouchTypeNote: row.pouchTypeNote,
-    layer: row.layer,
-    widthMm: toNumber(row.widthMm),
-    heightMm: toNumber(row.heightMm),
-    polyMicron: toNumber(row.polyMicron),
-    pricingBasis: row.pricingBasis,
+    materialId: row.materialId,
+    materialName: row.materialName,
+    micron: toNumber(row.micron),
+    density: row.density === null ? null : Number(row.density),
+    ratePerKg: row.ratePerKg === null ? null : Number(row.ratePerKg),
+    gsm: toNumber(row.gsm),
+  };
+}
+
+function toQuantity(row: ItemRow['quantities'][number]): QuotationItemQuantity {
+  return {
+    position: row.position,
     quantityKg: toNumber(row.quantityKg),
     ratePerKg: toNumber(row.ratePerKg),
     quantityPouches: row.quantityPouches,
     ratePerPouch: toNumber(row.ratePerPouch),
+    totalPouches: toNumber(row.totalPouches),
+    totalAmount: toNumber(row.totalAmount),
+    costPerPouch: toNumber(row.costPerPouch),
+    materialCost: row.materialCost === null ? null : Number(row.materialCost),
+    marginPercent: row.marginPercent === null ? null : Number(row.marginPercent),
+  };
+}
+
+function toTier(row: QuotationRow['tiers'][number]): QuotationTier {
+  return {
+    id: row.id,
+    position: row.position,
+    materialSubtotal: toNumber(row.materialSubtotal),
+    materialWithGst: toNumber(row.materialWithGst),
+    cylinderSubtotal: toNumber(row.cylinderSubtotal),
+    cylinderWithGst: toNumber(row.cylinderWithGst),
+    grandSubtotal: toNumber(row.grandSubtotal),
+    grandWithGst: toNumber(row.grandWithGst),
+    materialAdvance: toNumber(row.materialAdvance),
+    cylinderAdvance: toNumber(row.cylinderAdvance),
+    totalAdvance: toNumber(row.totalAdvance),
+    totalQuantityKg: toNumber(row.totalQuantityKg),
+    totalPouches: toNumber(row.totalPouches),
+  };
+}
+
+function toItem(row: ItemRow): QuotationItem {
+  return {
+    id: row.id,
+    position: row.position,
+    jobId: row.jobId,
+    jobName: row.jobName,
+    jobKind: row.jobKind,
+    pouchType: row.pouchType,
+    pouchTypeNote: row.pouchTypeNote,
+    widthMm: toNumber(row.widthMm),
+    heightMm: toNumber(row.heightMm),
+    pricingBasis: row.pricingBasis,
     repeatWidth: toNumber(row.repeatWidth),
     repeatHeight: toNumber(row.repeatHeight),
     cylinderCount: row.cylinderCount,
     transportCost: toNumber(row.transportCost),
+    chargeCylinders: row.chargeCylinders,
     micron: toNumber(row.micron),
     pouchesPerKg: toNumber(row.pouchesPerKg),
-    totalPouches: toNumber(row.totalPouches),
-    totalAmount: toNumber(row.totalAmount),
     cylinderWidth: toNumber(row.cylinderWidth),
     cylinderCircumference: toNumber(row.cylinderCircumference),
     costPerCylinder: toNumber(row.costPerCylinder),
     totalCylinderCost: toNumber(row.totalCylinderCost),
-    costPerPouch: toNumber(row.costPerPouch),
     materialCostPerKg: row.materialCostPerKg === null ? null : Number(row.materialCostPerKg),
-    materialCost: row.materialCost === null ? null : Number(row.materialCost),
-    marginPercent: row.marginPercent === null ? null : Number(row.marginPercent),
+    compositeGsm: toNumber(row.compositeGsm),
+    layers: row.layers.map(toLayer),
+    quantities: row.quantities.map(toQuantity),
   };
+}
+
+/**
+ * The tier a summary should quote.
+ *
+ * Whichever the customer accepted, or the smallest when the answer is still
+ * open — a list row needs one number, and "what they agreed to" beats "the
+ * biggest figure on the page" every time.
+ */
+function headlineTier(row: { wonTierId: string | null; tiers: QuotationRow['tiers'] }) {
+  return row.tiers.find((t) => t.id === row.wonTierId) ?? row.tiers[0] ?? null;
 }
 
 /**
@@ -109,6 +172,10 @@ async function loadCostingContext(onDate: string) {
   };
 }
 
+/** Child rows come back in insertion order otherwise, which is not their order. */
+const byPosition = <T extends { position: number }>(rows: T[]): T[] =>
+  [...rows].sort((a, b) => a.position - b.position);
+
 /** yyyy-mm-dd, so the client never has to deal with timezone drift. */
 const toISODate = (date: Date): string => date.toISOString().slice(0, 10);
 
@@ -121,8 +188,12 @@ function toSummary(row: QuotationRow): QuotationSummary {
     customerId: row.customerId,
     customerName: row.customerName,
     itemCount: row.items.length,
-    grandWithGst: toNumber(row.grandWithGst),
-    totalAdvance: toNumber(row.totalAdvance),
+    version: row.version,
+    isLatest: row.isLatest,
+    tierCount: row.tiers.length,
+    // The tier they agreed to, or the smallest while the answer is open.
+    grandWithGst: toNumber(headlineTier(row)?.grandWithGst ?? 0),
+    totalAdvance: toNumber(headlineTier(row)?.totalAdvance ?? 0),
     sentAt: row.sentAt ? row.sentAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -144,13 +215,9 @@ function toQuotation(row: QuotationRow): Quotation {
     gstPercent: toNumber(row.gstPercent),
     materialAdvancePercent: toNumber(row.materialAdvancePercent),
     cylinderAdvancePercent: toNumber(row.cylinderAdvancePercent),
-    materialSubtotal: toNumber(row.materialSubtotal),
-    materialAdvance: toNumber(row.materialAdvance),
-    cylinderAdvance: toNumber(row.cylinderAdvance),
-    materialWithGst: toNumber(row.materialWithGst),
-    cylinderSubtotal: toNumber(row.cylinderSubtotal),
-    cylinderWithGst: toNumber(row.cylinderWithGst),
-    grandSubtotal: toNumber(row.grandSubtotal),
+    wonTierId: row.wonTierId,
+    rootId: row.rootId,
+    tiers: [...row.tiers].sort((a, b) => a.position - b.position).map(toTier),
     terms: row.terms,
     notes: row.notes,
     items: [...row.items].sort((a, b) => a.position - b.position).map(toItem),
@@ -158,7 +225,7 @@ function toQuotation(row: QuotationRow): Quotation {
 }
 
 /**
- * Prices every line and the document totals.
+ * Prices every line, at every quantity, and the document totals for each.
  *
  * Always computed here, never taken from the client — the numbers on a
  * quotation are the whole point of the document.
@@ -175,66 +242,122 @@ function priceQuotation(
 ) {
   const priced = items.map((item, index) => {
     /*
-     * The basis is derived from the style rather than trusted from the client,
-     * so a request cannot ask for a standup pouch to be priced by weight.
+     * How the line is sold, as the office chose it on the form. The schema has
+     * already resolved it: a line that did not say takes the convention for its
+     * style, and a roll is forced to weight whatever the request asked for,
+     * because a reel has no pouches to count.
      */
-    const pricingBasis = pricingBasisFor(item.jobKind, item.pouchType);
-    const computed = computeItem({ ...item, pricingBasis }, rates.cylinderRate);
+    const pricingBasis = item.pricingBasis;
 
-    // Costed against the rates in force on the quotation's date, and stored, so
-    // the margin a quotation was accepted on never moves when prices do.
-    const film = item.filmMaterialId ? costing.byId.get(item.filmMaterialId) : undefined;
+    /*
+     * The plies as the office stated them, each costed against its own
+     * material's rate on the quotation's date and snapshotted, so the margin a
+     * quotation was accepted on never moves when prices do.
+     */
+    const layers = item.layers.map((layer, position) => {
+      const material = layer.materialId ? costing.byId.get(layer.materialId) : undefined;
+      const density = material?.density ? Number(material.density) : null;
+      const micron = layer.micron;
+
+      return {
+        position: position + 1,
+        materialId: material?.id ?? null,
+        // A ply left unchosen is named rather than blank, so the stored line
+        // still reads as a structure when someone opens it a year later.
+        name: material?.name ?? 'Not chosen',
+        micron,
+        density,
+        ratePerKg: costing.rateOfId(layer.materialId ?? null),
+        gsm: density === null ? 0 : round(micron * density, 3),
+      };
+    });
+
     const material = computeMaterialCostPerKg({
-      layer: item.layer,
-      polyMicron: item.polyMicron,
-      polyDensity: film?.density ? Number(film.density) : null,
-      petRate: costing.petRate,
-      metpetRate: costing.metpetRate,
-      polyRate: costing.rateOfId(item.filmMaterialId ?? null),
+      layers,
       inkRate: costing.inkRate,
       adhesiveRate: costing.adhesiveRate,
       inkGsm: costing.settings.inkGsm,
       adhesiveGsm: costing.settings.adhesiveGsm,
     });
 
-    const materialCostPerKg = material.costPerKg;
+    // Geometry holds for every quantity; only the money below changes.
+    const geometry = computeItemGeometry(
+      {
+        layerCount: layers.length,
+        micron: totalMicronForLayers(layers),
+        widthMm: item.widthMm,
+        heightMm: item.heightMm,
+        repeatWidth: item.repeatWidth,
+        repeatHeight: item.repeatHeight,
+        cylinderCount: item.cylinderCount,
+        transportCost: item.transportCost,
+        chargeCylinders: item.chargeCylinders,
+      },
+      rates.cylinderRate,
+    );
+
+    const quantities = item.quantities.map((quantity, position) => {
+      const tier = computeTier(geometry.pouchesPerKg, { ...quantity, pricingBasis });
+
+      /*
+       * Cost and margin come from the tier, never from the raw input. A
+       * per-pouch line leaves quantityKg and ratePerKg at zero — the office
+       * types a pouch count and a rate per pouch, and the engine works the
+       * weight and the equivalent rate back out. Reading the input here
+       * multiplied the cost by zero and asked for a margin on a rate of zero.
+       */
+      return {
+        position: position + 1,
+        input: quantity,
+        ...tier,
+        materialCost:
+          material.costPerKg === null ? null : round(material.costPerKg * tier.quantityKg, 2),
+        marginPercent: computeMargin(tier.ratePerKg, material.costPerKg),
+      };
+    });
+
     return {
       input: item,
-      computed,
       position: index + 1,
-      cost: {
-        materialCostPerKg,
-        /*
-         * Both figures come from `computed`, never from the raw input.
-         *
-         * A per-pouch line leaves quantityKg and ratePerKg at zero — the office
-         * types a pouch count and a rate per pouch, and the engine works the
-         * weight and the equivalent rate back out. Reading the input here
-         * multiplied the cost by zero and asked for a margin on a rate of zero,
-         * so every standup line stored no cost and no margin at all.
-         */
-        materialCost:
-          materialCostPerKg === null ? null : round(materialCostPerKg * computed.quantityKg, 2),
-        marginPercent: computeMargin(computed.ratePerKg, materialCostPerKg),
-      },
+      pricingBasis,
+      layers,
+      material,
+      geometry,
+      quantities,
     };
   });
 
-  const allTotals = computeTotals(
-    priced.map((entry) => ({
-      ...entry.computed,
-      // The computed weight: on a per-pouch line it is worked out, not typed.
-      quantityKg: entry.computed.quantityKg,
+  /*
+   * One set of totals per quantity. The cylinders are the same figure in every
+   * column — they do not scale with the order — which is what makes the
+   * per-pouch price fall as the quantity rises.
+   *
+   * The schema guarantees every line carries the same number of quantities, so
+   * the first line's count is the document's.
+   */
+  const tierCount = priced[0]?.quantities.length ?? 1;
+
+  const tiers = Array.from({ length: tierCount }, (_, index) => {
+    const lines = priced.map((entry) => ({
+      quantityKg: entry.quantities[index]!.quantityKg,
       cylinderCount: entry.input.cylinderCount,
-    })),
-    rates,
-  );
+      totalAmount: entry.quantities[index]!.totalAmount,
+      totalCylinderCost: entry.geometry.totalCylinderCost,
+    }));
 
-  // totalQuantityKg and totalCylinderCount are derived on render, not stored —
-  // keep them out of the object that gets spread into Prisma.
-  const { totalQuantityKg: _qty, totalCylinderCount: _cyls, ...totals } = allTotals;
+    const { totalCylinderCount: _cylinders, ...totals } = computeTotals(lines, rates);
 
-  return { priced, totals };
+    return {
+      position: index + 1,
+      ...totals,
+      totalPouches: round(
+        priced.reduce((sum, entry) => sum + entry.quantities[index]!.totalPouches, 0),
+        2,
+      ),
+    };
+  });
+
+  return { priced, tiers };
 }
 
 /**
@@ -313,12 +436,21 @@ export async function listQuotations(query: ListQuotationsQuery) {
   }
   if (query.status) filters.push({ status: query.status });
 
-  const where: Prisma.QuotationWhereInput = filters.length > 0 ? { AND: filters } : {};
+  /*
+   * Only the current version of each number. A revision keeps the number, so
+   * without this the list grows a second row every time somebody reprices —
+   * and two rows reading "121" with different totals is precisely the confusion
+   * versioning exists to prevent. Superseded versions are still reachable
+   * through GET /quotations/:id/versions.
+   */
+  filters.push({ isLatest: true });
+
+  const where: Prisma.QuotationWhereInput = { AND: filters };
 
   const [rows, total] = await Promise.all([
     prisma.quotation.findMany({
       where,
-      include: { items: true },
+      include: QUOTATION_INCLUDE,
       /*
        * Work order, not date order: drafts need finishing, sent ones need
        * chasing, and won or lost are settled. So the list reads as a queue
@@ -341,7 +473,7 @@ export async function listQuotations(query: ListQuotationsQuery) {
 }
 
 export async function getQuotationById(id: string): Promise<Quotation> {
-  const row = await prisma.quotation.findUnique({ where: { id }, include: { items: true } });
+  const row = await prisma.quotation.findUnique({ where: { id }, include: QUOTATION_INCLUDE });
   if (!row) throw ApiError.notFound('Quotation not found');
   return toQuotation(row);
 }
@@ -356,7 +488,7 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
   };
 
   const costing = await loadCostingContext(input.date);
-  const { priced, totals } = priceQuotation(input.items, rates, costing);
+  const { priced, tiers } = priceQuotation(input.items, rates, costing);
 
   /*
    * Retried rather than serialised. Each attempt is a short, independent
@@ -412,6 +544,12 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
             ).id;
         }
 
+        /*
+         * The tiers are created with the quotation, because a line's quantities
+         * point at them and nothing can reference a row that does not exist yet.
+         * That ordering is the only reason this is three writes rather than one
+         * nested tree.
+         */
         const created = await tx.quotation.create({
           data: {
             number,
@@ -426,43 +564,76 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
             email: input.email,
             gstNumber: input.gstNumber,
             ...rates,
-            ...totals,
             terms: input.terms.length > 0 ? input.terms : DEFAULT_TERMS,
             notes: input.notes,
             ...(input.status === 'SENT' ? { sentAt: new Date() } : {}),
-            items: {
-              create: priced.map((entry) => ({
-                position: entry.position,
-                jobId: entry.input.jobId ?? null,
-                jobName: entry.input.jobName,
-                jobKind: entry.input.jobKind,
-                pouchType: entry.input.pouchType,
-                pouchTypeNote: entry.input.pouchTypeNote,
-                layer: entry.input.layer,
-                widthMm: entry.input.widthMm,
-                heightMm: entry.input.heightMm,
-                polyMicron: entry.input.polyMicron,
-                pricingBasis: pricingBasisFor(entry.input.jobKind, entry.input.pouchType),
-                /*
-                 * quantityKg and ratePerKg arrive with the `...entry.computed`
-                 * spread below, already resolved for whichever basis this line
-                 * uses — listing them here as well would be dead code that TS
-                 * rightly flags as overwritten.
-                 */
-                quantityPouches: entry.computed.totalPouches,
-                ratePerPouch: entry.computed.costPerPouch,
-                repeatWidth: entry.input.repeatWidth,
-                repeatHeight: entry.input.repeatHeight,
-                cylinderCount: entry.input.cylinderCount,
-                transportCost: entry.input.transportCost,
-                filmMaterialId: entry.input.filmMaterialId ?? null,
-                ...entry.computed,
-                ...entry.cost,
-              })),
-            },
+            tiers: { create: tiers },
           },
-          select: { id: true },
+          select: { id: true, tiers: { select: { id: true, position: true } } },
         });
+
+        const tierIdAt = new Map(created.tiers.map((tier) => [tier.position, tier.id]));
+
+        for (const entry of priced) {
+          await tx.quotationItem.create({
+            data: {
+              quotationId: created.id,
+              position: entry.position,
+              jobId: entry.input.jobId ?? null,
+              jobName: entry.input.jobName,
+              jobKind: entry.input.jobKind,
+              pouchType: entry.input.pouchType,
+              pouchTypeNote: entry.input.pouchTypeNote,
+              widthMm: entry.input.widthMm,
+              heightMm: entry.input.heightMm,
+              pricingBasis: entry.pricingBasis,
+              repeatWidth: entry.input.repeatWidth,
+              repeatHeight: entry.input.repeatHeight,
+              cylinderCount: entry.input.cylinderCount,
+              transportCost: entry.input.transportCost,
+              chargeCylinders: entry.input.chargeCylinders,
+              // micron, pouchesPerKg and the four cylinder figures.
+              ...entry.geometry,
+              materialCostPerKg: entry.material.costPerKg,
+              compositeGsm: entry.material.compositeGsm,
+
+              layers: {
+                create: entry.layers.map((layer) => ({
+                  position: layer.position,
+                  materialId: layer.materialId,
+                  materialName: layer.name,
+                  micron: layer.micron,
+                  density: layer.density,
+                  ratePerKg: layer.ratePerKg,
+                  gsm: layer.gsm,
+                })),
+              },
+
+              quantities: {
+                create: entry.quantities.map((quantity) => ({
+                  position: quantity.position,
+                  tierId: tierIdAt.get(quantity.position)!,
+                  /*
+                   * Both units, always resolved rather than as typed. A per-kg
+                   * line never fills the pouch pair in and a per-pouch line
+                   * never fills the kilogram pair, but the film is ordered by
+                   * weight and sold by the piece — every reader needs both.
+                   */
+                  quantityKg: quantity.quantityKg,
+                  ratePerKg: quantity.ratePerKg,
+                  quantityPouches: Math.round(quantity.totalPouches),
+                  ratePerPouch: quantity.costPerPouch,
+                  totalPouches: quantity.totalPouches,
+                  totalAmount: quantity.totalAmount,
+                  costPerPouch: quantity.costPerPouch,
+                  materialCost: quantity.materialCost,
+                  marginPercent: quantity.marginPercent,
+                })),
+              },
+            },
+            select: { id: true },
+          });
+        }
 
         return created.id;
       });
@@ -479,7 +650,7 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
 export async function updateQuotation(id: string, input: UpdateQuotationInput): Promise<Quotation> {
   const existing = await prisma.quotation.findUnique({
     where: { id },
-    include: { items: true },
+    include: QUOTATION_INCLUDE,
   });
   if (!existing) throw ApiError.notFound('Quotation not found');
 
@@ -495,39 +666,67 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
   // Reprice from whichever line set applies — the new one if sent, else the stored one.
   const items: QuotationItemInput[] =
     input.items ??
-    [...existing.items]
-      .sort((a, b) => a.position - b.position)
-      .map((item) => ({
-        jobId: item.jobId,
-        filmMaterialId: item.filmMaterialId,
-        jobName: item.jobName,
-        jobKind: item.jobKind,
-        pouchType: item.pouchType,
-        pouchTypeNote: item.pouchTypeNote,
-        // Constrained to 2 or 3 by the schema when the row was written.
-        layer: item.layer as 2 | 3,
-        widthMm: toNumber(item.widthMm),
-        heightMm: toNumber(item.heightMm),
-        polyMicron: toNumber(item.polyMicron),
-        quantityKg: toNumber(item.quantityKg),
-        ratePerKg: toNumber(item.ratePerKg),
-        quantityPouches: item.quantityPouches,
-        ratePerPouch: toNumber(item.ratePerPouch),
-        repeatWidth: toNumber(item.repeatWidth),
-        repeatHeight: toNumber(item.repeatHeight),
-        cylinderCount: item.cylinderCount,
-        transportCost: toNumber(item.transportCost),
-      }));
+    byPosition(existing.items).map((item) => ({
+      jobId: item.jobId,
+      jobName: item.jobName,
+      jobKind: item.jobKind,
+      pouchType: item.pouchType,
+      pouchTypeNote: item.pouchTypeNote,
+      /*
+       * Carried through explicitly. It used to be re-derived from the style on
+       * every reprice, which was harmless while the style was the only thing
+       * that decided it — now that the office chooses, dropping it here would
+       * flip a standup pouch sold by the kilogram back to per-piece on any
+       * patch that did not resend the lines.
+       */
+      pricingBasis: item.pricingBasis,
+      widthMm: toNumber(item.widthMm),
+      heightMm: toNumber(item.heightMm),
+      layers: byPosition(item.layers).map((layer) => ({
+        materialId: layer.materialId,
+        micron: toNumber(layer.micron),
+      })),
+      /*
+       * Fed back as stored, both units populated. Which pair is actually read
+       * depends on the pricing basis above, so handing back the derived half of
+       * the pair is harmless.
+       */
+      quantities: byPosition(item.quantities).map((quantity) => ({
+        quantityKg: toNumber(quantity.quantityKg),
+        ratePerKg: toNumber(quantity.ratePerKg),
+        quantityPouches: quantity.quantityPouches,
+        ratePerPouch: toNumber(quantity.ratePerPouch),
+      })),
+      repeatWidth: toNumber(item.repeatWidth),
+      repeatHeight: toNumber(item.repeatHeight),
+      cylinderCount: item.cylinderCount,
+      transportCost: toNumber(item.transportCost),
+      chargeCylinders: item.chargeCylinders,
+    }));
 
   const costing = await loadCostingContext(input.date ?? toISODate(existing.date));
-  const { priced, totals } = priceQuotation(items, rates, costing);
+  const { priced, tiers } = priceQuotation(items, rates, costing);
 
   const becomingSent = input.status === 'SENT' && existing.status !== 'SENT';
 
+  /*
+   * Which quantity the customer accepted, remembered by position. The tiers are
+   * about to be deleted and recreated, and the foreign key would quietly null
+   * this out — losing the one fact that says what was actually agreed.
+   */
+  const wonPosition =
+    existing.tiers.find((tier) => tier.id === existing.wonTierId)?.position ?? null;
+
   await prisma.$transaction(async (tx) => {
-    // Lines are replaced wholesale: positions shift and lines get removed, so
-    // reconciling by id would be more fragile than rewriting the set.
+    /*
+     * Lines and tiers are replaced wholesale: positions shift and both get
+     * removed, so reconciling by id would be more fragile than rewriting the
+     * set. Items go first — their layers and quantities cascade with them, and
+     * a quantity also hangs off a tier, so nothing is left pointing at a row
+     * that is about to disappear.
+     */
     await tx.quotationItem.deleteMany({ where: { quotationId: id } });
+    await tx.quotationTier.deleteMany({ where: { quotationId: id } });
 
     await tx.quotation.update({
       where: { id },
@@ -546,49 +745,307 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
         ...(becomingSent ? { sentAt: new Date() } : {}),
         ...rates,
-        ...totals,
-        items: {
-          create: priced.map((entry) => ({
-            position: entry.position,
-            jobId: entry.input.jobId ?? null,
-            jobName: entry.input.jobName,
-            jobKind: entry.input.jobKind,
-            pouchType: entry.input.pouchType,
-            pouchTypeNote: entry.input.pouchTypeNote,
-            layer: entry.input.layer,
-            widthMm: entry.input.widthMm,
-            heightMm: entry.input.heightMm,
-            polyMicron: entry.input.polyMicron,
-            pricingBasis: pricingBasisFor(entry.input.jobKind, entry.input.pouchType),
-            /*
-             * quantityKg and ratePerKg arrive with the `...entry.computed`
-             * spread below, already resolved for whichever basis this line
-             * uses — listing them here as well would be dead code that TS
-             * rightly flags as overwritten.
-             */
-            quantityPouches: entry.computed.totalPouches,
-            ratePerPouch: entry.computed.costPerPouch,
-            repeatWidth: entry.input.repeatWidth,
-            repeatHeight: entry.input.repeatHeight,
-            cylinderCount: entry.input.cylinderCount,
-            transportCost: entry.input.transportCost,
-            filmMaterialId: entry.input.filmMaterialId ?? null,
-            ...entry.computed,
-            ...entry.cost,
-          })),
-        },
+        tiers: { create: tiers },
       },
     });
+
+    const rebuilt = await tx.quotationTier.findMany({
+      where: { quotationId: id },
+      select: { id: true, position: true },
+    });
+    const tierIdAt = new Map(rebuilt.map((tier) => [tier.position, tier.id]));
+
+    for (const entry of priced) {
+      await tx.quotationItem.create({
+        data: {
+          quotationId: id,
+          position: entry.position,
+          jobId: entry.input.jobId ?? null,
+          jobName: entry.input.jobName,
+          jobKind: entry.input.jobKind,
+          pouchType: entry.input.pouchType,
+          pouchTypeNote: entry.input.pouchTypeNote,
+          widthMm: entry.input.widthMm,
+          heightMm: entry.input.heightMm,
+          pricingBasis: entry.pricingBasis,
+          repeatWidth: entry.input.repeatWidth,
+          repeatHeight: entry.input.repeatHeight,
+          cylinderCount: entry.input.cylinderCount,
+          transportCost: entry.input.transportCost,
+          chargeCylinders: entry.input.chargeCylinders,
+          ...entry.geometry,
+          materialCostPerKg: entry.material.costPerKg,
+          compositeGsm: entry.material.compositeGsm,
+
+          layers: {
+            create: entry.layers.map((layer) => ({
+              position: layer.position,
+              materialId: layer.materialId,
+              materialName: layer.name,
+              micron: layer.micron,
+              density: layer.density,
+              ratePerKg: layer.ratePerKg,
+              gsm: layer.gsm,
+            })),
+          },
+
+          quantities: {
+            create: entry.quantities.map((quantity) => ({
+              position: quantity.position,
+              tierId: tierIdAt.get(quantity.position)!,
+              quantityKg: quantity.quantityKg,
+              ratePerKg: quantity.ratePerKg,
+              quantityPouches: Math.round(quantity.totalPouches),
+              ratePerPouch: quantity.costPerPouch,
+              totalPouches: quantity.totalPouches,
+              totalAmount: quantity.totalAmount,
+              costPerPouch: quantity.costPerPouch,
+              materialCost: quantity.materialCost,
+              marginPercent: quantity.marginPercent,
+            })),
+          },
+        },
+        select: { id: true },
+      });
+    }
+
+    // Re-point the accepted quantity at the tier that now holds that position.
+    if (wonPosition !== null) {
+      const wonTierId = tierIdAt.get(wonPosition) ?? null;
+      await tx.quotation.update({ where: { id }, data: { wonTierId } });
+    }
   });
 
   return getQuotationById(id);
 }
 
+/**
+ * A revision of an existing quotation.
+ *
+ * The office reprices rather than renumbers. The customer already has QUO-124
+ * on their desk, and a second document with a different number reads as a
+ * second offer rather than a corrected one — so a revision keeps the number and
+ * takes the next version, and only the newest of them appears in the list.
+ *
+ * Everything is copied exactly as it stands: plies, quantities, tiers, totals,
+ * the rates it was costed against and the date it carries. Nothing is repriced
+ * on the way in, because pressing "new version" should not silently move a
+ * figure the customer has already been quoted. It reprices on the first save,
+ * against whatever date the revision then carries — which is the point at which
+ * the office has decided what they are changing.
+ */
+export async function createQuotationVersion(id: string): Promise<Quotation> {
+  const source = await prisma.quotation.findUnique({
+    where: { id },
+    include: QUOTATION_INCLUDE,
+  });
+  if (!source) throw ApiError.notFound('Quotation not found');
+
+  /* Every revision hangs off the first version, not off the one it was made from. */
+  const rootId = source.rootId ?? source.id;
+
+  /*
+   * Retried on a clash, the same as a new quotation. Two people revising the
+   * same document at once both read the same highest version, and one of them
+   * loses on the (number, version) constraint.
+   */
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const createdId = await prisma.$transaction(async (tx) => {
+        const latest = await tx.quotation.findFirst({
+          where: { number: source.number },
+          orderBy: { version: 'desc' },
+          select: { version: true },
+        });
+        const version = (latest?.version ?? source.version) + 1;
+
+        // Exactly one version of a number is ever the current one.
+        await tx.quotation.updateMany({
+          where: { number: source.number },
+          data: { isLatest: false },
+        });
+
+        const created = await tx.quotation.create({
+          data: {
+            number: source.number,
+            version,
+            rootId,
+            isLatest: true,
+            /*
+             * A revision starts as a draft. It has not been sent, and the answer
+             * recorded against the version it came from is not its answer —
+             * carrying either across would misreport what the customer agreed.
+             */
+            status: 'DRAFT',
+            date: source.date,
+            customerId: source.customerId,
+            customerName: source.customerName,
+            addressLine1: source.addressLine1,
+            addressLine2: source.addressLine2,
+            addressLine3: source.addressLine3,
+            mobile: source.mobile,
+            email: source.email,
+            gstNumber: source.gstNumber,
+            cylinderRate: source.cylinderRate,
+            gstPercent: source.gstPercent,
+            materialAdvancePercent: source.materialAdvancePercent,
+            cylinderAdvancePercent: source.cylinderAdvancePercent,
+            terms: source.terms,
+            notes: source.notes,
+            tiers: {
+              create: byPosition(source.tiers).map((tier) => ({
+                position: tier.position,
+                materialSubtotal: tier.materialSubtotal,
+                materialWithGst: tier.materialWithGst,
+                cylinderSubtotal: tier.cylinderSubtotal,
+                cylinderWithGst: tier.cylinderWithGst,
+                grandSubtotal: tier.grandSubtotal,
+                grandWithGst: tier.grandWithGst,
+                materialAdvance: tier.materialAdvance,
+                cylinderAdvance: tier.cylinderAdvance,
+                totalAdvance: tier.totalAdvance,
+                totalQuantityKg: tier.totalQuantityKg,
+                totalPouches: tier.totalPouches,
+              })),
+            },
+          },
+          select: { id: true, tiers: { select: { id: true, position: true } } },
+        });
+
+        const tierIdAt = new Map(created.tiers.map((tier) => [tier.position, tier.id]));
+
+        for (const item of byPosition(source.items)) {
+          await tx.quotationItem.create({
+            data: {
+              quotationId: created.id,
+              position: item.position,
+              jobId: item.jobId,
+              jobName: item.jobName,
+              jobKind: item.jobKind,
+              pouchType: item.pouchType,
+              pouchTypeNote: item.pouchTypeNote,
+              widthMm: item.widthMm,
+              heightMm: item.heightMm,
+              pricingBasis: item.pricingBasis,
+              repeatWidth: item.repeatWidth,
+              repeatHeight: item.repeatHeight,
+              cylinderCount: item.cylinderCount,
+              transportCost: item.transportCost,
+              chargeCylinders: item.chargeCylinders,
+              micron: item.micron,
+              pouchesPerKg: item.pouchesPerKg,
+              cylinderWidth: item.cylinderWidth,
+              cylinderCircumference: item.cylinderCircumference,
+              costPerCylinder: item.costPerCylinder,
+              totalCylinderCost: item.totalCylinderCost,
+              materialCostPerKg: item.materialCostPerKg,
+              compositeGsm: item.compositeGsm,
+              layers: {
+                create: byPosition(item.layers).map((layer) => ({
+                  position: layer.position,
+                  materialId: layer.materialId,
+                  materialName: layer.materialName,
+                  micron: layer.micron,
+                  density: layer.density,
+                  ratePerKg: layer.ratePerKg,
+                  gsm: layer.gsm,
+                })),
+              },
+              quantities: {
+                create: byPosition(item.quantities).map((quantity) => ({
+                  position: quantity.position,
+                  tierId: tierIdAt.get(quantity.position)!,
+                  quantityKg: quantity.quantityKg,
+                  ratePerKg: quantity.ratePerKg,
+                  quantityPouches: quantity.quantityPouches,
+                  ratePerPouch: quantity.ratePerPouch,
+                  totalPouches: quantity.totalPouches,
+                  totalAmount: quantity.totalAmount,
+                  costPerPouch: quantity.costPerPouch,
+                  materialCost: quantity.materialCost,
+                  marginPercent: quantity.marginPercent,
+                })),
+              },
+            },
+            select: { id: true },
+          });
+        }
+
+        return created.id;
+      });
+
+      return await getQuotationById(createdId);
+    } catch (error) {
+      if (!isQuotationNumberClash(error) || attempt >= NUMBER_CLASH_RETRIES) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 15 * attempt + Math.random() * 25));
+    }
+  }
+}
+
+/** Every version of one quotation number, newest first. */
+export async function listQuotationVersions(id: string): Promise<QuotationSummary[]> {
+  const source = await prisma.quotation.findUnique({
+    where: { id },
+    select: { number: true },
+  });
+  if (!source) throw ApiError.notFound('Quotation not found');
+
+  const rows = await prisma.quotation.findMany({
+    where: { number: source.number },
+    orderBy: { version: 'desc' },
+    include: QUOTATION_INCLUDE,
+  });
+  return rows.map(toSummary);
+}
+
 export async function deleteQuotation(id: string): Promise<{ id: string }> {
-  const existing = await prisma.quotation.findUnique({ where: { id }, select: { id: true } });
+  const existing = await prisma.quotation.findUnique({
+    where: { id },
+    select: { id: true, number: true, version: true, isLatest: true, rootId: true },
+  });
   if (!existing) throw ApiError.notFound('Quotation not found');
-  // Items cascade.
-  await prisma.quotation.delete({ where: { id } });
+
+  await prisma.$transaction(async (tx) => {
+    /*
+     * Revisions hang off the first version through a cascading foreign key, so
+     * deleting the root would take every later version with it — somebody
+     * tidying away an old v1 would silently destroy the live v3. Re-parent
+     * first: the oldest survivor becomes the root and the rest follow it, and
+     * the cascade then has nothing to reach.
+     */
+    if (existing.rootId === null) {
+      const heir = await tx.quotation.findFirst({
+        where: { rootId: id },
+        orderBy: { version: 'asc' },
+        select: { id: true },
+      });
+      if (heir) {
+        await tx.quotation.update({ where: { id: heir.id }, data: { rootId: null } });
+        await tx.quotation.updateMany({ where: { rootId: id }, data: { rootId: heir.id } });
+      }
+    }
+
+    // Items, layers, quantities and tiers all cascade with the quotation.
+    await tx.quotation.delete({ where: { id } });
+
+    /*
+     * Exactly one version of a number is the current one, and the list shows
+     * only that. Deleting the current one has to promote the highest survivor,
+     * or the number disappears from the list while its earlier versions sit
+     * there unreachable.
+     */
+    if (existing.isLatest) {
+      const survivor = await tx.quotation.findFirst({
+        where: { number: existing.number },
+        orderBy: { version: 'desc' },
+        select: { id: true },
+      });
+      if (survivor) {
+        await tx.quotation.update({ where: { id: survivor.id }, data: { isLatest: true } });
+      }
+    }
+  });
+
   return { id };
 }
 
@@ -774,7 +1231,22 @@ export async function recordOutcome(
     const jobsSkipped: string[] = [];
     const takenCodes = new Set<string>();
 
+    /*
+     * Jobs the wizard already created, matched by id. The office now saves a
+     * new design as it steps past it, so most won quotations arrive here with
+     * their jobs already on record. Matching on name alone would miss one that
+     * was renamed after it was saved, and create a second copy of it.
+     */
+    const heldIds = new Set(
+      (await tx.job.findMany({ where: { customerId }, select: { id: true } })).map((job) => job.id),
+    );
+
     for (const item of quotation.items) {
+      if (item.jobId && heldIds.has(item.jobId)) {
+        jobsSkipped.push(item.jobName);
+        continue;
+      }
+
       const key = item.jobName.trim().toLowerCase();
       if (heldNames.has(key)) {
         jobsSkipped.push(item.jobName);
@@ -782,36 +1254,11 @@ export async function recordOutcome(
       }
       heldNames.add(key);
 
-      const petMicron = PET_MICRON_PER_LAYER;
-      const metPetMicron = item.layer === 3 ? METPET_MICRON_PER_LAYER : null;
-
       await tx.job.create({
         data: {
+          ...jobDataFromQuotationItem(item),
           jobCode: await nextJobCode(tx, takenCodes),
-          jobName: item.jobName,
-          // 0 means "not from the imported spreadsheet", the same marker the
-          // customer editor uses for a job added by hand.
-          sourceRow: 0,
           customerId,
-          customerSource: 'EXPLICIT',
-          needsCustomer: false,
-          // A roll has no pouch style; the jobs table predates the enum and
-          // stores 'NA' for anything unknown.
-          pouchType: item.pouchType ? POUCH_TYPE_LABELS[item.pouchType] : 'NA',
-          jobType: JOB_KIND_LABELS[item.jobKind],
-          layer: item.layer,
-          petMicron,
-          metPetMicron,
-          polyMicron: item.polyMicron,
-          designOpenWidth: item.widthMm,
-          designHeight: item.heightMm,
-          totalCylinders: item.cylinderCount,
-          petGsm: round(petMicron * PET_DENSITY, 3),
-          metPetGsm: metPetMicron === null ? null : round(metPetMicron * METPET_DENSITY, 3),
-          // Only known when a film was chosen; the density comes from it.
-          polyGsm: null,
-          // The imported jobs table stores this as text, not a number.
-          pouchesPerKg: String(item.pouchesPerKg),
         },
       });
       jobsCreated.push(item.jobName);

@@ -68,11 +68,15 @@ export type PricingBasis = (typeof PRICING_BASES)[number];
 const PER_POUCH_STYLES: readonly PouchType[] = ['STANDUP', 'STANDUP_ZIPPER'];
 
 /**
- * Which basis a line uses.
+ * The basis a style is conventionally sold on.
  *
- * Derived from the pouch style rather than chosen separately, so the two can
- * never disagree — changing the style reprices the line, which is correct: a
- * standup pouch is not sold the way a centre-seal one is.
+ * A suggestion, not a rule. It is what a line takes when nobody says otherwise,
+ * and what changing the style resets it to — but the office can sell a standup
+ * pouch by the kilogram if that is how the customer buys, which is a real order
+ * this could not describe while the style was the only answer.
+ *
+ * A roll is the one case with no choice: there are no pouches on a reel to
+ * count. That is enforced by the schema, not here.
  */
 export function pricingBasisFor(jobKind: JobKind, pouchType: PouchType | null): PricingBasis {
   if (jobKind === 'ROLL' || pouchType === null) return 'PER_KG';

@@ -26,6 +26,12 @@ export const ERROR_CODE = {
   NOT_FOUND: 'NOT_FOUND',
   CONFLICT: 'CONFLICT',
   RATE_LIMITED: 'RATE_LIMITED',
+  /**
+   * Something this server depends on is unavailable — not a bug here.
+   * Distinct from INTERNAL_ERROR because the client can say "try again" for
+   * one and must not for the other.
+   */
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const;
 

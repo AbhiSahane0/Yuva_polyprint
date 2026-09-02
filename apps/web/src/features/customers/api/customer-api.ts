@@ -3,7 +3,9 @@ import type {
   CreateCustomerInput,
   Customer,
   CustomerDetail,
+  CustomerJob,
   Paginated,
+  SaveQuotationJobInput,
   UpdateCustomerInput,
 } from '@yuva/shared';
 import { request } from '@/lib/api-client';
@@ -78,5 +80,48 @@ export function useDeleteCustomer() {
         method: 'DELETE',
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: customerKeys.lists() }),
+  });
+}
+
+/**
+ * One job, saved on its own.
+ *
+ * Separate from `useUpdateCustomer` because that sends the customer and every
+ * job they hold — right for the customer editor, wrong for the quotation
+ * wizard, where saving one design must not rewrite the others.
+ *
+ * Creating is idempotent by job name on the server, so a double-clicked Next,
+ * a retry or a refresh cannot leave a customer holding duplicates.
+ */
+export function useSaveCustomerJob() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      customerId,
+      jobId,
+      input,
+    }: {
+      customerId: string;
+      /** Absent for a design not yet on record. */
+      jobId?: string | null;
+      input: SaveQuotationJobInput;
+    }) =>
+      jobId
+        ? request<CustomerJob>({ url: `/jobs/${jobId}`, method: 'PATCH', data: input })
+        : request<CustomerJob>({
+            // The owner travels in the path, so a job cannot be attached to the
+            // wrong customer by a body that says otherwise.
+            url: `/customers/${customerId}/jobs`,
+            method: 'POST',
+            data: input,
+          }),
+    onSuccess: (_job, variables) => {
+      // The saved-job dropdown reads from the customer detail, so a design
+      // added here has to appear there without a reload.
+      void queryClient.invalidateQueries({
+        queryKey: customerKeys.detail(variables.customerId),
+      });
+    },
   });
 }

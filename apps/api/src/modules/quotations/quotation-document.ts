@@ -1,4 +1,10 @@
-import { formatNumber, formatRs, type Quotation } from '@yuva/shared';
+import {
+  formatNumber,
+  formatRs,
+  type Quotation,
+  type QuotationItem,
+  type QuotationItemQuantity,
+} from '@yuva/shared';
 import { getQuotationAssets } from './quotation-assets.js';
 
 /**
@@ -85,47 +91,82 @@ export function renderQuotationHtml(quotation: Quotation): string {
     .filter(Boolean);
 
   // Always draw at least four body rows so the table keeps its printed shape.
-  const blankRows = Math.max(0, 4 - quotation.items.length);
+  const tiers = [...quotation.tiers].sort((a, b) => a.position - b.position);
+
+  /*
+   * A quotation may now be priced at two or three quantities. They are printed
+   * as extra ROWS rather than extra columns: the table is already sixteen
+   * columns on a 194mm page, and four more per quantity would not fit — but a
+   * job's geometry and its cylinders do not vary by quantity anyway, so those
+   * cells span the rows instead and only the money repeats.
+   */
+  const columns = tiers.length > 0 ? tiers : [null];
+
+  /** Which line to read for a job at a given quantity. */
+  const quantityAt = (item: QuotationItem, position: number): QuotationItemQuantity | null =>
+    item.quantities.find((q) => q.position === position) ?? item.quantities[0] ?? null;
+
+  const rowsPerItem = columns.length;
+  const bodyRows = quotation.items.length * rowsPerItem;
+  const blankRows = Math.max(0, 4 - bodyRows);
 
   const itemRows = quotation.items
-    .map(
-      (item, index) => `
+    .map((item, index) =>
+      columns
+        .map((tier, tierIndex) => {
+          const q = quantityAt(item, tier?.position ?? 1);
+          const first = tierIndex === 0;
+          // Everything that describes the job rather than the order, spanned
+          // down the quantity rows so it is stated once.
+          const span = rowsPerItem > 1 ? ` rowspan="${rowsPerItem}"` : '';
+
+          return `
       <tr>
-        <td class="c">${index + 1}</td>
-        <td>${esc(item.jobName)}</td>
-        <td class="c">${item.layer}</td>
-        <td class="r">${formatNumber(item.widthMm)}</td>
-        <td class="r">${formatNumber(item.heightMm)}</td>
-        <td class="r">${formatNumber(item.micron)}</td>
-        <td class="r">${
+        ${
+          first
+            ? `<td class="c"${span}>${index + 1}</td>
+        <td class="job"${span}>${esc(item.jobName)}</td>
+        <td class="c"${span}>${item.layers.length}</td>
+        <td class="r"${span}>${formatNumber(item.widthMm)}</td>
+        <td class="r"${span}>${formatNumber(item.heightMm)}</td>
+        <td class="r"${span}>${formatNumber(item.micron)}</td>
+        <td class="r"${span}>${
           /*
            * Two decimals, because this is a multiplier the customer checks
            * against the total. Rounded to a whole number it stops reconciling:
-           * 29.67 prints as 30, and 30 × 100 kg suggests 3,000 pouches where
+           * 29.67 prints as 30, and 30 x 100 kg suggests 3,000 pouches where
            * the line correctly reads 2,967.
            */
           formatNumber(item.pouchesPerKg, 2)
-        }</td>
+        }</td>`
+            : ''
+        }
         <td class="r">${
           // Order quantity in the unit the line was quoted in: pouches for a
           // standup, kilograms for everything else.
           item.pricingBasis === 'PER_POUCH'
-            ? formatNumber(item.quantityPouches)
-            : formatNumber(item.quantityKg)
+            ? formatNumber(q?.quantityPouches ?? 0)
+            : formatNumber(q?.quantityKg ?? 0)
         }</td>
-        <td class="r">${formatNumber(item.totalPouches)}</td>
+        <td class="r">${formatNumber(q?.totalPouches ?? 0)}</td>
         <td class="r">${
           item.pricingBasis === 'PER_POUCH'
-            ? `${formatNumber(item.ratePerPouch, 2)} /pc`
-            : formatNumber(item.ratePerKg, 2)
+            ? `${formatNumber(q?.ratePerPouch ?? 0, 2)} /pc`
+            : formatNumber(q?.ratePerKg ?? 0, 2)
         }</td>
-        <td class="r">${formatRs(item.totalAmount)}</td>
-        <td class="r">${formatNumber(item.cylinderWidth)}</td>
-        <td class="r">${formatNumber(item.cylinderCircumference)}</td>
-        <td class="c">${item.cylinderCount}</td>
-        <td class="r">${formatRs(item.costPerCylinder)}</td>
-        <td class="r">${formatRs(item.totalCylinderCost)}</td>
-      </tr>`,
+        <td class="r">${formatRs(q?.totalAmount ?? 0)}</td>
+        ${
+          first
+            ? `<td class="r"${span}>${formatNumber(item.cylinderWidth)}</td>
+        <td class="r"${span}>${formatNumber(item.cylinderCircumference)}</td>
+        <td class="c"${span}>${item.cylinderCount}</td>
+        <td class="r"${span}>${formatRs(item.costPerCylinder)}</td>
+        <td class="r"${span}>${formatRs(item.totalCylinderCost)}</td>`
+            : ''
+        }
+      </tr>`;
+        })
+        .join(''),
     )
     .join('');
 
@@ -239,7 +280,12 @@ export function renderQuotationHtml(quotation: Quotation): string {
   /* Money and measurements must never wrap — a split "Rs. 8,625" reads as two
      different numbers on a customer-facing document. */
   td.r { text-align: right; white-space: nowrap; }
-  tbody td:nth-child(2) { min-width: 26mm; }
+  /* The job name needs room, but this cannot key on child position: a line
+     priced at several quantities spans its description down the extra rows, so
+     those rows begin at the order-quantity column and position two is a
+     different column entirely. As nth-child(2) it forced 26mm onto Total
+     Pouches and pushed the table 10mm past the page. */
+  tbody td.job { min-width: 26mm; }
   tr.empty td { height: 17px; }
   tfoot td { font-weight: 700; background: #f8f9fb; font-size: 7.6pt; white-space: nowrap; }
 
@@ -252,6 +298,14 @@ export function renderQuotationHtml(quotation: Quotation): string {
   .summary .amt { text-align: right; white-space: nowrap; }
   .summary .grand td { font-weight: 800; font-size: 9.5pt; }
   .summary .grand .red { color: #c00; }
+  /* Priced at several quantities: a real grid, so it gets rules and headings. */
+  .summary.tiered { border-collapse: collapse; }
+  .summary.tiered th {
+    padding: 4px 6px; font-size: 8.2pt; font-weight: 700; text-align: right;
+    background: #f2f2f2; border: 0.4pt solid #999; white-space: nowrap;
+  }
+  .summary.tiered td { border: 0.4pt solid #999; }
+  .summary.tiered .lbl { text-align: left; background: #fafafa; }
 
   .closing { margin: 6px 0 4px; }
   .terms { margin: 0; }
@@ -363,8 +417,23 @@ export function renderQuotationHtml(quotation: Quotation): string {
       ${emptyRows}
     </tbody>
     <tfoot>
+      ${columns
+        .map((tier, tierIndex) => {
+          const position = tier?.position ?? 1;
+          const first = tierIndex === 0;
+          /*
+           * The cylinders are the same figure at every quantity — they do not
+           * scale with the order. Printed once and spanned, rather than
+           * repeated down the column where it would read as being charged
+           * three times.
+           */
+          const span = columns.length > 1 ? ` rowspan="${columns.length}"` : '';
+
+          return `
       <tr>
-        <td colspan="7" class="c">Total</td>
+        <td colspan="7" class="c">${
+          columns.length > 1 ? `Total &mdash; quantity ${position}` : 'Total'
+        }</td>
         <td class="r">${(() => {
           /*
            * Only total this column when every line is quoted in the same unit.
@@ -375,48 +444,112 @@ export function renderQuotationHtml(quotation: Quotation): string {
            */
           const bases = new Set(quotation.items.map((i) => i.pricingBasis));
           if (bases.size !== 1) return '&mdash;';
-          return bases.has('PER_POUCH')
-            ? formatNumber(quotation.items.reduce((sum, i) => sum + i.quantityPouches, 0))
-            : formatNumber(quotation.items.reduce((sum, i) => sum + i.quantityKg, 0));
+          const perPouch = bases.has('PER_POUCH');
+          return formatNumber(
+            quotation.items.reduce((sum, item) => {
+              const q = quantityAt(item, position);
+              return sum + (perPouch ? (q?.quantityPouches ?? 0) : (q?.quantityKg ?? 0));
+            }, 0),
+          );
         })()}</td>
         <td></td>
         <td></td>
-        <td class="r">${formatRs(quotation.materialSubtotal)}</td>
-        <td></td>
-        <td></td>
-        <td class="c">${quotation.items.reduce((s, i) => s + i.cylinderCount, 0)}</td>
-        <td></td>
-        <td class="r">${formatRs(quotation.cylinderSubtotal)}</td>
-      </tr>
+        <td class="r">${formatRs(tier?.materialSubtotal ?? 0)}</td>
+        ${
+          first
+            ? `<td${span}></td>
+        <td${span}></td>
+        <td class="c"${span}>${quotation.items.reduce((sum, i) => sum + i.cylinderCount, 0)}</td>
+        <td${span}></td>
+        <td class="r"${span}>${formatRs(tier?.cylinderSubtotal ?? 0)}</td>`
+            : ''
+        }
+      </tr>`;
+        })
+        .join('')}
     </tfoot>
   </table>
 
-  <table class="summary">
+  ${
+    columns.length > 1
+      ? /*
+         * Priced at more than one quantity, so the summary is transposed: one
+         * column per quantity, with the cylinders sitting on a single row
+         * because they cost the same in all of them. That is the comparison the
+         * customer is being asked to make, and it only works side by side.
+         */
+        `<table class="summary tiered">
+    <tr>
+      <td class="lbl"></td>
+      ${columns
+        .map((tier) => {
+          const position = tier?.position ?? 1;
+          const bases = new Set(quotation.items.map((i) => i.pricingBasis));
+          const single = bases.size === 1;
+          const perPouch = single && bases.has('PER_POUCH');
+          const quantity = quotation.items.reduce((sum, item) => {
+            const q = quantityAt(item, position);
+            return sum + (perPouch ? (q?.quantityPouches ?? 0) : (q?.quantityKg ?? 0));
+          }, 0);
+          const heading = single
+            ? `${formatNumber(quantity)} ${perPouch ? 'pouches' : 'kg'}`
+            : `Quantity ${position}`;
+          return `<th class="c">${heading}</th>`;
+        })
+        .join('')}
+    </tr>
+    <tr>
+      <td class="lbl">Packaging material</td>
+      ${columns.map((t) => `<td class="amt">${formatRs(t?.materialSubtotal ?? 0)}</td>`).join('')}
+    </tr>
+    <tr>
+      <td class="lbl">Material incl. GST ${formatNumber(quotation.gstPercent)}%</td>
+      ${columns.map((t) => `<td class="amt"><b>${formatRs(t?.materialWithGst ?? 0)}</b></td>`).join('')}
+    </tr>
+    <tr>
+      <td class="lbl">Cylinders (one-time)</td>
+      ${columns.map((t) => `<td class="amt">${formatRs(t?.cylinderSubtotal ?? 0)}</td>`).join('')}
+    </tr>
+    <tr>
+      <td class="lbl">Cylinders incl. GST ${formatNumber(quotation.gstPercent)}%</td>
+      ${columns.map((t) => `<td class="amt"><b>${formatRs(t?.cylinderWithGst ?? 0)}</b></td>`).join('')}
+    </tr>
+    <tr class="grand">
+      <td class="lbl">Grand Total incl. GST</td>
+      ${columns.map((t) => `<td class="amt red">${formatRs(t?.grandWithGst ?? 0)}</td>`).join('')}
+    </tr>
+    <tr>
+      <td class="lbl">Advance</td>
+      ${columns.map((t) => `<td class="amt red">${formatRs(t?.totalAdvance ?? 0)}</td>`).join('')}
+    </tr>
+  </table>`
+      : `<table class="summary">
     <tr>
       <td class="lbl">Total Costing of Packaging Material</td>
-      <td class="amt">${formatRs(quotation.materialSubtotal)}</td>
+      <td class="amt">${formatRs(columns[0]?.materialSubtotal ?? 0)}</td>
       <td class="c">GST ${formatNumber(quotation.gstPercent)}%</td>
-      <td class="amt"><b>${formatRs(quotation.materialWithGst)}</b></td>
+      <td class="amt"><b>${formatRs(columns[0]?.materialWithGst ?? 0)}</b></td>
       <td class="lbl">${formatNumber(quotation.materialAdvancePercent)}% Material Payment Advance</td>
-      <td class="amt">${formatRs(quotation.materialAdvance)}</td>
+      <td class="amt">${formatRs(columns[0]?.materialAdvance ?? 0)}</td>
     </tr>
     <tr>
       <td class="lbl">Total Costing of Cylinder</td>
-      <td class="amt">${formatRs(quotation.cylinderSubtotal)}</td>
+      <td class="amt">${formatRs(columns[0]?.cylinderSubtotal ?? 0)}</td>
       <td class="c">GST ${formatNumber(quotation.gstPercent)}%</td>
-      <td class="amt"><b>${formatRs(quotation.cylinderWithGst)}</b></td>
+      <td class="amt"><b>${formatRs(columns[0]?.cylinderWithGst ?? 0)}</b></td>
       <td class="lbl">${formatNumber(quotation.cylinderAdvancePercent)}% Cylinder Payment Advance</td>
-      <td class="amt">${formatRs(quotation.cylinderAdvance)}</td>
+      <td class="amt">${formatRs(columns[0]?.cylinderAdvance ?? 0)}</td>
     </tr>
     <tr class="grand">
       <td class="lbl">Grand Total</td>
-      <td class="amt">${formatRs(quotation.grandSubtotal)}</td>
+      <td class="amt">${formatRs(columns[0]?.grandSubtotal ?? 0)}</td>
       <td class="c">GST ${formatNumber(quotation.gstPercent)}%</td>
-      <td class="amt red">${formatRs(quotation.grandWithGst)}</td>
+      <td class="amt red">${formatRs(columns[0]?.grandWithGst ?? 0)}</td>
       <td class="lbl">Advance</td>
-      <td class="amt red">${formatRs(quotation.totalAdvance)}</td>
+      <td class="amt red">${formatRs(columns[0]?.totalAdvance ?? 0)}</td>
     </tr>
-  </table>
+  </table>`
+  }
 
   ${(() => {
     /*

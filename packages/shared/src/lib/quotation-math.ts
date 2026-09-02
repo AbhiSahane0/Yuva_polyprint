@@ -37,7 +37,7 @@ export interface QuotationItemInputs {
   widthMm: number;
   heightMm: number;
   polyMicron: number;
-  /** How this line is sold. Derived from the pouch style, never chosen. */
+  /** How this line is sold — the office's choice, defaulting to weight. */
   pricingBasis?: PricingBasis;
   /** Entered on a per-kg line; derived on a per-pouch one. */
   quantityKg: number;
@@ -89,10 +89,10 @@ export function computeItem(
   const pouchesPerKg = areaTerm > 0 ? round(1000 / (areaTerm / 10000), 2) : 0;
 
   /*
-   * Standup and standup-zipper pouches are sold by the piece, everything else
-   * by weight. On a per-pouch line the office types a pouch count and a rate
-   * per pouch, and the weight is worked back from pouches-per-kg — that is the
-   * figure the film is ordered against, so it still has to exist.
+   * On a per-pouch line the office types a pouch count and a rate per pouch,
+   * and the weight is worked back from pouches-per-kg — that is the figure the
+   * film is ordered against, so it still has to exist. A per-kg line works the
+   * pouch count back the same way, for the same reason in reverse.
    */
   const basis = input.pricingBasis ?? 'PER_KG';
   const perPouch = basis === 'PER_POUCH';
@@ -141,6 +141,142 @@ export function computeItem(
   };
 }
 
+/* ---------------------------------------------------------------------------
+ * Geometry and tiers
+ *
+ * A quotation line has two halves that change at different rates. The geometry
+ * — thickness, pouches per kilogram, the cylinders — depends only on the design
+ * and holds for every quantity quoted. The money depends on the quantity, and a
+ * quotation may now carry two or three of those side by side so the customer
+ * can see what ordering more does to the unit price.
+ *
+ * Splitting them is what makes that comparison honest: cylinders do not scale
+ * with the order, so they are costed once here and spread across whichever
+ * quantity is being looked at. That is the entire reason the price per pouch
+ * falls as the quantity rises.
+ * ------------------------------------------------------------------------- */
+
+export interface ItemGeometryInputs {
+  /** How many plies. Only the yield allowance depends on it. */
+  layerCount: number;
+  /** Total structure thickness — see `totalMicronForLayers` in material-cost. */
+  micron: number;
+  widthMm: number;
+  heightMm: number;
+  repeatWidth: number;
+  repeatHeight: number;
+  cylinderCount: number;
+  transportCost?: number;
+  /**
+   * False when the design's cylinders already exist, so nothing is charged for
+   * them. Decided per line rather than per customer: a long-standing customer
+   * ordering a new design still needs new cylinders engraved, and the printed
+   * terms say exactly that — "each job/design requires a separate cylinder".
+   */
+  chargeCylinders?: boolean;
+}
+
+export interface ItemGeometry {
+  micron: number;
+  pouchesPerKg: number;
+  cylinderWidth: number;
+  cylinderCircumference: number;
+  costPerCylinder: number;
+  totalCylinderCost: number;
+}
+
+/** Everything about a line that does not depend on how much is ordered. */
+export function computeItemGeometry(input: ItemGeometryInputs, cylinderRate: number): ItemGeometry {
+  const factor = layerFactor(input.layerCount);
+  const areaTerm = ((input.widthMm * input.heightMm) / 100) * input.micron * factor;
+  const pouchesPerKg = areaTerm > 0 ? round(1000 / (areaTerm / 10000), 2) : 0;
+
+  const cylinderWidth = round(input.widthMm * input.repeatWidth + 80, 2);
+  const cylinderCircumference = round(input.heightMm * input.repeatHeight, 2);
+  const costPerCylinder = round(((cylinderWidth * cylinderCircumference) / 100) * cylinderRate, 2);
+
+  /*
+   * A design whose cylinders already exist is quoted without them — transport
+   * included, because there is nothing to deliver. The per-cylinder figure is
+   * still reported so the office can see what a new set would have cost.
+   */
+  const totalCylinderCost =
+    (input.chargeCylinders ?? true)
+      ? round(costPerCylinder * input.cylinderCount + (input.transportCost ?? 0), 2)
+      : 0;
+
+  return {
+    micron: round(input.micron, 2),
+    pouchesPerKg,
+    cylinderWidth,
+    cylinderCircumference,
+    costPerCylinder,
+    totalCylinderCost,
+  };
+}
+
+/** One quantity a line is priced at. */
+export interface TierInputs {
+  pricingBasis?: PricingBasis;
+  /** Entered on a per-kg line; derived on a per-pouch one. */
+  quantityKg: number;
+  ratePerKg: number;
+  /** Entered on a per-pouch line; derived on a per-kg one. */
+  quantityPouches?: number;
+  ratePerPouch?: number;
+}
+
+export interface TierComputed {
+  /** Both units, whichever was typed — the film is ordered by weight either way. */
+  quantityKg: number;
+  ratePerKg: number;
+  totalPouches: number;
+  totalAmount: number;
+  /** Effective cost of a single pouch — useful when comparing quotes. */
+  costPerPouch: number;
+}
+
+/**
+ * One quantity on one line.
+ *
+ * Note the rounding order: pouches-per-kg arrives already rounded to 2dp, and
+ * is multiplied by the quantity afterwards. The spreadsheet does this, and it
+ * is what makes the 1 Kg Paneer Bag line read 24,930 rather than 24,929.
+ */
+export function computeTier(pouchesPerKg: number, input: TierInputs): TierComputed {
+  const perPouch = (input.pricingBasis ?? 'PER_KG') === 'PER_POUCH';
+
+  const quantityPouches = perPouch ? Math.max(0, Math.round(input.quantityPouches ?? 0)) : 0;
+
+  const quantityKg = perPouch
+    ? pouchesPerKg > 0
+      ? round(quantityPouches / pouchesPerKg, 3)
+      : 0
+    : input.quantityKg;
+
+  const totalPouches = perPouch ? quantityPouches : round(pouchesPerKg * input.quantityKg, 0);
+
+  const totalAmount = perPouch
+    ? round(quantityPouches * (input.ratePerPouch ?? 0), 2)
+    : round(input.quantityKg * input.ratePerKg, 2);
+
+  // The equivalent rate in the other unit, so tiers and lines priced on
+  // different bases can still be compared with each other.
+  const ratePerKg = perPouch
+    ? quantityKg > 0
+      ? round(totalAmount / quantityKg, 2)
+      : 0
+    : input.ratePerKg;
+
+  return {
+    quantityKg,
+    ratePerKg,
+    totalPouches,
+    totalAmount,
+    costPerPouch: totalPouches > 0 ? round(totalAmount / totalPouches, 4) : 0,
+  };
+}
+
 export interface QuotationTotals {
   totalQuantityKg: number;
   totalCylinderCount: number;
@@ -170,7 +306,12 @@ export interface QuotationRates {
  * they actually collect, so both rows and the total now use it.
  */
 export function computeTotals(
-  items: Array<{ quantityKg: number; cylinderCount: number } & QuotationItemComputed>,
+  items: Array<{
+    quantityKg: number;
+    cylinderCount: number;
+    totalAmount: number;
+    totalCylinderCost: number;
+  }>,
   rates: QuotationRates,
 ): QuotationTotals {
   const gst = 1 + rates.gstPercent / 100;

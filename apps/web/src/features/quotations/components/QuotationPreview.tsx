@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, ExternalLink, FileText, Pencil, Send } from 'lucide-react';
+import { CopyPlus, Download, ExternalLink, FileText, History, Pencil, Send } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -7,7 +7,13 @@ import { Spinner } from '@/components/ui/Spinner';
 import { ApiClientError } from '@/lib/api-client';
 import { openBlobUrl, saveBlob } from '@/lib/download';
 import { toast } from '@/lib/toast';
-import { fetchQuotationPdf, quotationPdfName, useQuotation } from '../api/quotation-api';
+import {
+  fetchQuotationPdf,
+  quotationPdfName,
+  useCreateQuotationVersion,
+  useQuotation,
+  useQuotationVersions,
+} from '../api/quotation-api';
 
 /**
  * Shows the generated PDF itself, in the browser's own viewer.
@@ -35,7 +41,39 @@ export function QuotationPreview({
    */
   onSend?: (() => void) | undefined;
 }) {
-  const { data } = useQuotation(id);
+  /*
+   * Which version is on screen. A quotation may have been revised, and the
+   * office needs to see what the customer was actually sent last month — so the
+   * modal opens on whichever version it was given and the dropdown moves within
+   * that number, without disturbing the page underneath.
+   */
+  const [viewingId, setViewingId] = useState<string | null>(id);
+  useEffect(() => setViewingId(id), [id]);
+
+  const { data } = useQuotation(viewingId);
+  const { data: versions } = useQuotationVersions(id);
+  const createVersion = useCreateQuotationVersion();
+
+  /*
+   * Editing and sending belong to the current version only. An earlier one is
+   * a record of what went out; re-sending it would put a superseded price back
+   * in front of the customer, and the list the caller looks the row up in does
+   * not contain it anyway.
+   */
+  const isCurrent = data?.isLatest !== false;
+
+  async function onNewVersion() {
+    if (!id) return;
+    try {
+      const revision = await createVersion.mutateAsync(id);
+      setViewingId(revision.id);
+      toast.success(`Version ${revision.version} created as a draft`);
+    } catch (cause) {
+      toast.error(
+        cause instanceof ApiClientError ? cause.message : 'Could not create a new version.',
+      );
+    }
+  }
 
   /*
    * The PDF is fetched here rather than handed to <object> as a URL, for two
@@ -59,7 +97,7 @@ export function QuotationPreview({
   const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
-    if (id === null) return;
+    if (viewingId === null) return;
 
     let cancelled = false;
     let objectUrl: string | null = null;
@@ -67,7 +105,7 @@ export function QuotationPreview({
     setBlob(null);
     setFailure(null);
 
-    fetchQuotationPdf(id)
+    fetchQuotationPdf(viewingId)
       .then((result) => {
         if (cancelled) return;
         objectUrl = URL.createObjectURL(result.blob);
@@ -88,7 +126,7 @@ export function QuotationPreview({
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [id]);
+  }, [viewingId]);
 
   const ready = pdfUrl !== null && blob !== null;
 
@@ -118,8 +156,8 @@ export function QuotationPreview({
           <Button variant="secondary" onClick={onClose}>
             Close
           </Button>
-          {id ? (
-            <Link to={`/quotations/${id}/edit`}>
+          {viewingId && isCurrent ? (
+            <Link to={`/quotations/${viewingId}/edit`}>
               <Button variant="secondary">
                 <Pencil className="size-4" />
                 Edit
@@ -127,11 +165,25 @@ export function QuotationPreview({
             </Link>
           ) : null}
           {/*
+            A revision keeps the number and starts as a draft, so the version
+            the customer already has stays exactly as they received it.
+          */}
+          {id && isCurrent ? (
+            <Button
+              variant="secondary"
+              onClick={() => void onNewVersion()}
+              loading={createVersion.isPending}
+            >
+              <CopyPlus className="size-4" />
+              New version
+            </Button>
+          ) : null}
+          {/*
             Deliberately not disabled while the preview is still rendering:
             sending builds its own PDF on the server, so it never waits on the
             copy being drawn here.
           */}
-          {id && onSend ? (
+          {id && onSend && isCurrent ? (
             <Button variant="secondary" onClick={onSend}>
               <Send className="size-4" />
               Send
@@ -155,6 +207,42 @@ export function QuotationPreview({
     >
       {id ? (
         <div className="bg-ink-100 -mx-5 -my-4 p-0 sm:p-3">
+          {/*
+            Only when there is something to choose between. One version is the
+            normal case, and a dropdown offering a single option is furniture.
+          */}
+          {versions && versions.length > 1 ? (
+            <div className="flex flex-wrap items-center gap-3 bg-white px-4 py-2.5 sm:mb-3 sm:rounded-[var(--radius-md)]">
+              <label
+                htmlFor="quotation-version"
+                className="text-ink-500 flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase"
+              >
+                <History className="size-3.5" aria-hidden />
+                Version
+              </label>
+              <select
+                id="quotation-version"
+                value={viewingId ?? ''}
+                onChange={(event) => setViewingId(event.target.value)}
+                className="border-ink-200 text-ink-800 focus-visible:ring-brand-500 rounded-[var(--radius-sm)] border bg-white px-2.5 py-1 text-sm focus-visible:ring-2 focus-visible:outline-none"
+              >
+                {versions.map((version) => (
+                  <option key={version.id} value={version.id}>
+                    Version {version.version}
+                    {version.isLatest ? ' (current)' : ''} — {version.status.toLowerCase()}
+                  </option>
+                ))}
+              </select>
+
+              {isCurrent ? null : (
+                <span className="text-ink-500 text-xs">
+                  An earlier version, kept as a record of what was sent. Editing and sending apply
+                  to the current one.
+                </span>
+              )}
+            </div>
+          ) : null}
+
           {!ready ? (
             <div
               role="status"

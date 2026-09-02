@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import authRoutes from '../modules/auth/auth.routes.js';
 import customerRoutes from '../modules/customers/customer.routes.js';
+import gstinRoutes from '../modules/gstin/gstin.routes.js';
+import jobRoutes from '../modules/jobs/job.routes.js';
 import materialRoutes from '../modules/materials/material.routes.js';
 import monitorRoutes from '../modules/monitor/monitor.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
@@ -29,6 +31,13 @@ router.use('/customers', authenticate, requireModule('customers'), customerRoute
 router.use('/quotations', authenticate, requireModule('quotations'), quotationRoutes);
 
 /*
+ * Jobs are edited from two places — the customer editor and the quotation
+ * wizard — so this is gated on customers, the module that owns the data,
+ * rather than on whichever screen happens to be open.
+ */
+router.use('/jobs', authenticate, requireModule('customers'), jobRoutes);
+
+/*
  * Rates are readable by anyone signed in, because quotation costing depends on
  * them and the quotation screens would otherwise break for a user who has
  * quotations but not rates. Changing a rate still needs the rates module —
@@ -37,6 +46,13 @@ router.use('/quotations', authenticate, requireModule('quotations'), quotationRo
 router.use('/materials', authenticate, materialRoutes);
 
 router.use('/settings', authenticate, settingsRoutes);
+
+/*
+ * GSTIN lookup. Signed in, but not tied to a module: it is used from the
+ * customer form and from the quotation wizard, and gating it on one of those
+ * would break it on the other for anyone who has only the second.
+ */
+router.use('/gstin', authenticate, gstinRoutes);
 
 /** Administrators only — each router applies that guard to itself. */
 router.use('/users', userRoutes);
