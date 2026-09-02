@@ -104,7 +104,7 @@ export default function CustomersPage() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search company, contact, mobile, city…"
+            placeholder="Search company, brand, mobile, city…"
             aria-label="Search customers"
             className="pr-9 pl-9"
           />

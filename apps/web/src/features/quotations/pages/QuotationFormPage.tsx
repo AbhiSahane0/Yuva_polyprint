@@ -732,7 +732,19 @@ export default function QuotationFormPage() {
                         registration={register('customerName')}
                         value={watched.customerName ?? ''}
                         invalid={Boolean(formState.errors.customerName)}
-                        placeholder="Search companies…"
+                        placeholder="Search company or brand…"
+                        /*
+                         * The list is already what the server matched, on
+                         * company name OR brand. Filtering it again by company
+                         * name here discarded every customer found by their
+                         * brand — typing "Ashoka" returned ADF Foods Ltd from
+                         * the API and then showed nothing at all.
+                         */
+                        filterLocally={false}
+                        describe={(name) => {
+                          const brand = customers.find((c) => c.companyName === name)?.brandName;
+                          return brand && brand !== 'NA' ? brand : undefined;
+                        }}
                         onPick={(name) => {
                           setValue('customerName', name, { shouldValidate: true });
                           // The name is what the office types; the link to the

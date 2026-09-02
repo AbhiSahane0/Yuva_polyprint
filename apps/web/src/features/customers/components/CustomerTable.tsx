@@ -260,6 +260,15 @@ export function CustomerTable({
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-ink-900 text-sm font-medium">{customer.companyName}</p>
+                  {/*
+                    The brand gets its own line rather than joining the one
+                    below: it identifies the customer, where a mobile number and
+                    a town merely describe them — and it is the name an enquiry
+                    arrives under.
+                  */}
+                  {customer.brandName !== 'NA' ? (
+                    <p className="text-ink-600 mt-0.5 text-xs">{customer.brandName}</p>
+                  ) : null}
                   <p className="text-ink-500 mt-1 text-xs tabular-nums">
                     <Value value={customer.mobile} />
                     {customer.city !== 'NA' ? ` · ${customer.city}` : ''}
