@@ -61,8 +61,21 @@ export const quotationItemSchema = z
      */
     pricingBasis: z.enum(PRICING_BASES).nullable().default(null),
 
+    /** The finished pouch, before any gusset. */
     widthMm: positiveNumber('Width'),
     heightMm: positiveNumber('Height'),
+
+    /**
+     * A gazette pouch gussets at the sides and the base so it stands.
+     *
+     * Off by default, because most jobs are flat bags. The three depths are
+     * film the flat sheet has to carry, so they enlarge both the weight and the
+     * cylinder — see `computeItemGeometry`.
+     */
+    isGazette: z.boolean().default(false),
+    gazetteBottom: zeroOrMore('Bottom gazette').default(0),
+    gazetteLeft: zeroOrMore('Left gazette').default(0),
+    gazetteRight: zeroOrMore('Right gazette').default(0),
 
     /**
      * The structure, outermost ply first. Two or three in practice; the upper
@@ -97,7 +110,34 @@ export const quotationItemSchema = z
    * dropped, so the stored line always matches what the form is showing.
    */
   .transform((item) => {
-    const line = item.jobKind === 'ROLL' ? { ...item, pouchType: null, pouchTypeNote: '' } : item;
+    /*
+     * A roll is film on a reel: no pouch style, and no gusset either, because
+     * nothing has been converted. Dropping them rather than rejecting the
+     * combination means switching Pouch to Roll is not an error the office has
+     * to go and clear.
+     */
+    const rolled =
+      item.jobKind === 'ROLL'
+        ? {
+            ...item,
+            pouchType: null,
+            pouchTypeNote: '',
+            isGazette: false,
+            gazetteBottom: 0,
+            gazetteLeft: 0,
+            gazetteRight: 0,
+          }
+        : item;
+
+    /*
+     * The depths only mean anything when the box is ticked. Zeroing them when
+     * it is not keeps a stored line honest: a quotation cannot carry a 40mm
+     * bottom gusset that was never charged for, waiting to confuse whoever
+     * reads it next.
+     */
+    const line = rolled.isGazette
+      ? rolled
+      : { ...rolled, gazetteBottom: 0, gazetteLeft: 0, gazetteRight: 0 };
 
     /*
      * A roll is film on a reel: there are no pouches to count, so the choice is
@@ -120,6 +160,18 @@ export const quotationItemSchema = z
     message: 'Describe the pouch type',
     path: ['pouchTypeNote'],
   })
+  /*
+   * A gazette with no depth anywhere is not a gazette. Caught here rather than
+   * left to price as an ordinary pouch, because the tick says the office meant
+   * to enter something and then did not.
+   */
+  .refine(
+    (item) => !item.isGazette || item.gazetteBottom + item.gazetteLeft + item.gazetteRight > 0,
+    {
+      message: 'Enter at least one gazette depth, or untick Gazette pouch',
+      path: ['gazetteBottom'],
+    },
+  )
   /*
    * Whichever pair a line is priced on has to be filled in, at every quantity.
    * Checked here rather than on the fields themselves because a per-pouch line

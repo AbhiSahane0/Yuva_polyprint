@@ -156,13 +156,38 @@ export function computeItem(
  * falls as the quantity rises.
  * ------------------------------------------------------------------------- */
 
+/**
+ * The depth a gazette pouch opens out to, in millimetres.
+ *
+ * A gazette is not a flat bag: it gussets at the sides and the base so it stands
+ * and holds volume. That depth is film the flat sheet has to carry — the pouch
+ * the customer holds is `widthMm × heightMm`, and the film it is cut from is
+ * bigger by exactly this.
+ */
+export interface GazetteInputs {
+  bottom: number;
+  left: number;
+  right: number;
+}
+
 export interface ItemGeometryInputs {
   /** How many plies. Only the yield allowance depends on it. */
   layerCount: number;
   /** Total structure thickness — see `totalMicronForLayers` in material-cost. */
   micron: number;
+  /** The finished pouch, before any gusset is added. */
   widthMm: number;
   heightMm: number;
+  /**
+   * False for a roll.
+   *
+   * Film on a reel has not been converted into anything: there is no pouch to
+   * count, so pouches-per-kilogram is not a small number or an approximate one,
+   * it is not a quantity that exists. The customer buys the weight.
+   */
+  makesPouches?: boolean;
+  /** Absent, or all zero, on an ordinary flat pouch. */
+  gazette?: GazetteInputs | undefined;
   repeatWidth: number;
   repeatHeight: number;
   cylinderCount: number;
@@ -178,6 +203,16 @@ export interface ItemGeometryInputs {
 
 export interface ItemGeometry {
   micron: number;
+  /**
+   * The flat film one pouch is cut from — the pouch plus its gussets.
+   *
+   * Reported because it is what the office checks against the machine, and
+   * because on a gazette job it is the figure that explains why the weight and
+   * the cylinder are larger than the pouch's own dimensions suggest.
+   */
+  filmWidthMm: number;
+  filmHeightMm: number;
+  /** Zero on a roll: nothing has been converted into a pouch. */
   pouchesPerKg: number;
   cylinderWidth: number;
   cylinderCircumference: number;
@@ -188,11 +223,40 @@ export interface ItemGeometry {
 /** Everything about a line that does not depend on how much is ordered. */
 export function computeItemGeometry(input: ItemGeometryInputs, cylinderRate: number): ItemGeometry {
   const factor = layerFactor(input.layerCount);
-  const areaTerm = ((input.widthMm * input.heightMm) / 100) * input.micron * factor;
-  const pouchesPerKg = areaTerm > 0 ? round(1000 / (areaTerm / 10000), 2) : 0;
 
-  const cylinderWidth = round(input.widthMm * input.repeatWidth + 80, 2);
-  const cylinderCircumference = round(input.heightMm * input.repeatHeight, 2);
+  /*
+   * The film, not the pouch.
+   *
+   * A gusset is depth the flat sheet has to carry: the sides widen it, the base
+   * lengthens it. Everything downstream works from this rather than from the
+   * finished size — the weight, because that film is what is bought, and the
+   * cylinder, because that film is what is printed.
+   */
+  const filmWidthMm = round(
+    input.widthMm + (input.gazette?.left ?? 0) + (input.gazette?.right ?? 0),
+    2,
+  );
+  const filmHeightMm = round(input.heightMm + (input.gazette?.bottom ?? 0), 2);
+
+  /*
+   * Grams of film per pouch, and from that pouches per kilogram:
+   *
+   *     grams  = width × height × micron × factor ÷ 1,000,000
+   *     per kg = 1000 ÷ grams
+   *
+   * Written as one expression below, but that is the arithmetic. The 1 Kg
+   * Paneer Bag — 560 × 220 at 74µ over two plies — comes to 10.03 g of film and
+   * so 99.72 pouches to the kilogram, matching the client's sheet exactly.
+   *
+   * A roll is skipped: film on a reel is not pouches, and a confident figure
+   * there would be worse than none.
+   */
+  const areaTerm = ((filmWidthMm * filmHeightMm) / 100) * input.micron * factor;
+  const pouchesPerKg =
+    (input.makesPouches ?? true) && areaTerm > 0 ? round(1000 / (areaTerm / 10000), 2) : 0;
+
+  const cylinderWidth = round(filmWidthMm * input.repeatWidth + 80, 2);
+  const cylinderCircumference = round(filmHeightMm * input.repeatHeight, 2);
   const costPerCylinder = round(((cylinderWidth * cylinderCircumference) / 100) * cylinderRate, 2);
 
   /*
@@ -207,6 +271,8 @@ export function computeItemGeometry(input: ItemGeometryInputs, cylinderRate: num
 
   return {
     micron: round(input.micron, 2),
+    filmWidthMm,
+    filmHeightMm,
     pouchesPerKg,
     cylinderWidth,
     cylinderCircumference,

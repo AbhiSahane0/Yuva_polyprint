@@ -522,6 +522,27 @@ PET 12 + MET PET 12 + Poly 60 micron = 86
 2 plies: 1.1     3 or more: 1.2
 ```
 
+**Gazette pouches and rolls change what "width × height" means.**
+
+A gazette gussets at the sides and the base so the pouch stands, and that depth
+is film the flat sheet has to carry. The pouch the customer holds is
+`widthMm × heightMm`; the film it is cut from is
+
+```
+film width  = width  + left gazette + right gazette
+film height = height + bottom gazette
+```
+
+Everything below works from the film, not the pouch — the weight, because that
+film is what is bought, and the cylinder, because that film is what is printed.
+A 250 × 205 pouch with 30/30/40 is cut from 310 × 245, which is both heavier and
+a wider engraving.
+
+**A roll yields no pouches at all.** Film on a reel has not been converted into
+anything, so pouches-per-kg is not small or approximate — it is a quantity that
+does not exist. The engine returns 0 and the form and the PDF both print a dash;
+`0.00` would read as a count.
+
 **3. Pouches per kg** — how many pouches a kilogram of film yields:
 
 ```

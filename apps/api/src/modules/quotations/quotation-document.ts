@@ -127,8 +127,8 @@ export function renderQuotationHtml(quotation: Quotation): string {
             ? `<td class="c"${span}>${index + 1}</td>
         <td class="job"${span}>${esc(item.jobName)}</td>
         <td class="c"${span}>${item.layers.length}</td>
-        <td class="r"${span}>${formatNumber(item.widthMm)}</td>
-        <td class="r"${span}>${formatNumber(item.heightMm)}</td>
+        <td class="r"${span}>${formatNumber(item.filmWidthMm)}</td>
+        <td class="r"${span}>${formatNumber(item.filmHeightMm)}</td>
         <td class="r"${span}>${formatNumber(item.micron)}</td>
         <td class="r"${span}>${
           /*
@@ -137,7 +137,8 @@ export function renderQuotationHtml(quotation: Quotation): string {
            * 29.67 prints as 30, and 30 x 100 kg suggests 3,000 pouches where
            * the line correctly reads 2,967.
            */
-          formatNumber(item.pouchesPerKg, 2)
+          // A roll has no pouches. A dash says that; 0.00 reads as a count.
+          item.jobKind === 'ROLL' ? '—' : formatNumber(item.pouchesPerKg, 2)
         }</td>`
             : ''
         }
@@ -148,7 +149,7 @@ export function renderQuotationHtml(quotation: Quotation): string {
             ? formatNumber(q?.quantityPouches ?? 0)
             : formatNumber(q?.quantityKg ?? 0)
         }</td>
-        <td class="r">${formatNumber(q?.totalPouches ?? 0)}</td>
+        <td class="r">${item.jobKind === 'ROLL' ? '—' : formatNumber(q?.totalPouches ?? 0)}</td>
         <td class="r">${
           item.pricingBasis === 'PER_POUCH'
             ? `${formatNumber(q?.ratePerPouch ?? 0, 2)} /pc`

@@ -46,6 +46,15 @@ export interface QuotationItem {
 
   widthMm: number;
   heightMm: number;
+  /** True when this pouch gussets at the sides and base. */
+  isGazette: boolean;
+  gazetteBottom: number;
+  gazetteLeft: number;
+  gazetteRight: number;
+  /** The flat film one pouch is cut from: the pouch plus its gussets. */
+  filmWidthMm: number;
+  filmHeightMm: number;
+
   pricingBasis: PricingBasis;
 
   repeatWidth: number;

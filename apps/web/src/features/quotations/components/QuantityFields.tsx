@@ -42,6 +42,7 @@ export function QuantityFields({
   itemIndex,
   pricingBasis,
   onBasisChange,
+  showsPouches = true,
   results,
   errors,
 }: {
@@ -54,6 +55,13 @@ export function QuantityFields({
    * pouches to count, so offering the choice would be offering a mistake.
    */
   onBasisChange?: ((next: PricingBasis) => void) | undefined;
+  /**
+   * False on a roll. The other unit is normally worked back and shown beside
+   * the total — kilograms for a per-piece line, pieces for a per-kilo one — but
+   * a reel has no pieces, and "0 pouches" reads as a count rather than as an
+   * absence.
+   */
+  showsPouches?: boolean;
   /** One per row, in order. Absent entries render as blanks, not zeroes. */
   results: (QuantityResult | undefined)[];
   errors?: Record<string, { message?: string } | undefined>[];
@@ -171,11 +179,11 @@ export function QuantityFields({
                       <span className="text-ink-800 font-medium">
                         {formatRs(result.totalAmount)}
                       </span>
-                      <span>
-                        {perPouch
-                          ? `${formatNumber(result.quantityKg, 2)} kg`
-                          : `${formatNumber(result.totalPouches)} pouches`}
-                      </span>
+                      {perPouch ? (
+                        <span>{formatNumber(result.quantityKg, 2)} kg</span>
+                      ) : showsPouches ? (
+                        <span>{formatNumber(result.totalPouches)} pouches</span>
+                      ) : null}
                       {result.marginPercent === null ? (
                         <span className="text-ink-400">margin —</span>
                       ) : (

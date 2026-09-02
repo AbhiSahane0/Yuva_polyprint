@@ -18,6 +18,8 @@ import {
   type ItemGeometry,
   type MaterialCostResult,
   PET_MICRON_PER_LAYER,
+  JOB_KINDS,
+  JOB_KIND_LABELS,
   POUCH_TYPES,
   POUCH_TYPE_LABELS,
   type PouchType,
@@ -113,30 +115,6 @@ function today(): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
-/**
- * What a line is, as one choice.
- *
- * A grid of drawings sat here before. It read as decoration rather than a
- * control, and it pushed the fields that matter below the fold on every job.
- * The choice itself still carries weight — the style decides whether the line
- * is sold by the kilogram or by the piece — so the basis is spelled out beside
- * the box rather than left to be discovered on the next step.
- */
-const CONSTRUCTIONS: {
-  value: string;
-  label: string;
-  jobKind: 'POUCH' | 'ROLL';
-  pouchType: PouchType | null;
-}[] = [
-  ...POUCH_TYPES.map((pouchType) => ({
-    value: `POUCH:${pouchType}`,
-    label: POUCH_TYPE_LABELS[pouchType],
-    jobKind: 'POUCH' as const,
-    pouchType,
-  })),
-  { value: 'ROLL:', label: 'Roll', jobKind: 'ROLL' as const, pouchType: null },
-];
-
 type ItemValues = NonNullable<CreateQuotationFormValues['items']>[number];
 
 /**
@@ -150,6 +128,10 @@ const BLANK_DESIGN = {
   jobName: '',
   widthMm: '',
   heightMm: '',
+  isGazette: false,
+  gazetteBottom: 0,
+  gazetteLeft: 0,
+  gazetteRight: 0,
   layers: [
     { materialId: null, micron: PET_MICRON_PER_LAYER },
     { materialId: null, micron: 50 },
@@ -407,6 +389,10 @@ export default function QuotationFormPage() {
         pricingBasis: item.pricingBasis,
         widthMm: item.widthMm,
         heightMm: item.heightMm,
+        isGazette: item.isGazette,
+        gazetteBottom: item.gazetteBottom,
+        gazetteLeft: item.gazetteLeft,
+        gazetteRight: item.gazetteRight,
         layers: item.layers.map((layer) => ({
           materialId: layer.materialId,
           micron: layer.micron,
@@ -501,6 +487,14 @@ export default function QuotationFormPage() {
           micron: totalMicronForLayers(layers),
           widthMm: num(item?.widthMm),
           heightMm: num(item?.heightMm),
+          makesPouches: (item?.jobKind ?? 'POUCH') !== 'ROLL',
+          gazette: item?.isGazette
+            ? {
+                bottom: num(item?.gazetteBottom),
+                left: num(item?.gazetteLeft),
+                right: num(item?.gazetteRight),
+              }
+            : undefined,
           repeatWidth: num(item?.repeatWidth),
           repeatHeight: num(item?.repeatHeight),
           cylinderCount: num(item?.cylinderCount),
@@ -1279,49 +1273,98 @@ function JobCard({
           </Field>
         </div>
 
-        <div className="col-span-2 sm:col-span-4">
-          <Field
-            label="What it is"
-            htmlFor={`items.${index}.pouchType`}
-            hint={basis === 'PER_POUCH' ? 'Priced per pouch' : 'Priced per kg'}
-            error={errors?.pouchType?.message}
-          >
+        {/*
+          Type and style are two questions, not one.
+          
+          They were merged into a single list for a while, which read tidily and
+          hid the thing that matters most: a roll is not a pouch at all. It is
+          film on a reel, it has no style, and nothing about it is counted in
+          pieces. Asking Type first makes that a decision rather than an option
+          buried at the bottom of eight.
+        */}
+        <div className="col-span-1 sm:col-span-2">
+          <Field label="Type" htmlFor={`items.${index}.jobKind`} hint="What the customer receives">
             <Select
-              id={`items.${index}.pouchType`}
-              value={`${jobKind}:${pouchType ?? ''}`}
-              invalid={Boolean(errors?.pouchType)}
+              id={`items.${index}.jobKind`}
+              value={jobKind}
               onChange={(event) => {
-                const choice = CONSTRUCTIONS.find((option) => option.value === event.target.value);
-                if (!choice) return;
-                setValue(`items.${index}.jobKind`, choice.jobKind as ItemValues['jobKind'], {
+                const nextKind = event.target.value as 'POUCH' | 'ROLL';
+                setValue(`items.${index}.jobKind`, nextKind as ItemValues['jobKind'], {
                   shouldDirty: true,
                 });
-                setValue(`items.${index}.pouchType`, choice.pouchType as ItemValues['pouchType'], {
+
+                /*
+                 * A roll has no style and no gusset — nothing has been
+                 * converted. Clearing them here rather than rejecting the
+                 * combination means switching Pouch to Roll is not an error the
+                 * office has to go and clear; the schema does the same on the
+                 * way in, so a request cannot smuggle them back.
+                 */
+                const nextPouchType = nextKind === 'ROLL' ? null : (pouchType ?? 'STANDUP');
+                setValue(`items.${index}.pouchType`, nextPouchType as ItemValues['pouchType'], {
                   shouldDirty: true,
                   shouldValidate: true,
                 });
-                /*
-                 * The style resets the unit to the trade's convention for it.
-                 * Changing what the line IS is a bigger decision than how it is
-                 * sold, and landing on the conventional answer is what someone
-                 * who never touches the switch expects — a roll, in particular,
-                 * has no pouches to count.
-                 */
+                if (nextKind === 'ROLL') {
+                  setValue(`items.${index}.isGazette`, false, { shouldDirty: true });
+                }
                 setValue(
                   `items.${index}.pricingBasis`,
-                  pricingBasisFor(choice.jobKind, choice.pouchType) as ItemValues['pricingBasis'],
+                  pricingBasisFor(nextKind, nextPouchType) as ItemValues['pricingBasis'],
                   { shouldDirty: true },
                 );
               }}
             >
-              {CONSTRUCTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+              {JOB_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {JOB_KIND_LABELS[kind]}
                 </option>
               ))}
             </Select>
           </Field>
         </div>
+
+        {/* Only a pouch has a style. A roll is just film. */}
+        {jobKind === 'POUCH' ? (
+          <div className="col-span-1 sm:col-span-3">
+            <Field
+              label="Pouch type"
+              htmlFor={`items.${index}.pouchType`}
+              hint={basis === 'PER_POUCH' ? 'Priced per pouch' : 'Priced per kg'}
+              error={errors?.pouchType?.message}
+            >
+              <Select
+                id={`items.${index}.pouchType`}
+                value={pouchType ?? ''}
+                invalid={Boolean(errors?.pouchType)}
+                onChange={(event) => {
+                  const next = (event.target.value || null) as PouchType | null;
+                  setValue(`items.${index}.pouchType`, next as ItemValues['pouchType'], {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  });
+                  /*
+                   * The style resets the unit to the trade's convention for it.
+                   * Landing on the conventional answer is what someone who never
+                   * touches the switch expects.
+                   */
+                  setValue(
+                    `items.${index}.pricingBasis`,
+                    pricingBasisFor('POUCH', next) as ItemValues['pricingBasis'],
+                    { shouldDirty: true },
+                  );
+                }}
+              >
+                <option value="">— Choose —</option>
+                {POUCH_TYPES.map((style) => (
+                  <option key={style} value={style}>
+                    {POUCH_TYPE_LABELS[style]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+        ) : null}
 
         {pouchType === 'OTHER' ? (
           <div className="col-span-2 sm:col-span-5">
@@ -1335,6 +1378,85 @@ function JobCard({
                 {...register(`items.${index}.pouchTypeNote`)}
               />
             </Field>
+          </div>
+        ) : null}
+
+        {/*
+          A gazette gussets at the sides and the base so the pouch stands.
+          
+          Off by default, because most jobs are flat bags. The three depths are
+          film the flat sheet has to carry, so they enlarge the weight — fewer
+          pouches to the kilogram — and the cylinder, which prints that film.
+          Hidden entirely on a roll: nothing has been converted.
+        */}
+        {jobKind === 'POUCH' ? (
+          <div className="col-span-2 sm:col-span-12">
+            <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4">
+              <label className="flex cursor-pointer items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  className="accent-brand-600 size-4 cursor-pointer"
+                  checked={item?.isGazette === true}
+                  onChange={(event) =>
+                    setValue(`items.${index}.isGazette`, event.target.checked, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+                  }
+                />
+                <span className="text-ink-800 text-sm font-medium">Gazette pouch</span>
+                <span className="text-ink-400 text-xs">
+                  Gussets at the sides and base — more film per pouch
+                </span>
+              </label>
+
+              {item?.isGazette ? (
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-12">
+                  {(
+                    [
+                      ['gazetteBottom', 'Bottom gazette', 'adds to height'],
+                      ['gazetteLeft', 'Left gazette', 'adds to width'],
+                      ['gazetteRight', 'Right gazette', 'adds to width'],
+                    ] as const
+                  ).map(([field, label, hint]) => (
+                    <div key={field} className="sm:col-span-2">
+                      <Field
+                        label={label}
+                        htmlFor={`items.${index}.${field}`}
+                        hint={hint}
+                        error={errors?.[field]?.message}
+                      >
+                        <Input
+                          id={`items.${index}.${field}`}
+                          inputMode="decimal"
+                          invalid={Boolean(errors?.[field])}
+                          {...register(`items.${index}.${field}`)}
+                        />
+                      </Field>
+                    </div>
+                  ))}
+
+                  {/*
+                    The film, spelled out. On a gazette the pouch's own
+                    dimensions no longer explain the weight or the cylinder, and
+                    this is the number that does.
+                  */}
+                  <div className="col-span-2 sm:col-span-6">
+                    <Field
+                      label="Film size"
+                      htmlFor={`items.${index}.filmSize`}
+                      hint="mm — what is cut"
+                    >
+                      <ReadOnlyValue
+                        value={`${formatNumber(cost?.geometry.filmWidthMm ?? 0)} × ${formatNumber(
+                          cost?.geometry.filmHeightMm ?? 0,
+                        )}`}
+                      />
+                    </Field>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
@@ -1355,6 +1477,7 @@ function JobCard({
             register={register}
             itemIndex={index}
             pricingBasis={basis}
+            showsPouches={jobKind !== 'ROLL'}
             onBasisChange={
               jobKind === 'ROLL'
                 ? undefined
@@ -1499,7 +1622,17 @@ function JobCard({
               Structure{' '}
               <strong className="text-ink-900">{formatNumber(cost?.geometry.micron ?? 0)}µ</strong>
             </span>
-            <span>{formatNumber(cost?.geometry.pouchesPerKg ?? 0, 2)} pouches/kg</span>
+            {/*
+             * Not on a roll. Film on a reel has not been converted into
+             * anything, so a pouch count is not small or approximate — it is a
+             * quantity that does not exist, and printing 0.00 would read as one
+             * that does.
+             */}
+            {jobKind === 'ROLL' ? (
+              <span className="text-ink-400">Sold by weight — no pouches</span>
+            ) : (
+              <span>{formatNumber(cost?.geometry.pouchesPerKg ?? 0, 2)} pouches/kg</span>
+            )}
             {/*
              * Only once the line can actually be costed. With no film chosen
              * the composite is just the ink and adhesive — a confident 4.3 GSM

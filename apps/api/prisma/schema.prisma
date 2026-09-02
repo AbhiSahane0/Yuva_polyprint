@@ -370,6 +370,22 @@ model QuotationItem {
   // ---- The design --------------------------------------------------------
   widthMm      Decimal      @map("width_mm") @db.Decimal(10, 2)
   heightMm     Decimal      @map("height_mm") @db.Decimal(10, 2)
+
+  /// A gazette pouch gussets at the sides and the base so it stands. The three
+  /// depths below are film the flat sheet has to carry, so they enlarge both
+  /// the weight and the cylinder — see computeItemGeometry in @yuva/shared.
+  /// Stored rather than derived, because a quotation has to be able to
+  /// reproduce its own figures years later.
+  isGazette     Boolean @default(false) @map("is_gazette")
+  gazetteBottom Decimal @default(0) @map("gazette_bottom") @db.Decimal(10, 2)
+  gazetteLeft   Decimal @default(0) @map("gazette_left") @db.Decimal(10, 2)
+  gazetteRight  Decimal @default(0) @map("gazette_right") @db.Decimal(10, 2)
+
+  /// The flat film one pouch is cut from — the pouch plus its gussets. Equal to
+  /// width and height on an ordinary bag; larger on a gazette. Stored because
+  /// it is what the printed document and the machine both work from.
+  filmWidthMm  Decimal @map("film_width_mm") @db.Decimal(10, 2)
+  filmHeightMm Decimal @map("film_height_mm") @db.Decimal(10, 2)
   /// Derived from the pouch style; stored so a saved line keeps the basis it
   /// was priced on even if the style is edited later.
   pricingBasis PricingBasis @default(PER_KG) @map("pricing_basis")
