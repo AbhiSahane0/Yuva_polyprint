@@ -1311,7 +1311,7 @@ one rather than a crash.
 | Variable             | Meaning                                                                                                                                         |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GSTIN_API_KEY`      | Optional. Without it the offline format check still runs — that is the half that catches typos — and only **Verify** reports itself unavailable |
-| `GSTIN_API_BASE_URL` | Defaults to `https://api.gstinapi.in`                                                                                                           |
+| `GSTIN_API_BASE_URL` | Defaults to `https://gstinapi.in`                                                                                                               |
 
 Rate limited to 120 lookups per hour per IP. That is generous against real use —
 once per new customer — and tight against a stuck retry loop draining the

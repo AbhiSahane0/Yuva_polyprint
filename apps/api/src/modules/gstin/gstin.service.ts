@@ -41,6 +41,12 @@ interface ProviderResponse {
   state_jurisdiction?: string | null;
   /** Set by some providers instead of an HTTP error when nothing is found. */
   valid?: boolean;
+  /**
+   * This provider names its failure field `error` and adds a `fix`; others use
+   * `message`. Both are read so a provider swap does not silently lose the one
+   * sentence that says what actually went wrong.
+   */
+  error?: string | null;
   message?: string | null;
 }
 
@@ -187,7 +193,7 @@ export async function lookupGstin(input: string, force = false): Promise<GstinLo
 
   // A provider that answers 200 with `valid: false` rather than a 404.
   if (body.valid === false) {
-    throw ApiError.notFound(body.message ?? 'No registration found for that GSTIN');
+    throw ApiError.notFound(body.error ?? body.message ?? 'No registration found for that GSTIN');
   }
 
   const lookup = toLookup(gstin, body);

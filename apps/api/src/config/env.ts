@@ -59,7 +59,13 @@ const envSchema = z.object({
    * A developer without credentials is not blocked from anything else.
    */
   GSTIN_API_KEY: optional(z.string().min(1)),
-  GSTIN_API_BASE_URL: z.string().url().default('https://api.gstinapi.in'),
+  /*
+   * The apex domain, not an `api.` subdomain — `api.gstinapi.in` does not
+   * resolve at all. Verified against the live service: an unauthenticated
+   * GET to `/v1/gstin/:gstin` here answers 401 asking for the x-api-key
+   * header, while `/api/v1/...` answers 404.
+   */
+  GSTIN_API_BASE_URL: z.string().url().default('https://gstinapi.in'),
 
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
