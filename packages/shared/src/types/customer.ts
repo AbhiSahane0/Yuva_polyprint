@@ -63,6 +63,8 @@ export interface CustomerJob {
 export interface Customer {
   id: string;
   companyName: string;
+  /** What they trade as. 'NA' when not recorded. */
+  brandName: string;
   contactPerson: string;
   address: string;
   city: string;

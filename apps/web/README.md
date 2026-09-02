@@ -186,6 +186,24 @@ PET + Poly + Adhesive") and Pouches per kg ("From design size and composite
 GSM"). The two calculated ones update live as you type. The server recomputes
 on save regardless; the live figure is feedback, not the source of truth.
 
+#### Company and brand
+
+Two names, because customers genuinely have two. **Company** is who they are
+registered as and what belongs on an invoice; **Brand** is what they sell under
+and what the office actually calls them — a proprietorship registers as a person
+and trades as a brand.
+
+The table shows **Brand** where Contact used to be. A contact person was
+recorded for almost none of the imported customers; it is still stored and still
+editable on the form, it simply no longer earns a column.
+
+Searching matches on **both names**, so typing a brand finds the company
+registered behind it. That is the point — an enquiry arrives naming the brand.
+
+Brand starts empty on every customer; the office fills them in as they go. The
+quotation wizard shows it under the company once one is chosen, so you can
+confirm you picked the firm behind the brand you were asked about.
+
 #### GST number
 
 Sits with the contact details, is carried onto every quotation raised for that

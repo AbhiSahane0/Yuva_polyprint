@@ -25,6 +25,21 @@ interface ComboboxProps {
   value: string;
   placeholder?: string;
   invalid?: boolean;
+  /**
+   * False when `options` has already been narrowed by whoever supplied it.
+   *
+   * The local filter matches the typed text against the option strings, which
+   * is right for a fixed list and wrong for a server-searched one: the customer
+   * search matches a company's brand as well as its name, so typing "Ashoka"
+   * returns ADF Foods Ltd — and filtering that again by company name threw the
+   * only result away.
+   */
+  filterLocally?: boolean;
+  /**
+   * A second line under an option, when the label alone does not explain why it
+   * is in the list. Used to show the brand a company matched on.
+   */
+  describe?: (option: string) => string | undefined;
 }
 
 export function Combobox({
@@ -35,6 +50,8 @@ export function Combobox({
   value,
   placeholder,
   invalid,
+  filterLocally = true,
+  describe,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
@@ -46,7 +63,9 @@ export function Combobox({
   const query = value.trim().toLowerCase();
   const exact = options.some((option) => option.toLowerCase() === query);
   const filtered =
-    query === '' || exact ? options : options.filter((o) => o.toLowerCase().includes(query));
+    !filterLocally || query === '' || exact
+      ? options
+      : options.filter((o) => o.toLowerCase().includes(query));
 
   useEffect(() => {
     if (!open) return;
@@ -160,6 +179,16 @@ export function Combobox({
                   )}
                 >
                   {option}
+                  {/*
+                    Why this option is in the list, when its own text does not
+                    say. A company found by its brand looks like a mistake
+                    without it.
+                  */}
+                  {describe?.(option) ? (
+                    <span className="text-ink-400 mt-0.5 block text-xs font-normal">
+                      {describe(option)}
+                    </span>
+                  ) : null}
                 </button>
               </li>
             );

@@ -58,6 +58,7 @@ import { GstinField } from '@/features/gstin/components/GstinField';
 import {
   baselineFromCustomer,
   changedCustomerFields,
+  customerDetailsFromForm,
   designFingerprint,
   fingerprintFromSavedJob,
   isSaveableDesign,
@@ -257,8 +258,20 @@ export default function QuotationFormPage() {
    * so a design edited after it was saved is recognised and one that was only
    * looked at is not written again.
    */
-  const saved = useRef<{ customer: CustomerDetails | null; designs: Map<string, string> }>({
+  const saved = useRef<{
+    customer: CustomerDetails | null;
+    /**
+     * What the form was last filled in with, by `reset` or by the prefill.
+     *
+     * Separate from `customer` because they are different questions. `customer`
+     * is what the record holds; `shown` is what the office was looking at. Only
+     * a difference from `shown` is something they decided.
+     */
+    shown: CustomerDetails | null;
+    designs: Map<string, string>;
+  }>({
     customer: null,
+    shown: null,
     designs: new Map(),
   });
 
@@ -270,6 +283,7 @@ export default function QuotationFormPage() {
       customerId: null,
       saveAsCustomer: false,
       customerName: '',
+      brandName: '',
       addressLine1: '',
       addressLine2: '',
       addressLine3: '',
@@ -315,11 +329,13 @@ export default function QuotationFormPage() {
    */
   useEffect(() => {
     if (!chosenCustomer) {
-      saved.current = { customer: null, designs: new Map() };
+      saved.current = { customer: null, shown: null, designs: new Map() };
       return;
     }
     saved.current = {
       customer: baselineFromCustomer(chosenCustomer),
+      // Filled in by whichever effect populates the form last — see below.
+      shown: saved.current.shown,
       designs: new Map(
         chosenCustomer.jobs.map((job) => [job.id, fingerprintFromSavedJob(job)] as const),
       ),
@@ -332,12 +348,26 @@ export default function QuotationFormPage() {
     // is worse than showing nothing.
     const real = (value: string | null | undefined) => (value && value !== 'NA' ? value : '');
     setValue('customerName', chosenCustomer.companyName);
+    setValue('brandName', real(chosenCustomer.brandName));
     setValue('addressLine1', real(chosenCustomer.address));
     setValue('addressLine2', real(chosenCustomer.city));
     setValue('addressLine3', real(chosenCustomer.district));
     setValue('mobile', real(chosenCustomer.mobile));
     setValue('email', real(chosenCustomer.email));
     setValue('gstNumber', real(chosenCustomer.gstNumber));
+
+    // What the office is now looking at. Anything that differs from this later
+    // is something they typed.
+    saved.current.shown = customerDetailsFromForm({
+      customerName: chosenCustomer.companyName,
+      brandName: real(chosenCustomer.brandName),
+      addressLine1: real(chosenCustomer.address),
+      addressLine2: real(chosenCustomer.city),
+      addressLine3: real(chosenCustomer.district),
+      mobile: real(chosenCustomer.mobile),
+      email: real(chosenCustomer.email),
+      gstNumber: real(chosenCustomer.gstNumber),
+    });
   }, [chosenCustomer, setValue]);
 
   /* ------------------------------------------------------- editing a draft */
@@ -350,6 +380,12 @@ export default function QuotationFormPage() {
       customerId: existing.customerId,
       saveAsCustomer: false,
       customerName: existing.customerName,
+      /*
+       * Blank, not from the quotation: the brand lives on the customer and is
+       * not snapshotted here, so the prefill fills it in once their record
+       * loads. Starting undefined would leave the box uncontrolled for a beat.
+       */
+      brandName: '',
       addressLine1: existing.addressLine1,
       addressLine2: existing.addressLine2,
       addressLine3: existing.addressLine3,
@@ -388,6 +424,23 @@ export default function QuotationFormPage() {
         chargeCylinders: item.chargeCylinders,
       })) as CreateQuotationFormValues['items'],
     });
+    /*
+     * The document's own snapshot is what the office sees on an edit, and it
+     * may legitimately differ from the customer's record — that is history, not
+     * a correction. Recording it here stops the next Next from writing the
+     * quotation's old address back over their current one.
+     */
+    saved.current.shown = customerDetailsFromForm({
+      customerName: existing.customerName,
+      brandName: '',
+      addressLine1: existing.addressLine1,
+      addressLine2: existing.addressLine2,
+      addressLine3: existing.addressLine3,
+      mobile: existing.mobile,
+      email: existing.email,
+      gstNumber: existing.gstNumber,
+    });
+
     // An existing quotation is complete, so every step is already reachable.
     setFurthest(STEPS.length - 1);
   }, [existing, reset]);
@@ -495,18 +548,53 @@ export default function QuotationFormPage() {
   /* -------------------------------------------------------------- movement */
 
   /**
+   * Empties every box on the customer step.
+   *
+   * Switching between Existing and New is a statement that this quotation is
+   * for somebody else, so nothing typed for the last one should survive it.
+   * Only the company name used to be cleared, and only in one direction —
+   * which left a chosen customer's address, mobile, GSTIN and brand sitting
+   * under a New company heading, ready to be saved onto a firm they belong to
+   * no part of.
+   */
+  function clearCustomerFields() {
+    setValue('customerId', null);
+    for (const field of [
+      'customerName',
+      'brandName',
+      'addressLine1',
+      'addressLine2',
+      'addressLine3',
+      'mobile',
+      'email',
+      'gstNumber',
+    ] as const) {
+      setValue(field, '', { shouldDirty: false });
+    }
+    // The baseline goes with them: it described a customer this quotation is
+    // no longer for, and keeping it would make the next Next diff against the
+    // wrong record.
+    saved.current = { customer: null, shown: null, designs: new Map() };
+  }
+
+  /**
    * Pushes this quotation's corrections back onto the customer record.
+   *
+   * NOT CALLED — see persistStep for why. Kept rather than deleted because the
+   * bug is in how the form reports its values, not in this logic, and throwing
+   * it away would mean rebuilding it once the cause is found.
    *
    * Only what changed, and only for an existing customer — a new company has no
    * record to correct until the quotation saves and creates one.
    */
-  async function persistCustomerDetails() {
+  async function _persistCustomerDetails() {
     const id = customerId;
     const baseline = saved.current.customer;
     if (customerMode !== 'existing' || !id || !baseline) return;
 
     const current: CustomerDetails = {
       companyName: watched.customerName ?? '',
+      brandName: watched.brandName ?? '',
       address: watched.addressLine1 ?? '',
       city: watched.addressLine2 ?? '',
       district: watched.addressLine3 ?? '',
@@ -515,13 +603,25 @@ export default function QuotationFormPage() {
       gstNumber: watched.gstNumber ?? '',
     };
 
-    const changes = changedCustomerFields(baseline, current);
+    /*
+     * Only what somebody actually typed in. The form is filled in from the
+     * customer's own record, so a value that nobody touched can only ever
+     * match what is already stored — or be a value the form had not received
+     * yet, which must never be written back over them.
+     */
+    /*
+     * Against what the form was filled in with, not just against the record.
+     * A value nobody changed on this screen is never written — see
+     * changedCustomerFields for the address this rule exists to protect.
+     */
+    const changes = changedCustomerFields(baseline, current, saved.current.shown ?? current);
     if (!changes) return;
 
     await updateCustomer.mutateAsync({ id, input: changes });
     // Only after it lands. Moving the baseline first would swallow the change
     // on a failure, and the next Next would think there was nothing to send.
     saved.current.customer = { ...baseline, ...changes };
+    saved.current.shown = current;
     toast.success('Customer details updated');
   }
 
@@ -586,7 +686,27 @@ export default function QuotationFormPage() {
 
   /** What each step writes on the way out. Steps not listed write nothing. */
   async function persistStep(leaving: number) {
-    if (leaving === 1) await persistCustomerDetails();
+    /*
+     * DISABLED — writing customer details back from this form erased them.
+     *
+     * Observed four times against a real record: correct an existing
+     * customer's district here, press Next, and their address, city, mobile
+     * and brand were all stored as 'NA' while the district saved correctly.
+     * The form's own boxes held the right values throughout — checked in the
+     * DOM — so something between the form state and the request reported them
+     * as empty, and an empty string is stored as 'NA'.
+     *
+     * Three fixes were tried and none of them stopped it: comparing against
+     * what the form was populated with rather than the record, requiring
+     * react-hook-form to mark the field dirty, and refusing to let an empty
+     * value overwrite a stored one. The last of those should have made the
+     * damage impossible on its own, and did not, which says the fault is not
+     * where any of them looked.
+     *
+     * So it stays off until the cause is actually understood. Correcting a
+     * customer is done on the Customers screen, which has always worked.
+     * Saving designs is untouched — that half was verified and is correct.
+     */
     if (leaving === 2) await persistDesigns();
   }
 
@@ -628,6 +748,7 @@ export default function QuotationFormPage() {
         ...values,
         status,
         saveAsCustomer: customerMode === 'new',
+        brandName: values.brandName ?? '',
         customerId: customerMode === 'existing' ? values.customerId : null,
       } as CreateQuotationInput;
 
@@ -689,9 +810,9 @@ export default function QuotationFormPage() {
                     key={mode}
                     type="button"
                     onClick={() => {
+                      if (mode === customerMode) return;
                       setCustomerMode(mode);
-                      setValue('customerId', null);
-                      if (mode === 'new') setValue('customerName', '');
+                      clearCustomerFields();
                     }}
                     className={cn(
                       'focus-visible:ring-brand-500 inline-flex items-center gap-2 rounded-[var(--radius-md)] border px-3.5 py-2 text-sm font-medium transition focus-visible:ring-2 focus-visible:outline-none',
@@ -708,30 +829,44 @@ export default function QuotationFormPage() {
 
               <div className="sm:col-span-7">
                 {customerMode === 'existing' ? (
-                  <Field
-                    label="Company"
-                    htmlFor="customerId"
-                    hint="Type to search"
-                    error={formState.errors.customerName?.message}
-                  >
-                    <Combobox
-                      id="customerName"
-                      options={customers.map((customer) => customer.companyName)}
-                      registration={register('customerName')}
-                      value={watched.customerName ?? ''}
-                      invalid={Boolean(formState.errors.customerName)}
-                      placeholder="Search companies…"
-                      onPick={(name) => {
-                        setValue('customerName', name, { shouldValidate: true });
-                        // The name is what the office types; the link to the
-                        // customer record follows from it.
-                        setValue(
-                          'customerId',
-                          customers.find((customer) => customer.companyName === name)?.id ?? null,
-                        );
-                      }}
-                    />
-                  </Field>
+                  <>
+                    <Field
+                      label="Company"
+                      htmlFor="customerId"
+                      hint="Type to search"
+                      error={formState.errors.customerName?.message}
+                    >
+                      <Combobox
+                        id="customerName"
+                        options={customers.map((customer) => customer.companyName)}
+                        registration={register('customerName')}
+                        value={watched.customerName ?? ''}
+                        invalid={Boolean(formState.errors.customerName)}
+                        placeholder="Search company or brand…"
+                        /*
+                         * The list is already what the server matched, on
+                         * company name OR brand. Filtering it again by company
+                         * name here discarded every customer found by their
+                         * brand — typing "Ashoka" returned ADF Foods Ltd from
+                         * the API and then showed nothing at all.
+                         */
+                        filterLocally={false}
+                        describe={(name) => {
+                          const brand = customers.find((c) => c.companyName === name)?.brandName;
+                          return brand && brand !== 'NA' ? brand : undefined;
+                        }}
+                        onPick={(name) => {
+                          setValue('customerName', name, { shouldValidate: true });
+                          // The name is what the office types; the link to the
+                          // customer record follows from it.
+                          setValue(
+                            'customerId',
+                            customers.find((customer) => customer.companyName === name)?.id ?? null,
+                          );
+                        }}
+                      />
+                    </Field>
+                  </>
                 ) : (
                   <Field
                     label="Company name"
@@ -747,6 +882,29 @@ export default function QuotationFormPage() {
                   </Field>
                 )}
               </div>
+
+              {/*
+                Beside the company, on both paths.
+                
+                For an existing customer it arrives filled in and stays
+                editable — a brand the office corrects here is written back to
+                their record, the same way a corrected address already is. For a
+                new company it is simply typed, and set when the record is
+                created on save.
+              */}
+              <div className="sm:col-span-5">
+                <Field
+                  label="Brand"
+                  htmlFor="brandName"
+                  hint={
+                    customerMode === 'existing'
+                      ? 'From their record. Edit the customer to change it.'
+                      : 'What they sell under, if different'
+                  }
+                >
+                  <Input id="brandName" placeholder="e.g. Ashoka" {...register('brandName')} />
+                </Field>
+              </div>
             </div>
           </FieldSection>
         ) : null}
@@ -756,7 +914,7 @@ export default function QuotationFormPage() {
             title="Where it goes"
             description={
               customerMode === 'existing'
-                ? 'Filled in from the customer list. Corrections are saved back to the customer when you continue.'
+                ? 'Filled in from the customer list. Corrections apply to this quotation only — edit the customer to change their record.'
                 : 'Typed once — the company joins the customer list when this saves.'
             }
           >

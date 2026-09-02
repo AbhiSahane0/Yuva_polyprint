@@ -511,37 +511,60 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
          * already exists means the same firm, not a second one.
          */
         let customerId = input.customerId ?? null;
+        let customerWasCreated = false;
+
         if (customerId === null && input.saveAsCustomer) {
           const existing = await tx.customer.findUnique({
             where: { companyName: input.customerName },
             select: { id: true },
           });
-          customerId =
-            existing?.id ??
-            (
-              await tx.customer.create({
-                data: {
-                  companyName: input.customerName,
-                  // The quotation's address is three free-text lines; the customer
-                  // master keeps one. Joining them loses nothing a human reads.
-                  address:
-                    [input.addressLine1, input.addressLine2, input.addressLine3]
-                      .map((line) => line.trim())
-                      .filter(Boolean)
-                      .join(', ') || 'NA',
-                  mobile: input.mobile || 'NA',
-                  email: input.email || 'NA',
-                  gstNumber: input.gstNumber || 'NA',
-                  source: 'SHEET',
-                  // What the record was built from. There is no spreadsheet row
-                  // behind this one, so it says where it really came from.
-                  sourceRaw: `Created from quotation for ${input.customerName}`,
-                  // Typed in by hand, so it is as checked as it will ever be.
-                  isVerified: true,
-                },
-                select: { id: true },
-              })
-            ).id;
+
+          if (existing) {
+            customerId = existing.id;
+          } else {
+            /*
+             * The three address lines map back one-for-one, because that is how
+             * they were filled in: line 1 is the street address, line 2 the
+             * city, line 3 the district. They used to be joined into a single
+             * `address`, which meant a company created here and reopened showed
+             * the whole address in one box and an empty City — the form's own
+             * prefill reads them apart again.
+             */
+            const created = await tx.customer.create({
+              data: {
+                companyName: input.customerName,
+                brandName: input.brandName || 'NA',
+                address: input.addressLine1 || 'NA',
+                city: input.addressLine2 || 'NA',
+                district: input.addressLine3 || 'NA',
+                mobile: input.mobile || 'NA',
+                email: input.email || 'NA',
+                gstNumber: input.gstNumber || 'NA',
+                source: 'SHEET',
+                // What the record was built from. There is no spreadsheet row
+                // behind this one, so it says where it really came from.
+                sourceRaw: `Created from quotation for ${input.customerName}`,
+                // Typed in by hand, so it is as checked as it will ever be.
+                isVerified: true,
+              },
+              select: { id: true },
+            });
+            customerId = created.id;
+            customerWasCreated = true;
+          }
+        }
+
+        /*
+         * A brand corrected on the quotation belongs to the customer, so it is
+         * written back — the same way their address already is. Only when the
+         * office actually typed one: an empty box means "I did not say", not
+         * "erase what you have".
+         */
+        if (customerId !== null && !customerWasCreated && input.brandName) {
+          await tx.customer.update({
+            where: { id: customerId },
+            data: { brandName: input.brandName },
+          });
         }
 
         /*
@@ -633,6 +656,58 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
             },
             select: { id: true },
           });
+        }
+
+        /*
+         * A new company's designs join their record with the quotation.
+         *
+         * For an existing customer the wizard already does this as the office
+         * steps past each line. A new company has no record to attach to until
+         * this transaction creates one, so it happens here instead — otherwise
+         * the two paths would disagree, and a customer created from a quotation
+         * would arrive with no jobs at all.
+         *
+         * Idempotent by name within the customer, like the wizard's endpoint:
+         * two lines quoting the same design write one row, and re-saving does
+         * not add a second.
+         */
+        if (customerId !== null && customerWasCreated) {
+          const takenCodes = new Set<string>();
+          const written = new Set<string>();
+
+          for (const item of priced) {
+            const name = item.input.jobName.trim();
+            const key = name.toLowerCase();
+            if (name.length === 0 || written.has(key)) continue;
+            written.add(key);
+
+            /*
+             * Assembled into the shape the shared mapper reads, so a job created
+             * here is identical to one created when a quotation is won. The
+             * plies carry their costed GSM, which is the one thing the raw input
+             * does not know.
+             */
+            await tx.job.create({
+              data: {
+                ...jobDataFromQuotationItem({
+                  jobName: name,
+                  jobKind: item.input.jobKind,
+                  pouchType: item.input.pouchType,
+                  widthMm: item.input.widthMm,
+                  heightMm: item.input.heightMm,
+                  cylinderCount: item.input.cylinderCount,
+                  pouchesPerKg: item.geometry.pouchesPerKg,
+                  layers: item.layers.map((layer, position) => ({
+                    position: position + 1,
+                    micron: layer.micron,
+                    gsm: layer.gsm,
+                  })),
+                } as unknown as QuotationItem),
+                jobCode: await nextJobCode(tx, takenCodes),
+                customerId,
+              },
+            });
+          }
         }
 
         return created.id;

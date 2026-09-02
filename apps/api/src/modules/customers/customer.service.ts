@@ -197,6 +197,7 @@ function toCustomer(row: CustomerRow): Customer {
   return {
     id: row.id,
     companyName: row.companyName,
+    brandName: row.brandName,
     contactPerson: row.contactPerson,
     address: row.address,
     city: row.city,
@@ -224,6 +225,9 @@ function buildWhere(query: ListCustomersQuery): Prisma.CustomerWhereInput {
     filters.push({
       OR: [
         { companyName: contains },
+        // Searchable by brand too: the office asks for "the Aswad job" far more
+        // often than for the company registered behind it.
+        { brandName: contains },
         { contactPerson: contains },
         { mobile: contains },
         { altPhone: contains },

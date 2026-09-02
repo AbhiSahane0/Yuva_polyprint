@@ -17,6 +17,7 @@ import type { CustomerDetail, CustomerJob, SaveQuotationJobInput } from '@yuva/s
 /** The customer fields the quotation form can edit. */
 export interface CustomerDetails {
   companyName: string;
+  brandName: string;
   address: string;
   city: string;
   district: string;
@@ -41,6 +42,7 @@ export function normalise(value: string | null | undefined): string {
 export function baselineFromCustomer(customer: CustomerDetail): CustomerDetails {
   return {
     companyName: normalise(customer.companyName),
+    brandName: normalise(customer.brandName),
     address: normalise(customer.address),
     city: normalise(customer.city),
     district: normalise(customer.district),
@@ -56,18 +58,78 @@ export function baselineFromCustomer(customer: CustomerDetail): CustomerDetails 
  * Returns a partial rather than a boolean so the update carries only what
  * moved. A colleague editing the same customer's mobile in another tab keeps
  * their edit when this quotation only touched the address.
+ *
+ * **A field is written only if the office changed it on this screen.** That is
+ * `current` differing from `shown` — what the form was last filled in with —
+ * and not merely from `baseline`. The distinction is what stops a customer's
+ * address being wiped: on an existing quotation the form is filled from the
+ * document's own stored snapshot, which can legitimately differ from the
+ * customer's record, and comparing against the record alone made every one of
+ * those differences look like a deliberate edit. Empty strings are stored as
+ * 'NA', so "looks like an edit" meant "erase it".
+ *
+ * react-hook-form's `dirtyFields` cannot answer this: dirty means "differs from
+ * defaultValues", and the form is populated twice — once by `reset` from the
+ * quotation and once by the prefill from the customer — so fields nobody
+ * touched are marked dirty whenever those two disagree.
  */
 export function changedCustomerFields(
   baseline: CustomerDetails,
   current: CustomerDetails,
+  shown: CustomerDetails,
 ): Partial<CustomerDetails> | null {
   const changed: Partial<CustomerDetails> = {};
 
   for (const key of Object.keys(baseline) as (keyof CustomerDetails)[]) {
-    if (normalise(current[key]) !== baseline[key]) changed[key] = normalise(current[key]);
+    const now = normalise(current[key]);
+
+    // Untouched since the form was filled in: nothing the office decided.
+    if (now === normalise(shown[key])) continue;
+
+    /*
+     * **An empty value never overwrites a stored one.**
+     *
+     * This is the rule that matters, and it is deliberately blunt. Every
+     * observed failure of this write-back had the same shape: the form reported
+     * a field as empty when it was not, and 'NA' — what an empty string is
+     * stored as — replaced a real address. It happened three times against a
+     * real record, and two attempts to fix the cause did not stop it.
+     *
+     * The cost is that a field cannot be *cleared* from the quotation screen;
+     * the customer editor does that, where the whole record is in front of you
+     * and clearing one is unmistakably deliberate. That is a small loss against
+     * a customer's address disappearing because somebody corrected their
+     * district on a quotation.
+     */
+    if (now === '' && baseline[key] !== '') continue;
+
+    if (now !== baseline[key]) changed[key] = now;
   }
 
   return Object.keys(changed).length > 0 ? changed : null;
+}
+
+/** The customer fields as the quotation form currently holds them. */
+export function customerDetailsFromForm(values: {
+  customerName?: string | undefined;
+  brandName?: string | undefined;
+  addressLine1?: string | undefined;
+  addressLine2?: string | undefined;
+  addressLine3?: string | undefined;
+  mobile?: string | undefined;
+  email?: string | undefined;
+  gstNumber?: string | undefined;
+}): CustomerDetails {
+  return {
+    companyName: values.customerName ?? '',
+    brandName: values.brandName ?? '',
+    address: values.addressLine1 ?? '',
+    city: values.addressLine2 ?? '',
+    district: values.addressLine3 ?? '',
+    mobile: values.mobile ?? '',
+    email: values.email ?? '',
+    gstNumber: values.gstNumber ?? '',
+  };
 }
 
 /** A quotation line, as much of it as a job row can hold. */

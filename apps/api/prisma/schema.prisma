@@ -73,6 +73,12 @@ model Customer {
   id String @id @default(cuid())
 
   companyName   String @map("company_name")
+  /// The brand this company sells under, where that differs from its
+  /// registered name. A proprietorship registers as a person and trades as a
+  /// brand, and the office knows most customers by the second — so this is what
+  /// the customer list and the quotation show, and `companyName` stays the name
+  /// that belongs on an invoice.
+  brandName     String @default("NA") @map("brand_name")
   contactPerson String @default("NA") @map("contact_person")
   address       String @default("NA")
   city          String @default("NA")
