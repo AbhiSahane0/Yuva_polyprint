@@ -49,3 +49,5 @@ csv_files/
 # Generated import reports
 apps/api/import-reports/
 
+.claude/
+
