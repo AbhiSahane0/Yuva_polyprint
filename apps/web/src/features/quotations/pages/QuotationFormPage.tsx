@@ -655,7 +655,9 @@ export default function QuotationFormPage() {
                      * that no longer matches anything in the list.
                      */
                     if (customerMode === 'new') {
-                      set('customerName', lookup.legalName ?? lookup.tradeName);
+                      // Trade name first — see the customer form. A
+                      // proprietorship's legal name is a person's name.
+                      set('customerName', lookup.tradeName ?? lookup.legalName);
                     }
                     set('addressLine1', lookup.address);
                     set('addressLine2', lookup.city);

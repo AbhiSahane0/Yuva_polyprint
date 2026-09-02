@@ -277,7 +277,11 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
                     // answer is not a correction.
                     if (value) setValue(field, value, { shouldDirty: true, shouldValidate: true });
                   };
-                  set('companyName', lookup.legalName ?? lookup.tradeName);
+                  // Trade name first: a proprietorship registers under its
+                  // proprietor's own name, so the legal name of "Yuva
+                  // Polyprint" is "ANAND KISAN HASE". That is what a GST
+                  // invoice must carry and not what the office calls them.
+                  set('companyName', lookup.tradeName ?? lookup.legalName);
                   set('address', lookup.address);
                   set('city', lookup.city);
                   set('district', lookup.district);

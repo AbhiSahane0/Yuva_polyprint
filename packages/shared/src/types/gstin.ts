@@ -11,9 +11,16 @@
 export interface GstinLookup {
   gstin: string;
 
-  /** As registered. This is the name that belongs on an invoice. */
+  /**
+   * As registered — which for a proprietorship is a **person's name**, not the
+   * business's. Yuva's own GSTIN returns "ANAND KISAN HASE" here and
+   * "YUVA POLYPRINT AND PACKAGING INDUSTRIES" as the trade name.
+   *
+   * This is the name a GST invoice must carry. It is not the name the office
+   * knows a customer by, so it is not what prefills the company name.
+   */
   legalName: string | null;
-  /** What they trade as, where that differs. */
+  /** What they trade as. For most customers this is the name to use. */
   tradeName: string | null;
 
   /** Active, Cancelled, Suspended, Provisional. */
@@ -24,6 +31,14 @@ export interface GstinLookup {
   constitution: string | null;
   /** ISO date. */
   registrationDate: string | null;
+  /** Set only when the registration has been cancelled. */
+  cancellationDate: string | null;
+  /**
+   * E-way-bill blocking — "Blocked" / "Unblocked". Separate from status: a
+   * registration can be Active and still blocked for non-filing, which stops
+   * e-way bills being raised against it.
+   */
+  blockStatus: string | null;
 
   /** Principal place of business, split so it can fill the customer form. */
   address: string | null;
@@ -33,7 +48,6 @@ export interface GstinLookup {
   pincode: string | null;
 
   natureOfBusiness: string[];
-  centreJurisdiction: string | null;
   stateJurisdiction: string | null;
 
   /**

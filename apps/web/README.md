@@ -218,11 +218,23 @@ never on mount, never on a retry. It answers what arithmetic cannot — was this
 number ever issued, to whom, and is it still live — and returns the legal name,
 trade name, registered address, constitution, taxpayer type and status.
 
-**Use these details** fills in the company name, address, city and district from
-what came back, so a new customer is one paste rather than six fields, and the
-name is spelled the way it will appear on their invoice. It never blanks a field
-you have already filled in — the registry leaves plenty of these empty, and an
-empty answer is not a correction.
+**Use these details** fills in the company name, address, city and district
+from what came back, so a new customer is one paste rather than six fields. It
+never blanks a field you have already filled in — the registry leaves plenty of
+these empty, and an empty answer is not a correction.
+
+> **It fills in the trade name, not the legal one.** A proprietorship registers
+> under its proprietor, so Yuva's own GSTIN returns `ANAND KISAN HASE` as the
+> legal name and `YUVA POLYPRINT AND PACKAGING INDUSTRIES` as the trade name.
+> Putting the first into a customer list would leave a row nobody recognises.
+> The panel shows it as **Registered as** when the two differ, because that is
+> the name a GST invoice has to carry — which Invoicing will need and the
+> customer list does not.
+
+**E-way bill blocked** appears beside the status when it applies. It is separate
+from being Cancelled: a registration can be Active and still blocked for
+non-filing, which stops an e-way bill being raised — a delivery problem rather
+than a billing one.
 
 Every answer is **cached permanently by GSTIN**, so a credit is spent once per
 customer and never again. The panel says whether you are looking at a fresh

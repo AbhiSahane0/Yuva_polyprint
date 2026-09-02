@@ -148,6 +148,12 @@ function LookupResult({
    * their input tax credit, and by then nobody is looking at this screen.
    */
   const active = (lookup.status ?? '').toLowerCase() === 'active';
+  /*
+   * Separate from status, and easy to miss: a registration can be Active and
+   * still blocked for non-filing, which stops an e-way bill being raised
+   * against it. That is a delivery problem, so it is worth saying out loud.
+   */
+  const blocked = (lookup.blockStatus ?? '').toLowerCase() === 'blocked';
 
   const place = [lookup.city, lookup.district, lookup.state, lookup.pincode]
     .filter(Boolean)
@@ -167,7 +173,7 @@ function LookupResult({
           <TriangleAlert className="text-warning-600 size-4 shrink-0" aria-hidden />
         )}
         <span className="text-ink-900 font-semibold">
-          {lookup.legalName ?? lookup.tradeName ?? lookup.gstin}
+          {lookup.tradeName ?? lookup.legalName ?? lookup.gstin}
         </span>
         <span
           className={cn(
@@ -177,17 +183,28 @@ function LookupResult({
         >
           {lookup.status ?? 'Status unknown'}
         </span>
+        {blocked ? (
+          <span className="bg-warning-100 text-warning-800 rounded-full px-2 py-0.5 text-[11px] font-medium">
+            E-way bill blocked
+          </span>
+        ) : null}
       </div>
 
       <dl className="text-ink-600 mt-1.5 grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
-        {lookup.tradeName && lookup.tradeName !== lookup.legalName ? (
-          <Row label="Trades as" value={lookup.tradeName} />
+        {/*
+          Named "Registered as" rather than shown as the headline. For a
+          proprietorship this is the proprietor's own name, which is what a GST
+          invoice has to carry and not what anyone calls the business.
+        */}
+        {lookup.legalName && lookup.legalName !== lookup.tradeName ? (
+          <Row label="Registered as" value={lookup.legalName} />
         ) : null}
         {lookup.constitution ? <Row label="Constitution" value={lookup.constitution} /> : null}
         {lookup.taxpayerType ? <Row label="Taxpayer" value={lookup.taxpayerType} /> : null}
         {lookup.registrationDate ? (
           <Row label="Registered" value={lookup.registrationDate} />
         ) : null}
+        {lookup.cancellationDate ? <Row label="Cancelled" value={lookup.cancellationDate} /> : null}
         {lookup.address ? <Row label="Address" value={lookup.address} /> : null}
         {place ? <Row label="Place" value={place} /> : null}
       </dl>

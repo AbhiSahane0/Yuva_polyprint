@@ -1300,11 +1300,27 @@ the customer their input tax credit — so that re-check belongs to Invoicing.
 ### Swapping providers
 
 Two things know who answers: the `BASE_URL` constant and `toLookup()` in
-`gstin.service.ts`. Nothing above them does. The mapping is deliberately
-separate from the fetch because it is the one piece that has to be checked
-against a real response rather than a document — every provider field is
-optional going in and null coming out, so a renamed field degrades to a missing
-one rather than a crash.
+`gstin.service.ts`. Nothing above them does. Every provider field is optional
+going in and null coming out, so a renamed field degrades to a missing one
+rather than a crash.
+
+**The mapping is pinned by a recorded response.** `gstin-mapping.test.ts` holds
+a real 200 from gstinapi.in verbatim. It exists because the first mapping was
+written from a document and was wrong in a way nothing caught: the payload is
+nested under `data`, so every field came back null with no error to explain it.
+
+Two things about this provider's shape are worth knowing before swapping:
+
+- `business_constitution`, not `constitution`. Null on the record seen.
+- The **composed** `address` is preferred over `address_details`. Reassembling
+  from the parts gives something worse — the sample puts the industrial estate
+  in `building_name` and the survey number in `floor`, which is not how any
+  address there is written. `address_details.city` and `.district` were null on
+  a record whose top-level `city` was populated, so the top level wins.
+
+`credits_remaining` is logged on every uncached lookup, at `warn` below fifty.
+It is not returned to the browser: the office cannot act on it, and it would be
+noise beside a customer's address.
 
 ### Configuration
 

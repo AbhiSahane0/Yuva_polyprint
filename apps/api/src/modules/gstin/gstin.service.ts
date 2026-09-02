@@ -20,25 +20,59 @@ import { prisma } from '../../lib/prisma.js';
  * whether that matters. It does not, for a quotation. It does for an invoice.
  */
 
-/** How the provider answers. Their fields, before we make them ours. */
+/**
+ * How the provider answers.
+ *
+ * Written from a real 200, not from a document. **The payload is nested under
+ * `data`** — reading these off the top level, as the first version did, gives a
+ * response full of nulls and no error to explain it.
+ */
 interface ProviderResponse {
+  success?: boolean;
   gstin?: string;
-  legal_name?: string | null;
-  trade_name?: string | null;
-  status?: string | null;
-  taxpayer_type?: string | null;
-  constitution?: string | null;
-  registration_date?: string | null;
-  address?: string | null;
-  building?: string | null;
-  street?: string | null;
-  city?: string | null;
-  district?: string | null;
-  state?: string | null;
-  pincode?: string | null;
-  nature_of_business?: string[] | null;
-  centre_jurisdiction?: string | null;
-  state_jurisdiction?: string | null;
+  data?: {
+    gstin?: string | null;
+    legal_name?: string | null;
+    trade_name?: string | null;
+    status?: string | null;
+    taxpayer_type?: string | null;
+    /** Their name for it. Not `constitution`. Null on the sample seen. */
+    business_constitution?: string | null;
+    registration_date?: string | null;
+    cancellation_date?: string | null;
+    state_code?: string | null;
+    state_jurisdiction?: string | null;
+    /** The whole principal place, already composed. */
+    address?: string | null;
+    city?: string | null;
+    pincode?: string | null;
+    /**
+     * The same address in parts. Its `city`, `district` and `state` came back
+     * null on a record whose top-level `city` and `pincode` were populated, so
+     * the top level is preferred and this is only a fallback.
+     */
+    address_details?: {
+      building_number?: string | null;
+      building_name?: string | null;
+      floor?: string | null;
+      street?: string | null;
+      locality?: string | null;
+      district?: string | null;
+      city?: string | null;
+      state?: string | null;
+      landmark?: string | null;
+      pincode?: string | null;
+    } | null;
+    /** Null rather than an empty array when there is nothing to say. */
+    nature_of_business?: string[] | null;
+    /** E-way-bill blocking, which is separate from registration status. */
+    block_status?: string | null;
+  } | null;
+
+  /** What the call cost and what is left. Logged, not returned. */
+  credits_remaining?: number | null;
+  free_remaining?: number | null;
+
   /** Set by some providers instead of an HTTP error when nothing is found. */
   valid?: boolean;
   /**
@@ -63,11 +97,10 @@ const TIMEOUT_MS = 10_000;
 /**
  * The provider's answer, in our vocabulary.
  *
- * Kept deliberately small and separate from the fetch, because it is the one
- * piece here that has to be checked against a real response rather than a
- * document. Every field is optional on the way in and null on the way out, so
- * a provider that names something differently degrades to a missing field
- * rather than to a crash.
+ * Kept separate from the fetch because it is the one piece that has to be
+ * checked against a real response rather than a document — and was wrong until
+ * it was. Every field is optional going in and null coming out, so a provider
+ * that renames something degrades to a missing field rather than a crash.
  */
 function toLookup(gstin: string, body: ProviderResponse): GstinLookup {
   const text = (value: string | null | undefined): string | null => {
@@ -75,28 +108,40 @@ function toLookup(gstin: string, body: ProviderResponse): GstinLookup {
     return trimmed.length > 0 ? trimmed : null;
   };
 
-  // Some providers return the address whole, some in parts, some both. Prefer
-  // the parts — they are what the customer form actually needs — and fall back
-  // to the single line rather than showing nothing.
-  const parts = [body.building, body.street].map(text).filter(Boolean);
-  const addressLine = parts.length > 0 ? parts.join(', ') : text(body.address);
+  const data = body.data ?? {};
+  const parts = data.address_details ?? {};
+
+  /*
+   * The composed line is preferred: the registry writes it the way the address
+   * actually reads, and assembling it from the parts produces something worse
+   * — the sample's parts put the estate in `building_name` and the survey
+   * number in `floor`, which no address in Sangamner is written like.
+   */
+  const addressLine =
+    text(data.address) ??
+    [parts.building_number, parts.building_name, parts.street, parts.locality]
+      .map(text)
+      .filter(Boolean)
+      .join(', ') ??
+    null;
 
   return {
     gstin,
-    legalName: text(body.legal_name),
-    tradeName: text(body.trade_name),
-    status: text(body.status),
-    taxpayerType: text(body.taxpayer_type),
-    constitution: text(body.constitution),
-    registrationDate: text(body.registration_date),
+    legalName: text(data.legal_name),
+    tradeName: text(data.trade_name),
+    status: text(data.status),
+    taxpayerType: text(data.taxpayer_type),
+    constitution: text(data.business_constitution),
+    registrationDate: text(data.registration_date),
+    cancellationDate: text(data.cancellation_date),
+    blockStatus: text(data.block_status),
     address: addressLine,
-    city: text(body.city),
-    district: text(body.district),
-    state: text(body.state),
-    pincode: text(body.pincode),
-    natureOfBusiness: body.nature_of_business ?? [],
-    centreJurisdiction: text(body.centre_jurisdiction),
-    stateJurisdiction: text(body.state_jurisdiction),
+    city: text(data.city) ?? text(parts.city) ?? text(parts.locality),
+    district: text(parts.district),
+    state: text(parts.state),
+    pincode: text(data.pincode) ?? text(parts.pincode),
+    natureOfBusiness: data.nature_of_business ?? [],
+    stateJurisdiction: text(data.state_jurisdiction),
     checkedAt: new Date().toISOString(),
     fromCache: false,
   };
@@ -194,6 +239,19 @@ export async function lookupGstin(input: string, force = false): Promise<GstinLo
   // A provider that answers 200 with `valid: false` rather than a 404.
   if (body.valid === false) {
     throw ApiError.notFound(body.error ?? body.message ?? 'No registration found for that GSTIN');
+  }
+
+  /*
+   * What the account has left. Not returned to the browser — the office cannot
+   * act on it and it would only be noise beside a customer's address — but it
+   * belongs in the log, and a warning below fifty gives some notice before
+   * lookups start failing mid-quotation.
+   */
+  const remaining = body.credits_remaining ?? null;
+  if (remaining !== null) {
+    const line = { creditsRemaining: remaining, freeRemaining: body.free_remaining ?? null };
+    if (remaining <= 50) logger.warn(line, 'GSTIN lookup credits are running low');
+    else logger.info(line, 'GSTIN lookup credits');
   }
 
   const lookup = toLookup(gstin, body);
