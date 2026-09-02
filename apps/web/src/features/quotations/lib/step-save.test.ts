@@ -3,6 +3,7 @@ import type { CustomerDetail, CustomerJob } from '@yuva/shared';
 import {
   baselineFromCustomer,
   changedCustomerFields,
+  customerDetailsFromForm,
   designFingerprint,
   fingerprintFromSavedJob,
   isSaveableDesign,
@@ -26,7 +27,7 @@ describe('deciding whether the customer needs writing', () => {
     const baseline = baselineFromCustomer(customer);
     // What the form shows: 'NA' is rendered as an empty box.
     const current = { ...baseline };
-    expect(changedCustomerFields(baseline, current)).toBeNull();
+    expect(changedCustomerFields(baseline, current, baseline)).toBeNull();
   });
 
   it("does not mistake the importer's NA placeholder for an edit", () => {
@@ -37,25 +38,33 @@ describe('deciding whether the customer needs writing', () => {
     expect(baseline.email).toBe('');
 
     const current = { ...baseline, district: '', email: '' };
-    expect(changedCustomerFields(baseline, current)).toBeNull();
+    expect(changedCustomerFields(baseline, current, baseline)).toBeNull();
   });
 
   it('ignores whitespace-only differences', () => {
     const baseline = baselineFromCustomer(customer);
-    expect(changedCustomerFields(baseline, { ...baseline, city: '  Sangamner  ' })).toBeNull();
+    expect(
+      changedCustomerFields(baseline, { ...baseline, city: '  Sangamner  ' }, baseline),
+    ).toBeNull();
   });
 
   it('sends only the fields that moved', () => {
     const baseline = baselineFromCustomer(customer);
-    const changed = changedCustomerFields(baseline, { ...baseline, mobile: '9000000000' });
+    const changed = changedCustomerFields(
+      baseline,
+      { ...baseline, mobile: '9000000000' },
+      baseline,
+    );
 
     // Not the whole customer — a colleague's edit to another field survives.
     expect(changed).toEqual({ mobile: '9000000000' });
   });
 
-  it('treats deliberately clearing a field as a change', () => {
+  it('refuses to clear a stored field from this screen', () => {
+    // Deliberate: see the empty-value rule in changedCustomerFields. Clearing
+    // is done on the customer editor, with the whole record in view.
     const baseline = baselineFromCustomer(customer);
-    expect(changedCustomerFields(baseline, { ...baseline, mobile: '' })).toEqual({ mobile: '' });
+    expect(changedCustomerFields(baseline, { ...baseline, mobile: '' }, baseline)).toBeNull();
   });
 
   it('normalises NA and blanks identically', () => {
@@ -196,9 +205,11 @@ describe('a design read back from the server', () => {
 describe('the brand, as a customer detail', () => {
   it('is written back when the office corrects it', () => {
     const baseline = baselineFromCustomer(customer);
-    expect(changedCustomerFields(baseline, { ...baseline, brandName: 'Ashoka' })).toEqual({
-      brandName: 'Ashoka',
-    });
+    expect(changedCustomerFields(baseline, { ...baseline, brandName: 'Ashoka' }, baseline)).toEqual(
+      {
+        brandName: 'Ashoka',
+      },
+    );
   });
 
   it('is not written when it was only read', () => {
@@ -206,6 +217,61 @@ describe('the brand, as a customer detail', () => {
     const withBrand = { ...customer, brandName: 'NA' } as unknown as CustomerDetail;
     const baseline = baselineFromCustomer(withBrand);
     expect(baseline.brandName).toBe('');
-    expect(changedCustomerFields(baseline, { ...baseline })).toBeNull();
+    expect(changedCustomerFields(baseline, { ...baseline }, baseline)).toBeNull();
+  });
+});
+
+describe('a field nobody changed on this screen', () => {
+  /*
+   * The rule that exists because a customer's address was wiped twice. On an
+   * existing quotation the form shows the document's own snapshot, which can
+   * legitimately differ from the customer's record — that is history, not a
+   * correction — and comparing against the record alone made every one of those
+   * differences look like a deliberate edit. Empty is stored as 'NA', so
+   * "looks like an edit" meant "erase it".
+   */
+  it('is never written, however far it is from the record', () => {
+    const baseline = baselineFromCustomer(customer);
+    // What an older quotation stored: a different address, no city at all.
+    const shown = { ...baseline, address: 'Old address from 2024', city: '' };
+
+    expect(changedCustomerFields(baseline, shown, shown)).toBeNull();
+  });
+
+  it('but a field the office does change is written', () => {
+    const baseline = baselineFromCustomer(customer);
+    const shown = { ...baseline, address: 'Old address from 2024' };
+    const current = { ...shown, mobile: '9822334455' };
+
+    // Only the mobile. The stale address sitting beside it is left alone.
+    expect(changedCustomerFields(baseline, current, shown)).toEqual({ mobile: '9822334455' });
+  });
+
+  it('never lets an empty value overwrite a stored one', () => {
+    /*
+     * The rule that stops a customer's address disappearing. Observed three
+     * times against a real record: the form reported fields as empty when they
+     * were not, and 'NA' replaced a real address. Clearing a field is done on
+     * the customer editor, where the whole record is in front of you.
+     */
+    const baseline = baselineFromCustomer(customer);
+    const emptied = { ...baseline, address: '', city: '', mobile: '' };
+
+    expect(changedCustomerFields(baseline, emptied, baseline)).toBeNull();
+  });
+
+  it('still fills in a field the record does not have', () => {
+    // Empty -> something is always safe: nothing is being lost.
+    const baseline = baselineFromCustomer(customer);
+    expect(baseline.district).toBe('');
+    expect(changedCustomerFields(baseline, { ...baseline, district: 'Nashik' }, baseline)).toEqual({
+      district: 'Nashik',
+    });
+  });
+
+  it('reads the form field names onto the customer ones', () => {
+    expect(customerDetailsFromForm({ customerName: 'X', addressLine2: 'Sangamner' })).toMatchObject(
+      { companyName: 'X', city: 'Sangamner', district: '' },
+    );
   });
 });
