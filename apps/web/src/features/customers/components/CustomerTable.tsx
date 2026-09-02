@@ -152,8 +152,15 @@ export function CustomerTable({
               <th scope="col" className="px-4 py-3 font-semibold">
                 Company
               </th>
+              {/*
+                Brand, where Contact used to be. The office knows most customers
+                by what they sell, not by the firm registered behind it — and a
+                contact person was recorded for almost none of them. The column
+                is gone from the screen only; contactPerson is still stored and
+                still editable on the customer form.
+              */}
               <th scope="col" className="px-4 py-3 font-semibold">
-                Contact
+                Brand
               </th>
               <th scope="col" className="px-4 py-3 font-semibold">
                 Mobile
@@ -209,7 +216,7 @@ export function CustomerTable({
                       </p>
                     </td>
                     <td className="text-ink-600 px-4 py-3">
-                      <Value value={customer.contactPerson} />
+                      <Value value={customer.brandName} />
                     </td>
                     <td className="text-ink-600 px-4 py-3 tabular-nums">
                       <Value value={customer.mobile} />

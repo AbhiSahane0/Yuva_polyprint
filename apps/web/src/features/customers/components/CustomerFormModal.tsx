@@ -33,6 +33,7 @@ type JobFormValues = NonNullable<CreateCustomerFormValues['jobs']>[number];
  */
 const EMPTY: CreateCustomerFormValues = {
   companyName: '',
+  brandName: '',
   contactPerson: '',
   address: '',
   city: '',
@@ -139,6 +140,7 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
       customer
         ? {
             companyName: customer.companyName,
+            brandName: fromNA(customer.brandName),
             contactPerson: fromNA(customer.contactPerson),
             address: fromNA(customer.address),
             city: fromNA(customer.city),
@@ -224,6 +226,29 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
                   placeholder="e.g. Bunty Food Products"
                   invalid={Boolean(errors.companyName)}
                   {...register('companyName')}
+                />
+              </Field>
+            </div>
+
+            <div className="sm:col-span-4">
+              {/*
+                Beside the company name, because the two answer the same
+                question from different sides: one is who they are registered
+                as, the other is what the office and the customer's own packing
+                actually call them.
+              */}
+              <Field
+                label="Brand"
+                htmlFor="brandName"
+                hint="What they sell under, if different"
+                error={errors.brandName?.message}
+              >
+                <Input
+                  id="brandName"
+                  autoComplete="off"
+                  placeholder="e.g. Aswad"
+                  invalid={Boolean(errors.brandName)}
+                  {...register('brandName')}
                 />
               </Field>
             </div>

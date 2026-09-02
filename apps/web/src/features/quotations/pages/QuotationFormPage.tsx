@@ -306,6 +306,17 @@ export default function QuotationFormPage() {
   const customerId = (watched.customerId ?? null) as string | null;
   const { data: chosenCustomer } = useCustomer(customerMode === 'existing' ? customerId : null);
 
+  /**
+   * The chosen company's brand, if they recorded one.
+   *
+   * 'NA' is the importer's placeholder for "not known" and must never reach the
+   * screen as if it were a brand.
+   */
+  const brandOfChosen =
+    chosenCustomer && chosenCustomer.brandName && chosenCustomer.brandName !== 'NA'
+      ? chosenCustomer.brandName
+      : null;
+
   /* ---------------------------------------------- prefill from the customer */
 
   /*
@@ -708,30 +719,47 @@ export default function QuotationFormPage() {
 
               <div className="sm:col-span-7">
                 {customerMode === 'existing' ? (
-                  <Field
-                    label="Company"
-                    htmlFor="customerId"
-                    hint="Type to search"
-                    error={formState.errors.customerName?.message}
-                  >
-                    <Combobox
-                      id="customerName"
-                      options={customers.map((customer) => customer.companyName)}
-                      registration={register('customerName')}
-                      value={watched.customerName ?? ''}
-                      invalid={Boolean(formState.errors.customerName)}
-                      placeholder="Search companies…"
-                      onPick={(name) => {
-                        setValue('customerName', name, { shouldValidate: true });
-                        // The name is what the office types; the link to the
-                        // customer record follows from it.
-                        setValue(
-                          'customerId',
-                          customers.find((customer) => customer.companyName === name)?.id ?? null,
-                        );
-                      }}
-                    />
-                  </Field>
+                  <>
+                    <Field
+                      label="Company"
+                      htmlFor="customerId"
+                      hint="Type to search"
+                      error={formState.errors.customerName?.message}
+                    >
+                      <Combobox
+                        id="customerName"
+                        options={customers.map((customer) => customer.companyName)}
+                        registration={register('customerName')}
+                        value={watched.customerName ?? ''}
+                        invalid={Boolean(formState.errors.customerName)}
+                        placeholder="Search companies…"
+                        onPick={(name) => {
+                          setValue('customerName', name, { shouldValidate: true });
+                          // The name is what the office types; the link to the
+                          // customer record follows from it.
+                          setValue(
+                            'customerId',
+                            customers.find((customer) => customer.companyName === name)?.id ?? null,
+                          );
+                        }}
+                      />
+                    </Field>
+
+                    {/*
+                    The brand, once a company is chosen.
+                    
+                    Worth showing because the two names genuinely differ and the
+                    office knows customers by the second — this is the
+                    confirmation that they picked the firm behind the brand they
+                    were asked about. Searching already matches on it, so typing
+                    "Aswad" finds the company registered as something else.
+                  */}
+                    {brandOfChosen ? (
+                      <p className="text-ink-500 mt-1.5 text-sm">
+                        Brand <span className="text-ink-800 font-medium">{brandOfChosen}</span>
+                      </p>
+                    ) : null}
+                  </>
                 ) : (
                   <Field
                     label="Company name"
