@@ -481,9 +481,11 @@ keeps its default of `/api` in every environment, exactly as in development.
    | `CORS_ORIGINS`   | the Vercel origins, comma-separated — see [Two ways the browser can reach the API](#two-ways-the-browser-can-reach-the-api). Only omit this if you switch to the proxied setup                  |
    | `RESEND_API_KEY` | Optional. Enables emailing a quotation; without it every other screen still works                                                                                                               |
    | `MAIL_FROM`      | The sender, e.g. `Yuva Polyprint <quotations@yourdomain.com>`. **Decides whether customers can be emailed at all** — see [Sending quotations](./apps/api/README.md#sending-quotations-by-email) |
+   | `GSTIN_API_KEY`  | Optional. Enables the **Verify** button on a GST number; the offline format and check-digit validation works without it                                                                         |
 
-   The two mail variables are optional. Leave them unset and the app runs
-   normally, with only "send quotation" reporting that email is unavailable.
+   Those three are optional. Leave them unset and the app runs normally, with
+   only "send quotation" and "verify GSTIN" reporting themselves unavailable.
+   `GSTIN_API_BASE_URL` is fixed in `render.yaml` and needs no prompt.
 
 4. Wait for the first build. It is slow — the image is ~1.8GB, mostly Chromium.
 5. Confirm `https://<service>.onrender.com/health/ready` returns
@@ -494,6 +496,13 @@ is a browsable, testable reference and `/docs/openapi.json` is the spec behind i
 Both are open — reading changes nothing and every endpoint they describe answers
 401 without a session — so the URL can be handed to a developer as-is. There is
 no sandbox, though: **Try it out writes to production.**
+
+> **Order matters when a migration adds a required column.** Migrations run on
+> boot, so pushing applies them — but running one by hand _ahead_ of the deploy
+> leaves the live build unable to write the new column. The gazette migration
+> added `film_width_mm` as `NOT NULL` with no default, and until the matching
+> code shipped, saving a quotation failed. Apply by pushing, or apply by hand
+> and deploy immediately after.
 
 **Migrations run on boot.** The container runs `prisma migrate deploy` before
 starting the server, so a deploy can never serve against an older schema.

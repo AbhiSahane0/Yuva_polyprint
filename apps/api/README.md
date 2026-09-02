@@ -930,7 +930,7 @@ Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 | `customers`                 | Companies that order. Text fields use `'NA'` where the imported sheet was blank.          |
 | `jobs`                      | Products and their full 55-column specification.                                          |
 | `quotations`                | Customer-facing documents. Totals frozen at save; `lost_reason` says why a loss was lost. |
-| `quotation_items`           | One priced line: its design, its geometry and its cylinders.                              |
+| `quotation_items`           | One priced line: its design, its gazette, its geometry and its cylinders.                 |
 | `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted.    |
 | `quotation_item_quantities` | One line's figures at one quoted quantity.                                                |
 | `quotation_tiers`           | One quoted quantity and the document totals at it.                                        |
@@ -1317,6 +1317,23 @@ how old an "Active" is.
 **Status is the only field that goes stale.** It does not matter for a
 quotation. It matters for an invoice — billing a cancelled registration costs
 the customer their input tax credit — so that re-check belongs to Invoicing.
+
+### Three paths write a quotation line
+
+Creating a quotation, updating one, and copying one into a new version. Every
+column a line carries has to be written by all three.
+
+`item-persistence.test.ts` walks the three `quotationItem.create` blocks in the
+source and asserts each hand-written column appears in every one. It exists
+because the gazette flags were added to a single path: the geometry is spread
+into the row wholesale, so the film size and the weight came across on their
+own, and the line stored itself as an ordinary flat bag while showing the
+gazette figures on screen. Right in the browser, wrong in the database, and not
+repriceable afterwards.
+
+A source-level check rather than a round trip, because the failure is one of
+omission — a field nobody writes cannot be caught by exercising the fields that
+were.
 
 ### Swapping providers
 
