@@ -489,6 +489,12 @@ keeps its default of `/api` in every environment, exactly as in development.
 5. Confirm `https://<service>.onrender.com/health/ready` returns
    `{"status":"ready","database":"connected"}`.
 
+**The API documents itself at `/docs`.** Once deployed, `https://<service>.onrender.com/docs`
+is a browsable, testable reference and `/docs/openapi.json` is the spec behind it.
+Both are open — reading changes nothing and every endpoint they describe answers
+401 without a session — so the URL can be handed to a developer as-is. There is
+no sandbox, though: **Try it out writes to production.**
+
 **Migrations run on boot.** The container runs `prisma migrate deploy` before
 starting the server, so a deploy can never serve against an older schema.
 `migrate deploy` only applies pending migrations — it never resets or drops.

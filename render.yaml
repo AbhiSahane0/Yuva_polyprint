@@ -72,3 +72,18 @@ services:
         sync: false
       - key: MAIL_FROM
         sync: false
+
+      #   GSTIN_API_KEY  Optional, and optional in the same way email is: without
+      #                  it the app runs normally and only the "Verify" button on
+      #                  a GST number reports itself unavailable. The offline
+      #                  format and check-digit validation is unaffected — that
+      #                  half needs no network and catches every realistic typo.
+      #                  Each lookup spends a paid credit, so this is prompted
+      #                  rather than committed.
+      - key: GSTIN_API_KEY
+        sync: false
+      # Not a secret, and the apex domain on purpose: api.gstinapi.in does not
+      # resolve at all. Fixed here so a redeploy cannot silently pick up a
+      # different default.
+      - key: GSTIN_API_BASE_URL
+        value: https://gstinapi.in
