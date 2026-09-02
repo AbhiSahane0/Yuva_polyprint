@@ -114,6 +114,12 @@ function toItem(row: ItemRow): QuotationItem {
     pouchTypeNote: row.pouchTypeNote,
     widthMm: toNumber(row.widthMm),
     heightMm: toNumber(row.heightMm),
+    isGazette: row.isGazette,
+    gazetteBottom: toNumber(row.gazetteBottom),
+    gazetteLeft: toNumber(row.gazetteLeft),
+    gazetteRight: toNumber(row.gazetteRight),
+    filmWidthMm: toNumber(row.filmWidthMm),
+    filmHeightMm: toNumber(row.filmHeightMm),
     pricingBasis: row.pricingBasis,
     repeatWidth: toNumber(row.repeatWidth),
     repeatHeight: toNumber(row.repeatHeight),
@@ -287,6 +293,16 @@ function priceQuotation(
         micron: totalMicronForLayers(layers),
         widthMm: item.widthMm,
         heightMm: item.heightMm,
+        // Film on a reel is not pouches; the engine reports zero rather than a
+        // confident count of something that does not exist.
+        makesPouches: item.jobKind !== 'ROLL',
+        gazette: item.isGazette
+          ? {
+              bottom: item.gazetteBottom,
+              left: item.gazetteLeft,
+              right: item.gazetteRight,
+            }
+          : undefined,
         repeatWidth: item.repeatWidth,
         repeatHeight: item.repeatHeight,
         cylinderCount: item.cylinderCount,
@@ -609,6 +625,10 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
               pouchTypeNote: entry.input.pouchTypeNote,
               widthMm: entry.input.widthMm,
               heightMm: entry.input.heightMm,
+              isGazette: entry.input.isGazette,
+              gazetteBottom: entry.input.gazetteBottom,
+              gazetteLeft: entry.input.gazetteLeft,
+              gazetteRight: entry.input.gazetteRight,
               pricingBasis: entry.pricingBasis,
               repeatWidth: entry.input.repeatWidth,
               repeatHeight: entry.input.repeatHeight,
@@ -693,8 +713,8 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
                   jobName: name,
                   jobKind: item.input.jobKind,
                   pouchType: item.input.pouchType,
-                  widthMm: item.input.widthMm,
-                  heightMm: item.input.heightMm,
+                  widthMm: item.geometry.filmWidthMm,
+                  heightMm: item.geometry.filmHeightMm,
                   cylinderCount: item.input.cylinderCount,
                   pouchesPerKg: item.geometry.pouchesPerKg,
                   layers: item.layers.map((layer, position) => ({
@@ -757,6 +777,15 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
       pricingBasis: item.pricingBasis,
       widthMm: toNumber(item.widthMm),
       heightMm: toNumber(item.heightMm),
+      /*
+       * Carried through for the same reason pricingBasis is: this path reprices
+       * from storage when a PATCH does not resend the lines, and a gusset
+       * dropped here would quietly reprice a gazette pouch as a flat bag.
+       */
+      isGazette: item.isGazette,
+      gazetteBottom: toNumber(item.gazetteBottom),
+      gazetteLeft: toNumber(item.gazetteLeft),
+      gazetteRight: toNumber(item.gazetteRight),
       layers: byPosition(item.layers).map((layer) => ({
         materialId: layer.materialId,
         micron: toNumber(layer.micron),
@@ -842,6 +871,10 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
           pouchTypeNote: entry.input.pouchTypeNote,
           widthMm: entry.input.widthMm,
           heightMm: entry.input.heightMm,
+          isGazette: entry.input.isGazette,
+          gazetteBottom: entry.input.gazetteBottom,
+          gazetteLeft: entry.input.gazetteLeft,
+          gazetteRight: entry.input.gazetteRight,
           pricingBasis: entry.pricingBasis,
           repeatWidth: entry.input.repeatWidth,
           repeatHeight: entry.input.repeatHeight,
@@ -1001,6 +1034,12 @@ export async function createQuotationVersion(id: string): Promise<Quotation> {
               pouchTypeNote: item.pouchTypeNote,
               widthMm: item.widthMm,
               heightMm: item.heightMm,
+              isGazette: item.isGazette,
+              gazetteBottom: item.gazetteBottom,
+              gazetteLeft: item.gazetteLeft,
+              gazetteRight: item.gazetteRight,
+              filmWidthMm: item.filmWidthMm,
+              filmHeightMm: item.filmHeightMm,
               pricingBasis: item.pricingBasis,
               repeatWidth: item.repeatWidth,
               repeatHeight: item.repeatHeight,

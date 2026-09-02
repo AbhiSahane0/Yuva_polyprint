@@ -522,6 +522,27 @@ PET 12 + MET PET 12 + Poly 60 micron = 86
 2 plies: 1.1     3 or more: 1.2
 ```
 
+**Gazette pouches and rolls change what "width × height" means.**
+
+A gazette gussets at the sides and the base so the pouch stands, and that depth
+is film the flat sheet has to carry. The pouch the customer holds is
+`widthMm × heightMm`; the film it is cut from is
+
+```
+film width  = width  + left gazette + right gazette
+film height = height + bottom gazette
+```
+
+Everything below works from the film, not the pouch — the weight, because that
+film is what is bought, and the cylinder, because that film is what is printed.
+A 250 × 205 pouch with 30/30/40 is cut from 310 × 245, which is both heavier and
+a wider engraving.
+
+**A roll yields no pouches at all.** Film on a reel has not been converted into
+anything, so pouches-per-kg is not small or approximate — it is a quantity that
+does not exist. The engine returns 0 and the form and the PDF both print a dash;
+`0.00` would read as a count.
+
 **3. Pouches per kg** — how many pouches a kilogram of film yields:
 
 ```
@@ -909,7 +930,7 @@ Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 | `customers`                 | Companies that order. Text fields use `'NA'` where the imported sheet was blank.          |
 | `jobs`                      | Products and their full 55-column specification.                                          |
 | `quotations`                | Customer-facing documents. Totals frozen at save; `lost_reason` says why a loss was lost. |
-| `quotation_items`           | One priced line: its design, its geometry and its cylinders.                              |
+| `quotation_items`           | One priced line: its design, its gazette, its geometry and its cylinders.                 |
 | `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted.    |
 | `quotation_item_quantities` | One line's figures at one quoted quantity.                                                |
 | `quotation_tiers`           | One quoted quantity and the document totals at it.                                        |
@@ -1296,6 +1317,23 @@ how old an "Active" is.
 **Status is the only field that goes stale.** It does not matter for a
 quotation. It matters for an invoice — billing a cancelled registration costs
 the customer their input tax credit — so that re-check belongs to Invoicing.
+
+### Three paths write a quotation line
+
+Creating a quotation, updating one, and copying one into a new version. Every
+column a line carries has to be written by all three.
+
+`item-persistence.test.ts` walks the three `quotationItem.create` blocks in the
+source and asserts each hand-written column appears in every one. It exists
+because the gazette flags were added to a single path: the geometry is spread
+into the row wholesale, so the film size and the weight came across on their
+own, and the line stored itself as an ordinary flat bag while showing the
+gazette figures on screen. Right in the browser, wrong in the database, and not
+repriceable afterwards.
+
+A source-level check rather than a round trip, because the failure is one of
+omission — a field nobody writes cannot be caught by exercising the fields that
+were.
 
 ### Swapping providers
 

@@ -328,25 +328,70 @@ which of the two you are doing is a decision the office makes before they start.
   when the quotation saves** — so the next enquiry finds it under Existing
   instead of being retyped. A name that already exists is reused, not duplicated.
 
-Switching between the two **clears the link**. Leaving a half-filled form behind
-is how a new company inherits the previous one's GST number.
+Switching between the two **empties every box on the step** — name, brand,
+address, mobile, email and GSTIN. Switching is a statement that this quotation
+is for somebody else, and leaving a half-filled form behind is how a chosen
+customer's address ends up saved onto a firm it belongs to no part of. Only the
+name used to be cleared, and only in one direction.
+
+**Brand** sits beside the company on both paths. For an existing customer it
+arrives from their record; for a new company it is typed, and set when the
+record is created. Searching matches company name **and** brand, so an enquiry
+naming a brand finds the firm behind it.
+
+**A new company becomes a customer when the quotation saves** — with its
+address, city and district kept apart rather than joined into one line, and with
+every design on the quotation recorded as a job against it. Saving twice does
+not create a second copy of either.
 
 #### 3. What it is
 
-One dropdown beside the job's name and size:
+Two questions, not one. **Type** is Pouch or Roll; **Pouch type** is the style,
+and only appears for a pouch.
 
 > Standup · Standup zipper · Zipper · Spout pouch · Centre seal ·
-> Three side seal · Other · Roll
+> Three side seal · Other
 
-**The hint under it says how the line is priced** — "Priced per pouch" or
+**The hint under the style says how the line is priced** — "Priced per pouch" or
 "Priced per kg". Picking a style sets that to the trade's convention for it, and
 the switch in the Quantities panel changes it. Choosing Other reveals a box to
-say what it is; choosing Roll clears the pouch style rather than raising an
-error, and forces kilograms.
+say what it is.
 
-> A grid of eight drawn pouches sat here before. It read as decoration rather
-> than a control, and it pushed the fields that matter below the fold on every
-> single job.
+**A roll is not a pouch.** Choosing it clears the style and any gazette, hides
+both controls, and forces kilograms. Film on a reel has not been converted into
+anything, so it yields **no pouches at all** — the summary says "Sold by weight
+— no pouches" and the printed document shows a dash, because `0.00` reads as a
+count of something rather than as an absence.
+
+> These were one dropdown for a while, which read tidily and hid the thing that
+> matters most. Before that it was a grid of eight drawn pouches, which read as
+> decoration and pushed the fields that matter below the fold.
+
+#### Gazette pouches
+
+A gazette gussets at the sides and the base so the pouch stands. Off by default,
+because most jobs are flat bags; ticking it reveals **bottom**, **left** and
+**right** depths.
+
+Those depths are film the flat sheet has to carry:
+
+```
+film width  = width  + left + right
+film height = height + bottom
+```
+
+**Everything works from the film, not the pouch** — the weight, because that
+film is what is bought, and the cylinder, because that film is what is printed.
+A 350 × 250 pouch with 4 / 4 / 10 is cut from **358 × 260**, which is both
+heavier per piece and a wider engraving.
+
+The **Film size** box shows it, and the cylinder captions quote it: `358 × 1 +
+80 margin` beside a cylinder width of 438. They quoted the pouch for a while —
+`350 × 1 + 80 margin` printed beside 438 — which reads as an arithmetic error
+rather than a gusset, and invites doubt about a figure that is right.
+
+Unticking zeroes the depths, so a stored line cannot carry a 10mm bottom gusset
+that was never charged for.
 
 #### The structure, ply by ply
 
@@ -466,21 +511,31 @@ totals whenever transport was charged.
 
 #### Saved as you go
 
-For an **existing** customer, each step writes on the way out — and only what
-changed.
+For an **existing** customer, leaving the **Jobs** step records each line's
+design against them — and only when something changed.
 
-| Leaving     | What it writes                                            |
-| ----------- | --------------------------------------------------------- |
-| **Details** | Corrected contact fields, back onto the customer record   |
-| **Jobs**    | Each line's design, and the returned job id onto the line |
-
-Every step diffs against a baseline of what the server holds, seeded from the
-customer and the designs they already have. **Touch nothing and nothing is
-called.** The baseline only advances once a write lands, so a failure is retried
-rather than swallowed, and stepping back and forward again costs nothing.
+It diffs against a baseline of what the server holds, seeded from the designs
+they already have. **Touch nothing and nothing is called.** The baseline only
+advances once a write lands, so a failure is retried rather than swallowed, and
+stepping back and forward again costs nothing.
 
 Saving a design writes its **job id onto the line**. From then on the quotation
 points at a real job, and winning it will not create a second copy.
+
+> **Customer details are not written back.** Correcting an address here applies
+> to this quotation only.
+>
+> They were, briefly, and it erased them: correcting a customer's district and
+> pressing Next stored their address, city, mobile and brand as `NA`. Seen four
+> times against a real record. The form's own boxes held the right values
+> throughout, so something between the form state and the request reported them
+> as empty — and an empty string is stored as `NA`. Three attempts at a fix,
+> including one that should have made the damage impossible whatever the cause,
+> did not stop it, so the write-back is off until the cause is understood.
+> `persistCustomerDetails` is kept, not deleted, and re-enabling is one line.
+>
+> Corrections to a customer are made on the **Customers** screen, which has
+> always worked.
 
 > **Saving a new design does not make it a repeat.** It has an id now, but its
 > cylinders still have to be cut, so it stays charged. Only picking a job from
