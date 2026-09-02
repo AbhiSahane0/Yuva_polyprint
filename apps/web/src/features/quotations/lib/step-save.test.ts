@@ -138,3 +138,57 @@ describe('a line that is not yet a design', () => {
     expect(isSaveableDesign(line)).toBe(true);
   });
 });
+
+describe('a design read back from the server', () => {
+  /*
+   * Both of these were found by watching the wizard against a real database,
+   * not by reading the code. The jobs table stores measurements as Prisma
+   * Decimals, which JSON-serialise as strings — so the fingerprint compared
+   * "12" against 12, every design looked edited, and stepping past a saved job
+   * issued a PATCH every single time.
+   */
+  it('matches the form even though the API returns decimals as strings', () => {
+    const fromApi = {
+      id: 'j1',
+      jobName: 'Progressive Save Probe',
+      pouchType: 'STANDUP',
+      petMicron: '12',
+      metPetMicron: null,
+      polyMicron: '60',
+      designOpenWidth: '300',
+      designHeight: '200',
+      totalCylinders: '4',
+    } as unknown as CustomerJob;
+
+    const onScreen: LineForJob = {
+      jobName: 'Progressive Save Probe',
+      jobKind: 'POUCH',
+      pouchType: 'STANDUP',
+      widthMm: 300,
+      heightMm: 200,
+      cylinderCount: 4,
+      microns: [12, 60],
+      pouchesPerKg: 204.75,
+    };
+
+    expect(fingerprintFromSavedJob(fromApi)).toBe(designFingerprint(jobPayloadFromLine(onScreen)));
+  });
+
+  it('treats a zero metallised ply and an absent one as the same', () => {
+    // The imported sheet writes 0 into the middle slot for two-ply jobs.
+    const zero = { petMicron: '12', metPetMicron: '0', polyMicron: '60' };
+    const absent = { petMicron: '12', metPetMicron: null, polyMicron: '60' };
+    const rest = {
+      id: 'j1',
+      jobName: 'ADF Plain 200g.',
+      pouchType: 'NA',
+      designOpenWidth: '250',
+      designHeight: '205',
+      totalCylinders: '8',
+    };
+
+    expect(fingerprintFromSavedJob({ ...rest, ...zero } as unknown as CustomerJob)).toBe(
+      fingerprintFromSavedJob({ ...rest, ...absent } as unknown as CustomerJob),
+    );
+  });
+});

@@ -125,17 +125,36 @@ export function jobPayloadFromLine(line: LineForJob): SaveQuotationJobInput {
  * up different from what the server holds.
  */
 export function designFingerprint(payload: SaveQuotationJobInput): string {
+  /*
+   * Every measurement goes through this before it is compared.
+   *
+   * The jobs table stores these as Prisma Decimals, which JSON-serialise as
+   * strings — so a job read back from the customer detail carries `"12"` where
+   * the form carries `12`. Comparing those directly makes every design look
+   * edited, and the wizard issued a PATCH on every single Next: silent write
+   * amplification, and a saved job quietly rewritten by a form that only knows
+   * a subset of its fields.
+   */
+  const measure = (value: unknown): number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
   return JSON.stringify([
     payload.jobName.trim().toLowerCase(),
     payload.jobType,
     payload.pouchType,
-    payload.layer,
-    payload.petMicron,
-    payload.metPetMicron,
-    payload.polyMicron,
-    payload.designOpenWidth,
-    payload.designHeight,
-    payload.totalCylinders,
+    measure(payload.layer),
+    measure(payload.petMicron),
+    // A ply the jobs table records as 0 and one it leaves null both mean "no
+    // metallised layer". Treated as the same, or a three-slot row imported as 0
+    // would never stop looking different from a two-ply line.
+    measure(payload.metPetMicron) || null,
+    measure(payload.polyMicron),
+    measure(payload.designOpenWidth),
+    measure(payload.designHeight),
+    measure(payload.totalCylinders),
   ]);
 }
 

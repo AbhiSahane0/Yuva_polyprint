@@ -446,6 +446,37 @@ checking the figure as cylinders × cost-per-cylinder lands short by exactly the
 transport and concludes it is wrong. The PDF carries the same note under the
 totals whenever transport was charged.
 
+#### Saved as you go
+
+For an **existing** customer, each step writes on the way out — and only what
+changed.
+
+| Leaving     | What it writes                                            |
+| ----------- | --------------------------------------------------------- |
+| **Details** | Corrected contact fields, back onto the customer record   |
+| **Jobs**    | Each line's design, and the returned job id onto the line |
+
+Every step diffs against a baseline of what the server holds, seeded from the
+customer and the designs they already have. **Touch nothing and nothing is
+called.** The baseline only advances once a write lands, so a failure is retried
+rather than swallowed, and stepping back and forward again costs nothing.
+
+Saving a design writes its **job id onto the line**. From then on the quotation
+points at a real job, and winning it will not create a second copy.
+
+> **Saving a new design does not make it a repeat.** It has an id now, but its
+> cylinders still have to be cut, so it stays charged. Only picking a job from
+> the **Saved job** dropdown means the cylinders already exist.
+
+A **half-typed line is not saved** — no name, no size, no job. The quotation
+still carries every field, and winning it creates whatever is missing.
+
+A failed save never costs you your place: the step advances with a warning,
+everything typed stays in the form, and the final Save writes the lot.
+
+This applies to existing customers only. A new company has no record to attach
+to until the quotation saves and creates one.
+
 #### 4. Review
 
 What the customer will see: every job at every quantity, the cylinders on their

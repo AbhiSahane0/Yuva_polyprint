@@ -756,7 +756,7 @@ export default function QuotationFormPage() {
             title="Where it goes"
             description={
               customerMode === 'existing'
-                ? 'Filled in from the customer list. Corrections here apply to this quotation only.'
+                ? 'Filled in from the customer list. Corrections are saved back to the customer when you continue.'
                 : 'Typed once — the company joins the customer list when this saves.'
             }
           >
@@ -955,13 +955,19 @@ function JobCard({
   const basis = basisOf(item);
 
   /*
-   * A line prefilled from a saved job is a repeat of a design the works has
-   * already cut cylinders for, so it is not quoted for them and the whole
-   * section goes away — there is nothing on it to decide. Typing a new job name
-   * for the same customer brings it back, because a new design genuinely does
-   * need a new set, whoever is ordering it.
+   * Whether this line is quoted for cylinders.
+   *
+   * Keyed on `chargeCylinders`, not on whether the line has a job id. Those
+   * were the same thing until the wizard began saving new designs as the office
+   * steps past them — after which a brand-new design acquires an id
+   * immediately, and keying on that silently stopped charging for the very
+   * cylinders it had just been decided needed cutting.
+   *
+   * Picking a saved job from the dropdown sets it false: that design's
+   * cylinders are already in the works. A new design leaves it true, whoever is
+   * ordering and whether or not it has been recorded yet.
    */
-  const fromSavedJob = Boolean(item?.jobId);
+  const fromSavedJob = item?.chargeCylinders === false;
 
   /** Copies a saved job's specification onto this line. */
   function applyJob(jobId: string) {
