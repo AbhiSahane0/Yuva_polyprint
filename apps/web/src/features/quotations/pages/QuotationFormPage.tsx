@@ -1282,7 +1282,7 @@ function JobCard({
           pieces. Asking Type first makes that a decision rather than an option
           buried at the bottom of eight.
         */}
-        <div className="col-span-1 sm:col-span-2">
+        <div className="col-span-1 sm:col-span-3">
           <Field label="Type" htmlFor={`items.${index}.jobKind`} hint="What the customer receives">
             <Select
               id={`items.${index}.jobKind`}
