@@ -16,8 +16,6 @@ import {
   computeTier,
   totalMicronForLayers,
   type QuotationSummary,
-  JOB_KIND_LABELS,
-  POUCH_TYPE_LABELS,
   type QuotationEmail as QuotationEmailRecord,
   type RecordOutcomeInput,
   type RecordOutcomeResult,
@@ -31,6 +29,7 @@ import { ApiError } from '../../utils/api-error.js';
 import { getSettings } from '../settings/settings.service.js';
 import { getRateMap } from '../materials/material.service.js';
 import { nextJobCode } from '../customers/customer.service.js';
+import { jobDataFromQuotationItem } from './quotation-job.js';
 import { env } from '../../config/env.js';
 import { sendEmail } from '../../lib/mailer.js';
 import { renderQuotationPdf } from './quotation-pdf.js';
@@ -1232,7 +1231,22 @@ export async function recordOutcome(
     const jobsSkipped: string[] = [];
     const takenCodes = new Set<string>();
 
+    /*
+     * Jobs the wizard already created, matched by id. The office now saves a
+     * new design as it steps past it, so most won quotations arrive here with
+     * their jobs already on record. Matching on name alone would miss one that
+     * was renamed after it was saved, and create a second copy of it.
+     */
+    const heldIds = new Set(
+      (await tx.job.findMany({ where: { customerId }, select: { id: true } })).map((job) => job.id),
+    );
+
     for (const item of quotation.items) {
+      if (item.jobId && heldIds.has(item.jobId)) {
+        jobsSkipped.push(item.jobName);
+        continue;
+      }
+
       const key = item.jobName.trim().toLowerCase();
       if (heldNames.has(key)) {
         jobsSkipped.push(item.jobName);
@@ -1240,48 +1254,11 @@ export async function recordOutcome(
       }
       heldNames.add(key);
 
-      /*
-       * The jobs table predates stated plies: it has three fixed slots, for the
-       * printed ply, an optional metallised one, and the sealant. Map the line's
-       * structure onto them by position — outermost first, sealant last, and
-       * anything between them into the middle slot. A four-ply laminate loses
-       * its third ply here, which is the jobs table's limitation rather than the
-       * quotation's; the quotation itself keeps every ply.
-       */
-      const plies = [...item.layers].sort((a, b) => a.position - b.position);
-      const outer = plies[0] ?? null;
-      const middle = plies.length >= 3 ? plies[1] : null;
-      const sealant = plies.length >= 2 ? plies[plies.length - 1] : null;
-
       await tx.job.create({
         data: {
+          ...jobDataFromQuotationItem(item),
           jobCode: await nextJobCode(tx, takenCodes),
-          jobName: item.jobName,
-          // 0 means "not from the imported spreadsheet", the same marker the
-          // customer editor uses for a job added by hand.
-          sourceRow: 0,
           customerId,
-          customerSource: 'EXPLICIT',
-          needsCustomer: false,
-          // A roll has no pouch style; the jobs table predates the enum and
-          // stores 'NA' for anything unknown.
-          pouchType: item.pouchType ? POUCH_TYPE_LABELS[item.pouchType] : 'NA',
-          jobType: JOB_KIND_LABELS[item.jobKind],
-          layer: plies.length,
-          petMicron: outer?.micron ?? null,
-          metPetMicron: middle?.micron ?? null,
-          polyMicron: sealant?.micron ?? 0,
-          designOpenWidth: item.widthMm,
-          designHeight: item.heightMm,
-          totalCylinders: item.cylinderCount,
-          // Zero GSM means the ply's material had no density recorded, in which
-          // case the line was never costed and there is nothing truthful to
-          // store — null says that, 0 would read as "weighs nothing".
-          petGsm: outer?.gsm || null,
-          metPetGsm: middle?.gsm || null,
-          polyGsm: sealant?.gsm || null,
-          // The imported jobs table stores this as text, not a number.
-          pouchesPerKg: String(item.pouchesPerKg),
         },
       });
       jobsCreated.push(item.jobName);

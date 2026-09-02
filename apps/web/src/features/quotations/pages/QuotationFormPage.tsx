@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   useFieldArray,
@@ -40,7 +40,12 @@ import { Combobox } from '@/components/ui/Combobox';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { ApiClientError } from '@/lib/api-client';
-import { useCustomer, useCustomers } from '@/features/customers/api/customer-api';
+import {
+  useCustomer,
+  useCustomers,
+  useSaveCustomerJob,
+  useUpdateCustomer,
+} from '@/features/customers/api/customer-api';
 import { useMaterials } from '@/features/rates/api/rate-api';
 import {
   useCreateQuotation,
@@ -50,6 +55,15 @@ import {
   useUpdateQuotation,
 } from '../api/quotation-api';
 import { GstinField } from '@/features/gstin/components/GstinField';
+import {
+  baselineFromCustomer,
+  changedCustomerFields,
+  designFingerprint,
+  fingerprintFromSavedJob,
+  isSaveableDesign,
+  jobPayloadFromLine,
+  type CustomerDetails,
+} from '../lib/step-save';
 import { QuotationPreview } from '../components/QuotationPreview';
 import { LayerFields } from '../components/LayerFields';
 import { QuantityFields, type QuantityResult } from '../components/QuantityFields';
@@ -231,6 +245,22 @@ export default function QuotationFormPage() {
 
   const createQuotation = useCreateQuotation();
   const updateQuotation = useUpdateQuotation();
+  const updateCustomer = useUpdateCustomer();
+  const saveJob = useSaveCustomerJob();
+
+  /*
+   * What the server already holds, so a step can tell whether anything moved.
+   *
+   * A ref rather than state: nothing renders from it, and making it state would
+   * re-render the whole wizard every time a step advanced. The customer's
+   * details live under `customer`; each line's design lives under its job id,
+   * so a design edited after it was saved is recognised and one that was only
+   * looked at is not written again.
+   */
+  const saved = useRef<{ customer: CustomerDetails | null; designs: Map<string, string> }>({
+    customer: null,
+    designs: new Map(),
+  });
 
   const form = useForm<CreateQuotationFormValues>({
     resolver: zodResolver(createQuotationSchema),
@@ -277,6 +307,24 @@ export default function QuotationFormPage() {
   const { data: chosenCustomer } = useCustomer(customerMode === 'existing' ? customerId : null);
 
   /* ---------------------------------------------- prefill from the customer */
+
+  /*
+   * Seeded from the customer as they are loaded, and from every design they
+   * already hold. Without this the first Next would rewrite rows that nobody
+   * touched, purely because the wizard had nothing to compare against.
+   */
+  useEffect(() => {
+    if (!chosenCustomer) {
+      saved.current = { customer: null, designs: new Map() };
+      return;
+    }
+    saved.current = {
+      customer: baselineFromCustomer(chosenCustomer),
+      designs: new Map(
+        chosenCustomer.jobs.map((job) => [job.id, fingerprintFromSavedJob(job)] as const),
+      ),
+    };
+  }, [chosenCustomer]);
 
   useEffect(() => {
     if (!chosenCustomer) return;
@@ -446,9 +494,123 @@ export default function QuotationFormPage() {
 
   /* -------------------------------------------------------------- movement */
 
+  /**
+   * Pushes this quotation's corrections back onto the customer record.
+   *
+   * Only what changed, and only for an existing customer — a new company has no
+   * record to correct until the quotation saves and creates one.
+   */
+  async function persistCustomerDetails() {
+    const id = customerId;
+    const baseline = saved.current.customer;
+    if (customerMode !== 'existing' || !id || !baseline) return;
+
+    const current: CustomerDetails = {
+      companyName: watched.customerName ?? '',
+      address: watched.addressLine1 ?? '',
+      city: watched.addressLine2 ?? '',
+      district: watched.addressLine3 ?? '',
+      mobile: watched.mobile ?? '',
+      email: watched.email ?? '',
+      gstNumber: watched.gstNumber ?? '',
+    };
+
+    const changes = changedCustomerFields(baseline, current);
+    if (!changes) return;
+
+    await updateCustomer.mutateAsync({ id, input: changes });
+    // Only after it lands. Moving the baseline first would swallow the change
+    // on a failure, and the next Next would think there was nothing to send.
+    saved.current.customer = { ...baseline, ...changes };
+    toast.success('Customer details updated');
+  }
+
+  /**
+   * Records each line's design against the customer.
+   *
+   * A line with no `jobId` is a new design: it is created and its id written
+   * back onto the line, which is what links the quotation to the job from then
+   * on. A line that already has one is only updated if its design actually
+   * moved. Either way the line ends up carrying the id, so stepping back and
+   * forward again writes nothing.
+   */
+  async function persistDesigns() {
+    const id = customerId;
+    if (customerMode !== 'existing' || !id) return;
+
+    let created = 0;
+    let updated = 0;
+
+    for (const [index, item] of (watched.items ?? []).entries()) {
+      const line = {
+        jobName: (item?.jobName as string) ?? '',
+        jobKind: (item?.jobKind as string) ?? 'POUCH',
+        pouchType: (item?.pouchType as string | null) ?? null,
+        widthMm: num(item?.widthMm),
+        heightMm: num(item?.heightMm),
+        cylinderCount: num(item?.cylinderCount),
+        microns: (item?.layers ?? []).map((layer) => num(layer?.micron)),
+        pouchesPerKg: costed[index]?.geometry.pouchesPerKg ?? 0,
+      };
+
+      // A half-typed line is not a design. Saving one would leave the customer
+      // holding something nameless for somebody to find and delete later.
+      if (!isSaveableDesign(line)) continue;
+
+      const payload = jobPayloadFromLine(line);
+      const jobId = (item?.jobId as string | null) ?? null;
+      const fingerprint = designFingerprint(payload);
+
+      // Unchanged since it was last seen — nothing to send.
+      if (jobId && saved.current.designs.get(jobId) === fingerprint) continue;
+
+      const job = await saveJob.mutateAsync({ customerId: id, jobId, input: payload });
+
+      /*
+       * The id comes back and goes onto the line. This is the mapping: from
+       * here on the quotation points at a real job, the cylinder section knows
+       * it is a repeat, and winning the quotation will not create a second copy.
+       */
+      if (job.id !== jobId) {
+        setValue(`items.${index}.jobId`, job.id, { shouldDirty: true });
+        created += 1;
+      } else {
+        updated += 1;
+      }
+      saved.current.designs.set(job.id, fingerprint);
+    }
+
+    if (created > 0) toast.success(`${created} design${created > 1 ? 's' : ''} saved`);
+    else if (updated > 0) toast.success('Design updated');
+  }
+
+  /** What each step writes on the way out. Steps not listed write nothing. */
+  async function persistStep(leaving: number) {
+    if (leaving === 1) await persistCustomerDetails();
+    if (leaving === 2) await persistDesigns();
+  }
+
   async function goNext() {
     const fields = STEP_FIELDS[step] ?? [];
     if (fields.length > 0 && !(await trigger(fields))) return;
+
+    /*
+     * Saving must never cost the office their place in the form. If the network
+     * is down the step still advances with a warning: everything typed is still
+     * in the form, the final Save writes the whole quotation regardless, and
+     * winning it creates any design that never made it. Blocking here would
+     * strand somebody mid-quotation over a record they can fix later.
+     */
+    try {
+      await persistStep(step);
+    } catch (cause) {
+      toast.error(
+        cause instanceof ApiClientError
+          ? `Could not save yet: ${cause.message}`
+          : 'Could not save that yet — it will be saved with the quotation.',
+      );
+    }
+
     const next = Math.min(step + 1, STEPS.length - 1);
     setStep(next);
     setFurthest((seen) => Math.max(seen, next));

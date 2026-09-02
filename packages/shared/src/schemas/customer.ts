@@ -191,3 +191,37 @@ export type CreateCustomerFormValues = z.input<typeof createCustomerSchema>;
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>;
 export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>;
 export type ListCustomersQuery = z.infer<typeof listCustomersQuerySchema>;
+
+/**
+ * One job, saved on its own from the quotation wizard.
+ *
+ * A narrow slice of `customerJobSchema` rather than the whole thing: the wizard
+ * knows a design's name, structure, size and cylinders, and nothing about the
+ * machine, coating weights or the dozen sparse columns the imported sheet
+ * carried. Sending the full shape would mean the wizard inventing defaults for
+ * fields it has no opinion on, and quietly flattening whatever the customer
+ * editor had recorded there.
+ */
+export const saveQuotationJobSchema = z.object({
+  jobName: z.string().trim().min(1, 'Job name is required').max(200),
+  jobType: z.string().trim().max(40).default(NA),
+  pouchType: z.string().trim().max(80).default(NA),
+
+  layer: optionalNumber,
+  petMicron: optionalNumber,
+  metPetMicron: optionalNumber,
+  polyMicron: optionalNumber,
+
+  designOpenWidth: optionalNumber,
+  designHeight: optionalNumber,
+  totalCylinders: optionalNumber,
+
+  petGsm: optionalNumber,
+  metPetGsm: optionalNumber,
+  polyGsm: optionalNumber,
+
+  /** Stored as text in the imported jobs table, not as a number. */
+  pouchesPerKg: z.string().trim().max(40).default(NA),
+});
+
+export type SaveQuotationJobInput = z.infer<typeof saveQuotationJobSchema>;
