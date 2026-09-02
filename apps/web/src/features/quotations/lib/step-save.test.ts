@@ -192,3 +192,20 @@ describe('a design read back from the server', () => {
     );
   });
 });
+
+describe('the brand, as a customer detail', () => {
+  it('is written back when the office corrects it', () => {
+    const baseline = baselineFromCustomer(customer);
+    expect(changedCustomerFields(baseline, { ...baseline, brandName: 'Ashoka' })).toEqual({
+      brandName: 'Ashoka',
+    });
+  });
+
+  it('is not written when it was only read', () => {
+    // 'NA' on the record, blank in the box: unchanged, so nothing is sent.
+    const withBrand = { ...customer, brandName: 'NA' } as unknown as CustomerDetail;
+    const baseline = baselineFromCustomer(withBrand);
+    expect(baseline.brandName).toBe('');
+    expect(changedCustomerFields(baseline, { ...baseline })).toBeNull();
+  });
+});

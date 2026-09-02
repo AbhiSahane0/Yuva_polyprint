@@ -17,6 +17,7 @@ import type { CustomerDetail, CustomerJob, SaveQuotationJobInput } from '@yuva/s
 /** The customer fields the quotation form can edit. */
 export interface CustomerDetails {
   companyName: string;
+  brandName: string;
   address: string;
   city: string;
   district: string;
@@ -41,6 +42,7 @@ export function normalise(value: string | null | undefined): string {
 export function baselineFromCustomer(customer: CustomerDetail): CustomerDetails {
   return {
     companyName: normalise(customer.companyName),
+    brandName: normalise(customer.brandName),
     address: normalise(customer.address),
     city: normalise(customer.city),
     district: normalise(customer.district),

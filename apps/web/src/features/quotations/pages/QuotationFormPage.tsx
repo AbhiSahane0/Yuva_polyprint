@@ -270,6 +270,7 @@ export default function QuotationFormPage() {
       customerId: null,
       saveAsCustomer: false,
       customerName: '',
+      brandName: '',
       addressLine1: '',
       addressLine2: '',
       addressLine3: '',
@@ -306,17 +307,6 @@ export default function QuotationFormPage() {
   const customerId = (watched.customerId ?? null) as string | null;
   const { data: chosenCustomer } = useCustomer(customerMode === 'existing' ? customerId : null);
 
-  /**
-   * The chosen company's brand, if they recorded one.
-   *
-   * 'NA' is the importer's placeholder for "not known" and must never reach the
-   * screen as if it were a brand.
-   */
-  const brandOfChosen =
-    chosenCustomer && chosenCustomer.brandName && chosenCustomer.brandName !== 'NA'
-      ? chosenCustomer.brandName
-      : null;
-
   /* ---------------------------------------------- prefill from the customer */
 
   /*
@@ -343,6 +333,7 @@ export default function QuotationFormPage() {
     // is worse than showing nothing.
     const real = (value: string | null | undefined) => (value && value !== 'NA' ? value : '');
     setValue('customerName', chosenCustomer.companyName);
+    setValue('brandName', real(chosenCustomer.brandName));
     setValue('addressLine1', real(chosenCustomer.address));
     setValue('addressLine2', real(chosenCustomer.city));
     setValue('addressLine3', real(chosenCustomer.district));
@@ -361,6 +352,12 @@ export default function QuotationFormPage() {
       customerId: existing.customerId,
       saveAsCustomer: false,
       customerName: existing.customerName,
+      /*
+       * Blank, not from the quotation: the brand lives on the customer and is
+       * not snapshotted here, so the prefill fills it in once their record
+       * loads. Starting undefined would leave the box uncontrolled for a beat.
+       */
+      brandName: '',
       addressLine1: existing.addressLine1,
       addressLine2: existing.addressLine2,
       addressLine3: existing.addressLine3,
@@ -506,6 +503,36 @@ export default function QuotationFormPage() {
   /* -------------------------------------------------------------- movement */
 
   /**
+   * Empties every box on the customer step.
+   *
+   * Switching between Existing and New is a statement that this quotation is
+   * for somebody else, so nothing typed for the last one should survive it.
+   * Only the company name used to be cleared, and only in one direction —
+   * which left a chosen customer's address, mobile, GSTIN and brand sitting
+   * under a New company heading, ready to be saved onto a firm they belong to
+   * no part of.
+   */
+  function clearCustomerFields() {
+    setValue('customerId', null);
+    for (const field of [
+      'customerName',
+      'brandName',
+      'addressLine1',
+      'addressLine2',
+      'addressLine3',
+      'mobile',
+      'email',
+      'gstNumber',
+    ] as const) {
+      setValue(field, '', { shouldDirty: false });
+    }
+    // The baseline goes with them: it described a customer this quotation is
+    // no longer for, and keeping it would make the next Next diff against the
+    // wrong record.
+    saved.current = { customer: null, designs: new Map() };
+  }
+
+  /**
    * Pushes this quotation's corrections back onto the customer record.
    *
    * Only what changed, and only for an existing customer — a new company has no
@@ -518,6 +545,7 @@ export default function QuotationFormPage() {
 
     const current: CustomerDetails = {
       companyName: watched.customerName ?? '',
+      brandName: watched.brandName ?? '',
       address: watched.addressLine1 ?? '',
       city: watched.addressLine2 ?? '',
       district: watched.addressLine3 ?? '',
@@ -639,6 +667,7 @@ export default function QuotationFormPage() {
         ...values,
         status,
         saveAsCustomer: customerMode === 'new',
+        brandName: values.brandName ?? '',
         customerId: customerMode === 'existing' ? values.customerId : null,
       } as CreateQuotationInput;
 
@@ -700,9 +729,9 @@ export default function QuotationFormPage() {
                     key={mode}
                     type="button"
                     onClick={() => {
+                      if (mode === customerMode) return;
                       setCustomerMode(mode);
-                      setValue('customerId', null);
-                      if (mode === 'new') setValue('customerName', '');
+                      clearCustomerFields();
                     }}
                     className={cn(
                       'focus-visible:ring-brand-500 inline-flex items-center gap-2 rounded-[var(--radius-md)] border px-3.5 py-2 text-sm font-medium transition focus-visible:ring-2 focus-visible:outline-none',
@@ -756,21 +785,6 @@ export default function QuotationFormPage() {
                         }}
                       />
                     </Field>
-
-                    {/*
-                    The brand, once a company is chosen.
-                    
-                    Worth showing because the two names genuinely differ and the
-                    office knows customers by the second — this is the
-                    confirmation that they picked the firm behind the brand they
-                    were asked about. Searching already matches on it, so typing
-                    "Aswad" finds the company registered as something else.
-                  */}
-                    {brandOfChosen ? (
-                      <p className="text-ink-500 mt-1.5 text-sm">
-                        Brand <span className="text-ink-800 font-medium">{brandOfChosen}</span>
-                      </p>
-                    ) : null}
                   </>
                 ) : (
                   <Field
@@ -786,6 +800,29 @@ export default function QuotationFormPage() {
                     />
                   </Field>
                 )}
+              </div>
+
+              {/*
+                Beside the company, on both paths.
+                
+                For an existing customer it arrives filled in and stays
+                editable — a brand the office corrects here is written back to
+                their record, the same way a corrected address already is. For a
+                new company it is simply typed, and set when the record is
+                created on save.
+              */}
+              <div className="sm:col-span-5">
+                <Field
+                  label="Brand"
+                  htmlFor="brandName"
+                  hint={
+                    customerMode === 'existing'
+                      ? 'What they sell under. Corrections are saved back.'
+                      : 'What they sell under, if different'
+                  }
+                >
+                  <Input id="brandName" placeholder="e.g. Ashoka" {...register('brandName')} />
+                </Field>
               </div>
             </div>
           </FieldSection>

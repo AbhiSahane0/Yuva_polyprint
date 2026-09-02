@@ -170,6 +170,15 @@ const createQuotationBaseSchema = z.object({
    * the next enquiry finds it under "Existing company" instead of being retyped.
    */
   saveAsCustomer: z.boolean().default(false),
+  /**
+   * The customer's brand, as the office has it on this screen.
+   *
+   * Carried on the quotation input but not stored on the quotation: a brand
+   * belongs to the customer, and holding a second copy here would let the two
+   * disagree the moment either was edited. It is used to fill the brand in when
+   * a new company is created, and to correct it on an existing one.
+   */
+  brandName: z.string().trim().max(200).default(''),
   /* "Required" is untrue once a single character has been typed, which is what
    * this rule actually rejects — so the message says what to do instead. */
   customerName: z.string().trim().min(2, 'Enter the company name').max(200),
