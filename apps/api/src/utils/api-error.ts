@@ -49,6 +49,11 @@ export class ApiError extends Error {
     return new ApiError(HTTP_STATUS.CONFLICT, ERROR_CODE.CONFLICT, message);
   }
 
+  /** An upstream this server depends on is down or refusing. Retrying may work. */
+  static serviceUnavailable(message = 'That service is unavailable') {
+    return new ApiError(HTTP_STATUS.SERVICE_UNAVAILABLE, ERROR_CODE.SERVICE_UNAVAILABLE, message);
+  }
+
   static internal(message = 'Something went wrong') {
     return new ApiError(HTTP_STATUS.INTERNAL_SERVER_ERROR, ERROR_CODE.INTERNAL_ERROR, message);
   }

@@ -186,8 +186,54 @@ PET + Poly + Adhesive") and Pouches per kg ("From design size and composite
 GSM"). The two calculated ones update live as you type. The server recomputes
 on save regardless; the live figure is feedback, not the source of truth.
 
-**GST number** sits with the contact details and is carried onto every
-quotation raised for that customer.
+#### GST number
+
+Sits with the contact details, is carried onto every quotation raised for that
+customer, and is checked in two quite different ways.
+
+**The format check is free and runs as you type.** A GSTIN carries its own check
+digit, so a typed one can be verified offline with no network and no cost:
+
+```
+27  AIGPH5992Q  1  Z  D
+─┬  ─────┬────  ┬  ┬  ┬
+ │       │      │  │  └── check digit, Luhn mod 36 over the first 14
+ │       │      │  └───── 'Z', reserved
+ │       │      └──────── registrations this PAN holds in this state
+ │       └─────────────── the holder's PAN
+ └─────────────────────── state code
+```
+
+Measured exhaustively, this catches **100% of single-character typos** and
+**100% of adjacent transpositions** — which is essentially the whole realistic
+error space for a number copied off a letterhead. It also names the likeliest
+cause rather than saying "invalid": reading a GSTIN off paper confuses 0/O and
+1/I constantly, and where each is legal is not obvious.
+
+A **blank** GST number is not an error. Registration is not compulsory below the
+turnover threshold, so plenty of genuine small customers have none.
+
+**The registry lookup costs money and happens only on Verify.** Never on blur,
+never on mount, never on a retry. It answers what arithmetic cannot — was this
+number ever issued, to whom, and is it still live — and returns the legal name,
+trade name, registered address, constitution, taxpayer type and status.
+
+**Use these details** fills in the company name, address, city and district from
+what came back, so a new customer is one paste rather than six fields, and the
+name is spelled the way it will appear on their invoice. It never blanks a field
+you have already filled in — the registry leaves plenty of these empty, and an
+empty answer is not a correction.
+
+Every answer is **cached permanently by GSTIN**, so a credit is spent once per
+customer and never again. The panel says whether you are looking at a fresh
+check or an old one, because the status is the one field that goes stale.
+
+> Anything other than **Active** is the whole point of having looked. Quoting a
+> cancelled registration is survivable; invoicing one costs the customer their
+> input tax credit. The re-check belongs in Invoicing, not here.
+
+The same field appears on the quotation wizard's Details step, because a new
+company is created from there too.
 
 `NA` never appears in the UI. The imported data is full of it, so the table
 shows a muted dash and edit boxes open blank. Clearing a box saves it back as

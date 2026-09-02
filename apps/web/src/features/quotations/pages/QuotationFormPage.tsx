@@ -49,6 +49,7 @@ import {
   useSettings,
   useUpdateQuotation,
 } from '../api/quotation-api';
+import { GstinField } from '@/features/gstin/components/GstinField';
 import { QuotationPreview } from '../components/QuotationPreview';
 import { LayerFields } from '../components/LayerFields';
 import { QuantityFields, type QuantityResult } from '../components/QuantityFields';
@@ -626,10 +627,42 @@ export default function QuotationFormPage() {
                   <Input id="email" type="email" {...register('email')} />
                 </Field>
               </div>
-              <div className="sm:col-span-4">
-                <Field label="GST number" htmlFor="gstNumber">
-                  <Input id="gstNumber" {...register('gstNumber')} />
-                </Field>
+              <div className="sm:col-span-8">
+                {/*
+                  Verify is offered here too, not only on the customer screen.
+                  A new company is created from this form, and asking the office
+                  to go and add them properly somewhere else first is how a
+                  quotation ends up addressed to a name nobody checked.
+                */}
+                <GstinField
+                  registration={register('gstNumber')}
+                  value={(watched.gstNumber as string | undefined) ?? ''}
+                  error={formState.errors.gstNumber?.message}
+                  onApply={(lookup) => {
+                    const set = (
+                      field: 'customerName' | 'addressLine1' | 'addressLine2' | 'addressLine3',
+                      value: string | null,
+                    ) => {
+                      // An empty answer from the registry is not a correction —
+                      // never blank something the office already typed.
+                      if (value)
+                        setValue(field, value, { shouldDirty: true, shouldValidate: true });
+                    };
+                    /*
+                     * The company name is only taken for a new company. On an
+                     * existing one it is the link to their customer record, and
+                     * rewriting it would quietly point the quotation at a name
+                     * that no longer matches anything in the list.
+                     */
+                    if (customerMode === 'new') {
+                      set('customerName', lookup.legalName ?? lookup.tradeName);
+                    }
+                    set('addressLine1', lookup.address);
+                    set('addressLine2', lookup.city);
+                    set('addressLine3', lookup.district);
+                    toast.success('Filled in from the GST registry');
+                  }}
+                />
               </div>
             </div>
           </FieldSection>

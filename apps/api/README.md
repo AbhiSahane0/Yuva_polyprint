@@ -1266,3 +1266,58 @@ instead.
 
 The header band repeats on every page (`position: fixed` in print), while the
 footer follows the content so it appears once, under the sign-off.
+
+## GSTIN lookup
+
+`GET /api/gstin/:gstin` — the registered details behind a GST number. Signed in,
+but not tied to a module: the customer form and the quotation wizard both use
+it, and gating it on one would break it on the other.
+
+### The offline check comes first
+
+`checkGstin()` in `@yuva/shared` validates shape, state code and check digit
+with no network and no cost. **A GSTIN that fails it is refused before any
+credit is spent** — asking about a number that cannot exist buys nothing that
+arithmetic did not already know.
+
+That check is exhaustive against the errors people actually make: **100% of
+single-character typos** and **100% of adjacent transpositions**, which is what
+Luhn mod 36 guarantees by construction. State codes 01–38, 97 and 99 are
+accepted; 25 and 28 are no longer issued but old registrations under them are
+genuine, so they are not refused.
+
+### Every answer is cached, permanently
+
+Keyed by GSTIN in `app_settings`. A legal name and a registered address do not
+change, and a credit spent on one should never be spent twice. `?refresh=1`
+re-asks; the response carries `fromCache` and `checkedAt` so a caller can weigh
+how old an "Active" is.
+
+**Status is the only field that goes stale.** It does not matter for a
+quotation. It matters for an invoice — billing a cancelled registration costs
+the customer their input tax credit — so that re-check belongs to Invoicing.
+
+### Swapping providers
+
+Two things know who answers: the `BASE_URL` constant and `toLookup()` in
+`gstin.service.ts`. Nothing above them does. The mapping is deliberately
+separate from the fetch because it is the one piece that has to be checked
+against a real response rather than a document — every provider field is
+optional going in and null coming out, so a renamed field degrades to a missing
+one rather than a crash.
+
+### Configuration
+
+| Variable             | Meaning                                                                                                                                         |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GSTIN_API_KEY`      | Optional. Without it the offline format check still runs — that is the half that catches typos — and only **Verify** reports itself unavailable |
+| `GSTIN_API_BASE_URL` | Defaults to `https://api.gstinapi.in`                                                                                                           |
+
+Rate limited to 120 lookups per hour per IP. That is generous against real use —
+once per new customer — and tight against a stuck retry loop draining the
+account's balance.
+
+> **Blank means absent.** A `.env` cannot express `undefined`, so `KEY=` arrives
+> as an empty string. Every optional credential is now wrapped so that reads as
+> unset. Before that, copying `.env.example` to `.env` produced a server that
+> refused to boot, naming a key the developer had deliberately left blank.

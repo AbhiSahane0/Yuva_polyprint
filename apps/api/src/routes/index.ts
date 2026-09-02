@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import authRoutes from '../modules/auth/auth.routes.js';
 import customerRoutes from '../modules/customers/customer.routes.js';
+import gstinRoutes from '../modules/gstin/gstin.routes.js';
 import materialRoutes from '../modules/materials/material.routes.js';
 import monitorRoutes from '../modules/monitor/monitor.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
@@ -37,6 +38,13 @@ router.use('/quotations', authenticate, requireModule('quotations'), quotationRo
 router.use('/materials', authenticate, materialRoutes);
 
 router.use('/settings', authenticate, settingsRoutes);
+
+/*
+ * GSTIN lookup. Signed in, but not tied to a module: it is used from the
+ * customer form and from the quotation wizard, and gating it on one of those
+ * would break it on the other for anyone who has only the second.
+ */
+router.use('/gstin', authenticate, gstinRoutes);
 
 /** Administrators only — each router applies that guard to itself. */
 router.use('/users', userRoutes);
