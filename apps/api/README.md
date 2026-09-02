@@ -1337,3 +1337,37 @@ account's balance.
 > as an empty string. Every optional credential is now wrapped so that reads as
 > unset. Before that, copying `.env.example` to `.env` produced a server that
 > refused to boot, naming a key the developer had deliberately left blank.
+
+## The API's own documentation
+
+`/docs` serves a browsable, testable reference; `/docs/openapi.json` serves the
+spec behind it. Both are open — reading changes nothing, and every endpoint they
+describe answers 401 without a session, so the URL can be shared with a
+developer without giving anybody a way in.
+
+**The request and query schemas are generated, not written.** Zod 4 emits JSON
+Schema natively, so `openapi.ts` converts the very schemas the routes validate
+with — change a schema and the page changes with it. Documentation kept
+separately from validation drifts, and the drift is invisible until somebody has
+already built against the wrong contract.
+
+What is written by hand is the _surface_: which paths exist and what each is
+for. Express does not expose that in a form worth introspecting, and a route's
+purpose is not something a type can state. `openapi.test.ts` pins every
+documented path, because a path that does not exist is worse than no
+documentation — `/api/monitor/logins` sat in there until a live 404 said so.
+
+### Trying it out
+
+Everything but `POST /api/auth/login` needs a session. Call login, copy
+`data.accessToken`, press **Authorize**. It survives a reload.
+
+There is no sandbox: the docs point at whichever server served them, so on the
+deployed URL **Try it out writes to production**. Reading is free; a POST is
+real.
+
+### Sharing it
+
+The deployed page is at `https://<your-api-host>/docs`. A developer who would
+rather generate a client than click can take `/docs/openapi.json` straight into
+openapi-generator, Postman or Insomnia.
