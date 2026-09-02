@@ -1565,7 +1565,7 @@ function JobCard({
                   <Field
                     label="Cylinder width"
                     htmlFor={`items.${index}.cylinderWidth`}
-                    hint={`${formatNumber(num(item?.widthMm))} × ${formatNumber(num(item?.repeatWidth))} + 80 margin`}
+                    hint={`${formatNumber(cost?.geometry.filmWidthMm ?? 0)} × ${formatNumber(num(item?.repeatWidth))} + 80 margin`}
                   >
                     <ReadOnlyValue value={formatNumber(cost?.geometry.cylinderWidth ?? 0)} />
                   </Field>
@@ -1574,7 +1574,7 @@ function JobCard({
                   <Field
                     label="Cylinder circumference"
                     htmlFor={`items.${index}.cylinderCircumference`}
-                    hint={`${formatNumber(num(item?.heightMm))} × ${formatNumber(num(item?.repeatHeight))}`}
+                    hint={`${formatNumber(cost?.geometry.filmHeightMm ?? 0)} × ${formatNumber(num(item?.repeatHeight))}`}
                   >
                     <ReadOnlyValue
                       value={formatNumber(cost?.geometry.cylinderCircumference ?? 0)}
