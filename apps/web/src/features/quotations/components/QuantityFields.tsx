@@ -22,18 +22,22 @@ import { cn } from '@/lib/utils';
  * suggestion used to be the only answer available, and a customer who orders
  * standup pouches by the kilogram could not be quoted the way they buy.
  *
- * Whichever unit is chosen, only that pair is asked for. The other is worked
- * back and shown beside the result, because the film is ordered by weight
- * however it is sold.
+ * Whichever unit is chosen, only that pair is asked for — but **both** are
+ * reported beside the result. The film is ordered by weight however it is
+ * sold, and the works needs the count however it is priced.
  */
 
 /** What each quantity works out to, computed live so nothing is a surprise. */
 export interface QuantityResult {
   quantityKg: number;
+  /** Effective rupees per kilogram — typed on a per-kg line, derived on a per-pouch one. */
+  ratePerKg: number;
   totalPouches: number;
   totalAmount: number;
   costPerPouch: number;
   marginPercent: number | null;
+  /** The other half of the margin, so the row can show its working. */
+  materialCostPerKg: number | null;
 }
 
 export function QuantityFields({
@@ -56,10 +60,8 @@ export function QuantityFields({
    */
   onBasisChange?: ((next: PricingBasis) => void) | undefined;
   /**
-   * False on a roll. The other unit is normally worked back and shown beside
-   * the total — kilograms for a per-piece line, pieces for a per-kilo one — but
-   * a reel has no pieces, and "0 pouches" reads as a count rather than as an
-   * absence.
+   * False on a roll. Weight is reported either way, but a reel has no pieces,
+   * and "0 pouches" reads as a count rather than as an absence.
    */
   showsPouches?: boolean;
   /** One per row, in order. Absent entries render as blanks, not zeroes. */
@@ -143,6 +145,21 @@ export function QuantityFields({
                   error={errors?.[index]?.[quantityField]?.message}
                 >
                   <Input
+                    /*
+                     * Keyed on the field, so switching the unit remounts the
+                     * box instead of reusing it.
+                     *
+                     * `register` is uncontrolled: it never writes back into an
+                     * input it is already holding. React reuses this node
+                     * across the switch because nothing about its position
+                     * changed, so the box went on displaying the kilograms
+                     * that were typed while the form was reading and writing
+                     * `quantityPouches` underneath — 100 and Rs. 400 on
+                     * screen, Rs. 0 as the total beside them. Remounting makes
+                     * react-hook-form register a fresh element and fill it
+                     * from what it actually holds.
+                     */
+                    key={quantityField}
                     id={`items.${itemIndex}.quantities.${index}.${quantityField}`}
                     inputMode="decimal"
                     invalid={Boolean(errors?.[index]?.[quantityField])}
@@ -159,6 +176,7 @@ export function QuantityFields({
                   error={errors?.[index]?.[rateField]?.message}
                 >
                   <Input
+                    key={rateField}
                     id={`items.${itemIndex}.quantities.${index}.${rateField}`}
                     inputMode="decimal"
                     invalid={Boolean(errors?.[index]?.[rateField])}
@@ -179,15 +197,47 @@ export function QuantityFields({
                       <span className="text-ink-800 font-medium">
                         {formatRs(result.totalAmount)}
                       </span>
-                      {perPouch ? (
-                        <span>{formatNumber(result.quantityKg, 2)} kg</span>
-                      ) : showsPouches ? (
-                        <span>{formatNumber(result.totalPouches)} pouches</span>
+                      {/*
+                       * Both units, always — not just the one that was not
+                       * typed. The office quotes in whichever the customer
+                       * buys, but the works runs on the other: a per-pouch
+                       * order still has to be laminated and slit by weight,
+                       * and a per-kilo one still has to come off the machine
+                       * as a countable number of pouches. Showing only the
+                       * derived half meant reading the typed figure off the
+                       * box above and holding the pair in your head.
+                       */}
+                      <span className="tabular-nums">{formatNumber(result.quantityKg, 2)} kg</span>
+                      {showsPouches ? (
+                        <span className="tabular-nums">
+                          {formatNumber(result.totalPouches)} pouches
+                        </span>
                       ) : null}
+                      {/*
+                       * Margin on the selling rate, against the *material*
+                       * cost of a kilogram and nothing else — cylinders,
+                       * printing and wastage are not in it. Spelled out on
+                       * hover rather than on the row, because it is a question
+                       * asked once and a line of noise thereafter, and because
+                       * a figure this high on a per-pouch line surprises
+                       * people until they see which two numbers made it.
+                       */}
                       {result.marginPercent === null ? (
-                        <span className="text-ink-400">margin —</span>
+                        <span
+                          className="text-ink-400"
+                          title="No margin without a costed structure — every ply needs a film with a rate."
+                        >
+                          margin —
+                        </span>
                       ) : (
                         <span
+                          title={`(${formatRs(result.ratePerKg, 2)} per kg − ${formatRs(
+                            result.materialCostPerKg ?? 0,
+                            2,
+                          )} material per kg) ÷ ${formatRs(
+                            result.ratePerKg,
+                            2,
+                          )}. Material only — cylinders and conversion are not included.`}
                           className={cn(
                             'font-medium',
                             result.marginPercent < 15 ? 'text-warning-600' : 'text-success-600',
