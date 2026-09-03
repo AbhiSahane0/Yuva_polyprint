@@ -145,6 +145,21 @@ export function QuantityFields({
                   error={errors?.[index]?.[quantityField]?.message}
                 >
                   <Input
+                    /*
+                     * Keyed on the field, so switching the unit remounts the
+                     * box instead of reusing it.
+                     *
+                     * `register` is uncontrolled: it never writes back into an
+                     * input it is already holding. React reuses this node
+                     * across the switch because nothing about its position
+                     * changed, so the box went on displaying the kilograms
+                     * that were typed while the form was reading and writing
+                     * `quantityPouches` underneath — 100 and Rs. 400 on
+                     * screen, Rs. 0 as the total beside them. Remounting makes
+                     * react-hook-form register a fresh element and fill it
+                     * from what it actually holds.
+                     */
+                    key={quantityField}
                     id={`items.${itemIndex}.quantities.${index}.${quantityField}`}
                     inputMode="decimal"
                     invalid={Boolean(errors?.[index]?.[quantityField])}
@@ -161,6 +176,7 @@ export function QuantityFields({
                   error={errors?.[index]?.[rateField]?.message}
                 >
                   <Input
+                    key={rateField}
                     id={`items.${itemIndex}.quantities.${index}.${rateField}`}
                     inputMode="decimal"
                     invalid={Boolean(errors?.[index]?.[rateField])}
