@@ -352,16 +352,16 @@ and only appears for a pouch.
 > Standup · Standup zipper · Zipper · Spout pouch · Centre seal ·
 > Three side seal · Other
 
-**The hint under the style says how the line is priced** — "Priced per pouch" or
-"Priced per kg". Picking a style sets that to the trade's convention for it, and
-the switch in the Quantities panel changes it. Choosing Other reveals a box to
-say what it is.
+**The style decides how the line is priced.** Picking one sets the basis to the
+trade's convention for it, and the switch in the Quantities panel changes it —
+that switch is where the basis is stated, not under the style. Choosing Other
+reveals a box to say what it is.
 
 **A roll is not a pouch.** Choosing it clears the style and any gazette, hides
 both controls, and forces kilograms. Film on a reel has not been converted into
-anything, so it yields **no pouches at all** — the summary says "Sold by weight
-— no pouches" and the printed document shows a dash, because `0.00` reads as a
-count of something rather than as an absence.
+anything, so it yields **no pouches at all** — the quantity row reports the
+weight and drops the count entirely, and the printed document shows a dash,
+because `0.00` reads as a count of something rather than as an absence.
 
 > These were one dropdown for a while, which read tidily and hid the thing that
 > matters most. Before that it was a grid of eight drawn pouches, which read as
@@ -385,22 +385,28 @@ film is what is bought, and the cylinder, because that film is what is printed.
 A 350 × 250 pouch with 4 / 4 / 10 is cut from **358 × 260**, which is both
 heavier per piece and a wider engraving.
 
-The **Film size** box shows it, and the cylinder captions quote it: `358 × 1 +
-80 margin` beside a cylinder width of 438. They quoted the pouch for a while —
-`350 × 1 + 80 margin` printed beside 438 — which reads as an arithmetic error
-rather than a gusset, and invites doubt about a figure that is right.
+The **Film size** box is where that is stated: a 350 × 250 pouch with 4 / 4 / 10
+reads `358 × 260`, and the cylinder width beside it reads 438 — the film plus
+the 80mm margin. The cylinders once carried captions spelling that sum out, and
+they have been removed along with the rest of the workings; Film size is what
+explains a cylinder wider than the pouch.
 
 Unticking zeroes the depths, so a stored line cannot carry a 10mm bottom gusset
 that was never charged for.
 
 #### The structure, ply by ply
 
-Each ply gets its own row: **choose a film, and that is the whole row**. Its
-gauge, density and GSM are shown beside it. **2 layer / 3 layer** adds or
-removes rows rather than swapping the form, so moving from two plies to three
-keeps everything already typed and only asks for the new one. The outermost and
-the sealant are labelled, because those are the two the office actually thinks
-about.
+Each ply gets its own row: **choose a film, and that is the whole row.** Beside
+it sits that film's rate — `Rs. 210.00 / kg` — and nothing else. **2 layer /
+3 layer** adds or removes rows rather than swapping the form, so moving from two
+plies to three keeps everything already typed and only asks for the new one.
+
+> The row used to state the gauge, the density and the resulting GSM. All three
+> are inputs to the cost rather than facts anyone needs while choosing a film,
+> and three figures per ply read as noise on a screen with six of them. The rate
+> is what the question at that dropdown actually is, and it is the reason a ply
+> gets swapped. A film with **no rate on record** says so in amber, because that
+> is where an uncostable line begins.
 
 > This replaces a single **Film** dropdown that set only the sealant, with the
 > printed PET and the metallised ply assumed. The client could not read what he
@@ -425,9 +431,9 @@ engine and the schema handle four, so a foil laminate can be quoted the day it
 is genuinely needed — it is simply not on screen, because an option nobody uses
 is one more thing to read past on every job.
 
-**A ply left unchosen makes the line uncostable, not free** — the strip says
-"Not costed — every ply needs a film" rather than showing an average of whatever
-is left.
+**A ply left unchosen makes the line uncostable, not free.** The margin falls to
+a dash rather than averaging whatever is left, and hovering it says why: "No
+margin without a costed structure — every ply needs a film with a rate."
 
 #### Repeat or new design
 
@@ -438,10 +444,9 @@ retyped.
 
 **The materials are deliberately left blank.** The jobs table records
 thicknesses but never recorded which film was used, and guessing one would put a
-rate behind a margin nobody chose. The prefilled gauge is shown on the row as
-`12µ · Film not chosen`, so a figure already driving pouches-per-kg is not
-hidden behind the empty dropdown; naming the film replaces it with that film's
-own gauge.
+rate behind a margin nobody chose. The thicknesses are still there and still
+driving pouches-per-kg; what is missing is the rate, and the line says so by
+refusing to show a margin until every ply names a film.
 
 Switching back to **— New design —** clears the design: name, size, structure,
 repeats and cylinder count all return to their defaults. Leaving the previous
@@ -459,9 +464,28 @@ spreadsheet, not a failed prefill.
 One to three per line, each with its own quantity and rate, and its result
 alongside:
 
-> **Rs. 1,45,000** · 25,000 pouches · **31.2% margin**
+> **Rs. 1,45,000** · 51.52 kg · 25,000 pouches · **31.2% margin**
 
 Margin under 15% turns amber.
+
+**Both units are reported, not just the one that was not typed.** The office
+quotes in whichever the customer buys; the works runs on the other. A per-pouch
+order still has to be laminated and slit by weight, and a per-kilo one still has
+to come off the machine as a countable number of pieces.
+
+**The margin is material only.** It is the selling rate against the material
+cost of a kilogram — films, ink and adhesive — and **cylinders, printing,
+lamination, slitting and wastage are not in it**:
+
+```
+margin % = (selling per kg − material per kg) ÷ selling per kg
+```
+
+Hovering it spells out the two figures that made it, and says what it leaves
+out. That lives on hover because it is a question asked once and a line of noise
+afterwards. Note that a per-pouch line converts first — 1,000 pouches at Rs. 10
+is Rs. 10,000 for 6.16 kg, so the selling rate is Rs. 1,623/kg — which is why a
+small light pouch sold per piece always shows a spectacular figure.
 
 **Kilogram or Pouches is chosen here**, on the switch in the panel header:
 
@@ -470,8 +494,17 @@ QUANTITIES              Sold by [ Kilogram | Pouches ]     Add a quantity
 ```
 
 Only the chosen pair is asked for — kg and rate per kg, or pouches and rate per
-pouch — and the other unit is worked back and shown beside the result, because
-the film is ordered by weight however it is sold.
+pouch — but **both are kept**, so a customer who asks for the price the other way
+round is answered without re-typing the first one.
+
+> The boxes and the total disagreed for a while. Switching the unit swaps which
+> two fields the row is bound to, and React reused the same input — same
+> element, same position, new name — while react-hook-form's `register` never
+> writes back into an input it already holds. So the boxes went on showing the
+> kilograms that were typed while the form read and wrote the pouch fields
+> underneath: **100 and Rs. 400 on screen, Rs. 0 as the total beside them.** A
+> quotation could be sent on a figure nobody entered. The boxes are keyed on the
+> field name now, so switching remounts them and fills them from what is stored.
 
 The style seeds it: standup and standup zipper start on Pouches, everything else
 on Kilogram, which is what the trade does. Changing the style resets the switch
@@ -503,11 +536,36 @@ say — so the trigger is which job the line is for, not who is ordering it.
 Keying it to the customer would have made those cylinders quietly
 unchargeable.
 
-**The cylinder total shows its sum.** Transport is added to it, so the hint
-under the field reads `4 × Rs. 9,085 + Rs. 100 transport`. Without that, anyone
-checking the figure as cylinders × cost-per-cylinder lands short by exactly the
-transport and concludes it is wrong. The PDF carries the same note under the
-totals whenever transport was charged.
+**Transport is inside the cylinder total.** Anyone checking that figure as
+cylinders × cost-per-cylinder lands short by exactly the transport, so the PDF
+spells the sum out under the totals whenever transport was charged. The wizard
+no longer does — the field captions were removed with the rest of the workings,
+and the printed document is where that arithmetic is actually queried.
+
+#### What the card no longer shows
+
+Every job used to end in a dashed strip:
+
+```
+Structure 26µ    485.63 pouches/kg    37.9 GSM        Material Rs. 268.08/kg
+```
+
+It has been removed. All four are **workings rather than answers** — nobody
+reads them while quoting, because the price and the margin are what is being
+watched, and those sit on the quantity row where the price is chosen.
+
+Two things about it were worth keeping and were kept elsewhere:
+
+- **"Not costed — every ply needs a film"** is now the dash where the margin
+  would be, which says the same thing on hover.
+- **Material cost per kilogram** is one of the two figures the margin's own
+  explanation quotes.
+
+> A blank line used to open reading `Structure 64µ` before a single film had
+> been chosen. That is 12 + 50 placeholder gauges plus the 2µ of adhesive the
+> laminate carries — the defaults a new line starts with. Once the film began
+> setting the micron those placeholders stopped being visible, and the 64 had
+> nothing on screen to explain it.
 
 #### Saved as you go
 
@@ -787,12 +845,12 @@ store that does not exist yet.
 The browser recomputes the same figures the server does, using **the same code**
 — `@yuva/shared` is imported by both. Nothing is duplicated or reimplemented.
 
-| Where                 | What is previewed                                                                |
-| --------------------- | -------------------------------------------------------------------------------- |
-| Customer job editor   | Composite GSM, pouches per kg                                                    |
-| Quotation form line   | Micron, pouches/kg, total pouches, cylinder size and cost, material cost, margin |
-| Quotation form totals | Material and cylinder subtotals, GST, grand total, advance                       |
-| Rates screen          | The change % a typed rate would produce                                          |
+| Where                 | What is previewed                                          |
+| --------------------- | ---------------------------------------------------------- |
+| Customer job editor   | Composite GSM, pouches per kg                              |
+| Quotation form line   | Total pouches and weight, cylinder size and cost, margin   |
+| Quotation form totals | Material and cylinder subtotals, GST, grand total, advance |
+| Rates screen          | The change % a typed rate would produce                    |
 
 **The server always recalculates on save and its value wins.** The browser
 figure exists so the effect of a change is visible before committing to it —
