@@ -512,7 +512,11 @@ export default function QuotationFormPage() {
           quantityPouches: num(quantity?.quantityPouches),
           ratePerPouch: num(quantity?.ratePerPouch),
         });
-        return { ...tier, marginPercent: computeMargin(tier.ratePerKg, material.costPerKg) };
+        return {
+          ...tier,
+          marginPercent: computeMargin(tier.ratePerKg, material.costPerKg),
+          materialCostPerKg: material.costPerKg,
+        };
       });
 
       return { basis, material, geometry, quantities };
@@ -827,7 +831,6 @@ export default function QuotationFormPage() {
                     <Field
                       label="Company"
                       htmlFor="customerId"
-                      hint="Type to search"
                       error={formState.errors.customerName?.message}
                     >
                       <Combobox
@@ -865,7 +868,6 @@ export default function QuotationFormPage() {
                   <Field
                     label="Company name"
                     htmlFor="customerName"
-                    hint="Added to the customer list when this saves"
                     error={formState.errors.customerName?.message}
                   >
                     <Input
@@ -887,15 +889,7 @@ export default function QuotationFormPage() {
                 created on save.
               */}
               <div className="sm:col-span-5">
-                <Field
-                  label="Brand"
-                  htmlFor="brandName"
-                  hint={
-                    customerMode === 'existing'
-                      ? 'From their record. Edit the customer to change it.'
-                      : 'What they sell under, if different'
-                  }
-                >
+                <Field label="Brand" htmlFor="brandName">
                   <Input id="brandName" placeholder="e.g. Ashoka" {...register('brandName')} />
                 </Field>
               </div>
@@ -937,7 +931,7 @@ export default function QuotationFormPage() {
                 </Field>
               </div>
               <div className="sm:col-span-5">
-                <Field label="Email" htmlFor="email" hint="Used when sending the quotation">
+                <Field label="Email" htmlFor="email">
                   <Input id="email" type="email" {...register('email')} />
                 </Field>
               </div>
@@ -994,7 +988,6 @@ export default function QuotationFormPage() {
                 register={register}
                 setValue={setValue}
                 films={films}
-                cylinderRate={cylinderRate}
                 jobs={chosenCustomer?.jobs ?? []}
                 item={watched.items?.[index] as Partial<ItemValues> | undefined}
                 cost={costed[index]}
@@ -1079,7 +1072,6 @@ function JobCard({
   register,
   setValue,
   films,
-  cylinderRate,
   jobs,
   item,
   cost,
@@ -1092,8 +1084,6 @@ function JobCard({
   register: UseFormRegister<CreateQuotationFormValues>;
   setValue: UseFormSetValue<CreateQuotationFormValues>;
   films: Film[];
-  /** Rupees per 100 mm² of engraved area, from settings. */
-  cylinderRate: number;
   /** The chosen customer's saved jobs. Empty for a new company. */
   jobs: CustomerJob[];
   item: Partial<ItemValues> | undefined;
@@ -1208,11 +1198,7 @@ function JobCard({
         */}
         {jobs.length > 0 ? (
           <div className="col-span-2 sm:col-span-5">
-            <Field
-              label="Saved job"
-              htmlFor={`items.${index}.jobId`}
-              hint={`${jobs.length} on record for this customer`}
-            >
+            <Field label="Saved job" htmlFor={`items.${index}.jobId`}>
               <Select
                 id={`items.${index}.jobId`}
                 value={item?.jobId ?? ''}
@@ -1283,7 +1269,7 @@ function JobCard({
           buried at the bottom of eight.
         */}
         <div className="col-span-1 sm:col-span-3">
-          <Field label="Type" htmlFor={`items.${index}.jobKind`} hint="What the customer receives">
+          <Field label="Type" htmlFor={`items.${index}.jobKind`}>
             <Select
               id={`items.${index}.jobKind`}
               value={jobKind}
@@ -1330,7 +1316,6 @@ function JobCard({
             <Field
               label="Pouch type"
               htmlFor={`items.${index}.pouchType`}
-              hint={basis === 'PER_POUCH' ? 'Priced per pouch' : 'Priced per kg'}
               error={errors?.pouchType?.message}
             >
               <Select
@@ -1405,25 +1390,21 @@ function JobCard({
                   }
                 />
                 <span className="text-ink-800 text-sm font-medium">Gazette pouch</span>
-                <span className="text-ink-400 text-xs">
-                  Gussets at the sides and base — more film per pouch
-                </span>
               </label>
 
               {item?.isGazette ? (
                 <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-12">
                   {(
                     [
-                      ['gazetteBottom', 'Bottom gazette', 'adds to height'],
-                      ['gazetteLeft', 'Left gazette', 'adds to width'],
-                      ['gazetteRight', 'Right gazette', 'adds to width'],
+                      ['gazetteBottom', 'Bottom gazette'],
+                      ['gazetteLeft', 'Left gazette'],
+                      ['gazetteRight', 'Right gazette'],
                     ] as const
-                  ).map(([field, label, hint]) => (
+                  ).map(([field, label]) => (
                     <div key={field} className="sm:col-span-2">
                       <Field
                         label={label}
                         htmlFor={`items.${index}.${field}`}
-                        hint={hint}
                         error={errors?.[field]?.message}
                       >
                         <Input
@@ -1442,11 +1423,7 @@ function JobCard({
                     this is the number that does.
                   */}
                   <div className="col-span-2 sm:col-span-6">
-                    <Field
-                      label="Film size"
-                      htmlFor={`items.${index}.filmSize`}
-                      hint="mm — what is cut"
-                    >
+                    <Field label="Film size" htmlFor={`items.${index}.filmSize`}>
                       <ReadOnlyValue
                         value={`${formatNumber(cost?.geometry.filmWidthMm ?? 0)} × ${formatNumber(
                           cost?.geometry.filmHeightMm ?? 0,
@@ -1530,11 +1507,7 @@ function JobCard({
                   </Field>
                 </div>
                 <div className="sm:col-span-3">
-                  <Field
-                    label="Cylinders"
-                    htmlFor={`items.${index}.cylinderCount`}
-                    hint="One per colour"
-                  >
+                  <Field label="Cylinders" htmlFor={`items.${index}.cylinderCount`}>
                     <Input
                       id={`items.${index}.cylinderCount`}
                       inputMode="numeric"
@@ -1562,11 +1535,7 @@ function JobCard({
                   came from — and no way to spot a repeat typed wrong.
                 */}
                 <div className="sm:col-span-3">
-                  <Field
-                    label="Cylinder width"
-                    htmlFor={`items.${index}.cylinderWidth`}
-                    hint={`${formatNumber(cost?.geometry.filmWidthMm ?? 0)} × ${formatNumber(num(item?.repeatWidth))} + 80 margin`}
-                  >
+                  <Field label="Cylinder width" htmlFor={`items.${index}.cylinderWidth`}>
                     <ReadOnlyValue value={formatNumber(cost?.geometry.cylinderWidth ?? 0)} />
                   </Field>
                 </div>
@@ -1574,7 +1543,6 @@ function JobCard({
                   <Field
                     label="Cylinder circumference"
                     htmlFor={`items.${index}.cylinderCircumference`}
-                    hint={`${formatNumber(cost?.geometry.filmHeightMm ?? 0)} × ${formatNumber(num(item?.repeatHeight))}`}
                   >
                     <ReadOnlyValue
                       value={formatNumber(cost?.geometry.cylinderCircumference ?? 0)}
@@ -1582,32 +1550,12 @@ function JobCard({
                   </Field>
                 </div>
                 <div className="sm:col-span-3">
-                  <Field
-                    label="Cost per cylinder"
-                    htmlFor={`items.${index}.costPerCylinder`}
-                    hint={`area ÷ 100 × ${formatRs(cylinderRate, 2)}`}
-                  >
+                  <Field label="Cost per cylinder" htmlFor={`items.${index}.costPerCylinder`}>
                     <ReadOnlyValue value={formatRs(cost?.geometry.costPerCylinder ?? 0)} />
                   </Field>
                 </div>
                 <div className="sm:col-span-3">
-                  <Field
-                    label="Total cylinder cost"
-                    htmlFor={`items.${index}.totalCylinderCost`}
-                    /*
-                     * Transport is part of this total, so anyone checking it as
-                     * cylinders × cost-per-cylinder lands short by exactly the
-                     * transport and concludes the figure is wrong. The wizard
-                     * dropped that half of the hint; the PDF never did.
-                     */
-                    hint={`${formatNumber(num(item?.cylinderCount))} × ${formatRs(
-                      cost?.geometry.costPerCylinder ?? 0,
-                    )}${
-                      num(item?.transportCost) > 0
-                        ? ` + ${formatRs(num(item?.transportCost))} transport`
-                        : ''
-                    }`}
-                  >
+                  <Field label="Total cylinder cost" htmlFor={`items.${index}.totalCylinderCost`}>
                     <ReadOnlyValue value={formatRs(cost?.geometry.totalCylinderCost ?? 0)} />
                   </Field>
                 </div>

@@ -6,7 +6,7 @@ import {
   type UseFormSetValue,
 } from 'react-hook-form';
 import { Layers } from 'lucide-react';
-import { formatNumber, micronFromFilmName, type CreateQuotationFormValues } from '@yuva/shared';
+import { formatRs, micronFromFilmName, type CreateQuotationFormValues } from '@yuva/shared';
 import { Field, Input, Select } from '@/components/ui/Field';
 import { cn } from '@/lib/utils';
 
@@ -24,10 +24,10 @@ import { cn } from '@/lib/utils';
  * There is no thickness box. Every film in the rates master is named with its
  * gauge — a 12µ PET and a 19µ PET are two separate materials, bought and priced
  * separately — so the film IS the thickness, and asking for it again only
- * created a way for the two to disagree. Choosing the film sets the micron; the
- * row shows what it set. A film whose name states no gauge is the one exception
- * and asks for the figure, because guessing at it would silently under-weigh
- * the laminate and report a confident, wrong cost.
+ * created a way for the two to disagree. Choosing the film sets the micron
+ * silently. A film whose name states no gauge is the one exception and asks for
+ * the figure, because guessing at it would silently under-weigh the laminate
+ * and report a confident, wrong cost.
  */
 
 /**
@@ -45,12 +45,6 @@ interface Film {
   name: string;
   density: number | null;
   currentRate: number | null;
-}
-
-function roleOf(index: number, total: number): string {
-  if (index === 0) return 'Outer, printed';
-  if (index === total - 1) return 'Sealant';
-  return 'Middle';
 }
 
 export function LayerFields({
@@ -145,7 +139,6 @@ export function LayerFields({
           const layer = layers[index];
           const filmId = (layer?.materialId ?? null) as string | null;
           const film = filmId ? filmById.get(filmId) : undefined;
-          const micron = Number(layer?.micron ?? 0);
 
           // The one case the film cannot answer: a name that states no gauge.
           const needsMicron = Boolean(film) && micronFromFilmName(film!.name) === null;
@@ -156,7 +149,6 @@ export function LayerFields({
                 <Field
                   label={`Layer ${index + 1}`}
                   htmlFor={`items.${itemIndex}.layers.${index}.materialId`}
-                  hint={roleOf(index, fields.length)}
                 >
                   <Select
                     id={`items.${itemIndex}.layers.${index}.materialId`}
@@ -179,7 +171,6 @@ export function LayerFields({
                   <Field
                     label="Thickness"
                     htmlFor={`items.${itemIndex}.layers.${index}.micron`}
-                    hint="micron"
                     error={errors?.[index]?.micron?.message}
                   >
                     <Input
@@ -193,10 +184,20 @@ export function LayerFields({
               ) : null}
 
               {/*
-               * What the chosen film contributes: its gauge, and the density
-               * that turns the gauge into weight. Shown per row because this is
-               * the pair that explains the cost — the sealant is usually four
-               * times the PET and dominates the average.
+               * The film's rate, and nothing else.
+               *
+               * This column used to state the gauge, the density and the
+               * resulting GSM. Every one of those is an input to the cost
+               * rather than a fact the office needs while choosing a film, and
+               * three figures per ply on a six-ply screen read as noise. The
+               * rate is the one that answers the question actually being asked
+               * here — what does this film cost today — and it is the reason a
+               * ply gets swapped.
+               *
+               * "No rate" is said out loud rather than left blank, because a
+               * film without one makes the whole line uncostable: the material
+               * cost comes back null and the margin reads as a dash, and this
+               * is where that starts.
                */}
               <div
                 className={cn(
@@ -204,36 +205,16 @@ export function LayerFields({
                   needsMicron ? 'col-span-1 sm:col-span-5' : 'col-span-2 sm:col-span-7',
                 )}
               >
-                <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                  {micron > 0 && !needsMicron ? (
-                    <span className="text-ink-800 font-medium tabular-nums">
-                      {formatNumber(micron)}µ
-                    </span>
-                  ) : null}
-                  {/*
-                   * A line prefilled from a saved job arrives with the job's
-                   * thickness but no film — the jobs table never recorded which
-                   * one was used. Saying only "not chosen" would hide a figure
-                   * that is already driving the cost, and picking a film here
-                   * replaces it with the film's own gauge.
-                   */}
-                  {!filmId ? (
-                    <span>Film not chosen</span>
+                {film ? (
+                  film.currentRate === null ? (
+                    <span className="text-warning-600">No rate on record</span>
                   ) : (
-                    <>
-                      <span>
-                        {film?.density
-                          ? `${formatNumber(film.density, 2)} g/cm³`
-                          : 'No density recorded'}
-                      </span>
-                      {micron > 0 && film?.density ? (
-                        <span className="tabular-nums">
-                          {formatNumber(micron * film.density, 1)} GSM
-                        </span>
-                      ) : null}
-                    </>
-                  )}
-                </span>
+                    <span className="text-ink-800 font-medium tabular-nums">
+                      {formatRs(film.currentRate, 2)}
+                      <span className="text-ink-400 font-normal"> / kg</span>
+                    </span>
+                  )
+                ) : null}
               </div>
 
               {/*

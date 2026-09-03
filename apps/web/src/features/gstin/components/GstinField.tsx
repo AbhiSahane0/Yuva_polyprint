@@ -79,7 +79,7 @@ export function GstinField({
         label={label}
         htmlFor={id}
         // The offline verdict, live. Only once there is something to judge.
-        hint={check.valid ? 'Format looks right' : 'Carried onto their quotations'}
+        hint={check.valid ? 'Format looks right' : undefined}
         error={error ?? (showFormatError ? check.message : undefined)}
       >
         <div className="flex items-stretch gap-2">
