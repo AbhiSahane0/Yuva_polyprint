@@ -1563,46 +1563,6 @@ function JobCard({
             </div>
           </div>
         )}
-
-        <div className="col-span-2 sm:col-span-12">
-          <div className="border-ink-200 text-ink-600 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-[var(--radius-md)] border border-dashed px-3 py-2.5 text-sm">
-            <span>
-              Structure{' '}
-              <strong className="text-ink-900">{formatNumber(cost?.geometry.micron ?? 0)}µ</strong>
-            </span>
-            {/*
-             * Not on a roll. Film on a reel has not been converted into
-             * anything, so a pouch count is not small or approximate — it is a
-             * quantity that does not exist, and printing 0.00 would read as one
-             * that does.
-             */}
-            {jobKind === 'ROLL' ? (
-              <span className="text-ink-400">Sold by weight — no pouches</span>
-            ) : (
-              <span>{formatNumber(cost?.geometry.pouchesPerKg ?? 0, 2)} pouches/kg</span>
-            )}
-            {/*
-             * Only once the line can actually be costed. With no film chosen
-             * the composite is just the ink and adhesive — a confident 4.3 GSM
-             * for a pouch that weighs twenty times that.
-             */}
-            {cost?.material.costPerKg == null ? null : (
-              <span>{formatNumber(cost.material.compositeGsm, 1)} GSM</span>
-            )}
-            <span className="ml-auto">
-              {cost?.material.costPerKg == null ? (
-                <span className="text-ink-400">Not costed — every ply needs a film</span>
-              ) : (
-                <>
-                  Material{' '}
-                  <strong className="text-ink-900">
-                    {formatRs(cost.material.costPerKg, 2)}/kg
-                  </strong>
-                </>
-              )}
-            </span>
-          </div>
-        </div>
       </div>
     </section>
   );

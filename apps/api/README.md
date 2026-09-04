@@ -780,6 +780,18 @@ priced as MET PET and not as the plain PET beside it — same 12µ and the same
 density, so quoted prices and pouch counts are identical either way, but a
 different material at a different price.
 
+**The margin is material only.** Films, ink and adhesive are in it; cylinders,
+printing, lamination, slitting and wastage are not. It answers "what does the
+film in this cost against what we are charging for it", which is the question
+asked while choosing a rate — not "what does this job earn". The wizard says so
+where the figure is shown, because a margin above 90% is otherwise alarming
+rather than informative.
+
+Both sides are **per kilogram**, so a line priced per piece is converted first:
+1,000 pouches at ₹10 is ₹10,000 for 6.16 kg, a selling rate of ₹1,623/kg. That
+is why a small light pouch sold per piece reports a far higher margin than a
+heavy one at the same price per piece — there is very little film in it.
+
 **A ply with no material chosen, or a material with no density recorded, stops
 the whole line being costed.** It cannot be turned into a weight, so including
 it is impossible and excluding it would report an average of the remaining plies
