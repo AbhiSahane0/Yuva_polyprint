@@ -173,6 +173,49 @@ export function micronFromFilmName(name: string): number | null {
 }
 
 /**
+ * What one ply costs per kilogram, once the gauge and the film are both known.
+ *
+ * Three cases, and the third is the one worth stating:
+ *
+ * - The gauge the film is stocked at: the film's own rate.
+ * - A gauge off the price list, with a rate typed: that rate.
+ * - **A gauge off the price list with no rate: null, which makes the whole line
+ *   uncostable.**
+ *
+ * Falling back to the film's rate in that third case is the failure this exists
+ * to prevent. `PET 12µm` at 20 microns would be costed at the 12µ price and
+ * report a margin of 87.7% — a confident figure, wrong, and contradicted by
+ * nothing on screen. Asking for the rate is only half the job; refusing to
+ * invent one until it arrives is the other half.
+ *
+ * Null is how the engine already says "cannot be costed", so this needs no new
+ * handling downstream: the margin reads as a dash until the rate is given, the
+ * same as for a film with no rate on record.
+ */
+export function plyRatePerKg(ply: {
+  /** Null when no film has been chosen at all. */
+  materialName: string | null;
+  micron: number;
+  /** The chosen film's current rate, or null when it has none on record. */
+  stockRate: number | null;
+  /** What the office typed, when it was asked for. */
+  override: number | null;
+}): number | null {
+  if (ply.override !== null && ply.override > 0) return ply.override;
+  if (ply.materialName === null) return null;
+
+  const stocked = micronFromFilmName(ply.materialName);
+  // A film named without a gauge — PP Woven, priced by GSM — is sold at its
+  // rate whatever thickness is quoted, so there is nothing to disagree with.
+  if (stocked === null) return ply.stockRate;
+
+  // The gauge quoted is not the gauge priced, and nobody has said what it costs.
+  if (ply.micron > 0 && ply.micron !== stocked) return null;
+
+  return ply.stockRate;
+}
+
+/**
  * The rate on a stored ply, when the office typed it rather than the film supplying it.
  *
  * The rates master prices a film at the gauge it is stocked in — `PET 12µm` and

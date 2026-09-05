@@ -15,6 +15,7 @@ import {
   computeItemGeometry,
   computeTier,
   overriddenRate,
+  plyRatePerKg,
   totalMicronForLayers,
   type QuotationSummary,
   type QuotationEmail as QuotationEmailRecord,
@@ -275,15 +276,21 @@ function priceQuotation(
         micron,
         density,
         /*
-         * The film's own rate, unless the office typed one over it.
+         * The film's own rate, unless the office typed one over it — and
+         * nothing at all when the gauge quoted is off the price list and no
+         * rate was given.
          *
-         * An override is asked for when the gauge quoted is not the gauge the
-         * film is stocked at — a 20µ PET priced at the 12µ rate would be a
-         * confident wrong number, which is worse than a question. What is typed
-         * is used here and snapshotted onto the line; it never reaches the
-         * rates master. See `rateOverride` on the layer schema.
+         * Shared with the form, so what was on screen is what gets stored. See
+         * `plyRatePerKg`: costing a 20µ PET at the 12µ price would be a
+         * confident wrong number, and a null here makes the line read as
+         * uncostable instead, exactly as an unpriced film does.
          */
-        ratePerKg: layer.rateOverride ?? costing.rateOfId(layer.materialId ?? null),
+        ratePerKg: plyRatePerKg({
+          materialName: material?.name ?? null,
+          micron,
+          stockRate: costing.rateOfId(layer.materialId ?? null),
+          override: layer.rateOverride ?? null,
+        }),
         gsm: density === null ? 0 : round(micron * density, 3),
       };
     });

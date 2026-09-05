@@ -3,6 +3,7 @@ import {
   computeMargin,
   computeMaterialCostPerKg,
   overriddenRate,
+  plyRatePerKg,
   totalMicronForLayers,
   type LayerInput,
 } from './material-cost.js';
@@ -166,5 +167,76 @@ describe('overriddenRate', () => {
     // arrive would make every reloaded ply look overridden.
     expect(overriddenRate({ materialName: 'PET 12µm', micron: '12', ratePerKg: '210' })).toBeNull();
     expect(overriddenRate({ materialName: 'PET 12µm', micron: '20', ratePerKg: '245' })).toBe(245);
+  });
+});
+
+/**
+ * What a ply costs, and when it refuses to cost at all.
+ *
+ * The third case is the point. Asking for a rate when a gauge off the price
+ * list is quoted does nothing if the line goes on costing itself from the
+ * stocked gauge's price meanwhile — it reported an 87.7% margin on a 20µ PET
+ * priced as a 12µ one, with an empty rate box beside it and nothing to say the
+ * figure was invented.
+ */
+describe('plyRatePerKg', () => {
+  it('uses the film’s rate at the gauge it is stocked at', () => {
+    expect(
+      plyRatePerKg({ materialName: 'PET 12µm', micron: 12, stockRate: 210, override: null }),
+    ).toBe(210);
+  });
+
+  it('refuses to cost a gauge off the price list until a rate is given', () => {
+    expect(
+      plyRatePerKg({ materialName: 'PET 12µm', micron: 20, stockRate: 210, override: null }),
+    ).toBeNull();
+  });
+
+  it('uses the typed rate once it arrives', () => {
+    expect(
+      plyRatePerKg({ materialName: 'PET 12µm', micron: 20, stockRate: 210, override: 245 }),
+    ).toBe(245);
+  });
+
+  it('prices a film named without a gauge at whatever thickness is typed', () => {
+    // PP Woven is specified by GSM, so there is no stocked gauge to disagree with.
+    expect(
+      plyRatePerKg({ materialName: 'PP Woven', micron: 90, stockRate: 150, override: null }),
+    ).toBe(150);
+  });
+
+  it('is null when no film has been chosen', () => {
+    expect(
+      plyRatePerKg({ materialName: null, micron: 12, stockRate: null, override: null }),
+    ).toBeNull();
+  });
+
+  it('is null when the film itself has no rate on record', () => {
+    expect(
+      plyRatePerKg({ materialName: 'PET 12µm', micron: 12, stockRate: null, override: null }),
+    ).toBeNull();
+  });
+
+  it('does not refuse while the micron box is empty mid-edit', () => {
+    // Zero is "not typed yet", not "a gauge off the list". Treating it as the
+    // latter would blank the margin on every keystroke that clears the box.
+    expect(
+      plyRatePerKg({ materialName: 'PET 12µm', micron: 0, stockRate: 210, override: null }),
+    ).toBe(210);
+  });
+
+  it('leaves the whole line uncostable, which is how the margin reads as a dash', () => {
+    const cost = computeMaterialCostPerKg({
+      layers: [
+        { name: 'PET 12µm', micron: 20, density: 1.4, ratePerKg: null },
+        { name: 'PE 50µm', micron: 50, density: 0.92, ratePerKg: 185 },
+      ],
+      inkGsm: 1.8,
+      adhesiveGsm: 2.5,
+      inkRate: 610,
+      adhesiveRate: 480,
+    });
+    expect(cost.costPerKg).toBeNull();
+    expect(computeMargin(1623, cost.costPerKg)).toBeNull();
   });
 });

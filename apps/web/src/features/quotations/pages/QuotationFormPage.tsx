@@ -28,6 +28,7 @@ import {
   computeMargin,
   computeMaterialCostPerKg,
   overriddenRate,
+  plyRatePerKg,
   suggestRepeatHeight,
   suggestRepeatWidth,
   computeTier,
@@ -479,15 +480,24 @@ export default function QuotationFormPage() {
 
       const layers = (item?.layers ?? []).map((layer) => {
         const film = layer?.materialId ? filmById.get(String(layer.materialId)) : undefined;
-        // The typed rate wins, matching what the server will store. If these
-        // disagreed, the margin shown while choosing a price would not be the
-        // one the quotation is saved with.
         const override = num(layer?.rateOverride);
         return {
           name: film?.name ?? 'Not chosen',
           micron: num(layer?.micron),
           density: film?.density ?? null,
-          ratePerKg: override > 0 ? override : (film?.currentRate ?? null),
+          /*
+           * Shared, so the margin shown while a price is being chosen is the
+           * one the quotation is saved with. It also refuses to guess: a gauge
+           * off the price list with no rate yet costs nothing, so the line
+           * reads as uncostable rather than quietly borrowing the stocked
+           * gauge's price.
+           */
+          ratePerKg: plyRatePerKg({
+            materialName: film?.name ?? null,
+            micron: num(layer?.micron),
+            stockRate: film?.currentRate ?? null,
+            override: override > 0 ? override : null,
+          }),
         };
       });
 

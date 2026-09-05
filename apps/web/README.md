@@ -462,6 +462,12 @@ confident, wrong margin that nothing on screen contradicts.** The caption names
 the gauge the film _is_ priced at, so it is obvious that a 20 was typed where
 the list holds a 12, rather than reading as an unpriced film.
 
+Until it is given, **the line does not cost itself.** The margin reads as a dash
+and the material cost is blank, exactly as for a film with no rate on record.
+Asking for the rate is only half the job: while the ply still fell back to the
+stocked gauge's price, a 20µ PET reported an 87.7% margin with an empty rate box
+beside it, and nothing on the screen said the figure was invented.
+
 **That rate is used for this quotation and stored on it. It does not reach the
 Rates master.** A figure keyed in the middle of quoting is a decision about one
 document; letting it edit the price list would make every quotation a chance to
