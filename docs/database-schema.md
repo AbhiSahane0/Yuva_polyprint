@@ -95,6 +95,16 @@ erDiagram
     text id PK
     text user_id FK
   }
+  stock_batches {
+    text id PK
+    text material_id FK
+  }
+  stock_movements {
+    text id PK
+    text batch_id FK
+    text material_id FK
+    text job_id FK
+  }
   users {
     text id PK
   }
@@ -113,6 +123,10 @@ erDiagram
   materials ||--o{ quotation_item_layers : "material_id"
   quotation_items ||--|{ quotation_item_quantities : "item_id"
   quotation_tiers ||--|{ quotation_item_quantities : "tier_id"
+  materials ||--|{ stock_batches : "material_id"
+  stock_batches ||--|{ stock_movements : "batch_id"
+  materials ||--|{ stock_movements : "material_id"
+  jobs ||--o{ stock_movements : "job_id"
 ```
 
 ## Tables
@@ -120,18 +134,20 @@ erDiagram
 | Table | Columns | Rows | Purpose |
 | --- | ---: | ---: | --- |
 | `app_settings` | 3 | 0 | Editable rates: cylinder rate, GST %, advance %. |
-| `customers` | 16 | 68 | Companies that order from Yuva Polyprint. |
-| `jobs` | 55 | 414 | Products and their full engineering specification. |
-| `login_events` | 7 | 25 |  |
-| `material_rates` | 6 | 117 |  |
-| `materials` | 9 | 17 |  |
-| `quotation_emails` | 8 | 0 |  |
-| `quotation_item_layers` | 9 | 12 |  |
-| `quotation_item_quantities` | 13 | 5 |  |
-| `quotation_items` | 25 | 5 | One priced line on a quotation. |
-| `quotation_tiers` | 14 | 3 |  |
-| `quotations` | 27 | 3 | Customer-facing quotations, with totals frozen at save. |
-| `sessions` | 6 | 25 |  |
+| `customers` | 17 | 71 | Companies that order from Yuva Polyprint. |
+| `jobs` | 55 | 420 | Products and their full engineering specification. |
+| `login_events` | 7 | 35 |  |
+| `material_rates` | 6 | 202 |  |
+| `materials` | 10 | 17 |  |
+| `quotation_emails` | 10 | 1 |  |
+| `quotation_item_layers` | 9 | 8 |  |
+| `quotation_item_quantities` | 13 | 6 |  |
+| `quotation_items` | 31 | 4 | One priced line on a quotation. |
+| `quotation_tiers` | 14 | 6 |  |
+| `quotations` | 28 | 4 | Customer-facing quotations, with totals frozen at save. |
+| `sessions` | 6 | 16 |  |
+| `stock_batches` | 14 | 4 |  |
+| `stock_movements` | 13 | 5 |  |
 | `users` | 10 | 2 |  |
 
 ## Relationships
@@ -153,6 +169,10 @@ erDiagram
 | `quotation_item_layers.material_id` | `materials.id` | SET NULL |  |
 | `quotation_item_quantities.item_id` | `quotation_items.id` | CASCADE |  |
 | `quotation_item_quantities.tier_id` | `quotation_tiers.id` | CASCADE |  |
+| `stock_batches.material_id` | `materials.id` | RESTRICT |  |
+| `stock_movements.batch_id` | `stock_batches.id` | CASCADE |  |
+| `stock_movements.material_id` | `materials.id` | RESTRICT |  |
+| `stock_movements.job_id` | `jobs.id` | SET NULL |  |
 
 ## Enums
 
@@ -165,6 +185,7 @@ erDiagram
 | `PouchType` | `STANDUP`, `STANDUP_ZIPPER`, `ZIPPER`, `SPOUT`, `CENTRE_SEAL`, `THREE_SIDE_SEAL`, `OTHER` |
 | `PricingBasis` | `PER_KG`, `PER_POUCH` |
 | `QuotationStatus` | `DRAFT`, `SENT`, `WON`, `LOST` |
+| `StockMovementKind` | `RECEIPT`, `ISSUE`, `WASTE`, `ADJUSTMENT`, `TRANSFER` |
 
 ## Full column reference
 
@@ -196,6 +217,7 @@ erDiagram
 | `updated_at` | `timestamp` |  |  |
 | `source` | `CustomerSource` (enum) |  |  |
 | `gst_number` | `text` |  |  |
+| `brand_name` | `text` |  |  |
 
 ### `jobs`
 
@@ -293,6 +315,7 @@ erDiagram
 | `sort_order` | `integer` |  |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
+| `reorder_level` | `decimal(14,3)` | ✓ |  |
 
 ### `quotation_emails`
 
@@ -306,6 +329,8 @@ erDiagram
 | `provider_id` | `text` | ✓ |  |
 | `sent_by` | `text` |  |  |
 | `created_at` | `timestamp` |  |  |
+| `whatsapp_to` | `text[]` |  |  |
+| `whatsapp_sent_at` | `timestamp` | ✓ |  |
 
 ### `quotation_item_layers`
 
@@ -368,6 +393,12 @@ erDiagram
 | `pricing_basis` | `PricingBasis` (enum) |  |  |
 | `charge_cylinders` | `boolean` |  |  |
 | `composite_gsm` | `decimal(10,3)` |  |  |
+| `is_gazette` | `boolean` |  |  |
+| `gazette_bottom` | `decimal(10,2)` |  |  |
+| `gazette_left` | `decimal(10,2)` |  |  |
+| `gazette_right` | `decimal(10,2)` |  |  |
+| `film_width_mm` | `decimal(10,2)` |  |  |
+| `film_height_mm` | `decimal(10,2)` |  |  |
 
 ### `quotation_tiers`
 
@@ -419,6 +450,7 @@ erDiagram
 | `root_id` | `text` | ✓ | FK → `quotations.id` |
 | `is_latest` | `boolean` |  |  |
 | `won_tier_id` | `text` | ✓ | FK → `quotation_tiers.id` |
+| `selected_quantity` | `integer` |  |  |
 
 ### `sessions`
 
@@ -429,6 +461,43 @@ erDiagram
 | `user_id` | `text` |  | FK → `users.id` |
 | `expires_at` | `timestamp` |  |  |
 | `last_seen_at` | `timestamp` |  |  |
+| `created_at` | `timestamp` |  |  |
+
+### `stock_batches`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `material_id` | `text` |  | FK → `materials.id` |
+| `batch_code` | `text` |  | unique |
+| `location` | `text` |  |  |
+| `received_on` | `date` |  |  |
+| `initial_quantity` | `decimal(14,3)` |  |  |
+| `quantity` | `decimal(14,3)` |  |  |
+| `rate_per_unit` | `decimal(12,4)` | ✓ |  |
+| `reference` | `text` |  |  |
+| `notes` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+| `purchase_quantity` | `decimal(14,3)` | ✓ |  |
+| `purchase_unit` | `text` | ✓ |  |
+
+### `stock_movements`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `batch_id` | `text` |  | FK → `stock_batches.id` |
+| `material_id` | `text` |  | FK → `materials.id` |
+| `kind` | `StockMovementKind` (enum) |  |  |
+| `quantity` | `decimal(14,3)` |  |  |
+| `balance_after` | `decimal(14,3)` |  |  |
+| `job_id` | `text` | ✓ | FK → `jobs.id` |
+| `from_location` | `text` |  |  |
+| `to_location` | `text` |  |  |
+| `reference` | `text` |  |  |
+| `notes` | `text` |  |  |
+| `entered_by` | `text` |  |  |
 | `created_at` | `timestamp` |  |  |
 
 ### `users`

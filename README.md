@@ -398,8 +398,8 @@ The script refuses to run if an active administrator already exists.
 
 **Access is two tiers and no more.** An administrator sees everything and manages
 users; everyone else sees only the sections ticked for them — Customers,
-Quotations, Rates, Jobs. The sidebar hides the rest, and the API refuses it
-independently, because hiding a link is not access control.
+Quotations, Rates, Inventory, Jobs. The sidebar hides the rest, and the API
+refuses it independently, because hiding a link is not access control.
 
 Full detail, including how sessions and passwords are stored:
 [`apps/api/README.md`](./apps/api/README.md#authentication-and-access).
@@ -646,11 +646,17 @@ Four rules worth repeating here:
 
 1. Model it in `apps/api/prisma/schema.prisma`, then `npm run db:migrate`.
 2. Put the request/response contract in `packages/shared`.
-3. Build the API module in `apps/api/src/modules/<module>/` and register its
+3. **Add the module key to `APP_MODULES`** in
+   `packages/shared/src/constants/modules.ts`. One list feeds the user editor's
+   tick boxes, the sidebar and the API guards, so a module added anywhere else
+   is unreachable and invisible — `requireModule` will not compile without it.
+4. Build the API module in `apps/api/src/modules/<module>/` and register its
    router in `apps/api/src/routes/index.ts`.
-4. Build the web feature in `apps/web/src/features/<feature>/` and register its
-   routes in `apps/web/src/app/router.tsx`.
-5. Run `npm run lint && npm run typecheck && npm test`.
+5. Build the web feature in `apps/web/src/features/<feature>/`, register its
+   routes in `apps/web/src/app/router.tsx`, and add it to `NAV` in
+   `apps/web/src/components/layout/AppShell.tsx`.
+6. Add its paths to `apps/api/src/openapi/openapi.ts` so `/docs` covers it.
+7. Run `npm run lint && npm run typecheck && npm test`.
 
 ---
 
@@ -674,6 +680,16 @@ Four rules worth repeating here:
 - **The app requires a sign-in.** There is no anonymous access to any module.
   A fresh database therefore needs `seed:admin` before anyone can get in — see
   [Signing in](#signing-in).
-- **Rendering a quotation PDF takes 15–20 seconds** on Render's free tier, and
-  longer from cold, because Chromium lays the document out on the server. Every
-  screen that waits on it shows a spinner; do not mistake that for a hang.
+- **A quotation PDF takes a few seconds on Render's free tier, and the time is
+  almost all cold starts.** Measured: the render itself is ~130 ms locally and
+  ~370 ms with the CPU throttled 8×, so it is not the bottleneck. Neon's free
+  tier suspends after inactivity — a first query costs ~1.7 s against ~0.2 s
+  warm — and the web service sleeps after 15 minutes idle, so Chromium relaunches
+  too. Two idle systems waking on the same click. Every screen that waits shows a
+  spinner; do not mistake it for a hang.
+- **The letterhead artwork is 762 KB of PNG**, which becomes ~1 MB of base64 in
+  the HTML and ~670 KB of the finished 787 KB PDF. Resampling the header and
+  footer to around 800px wide would take the PDF to roughly 200 KB with no code
+  change — the asset loader reads dimensions from the file header, so the layout
+  follows. Worth doing for the download and the email attachment; it will not
+  move generation time much.

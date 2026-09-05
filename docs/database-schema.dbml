@@ -49,6 +49,14 @@ Enum QuotationStatus {
   LOST
 }
 
+Enum StockMovementKind {
+  RECEIPT
+  ISSUE
+  WASTE
+  ADJUSTMENT
+  TRANSFER
+}
+
 Table app_settings {
   key text [pk]
   value text [not null]
@@ -74,8 +82,9 @@ Table customers {
   updated_at timestamp [not null]
   source CustomerSource [not null, default: `'SHEET'::"CustomerSource"`]
   gst_number text [not null, default: `'NA'`]
+  brand_name text [not null, default: `'NA'`]
 
-  Note: '68 row(s) at time of generation'
+  Note: '71 row(s) at time of generation'
 }
 
 Table jobs {
@@ -135,7 +144,7 @@ Table jobs {
   customer_source JobCustomerSource [not null, default: `'NONE'::"JobCustomerSource"`]
   needs_customer boolean [not null, default: `false`]
 
-  Note: '414 row(s) at time of generation'
+  Note: '420 row(s) at time of generation'
 }
 
 Table login_events {
@@ -147,7 +156,7 @@ Table login_events {
   user_agent text
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '25 row(s) at time of generation'
+  Note: '35 row(s) at time of generation'
 }
 
 Table material_rates {
@@ -158,7 +167,7 @@ Table material_rates {
   entered_by text [not null, default: `'Office'`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '117 row(s) at time of generation'
+  Note: '202 row(s) at time of generation'
 }
 
 Table materials {
@@ -171,6 +180,7 @@ Table materials {
   sort_order integer [not null, default: `0`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
+  reorder_level decimal(14,3)
 
   Note: '17 row(s) at time of generation'
 }
@@ -184,8 +194,10 @@ Table quotation_emails {
   provider_id text
   sent_by text [not null]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  whatsapp_to text[] [not null, default: `ARRAY[]::text[]`]
+  whatsapp_sent_at timestamp
 
-  Note: '0 row(s) at time of generation'
+  Note: '1 row(s) at time of generation'
 }
 
 Table quotation_item_layers {
@@ -199,7 +211,7 @@ Table quotation_item_layers {
   rate_per_kg decimal(12,2)
   gsm decimal(10,3) [not null]
 
-  Note: '12 row(s) at time of generation'
+  Note: '8 row(s) at time of generation'
 }
 
 Table quotation_item_quantities {
@@ -217,7 +229,7 @@ Table quotation_item_quantities {
   material_cost decimal(14,2)
   margin_percent decimal(6,2)
 
-  Note: '5 row(s) at time of generation'
+  Note: '6 row(s) at time of generation'
 }
 
 Table quotation_items {
@@ -246,8 +258,14 @@ Table quotation_items {
   pricing_basis PricingBasis [not null, default: `'PER_KG'::"PricingBasis"`]
   charge_cylinders boolean [not null, default: `true`]
   composite_gsm decimal(10,3) [not null, default: `0`]
+  is_gazette boolean [not null, default: `false`]
+  gazette_bottom decimal(10,2) [not null, default: `0`]
+  gazette_left decimal(10,2) [not null, default: `0`]
+  gazette_right decimal(10,2) [not null, default: `0`]
+  film_width_mm decimal(10,2) [not null]
+  film_height_mm decimal(10,2) [not null]
 
-  Note: '5 row(s) at time of generation'
+  Note: '4 row(s) at time of generation'
 }
 
 Table quotation_tiers {
@@ -266,7 +284,7 @@ Table quotation_tiers {
   total_quantity_kg decimal(14,3) [not null]
   total_pouches decimal(14,2) [not null]
 
-  Note: '3 row(s) at time of generation'
+  Note: '6 row(s) at time of generation'
 }
 
 Table quotations {
@@ -297,8 +315,9 @@ Table quotations {
   root_id text
   is_latest boolean [not null, default: `true`]
   won_tier_id text [unique]
+  selected_quantity integer [not null, default: `1`]
 
-  Note: '3 row(s) at time of generation'
+  Note: '4 row(s) at time of generation'
 }
 
 Table sessions {
@@ -309,7 +328,44 @@ Table sessions {
   last_seen_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '25 row(s) at time of generation'
+  Note: '16 row(s) at time of generation'
+}
+
+Table stock_batches {
+  id text [pk]
+  material_id text [unique, not null]
+  batch_code text [unique, not null]
+  location text [not null, default: `'NA'`]
+  received_on date [not null]
+  initial_quantity decimal(14,3) [not null]
+  quantity decimal(14,3) [not null]
+  rate_per_unit decimal(12,4)
+  reference text [not null, default: `''`]
+  notes text [not null, default: `''`]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+  purchase_quantity decimal(14,3)
+  purchase_unit text
+
+  Note: '4 row(s) at time of generation'
+}
+
+Table stock_movements {
+  id text [pk]
+  batch_id text [not null]
+  material_id text [not null]
+  kind StockMovementKind [not null]
+  quantity decimal(14,3) [not null]
+  balance_after decimal(14,3) [not null]
+  job_id text
+  from_location text [not null, default: `''`]
+  to_location text [not null, default: `''`]
+  reference text [not null, default: `''`]
+  notes text [not null, default: `''`]
+  entered_by text [not null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+
+  Note: '5 row(s) at time of generation'
 }
 
 Table users {
@@ -342,3 +398,7 @@ Ref: quotation_item_layers.item_id > quotation_items.id [delete: cascade]
 Ref: quotation_item_layers.material_id > materials.id [delete: set null]
 Ref: quotation_item_quantities.item_id > quotation_items.id [delete: cascade]
 Ref: quotation_item_quantities.tier_id > quotation_tiers.id [delete: cascade]
+Ref: stock_batches.material_id > materials.id [delete: restrict]
+Ref: stock_movements.batch_id > stock_batches.id [delete: cascade]
+Ref: stock_movements.material_id > materials.id [delete: restrict]
+Ref: stock_movements.job_id > jobs.id [delete: set null]

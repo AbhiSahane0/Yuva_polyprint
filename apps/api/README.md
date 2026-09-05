@@ -181,6 +181,10 @@ guard is visible in that diff; a guard forgotten three files away is not.
 /materials   authenticate — reading rates is open to any signed-in user,
              because quotation costing depends on it. Writing a rate needs
              requireModule('rates'), applied on the write endpoints themselves.
+/inventory   authenticate — reading stock is open for the same reason. Every
+             write — receive, issue, adjust, transfer — needs
+             requireModule('inventory'), applied on those endpoints.
+             /inventory/reconcile is requireAdmin on top.
 /users       authenticate + requireAdmin
 ```
 
@@ -327,6 +331,31 @@ cannot backdate anything.
 
 Rates are saved as a **batch, not per field** — the office keys the morning's
 rates in together, and a partial save would leave the day half-recorded.
+
+### Inventory
+
+| Method | Path                           | Notes                                                                  |
+| ------ | ------------------------------ | ---------------------------------------------------------------------- |
+| GET    | `/inventory`                   | Every active material with its stock, plus the totals                  |
+| GET    | `/inventory/:id`               | One material: batches oldest first, last 200 movements newest first    |
+| POST   | `/inventory/receive`           | Records a delivery and opens a batch. The only action that creates one |
+| POST   | `/inventory/issue`             | Issue or waste. Refused if the batch holds less than is being taken    |
+| POST   | `/inventory/adjust`            | A cycle count. Takes what was counted, not the difference              |
+| POST   | `/inventory/transfer`          | Moves a batch. Changes where stock is, never how much                  |
+| PATCH  | `/inventory/:id/reorder-level` | Sets or clears the level below which stock reads as low                |
+| GET    | `/inventory/reconcile`         | Admin. Proves the cached quantities agree with the ledger              |
+
+Query on `GET /inventory`: `q`, `category`, `lowOnly`.
+
+**Every active material is listed, including ones with no stock.** A material
+missing from the answer because it happens to be empty is exactly the one that
+needs ordering. Totals are over everything the filters matched rather than over
+a page — a stock value that changes when a category filter is clicked is not a
+total anybody can use.
+
+`/inventory/reconcile` exists because "the system says 2,450 and the shelf says
+2,410" needs an answer that is not "trust it". It recomputes every batch from
+its own movements and reports what does not match.
 
 ### Settings
 
@@ -1009,29 +1038,73 @@ reports what does not match. It exists because "the system says 2,450 and the
 shelf says 2,410" needs an answer that is not "trust it": this says whether the
 discrepancy is in the books or on the floor.
 
+### Receiving converts, and may create the material
+
+A delivery arrives in whatever unit the supplier invoices in. Film is bought by
+the tonne and stocked by the kilogram, so `receiveStock` converts both figures
+before anything is written, and everything downstream measures in the stocked
+unit without knowing a conversion happened:
+
+```
+2 TON               -> initial_quantity 2000       (convertQuantity)
+Rs. 205,000 / TON   -> rate_per_unit    205        (convertRate — the inverse)
+purchase_quantity 2, purchase_unit 'TON'           (only when they differ)
+```
+
+The rate moves the **opposite way** to the quantity. Getting that backwards
+would value the stock at Rs. 205,000 a kilogram — out by a factor of a million,
+and exactly the sort of figure that gets believed because it is too large to be
+a typo. A test asserts the invariant directly: whichever unit it was entered in,
+the delivery is worth the same money.
+
+**Only conversions within one family are offered** — g/kg/ton, ml/l/kl. Litres
+to kilograms is a property of the substance rather than arithmetic, and none of
+the four inks has a density recorded, so the server refuses with the material's
+own unit named rather than guessing at one.
+
+> Ink is priced at Rs. 640 and costed as `GSM × rate`, which only works if that
+> figure is per kilogram. **Whether it is has not been confirmed.** Until it is,
+> ink is received in the unit it is priced in. If it turns out to be per litre,
+> quotations are costing ink wrongly today, independently of any of this.
+
+A receipt may also carry `newMaterial` instead of `materialId`, and creates the
+material in the same transaction. A film the works has not bought before is an
+ordinary event; the alternative is the office unable to book in a delivery until
+somebody with the rates module adds it, which leaves the stock wrong until they
+do. It is created **with no rate and no density** — both belong on the Rates
+screen, where there is room to get them right. What one supplier charged on one
+day is not the works' rate for the material.
+
+Creating it inside the transaction matters: a material that exists with no stock
+against it, because the receipt then failed, is a row somebody has to notice and
+tidy up. A name that already exists is reused rather than refused — two people
+booking in the same new film on one morning should not produce an error neither
+can explain — and a retired one is brought back, because receiving it is what
+that means.
+
 ## Data model
 
 Full diagram and column reference: [`docs/database-schema.md`](../../docs/database-schema.md).
 Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 
-| Table                       | Holds                                                                                     |
-| --------------------------- | ----------------------------------------------------------------------------------------- |
-| `customers`                 | Companies that order. Text fields use `'NA'` where the imported sheet was blank.          |
-| `jobs`                      | Products and their full 55-column specification.                                          |
-| `quotations`                | Customer-facing documents. Totals frozen at save; `lost_reason` says why a loss was lost. |
-| `quotation_items`           | One priced line: its design, its gazette, its geometry and its cylinders.                 |
-| `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted.    |
-| `quotation_item_quantities` | One line's figures at one quoted quantity.                                                |
-| `quotation_tiers`           | One quoted quantity and the document totals at it.                                        |
-| `materials`                 | The rate catalogue, with density for films.                                               |
-| `material_rates`            | One material's price on one date — one row per active material per day.                   |
-| `stock_batches`             | One delivery of one material, and what is left of it. Unique batch code per material.     |
-| `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.         |
-| `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.             |
-| `app_settings`              | Editable rates and costing defaults.                                                      |
-| `users`                     | Accounts, their password hash and which modules each may reach.                           |
-| `sessions`                  | Live sign-ins. Deleted on expiry, so this table is always "right now".                    |
-| `login_events`              | Every successful sign-in, kept permanently. Survives the account being deleted.           |
+| Table                       | Holds                                                                                                                                                       |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `customers`                 | Companies that order. Text fields use `'NA'` where the imported sheet was blank.                                                                            |
+| `jobs`                      | Products and their full 55-column specification.                                                                                                            |
+| `quotations`                | Customer-facing documents. Totals frozen at save; `lost_reason` says why a loss was lost.                                                                   |
+| `quotation_items`           | One priced line: its design, its gazette, its geometry and its cylinders.                                                                                   |
+| `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted.                                                                      |
+| `quotation_item_quantities` | One line's figures at one quoted quantity.                                                                                                                  |
+| `quotation_tiers`           | One quoted quantity and the document totals at it.                                                                                                          |
+| `materials`                 | The rate catalogue, with density for films.                                                                                                                 |
+| `material_rates`            | One material's price on one date — one row per active material per day.                                                                                     |
+| `stock_batches`             | One delivery of one material, and what is left of it. Unique batch code per material. Keeps the delivery note's own figure when it arrived in another unit. |
+| `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.                                                                           |
+| `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.                                                                               |
+| `app_settings`              | Editable rates and costing defaults.                                                                                                                        |
+| `users`                     | Accounts, their password hash and which modules each may reach.                                                                                             |
+| `sessions`                  | Live sign-ins. Deleted on expiry, so this table is always "right now".                                                                                      |
+| `login_events`              | Every successful sign-in, kept permanently. Survives the account being deleted.                                                                             |
 
 Two deliberate choices:
 

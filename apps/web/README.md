@@ -1121,6 +1121,7 @@ The browser recomputes the same figures the server does, using **the same code**
 | Customer job editor   | Composite GSM, pouches per kg                              |
 | Quotation form line   | Total pouches and weight, cylinder size and cost, margin   |
 | Quotation form totals | Material and cylinder subtotals, GST, grand total, advance |
+| Receive material      | What a delivery converts to in the stocked unit            |
 | Rates screen          | The change % a typed rate would produce                    |
 
 **The server always recalculates on save and its value wins.** The browser
