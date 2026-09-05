@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { JOB_KINDS, POUCH_TYPES, PRICING_BASES, pricingBasisFor } from '../constants/job.js';
 import { paginationQuerySchema } from './common.js';
+import { isMobile, normaliseMobile } from '../lib/phone.js';
 
 export const quotationStatusSchema = z.enum(['DRAFT', 'SENT', 'WON', 'LOST']);
 export type QuotationStatus = z.infer<typeof quotationStatusSchema>;
@@ -409,12 +410,43 @@ const recipients = z
   .max(20, 'That is more recipients than a quotation needs')
   .transform((values) => [...new Set(values)]);
 
+/**
+ * Mobile numbers a send is also addressed to, normalised to E.164 here.
+ *
+ * Normalising in the schema rather than in the caller means the stored number
+ * is the same shape however it was typed — `9545390337`, `+91 95453 90337` and
+ * `09545390337` are one number, and a history that recorded three would make
+ * "did we send this to him" unanswerable.
+ *
+ * A number that is not a mobile is rejected rather than dropped. Silently
+ * discarding it would leave the office believing a message was addressed to a
+ * landline that can never receive one.
+ */
+const mobiles = z
+  .array(z.string().trim())
+  .max(10, 'Ten numbers is the most one send can carry')
+  .default([])
+  .transform((values) => values.map((value) => normaliseMobile(value) ?? value))
+  .refine(
+    (values) => values.every((value) => isMobile(value)),
+    'Every number must be a ten-digit Indian mobile',
+  )
+  .transform((values) => [...new Set(values)]);
+
 export const sendQuotationSchema = z.object({
+  /**
+   * Email is required even when WhatsApp numbers are given.
+   *
+   * The PDF is the deliverable and email is what carries it; a send with no
+   * address would mean pressing Send and nothing leaving the building.
+   */
   to: recipients.refine((values) => values.length > 0, 'Add at least one recipient'),
   cc: recipients.default([]),
   subject: z.string().trim().min(1, 'Enter a subject').max(200),
   /** Free text above the standard body. Plain text — it is escaped, never HTML. */
   message: z.string().trim().max(4000).default(''),
+  /** Recorded against the send; delivery follows when WhatsApp is wired up. */
+  whatsappTo: mobiles,
 });
 
 export type SendQuotationInput = z.infer<typeof sendQuotationSchema>;

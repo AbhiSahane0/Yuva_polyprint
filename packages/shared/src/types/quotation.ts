@@ -179,6 +179,15 @@ export interface QuotationEmail {
   to: string[];
   cc: string[];
   subject: string;
+  /** Mobile numbers the same send was addressed to, in E.164. */
+  whatsappTo: string[];
+  /**
+   * When WhatsApp actually accepted a message, or null while it is pending.
+   *
+   * Numbers with no timestamp are what the office intended, not what was
+   * delivered — the history says so rather than implying a message went out.
+   */
+  whatsappSentAt: string | null;
   sentBy: string;
   createdAt: string;
 }

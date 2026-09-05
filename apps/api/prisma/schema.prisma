@@ -683,6 +683,13 @@ model LoginEvent {
 /// quotation is commonly revised and sent again — to a different person, or to
 /// the same one twice — and "who has actually seen this, and when" is a
 /// question the office asks. `Quotation.sentAt` still records the first send.
+/// One press of Send, and everywhere the quotation was addressed to.
+///
+/// Named for email because that is the channel that existed first and the one
+/// that carries the PDF today; a record now also carries the WhatsApp numbers
+/// the same send was meant for. One row per send rather than one per channel,
+/// because "who did we send quotation 124 to" is a single question with a
+/// single answer, and splitting it would make the history a join.
 model QuotationEmail {
   id String @id @default(cuid())
 
@@ -693,6 +700,19 @@ model QuotationEmail {
   to      String[]
   cc      String[]
   subject String
+
+  /// Mobile numbers the quotation is to reach over WhatsApp, in E.164.
+  ///
+  /// Recorded when the office presses send, whether or not WhatsApp has
+  /// delivered yet — the numbers are part of what was decided, and losing them
+  /// would mean nobody could say afterwards who the quotation was meant for.
+  ///
+  /// `whatsappSentAt` is null until a message is actually accepted by the
+  /// provider, so a record with numbers and no timestamp reads as pending
+  /// rather than as delivered. That distinction is the whole reason these are
+  /// two columns and not one.
+  whatsappTo     String[]  @map("whatsapp_to")
+  whatsappSentAt DateTime? @map("whatsapp_sent_at")
 
   /// Resend's id for the message, for chasing a delivery with their dashboard.
   providerId String? @map("provider_id")

@@ -1301,6 +1301,15 @@ export async function sendQuotationEmail(
         to: input.to,
         cc: input.cc,
         subject: input.subject,
+        /*
+         * Recorded, not delivered.
+         *
+         * `whatsappSentAt` stays null until a provider actually accepts a
+         * message, so this row reads as "meant for these numbers, not yet
+         * sent". Writing a timestamp here to keep the columns tidy would make
+         * the history claim a delivery that never happened.
+         */
+        whatsappTo: input.whatsappTo,
         providerId,
         sentBy,
       },
@@ -1339,6 +1348,8 @@ export async function listQuotationEmails(id: string): Promise<QuotationEmailRec
     to: row.to,
     cc: row.cc,
     subject: row.subject,
+    whatsappTo: row.whatsappTo,
+    whatsappSentAt: row.whatsappSentAt ? row.whatsappSentAt.toISOString() : null,
     sentBy: row.sentBy,
     createdAt: row.createdAt.toISOString(),
   }));

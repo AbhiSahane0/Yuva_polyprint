@@ -1,6 +1,6 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
-import { Mail, Plus, Send, X } from 'lucide-react';
-import type { QuotationSummary } from '@yuva/shared';
+import { Mail, MessageCircle, Plus, Send, X } from 'lucide-react';
+import { collectMobiles, formatMobile, normaliseMobile, type QuotationSummary } from '@yuva/shared';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Textarea } from '@/components/ui/Field';
@@ -79,8 +79,11 @@ export function SendQuotationModal({
 
   const [to, setTo] = useState<string[]>([]);
   const [cc, setCc] = useState<string[]>([]);
+  /** E.164 throughout — what is stored and what WhatsApp will address. */
+  const [mobiles, setMobiles] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
   const [ccDraft, setCcDraft] = useState('');
+  const [mobileDraft, setMobileDraft] = useState('');
   const [showCc, setShowCc] = useState(false);
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
@@ -91,8 +94,10 @@ export function SendQuotationModal({
     if (!open) return;
     setTo([]);
     setCc([]);
+    setMobiles([]);
     setDraft('');
     setCcDraft('');
+    setMobileDraft('');
     setShowCc(false);
     setMessage('');
     setError(null);
@@ -111,6 +116,19 @@ export function SendQuotationModal({
     if (customerEmail) setTo((current) => (current.length === 0 ? [customerEmail] : current));
   }, [customerEmail]);
 
+  /*
+   * The customer's number, from the quotation's own snapshot of it.
+   *
+   * Null when the record has none, or has something that is not a mobile — one
+   * imported row holds a pair of landlines in a single cell, and a chip reading
+   * "222394, 222044" would be a number nobody can be reached on.
+   */
+  const customerMobile = normaliseMobile(detail?.mobile);
+  useEffect(() => {
+    if (customerMobile)
+      setMobiles((current) => (current.length === 0 ? [customerMobile] : current));
+  }, [customerMobile]);
+
   function addFrom(value: string, list: string[], set: (next: string[]) => void): boolean {
     // One paste can carry several addresses; split on the usual separators.
     const parts = value
@@ -127,6 +145,39 @@ export function SendQuotationModal({
     setError(null);
     set([...new Set([...list, ...parts])]);
     return true;
+  }
+
+  /**
+   * Commit whatever is in the number box, reporting anything unreadable.
+   *
+   * Returns false without adding when a number cannot be read, so the office is
+   * told rather than left with a chip missing. Silently dropping half a paste
+   * is how a recipient goes missing.
+   */
+  function addMobilesFrom(value: string, list: string[], set: (next: string[]) => void): boolean {
+    const { valid, invalid } = collectMobiles(value);
+    if (invalid.length > 0) {
+      setError(
+        `"${invalid[0]}" is not a ten-digit mobile number. WhatsApp cannot reach a landline.`,
+      );
+      return false;
+    }
+    if (valid.length === 0) return true;
+    setError(null);
+    set([...new Set([...list, ...valid])]);
+    return true;
+  }
+
+  function onMobileKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Enter' || event.key === ',' || event.key === 'Tab') {
+      if (mobileDraft.trim() === '') return;
+      event.preventDefault();
+      if (addMobilesFrom(mobileDraft, mobiles, setMobiles)) setMobileDraft('');
+      return;
+    }
+    if (event.key === 'Backspace' && mobileDraft === '' && mobiles.length > 0) {
+      setMobiles(mobiles.slice(0, -1));
+    }
   }
 
   function onKeyDown(
@@ -166,6 +217,16 @@ export function SendQuotationModal({
     )
       return;
 
+    // A number typed but not committed must not be dropped either.
+    const pendingMobiles = [...mobiles];
+    if (
+      mobileDraft.trim() &&
+      !addMobilesFrom(mobileDraft, pendingMobiles, (next) =>
+        pendingMobiles.splice(0, pendingMobiles.length, ...next),
+      )
+    )
+      return;
+
     if (pendingTo.length === 0) {
       setError('Add at least one recipient.');
       return;
@@ -173,7 +234,14 @@ export function SendQuotationModal({
 
     setError(null);
     send.mutate(
-      { id: quotation.id, to: pendingTo, cc: pendingCc, subject, message },
+      {
+        id: quotation.id,
+        to: pendingTo,
+        cc: pendingCc,
+        subject,
+        message,
+        whatsappTo: pendingMobiles,
+      },
       {
         onSuccess: (result) => {
           toast.success(
@@ -259,6 +327,48 @@ export function SendQuotationModal({
           </button>
         )}
 
+        {/*
+         * WhatsApp numbers, recorded now and delivered to once the provider is
+         * wired up.
+         *
+         * Shown here rather than on a screen of its own because it is part of
+         * one decision — "send this quotation, to these people" — and asking
+         * the same question twice is how the two lists come to disagree.
+         */}
+        <Field
+          label="WhatsApp numbers"
+          htmlFor="sendMobiles"
+          hint={
+            customerMobile
+              ? 'Filled in from the customer record. Recorded with this send — WhatsApp delivery is not live yet.'
+              : 'This customer has no saved mobile. Recorded with this send — WhatsApp delivery is not live yet.'
+          }
+        >
+          {/*
+           * Chips carry the readable form while the state stays E.164, so what
+           * is on screen and what is stored can never drift apart.
+           */}
+          <Chips
+            values={mobiles.map(formatMobile)}
+            onRemove={(shown) => setMobiles(mobiles.filter((m) => formatMobile(m) !== shown))}
+            tone="ink"
+          />
+          <Input
+            id="sendMobiles"
+            type="tel"
+            inputMode="tel"
+            value={mobileDraft}
+            onChange={(event) => setMobileDraft(event.target.value)}
+            onKeyDown={onMobileKeyDown}
+            onBlur={() => {
+              if (mobileDraft.trim() && addMobilesFrom(mobileDraft, mobiles, setMobiles))
+                setMobileDraft('');
+            }}
+            placeholder={mobiles.length === 0 ? '9545390337' : 'Add another…'}
+            autoComplete="off"
+          />
+        </Field>
+
         <Field label="Subject" htmlFor="sendSubject">
           <Input
             id="sendSubject"
@@ -311,6 +421,19 @@ export function SendQuotationModal({
                     timeStyle: 'short',
                   })}{' '}
                   — {entry.to.join(', ')} <span className="text-ink-400">by {entry.sentBy}</span>
+                  {/*
+                   * Numbers with no timestamp are what the office intended, not
+                   * what was delivered. Saying "pending" rather than listing
+                   * them plainly keeps the history from implying a message that
+                   * never went out.
+                   */}
+                  {entry.whatsappTo.length > 0 ? (
+                    <span className="text-ink-400 ml-1 inline-flex items-center gap-1">
+                      <MessageCircle className="size-3.5" aria-hidden />
+                      {entry.whatsappTo.map(formatMobile).join(', ')}
+                      {entry.whatsappSentAt ? '' : ' (pending)'}
+                    </span>
+                  ) : null}
                 </li>
               ))}
             </ul>

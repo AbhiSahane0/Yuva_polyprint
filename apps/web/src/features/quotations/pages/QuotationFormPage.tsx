@@ -14,6 +14,7 @@ import {
   type CreateQuotationFormValues,
   type CreateQuotationInput,
   type CustomerJob,
+  type QuotationSummary,
   MAX_PAGE_SIZE,
   type ItemGeometry,
   type MaterialCostResult,
@@ -73,6 +74,7 @@ import {
   type CustomerDetails,
 } from '../lib/step-save';
 import { QuotationPreview } from '../components/QuotationPreview';
+import { SendQuotationModal } from '../components/SendQuotationModal';
 import { LayerFields } from '../components/LayerFields';
 import { QuantityFields, type QuantityResult } from '../components/QuantityFields';
 import { StepIndicator, type Step } from '../components/StepIndicator';
@@ -224,6 +226,15 @@ export default function QuotationFormPage() {
   const [furthest, setFurthest] = useState(0);
   const [customerMode, setCustomerMode] = useState<'existing' | 'new'>('existing');
   const [previewId, setPreviewId] = useState<string | null>(null);
+  /**
+   * The saved quotation the office asked to send, or null.
+   *
+   * Two pieces of state rather than one because they answer different
+   * questions: `previewId` is what is on screen, and this is whether Send
+   * belongs on it. Saving as a draft opens the same preview with no Send.
+   */
+  const [reviewing, setReviewing] = useState<QuotationSummary | null>(null);
+  const [sending, setSending] = useState<QuotationSummary | null>(null);
 
   const { data: settings } = useSettings();
   // Only asked for on a new quotation; an existing one already has its number.
@@ -784,11 +795,22 @@ export default function QuotationFormPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  async function save(status: 'DRAFT' | 'SENT') {
+  /**
+   * Save, then show what the customer would get.
+   *
+   * **Nothing is sent from here.** `intent` decides only what happens after the
+   * save: either back to the list, or the printed quotation on screen with a
+   * Send button on it.
+   *
+   * The status is not touched. It used to be set to SENT by this button, which
+   * made every quotation say it had been sent whether or not an email ever left
+   * — and the office's own work queue is ordered by that status. Sending is what
+   * advances it, and that happens once the provider accepts the message.
+   */
+  async function save(intent: 'CLOSE' | 'REVIEW') {
     await handleSubmit(async (values) => {
       const payload = {
         ...values,
-        status,
         saveAsCustomer: customerMode === 'new',
         brandName: values.brandName ?? '',
         customerId: customerMode === 'existing' ? values.customerId : null,
@@ -800,6 +822,7 @@ export default function QuotationFormPage() {
           : await createQuotation.mutateAsync(payload);
         toast.success(`Quotation ${saved.number} saved`);
         setPreviewId(saved.id);
+        setReviewing(intent === 'REVIEW' ? saved : null);
       } catch (cause) {
         toast.error(cause instanceof ApiClientError ? cause.message : 'Could not save.');
       }
@@ -1088,10 +1111,10 @@ export default function QuotationFormPage() {
             </Button>
           ) : (
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => void save('DRAFT')} loading={busy}>
+              <Button variant="secondary" onClick={() => void save('CLOSE')} loading={busy}>
                 Save as draft
               </Button>
-              <Button onClick={() => void save('SENT')} loading={busy}>
+              <Button onClick={() => void save('REVIEW')} loading={busy}>
                 <Check className="size-4" />
                 Save and send
               </Button>
@@ -1100,10 +1123,49 @@ export default function QuotationFormPage() {
         </div>
       </form>
 
+      {/*
+       * The saved quotation, exactly as it prints, with Send on it.
+       *
+       * `onSend` is passed only when the office asked to send — pressing Save
+       * as draft opens the same preview without it, because offering Send there
+       * would make "draft" and "send" the same button with different wording.
+       */}
       <QuotationPreview
         id={previewId}
+        onSend={
+          reviewing
+            ? () => {
+                /*
+                 * The preview closes before the dialog opens, matching the list.
+                 * `Modal` installs its own Escape handler and focus trap, so two
+                 * at once fight over both — Escape would dismiss whichever
+                 * bound last rather than the one on top.
+                 */
+                setPreviewId(null);
+                setSending(reviewing);
+              }
+            : undefined
+        }
         onClose={() => {
           setPreviewId(null);
+          setReviewing(null);
+          navigate('/quotations');
+        }}
+      />
+
+      {/*
+       * Who it goes to, asked after the document has been looked at rather than
+       * before. The dialog owns the actual send; this screen never sends.
+       *
+       * Closing it leaves for the list either way. The quotation is saved by
+       * this point, so staying on a wizard whose work is already recorded would
+       * invite a second save of the same document.
+       */}
+      <SendQuotationModal
+        quotation={sending}
+        onClose={() => {
+          setSending(null);
+          setReviewing(null);
           navigate('/quotations');
         }}
       />

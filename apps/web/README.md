@@ -716,8 +716,21 @@ The cylinder row is **identical in every column** — they do not scale with the
 order. That is the whole reason for quoting more than one quantity, and it only
 reads as a comparison side by side.
 
-Then **Save as draft**, which keeps it editable, or **Save and send**, which
-opens the printed quotation so it can be checked before it goes out.
+Then **Save as draft**, which keeps it editable, or **Save and send**.
+
+**Neither of them sends anything.** Both save, and both open the printed
+quotation; Save and send is the one that puts a **Send** button on it. Pressing
+that asks who it goes to, and the send happens there.
+
+The order matters: the document is looked at before the question of who gets it
+is asked. Sending from a wizard step means committing to a page nobody has seen
+in the form it will arrive in.
+
+> Save and send used to set the status to **Sent** as it saved, before any email
+> existed. Every quotation then said it had been sent whether or not one ever
+> left — and the list is ordered by that status, so the queue of what still
+> needs chasing filled up with documents nobody had received. The status is now
+> advanced by the send itself, once the provider accepts the message.
 
 ### Record the outcome — won or lost
 
@@ -765,6 +778,33 @@ last one back; pasting several addresses at once splits them.
 has one — and the hint says so, rather than leaving a mystery address in the
 box. Where there is none, it says that too, so an empty field does not look
 broken. `NA` from the spreadsheet import is treated as no address, not as one.
+
+#### WhatsApp numbers
+
+The dialog also asks for mobile numbers, prefilled from the customer the same
+way. **WhatsApp delivery is not live yet** — the numbers are recorded against
+the send so that nothing the office decided is lost, and the hint says exactly
+that rather than implying a message went out.
+
+Numbers are stored in E.164 — `+919545390337` — however they were typed. The
+office types `9545390337`, and a paste can arrive as `+91 95453 90337` or
+`09545390337`; a history recording those as three different recipients would
+make "did we send this to him" unanswerable. Chips show the readable form while
+the state stays E.164, so screen and storage cannot drift apart.
+
+**A landline is refused, not dropped.** Indian mobiles are ten digits beginning
+6–9, and nothing else can receive a WhatsApp message. One imported customer row
+holds a pair of landlines in a single cell — `222394, 222044` — and accepting
+either would store a number that can never be delivered to, with nothing to
+suggest doubt until a message silently failed months later.
+
+**Email is still required.** WhatsApp is an addition, not a replacement: the PDF
+is the deliverable and email is what carries it, so a send with no address would
+mean pressing Send and nothing leaving the building.
+
+The history line shows the numbers with **(pending)** beside them while
+`whatsappSentAt` is null. Numbers with no timestamp are what was intended, not
+what was delivered, and the two must not read alike.
 
 The dialog also lists what has already been sent, with recipients and who sent
 it, because the common question before sending is whether someone already did.
