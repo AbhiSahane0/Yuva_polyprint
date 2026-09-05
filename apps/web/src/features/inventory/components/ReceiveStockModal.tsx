@@ -1,10 +1,16 @@
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { receiveStockSchema, type ReceiveStockInput } from '@yuva/shared';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  MATERIAL_CATEGORY_LABELS,
+  convertQuantity,
+  purchaseUnitsFor,
+  receiveStockSchema,
+  unitLabel,
+  type MaterialCategory,
+} from '@yuva/shared';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Select } from '@/components/ui/Field';
+import { Combobox } from '@/components/ui/Combobox';
 import { useMaterials } from '@/features/rates/api/rate-api';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
@@ -18,12 +24,18 @@ function today(): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+const CATEGORIES: MaterialCategory[] = ['FILM', 'INK', 'ADHESIVE', 'SOLVENT', 'CONSUMABLE'];
+
 /**
  * A delivery arriving.
  *
- * The only action that creates a batch, and the only one that asks what was
- * paid — the rate on a delivery is what the stock is worth, and it is not
- * always the rate on the morning's rates screen.
+ * Two things make this more than a form. The material is a **combobox, not a
+ * dropdown** — a film the works has not bought before is an ordinary event, and
+ * the alternative is the office unable to book in a delivery until somebody
+ * with the rates module adds it, which leaves the stock wrong until then. And
+ * the quantity carries **the unit on the delivery note**: film is bought by the
+ * tonne and stocked by the kilogram, and typing 2,000 where the note says 2 is
+ * a thousand-fold error nothing on screen would question.
  */
 export function ReceiveStockModal({
   open,
@@ -37,36 +49,104 @@ export function ReceiveStockModal({
 }) {
   const { data: materials } = useMaterials();
   const receive = useReceiveStock();
+
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState<MaterialCategory>('FILM');
+  const [newUnit, setNewUnit] = useState('KG');
+  const [unit, setUnit] = useState('');
+  const [batchCode, setBatchCode] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [rate, setRate] = useState('');
+  const [location, setLocation] = useState('');
+  const [receivedOn, setReceivedOn] = useState(today());
+  const [reference, setReference] = useState('');
+  const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<ReceiveStockInput>({
-    resolver: zodResolver(receiveStockSchema) as never,
-    defaultValues: { receivedOn: today(), location: '', materialId: materialId ?? '' },
-  });
+  const options = useMemo(() => (materials ?? []).map((material) => material.name), [materials]);
+
+  /** The catalogue entry this name matches, case-insensitively. */
+  const matched = useMemo(
+    () => (materials ?? []).find((m) => m.name.toLowerCase() === name.trim().toLowerCase()) ?? null,
+    [materials, name],
+  );
+
+  /** Nothing on the list answers to this name, so it would be created. */
+  const isNew = name.trim().length > 0 && matched === null;
+  const stockUnit = matched?.unit ?? newUnit;
+  const units = useMemo(() => purchaseUnitsFor(stockUnit), [stockUnit]);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
-    reset({ receivedOn: today(), location: '', materialId: materialId ?? '' } as ReceiveStockInput);
-  }, [open, materialId, reset]);
+    const fixed = (materials ?? []).find((m) => m.id === materialId);
+    setName(fixed?.name ?? '');
+    setCategory('FILM');
+    setNewUnit('KG');
+    setUnit(fixed?.unit ?? '');
+    setBatchCode('');
+    setQuantity('');
+    setRate('');
+    setLocation('');
+    setReceivedOn(today());
+    setReference('');
+    setNotes('');
+  }, [open, materialId, materials]);
 
-  const onSubmit = handleSubmit(async (values) => {
+  // The unit follows the material until somebody chooses otherwise, so picking
+  // a solvent does not leave KG selected against something stocked in litres.
+  useEffect(() => {
+    if (!units.includes(unit.toUpperCase())) setUnit(units[0] ?? '');
+  }, [units, unit]);
+
+  /*
+   * What will actually go into stock, when that differs from what was typed.
+   *
+   * Shown while typing rather than after saving: a tonne mistyped as a kilogram
+   * is only obvious next to the figure it produces.
+   */
+  const converted =
+    quantity.trim() && unit && unit.toUpperCase() !== stockUnit.toUpperCase()
+      ? convertQuantity(Number(quantity), unit, stockUnit)
+      : null;
+
+  async function onSubmit() {
     setError(null);
+
+    const payload = {
+      materialId: matched?.id ?? null,
+      newMaterial: isNew ? { name: name.trim(), category, unit: newUnit } : null,
+      unit,
+      batchCode,
+      quantity,
+      location,
+      receivedOn,
+      ratePerUnit: rate,
+      reference,
+      notes,
+    };
+
+    // Checked against the same schema the server uses, so the office is told
+    // which field is wrong rather than "Validation failed".
+    const parsed = receiveStockSchema.safeParse(payload);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? 'Check the details and try again.');
+      return;
+    }
+
     try {
-      const batch = await receive.mutateAsync(values);
-      toast.success(`Received ${batch.quantity} ${batch.unit} of ${batch.materialName}`);
+      const batch = await receive.mutateAsync(parsed.data);
+      toast.success(
+        `Received ${batch.initialQuantity} ${batch.unit} of ${batch.materialName}` +
+          (batch.purchaseUnit
+            ? ` (${batch.purchaseQuantity} ${unitLabel(batch.purchaseUnit)})`
+            : ''),
+      );
       onClose();
     } catch (cause) {
       setError(cause instanceof ApiClientError ? cause.message : 'Could not record the delivery.');
     }
-  });
-
-  const films = materials ?? [];
+  }
 
   return (
     <Modal
@@ -86,67 +166,160 @@ export function ReceiveStockModal({
       }
     >
       <div className="flex flex-col gap-4">
-        <Field label="Material" htmlFor="materialId" error={errors.materialId?.message}>
-          <Select id="materialId" disabled={Boolean(materialId)} {...register('materialId')}>
-            <option value="">— Choose a material —</option>
-            {films.map((material) => (
-              <option key={material.id} value={material.id}>
-                {material.name}
-              </option>
-            ))}
-          </Select>
+        <Field
+          label="Material"
+          htmlFor="materialName"
+          hint={
+            isNew
+              ? 'Not on the rates list — it will be added, ready to be priced under Rates.'
+              : 'Pick one, or type a name that is not on the list.'
+          }
+        >
+          <Combobox
+            id="materialName"
+            options={options}
+            value={name}
+            registration={{
+              name: 'materialName',
+              onChange: async (event: { target: { value: string } }) => setName(event.target.value),
+              onBlur: async () => {},
+              ref: () => {},
+            }}
+            onPick={(picked) => setName(picked)}
+            placeholder="PET 12µm, or a new material"
+          />
         </Field>
 
+        {/*
+         * Only for something being created. An existing material's category and
+         * unit are settled facts that belong on the Rates screen, not questions
+         * to re-ask on every delivery.
+         */}
+        {isNew ? (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Category" htmlFor="newCategory">
+              <Select
+                id="newCategory"
+                value={category}
+                onChange={(event) => setCategory(event.target.value as MaterialCategory)}
+              >
+                {CATEGORIES.map((option) => (
+                  <option key={option} value={option}>
+                    {MATERIAL_CATEGORY_LABELS[option]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Stocked in" htmlFor="newUnit" hint="The unit its rate will be quoted in">
+              <Select
+                id="newUnit"
+                value={newUnit}
+                onChange={(event) => setNewUnit(event.target.value)}
+              >
+                <option value="KG">Kilograms (KG)</option>
+                <option value="L">Litres (L)</option>
+                <option value="PCS">Pieces (PCS)</option>
+              </Select>
+            </Field>
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-2 gap-3">
-          <Field
-            label="Batch or lot"
-            htmlFor="batchCode"
-            hint="From the delivery note"
-            error={errors.batchCode?.message}
-          >
-            <Input id="batchCode" placeholder="PET-2026-081" {...register('batchCode')} />
+          <Field label="Batch or lot" htmlFor="batchCode" hint="From the delivery note">
+            <Input
+              id="batchCode"
+              value={batchCode}
+              onChange={(event) => setBatchCode(event.target.value)}
+              placeholder="PET-2026-081"
+            />
           </Field>
-          <Field label="Received on" htmlFor="receivedOn" error={errors.receivedOn?.message}>
-            <Input id="receivedOn" type="date" {...register('receivedOn')} />
+          <Field label="Received on" htmlFor="receivedOn">
+            <Input
+              id="receivedOn"
+              type="date"
+              value={receivedOn}
+              onChange={(event) => setReceivedOn(event.target.value)}
+            />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2">
+            <Field
+              label="Quantity"
+              htmlFor="quantity"
+              hint={
+                converted !== null
+                  ? `Goes into stock as ${converted} ${stockUnit}`
+                  : `As it appears on the note`
+              }
+            >
+              <Input
+                id="quantity"
+                inputMode="decimal"
+                value={quantity}
+                onChange={(event) => setQuantity(event.target.value)}
+              />
+            </Field>
+          </div>
+          <Field label="Unit" htmlFor="unit">
+            <Select
+              id="unit"
+              value={unit}
+              onChange={(event) => setUnit(event.target.value)}
+              disabled={units.length === 1}
+            >
+              {units.map((option) => (
+                <option key={option} value={option}>
+                  {unitLabel(option)}
+                </option>
+              ))}
+            </Select>
           </Field>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Quantity" htmlFor="quantity" error={errors.quantity?.message}>
-            <Input id="quantity" inputMode="decimal" {...register('quantity')} />
-          </Field>
-          {/*
-           * What was paid, not today's rate. Optional, because the office does
-           * not always have the invoice when the lorry arrives — the catalogue
-           * rate stands in for valuation until somebody fills it in.
-           */}
           <Field
-            label="Rate paid"
+            label={`Rate paid${unit ? ` per ${unitLabel(unit)}` : ''}`}
             htmlFor="ratePerUnit"
             hint="Optional — today's rate is used if blank"
-            error={errors.ratePerUnit?.message}
           >
             <Input
               id="ratePerUnit"
               inputMode="decimal"
-              placeholder="Rs. / unit"
-              {...register('ratePerUnit')}
+              value={rate}
+              onChange={(event) => setRate(event.target.value)}
+              placeholder="Rs."
+            />
+          </Field>
+          <Field label="Location" htmlFor="location" hint="Where it is stored">
+            <Input
+              id="location"
+              value={location}
+              onChange={(event) => setLocation(event.target.value)}
+              placeholder="Warehouse A"
             />
           </Field>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Location" htmlFor="location" hint="Where it is stored">
-            <Input id="location" placeholder="Warehouse A" {...register('location')} />
-          </Field>
           <Field label="Reference" htmlFor="reference" hint="PO or invoice number">
-            <Input id="reference" placeholder="PO-4471" {...register('reference')} />
+            <Input
+              id="reference"
+              value={reference}
+              onChange={(event) => setReference(event.target.value)}
+              placeholder="PO-4471"
+            />
+          </Field>
+          <Field label="Notes" htmlFor="notes">
+            <Input
+              id="notes"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Optional"
+            />
           </Field>
         </div>
-
-        <Field label="Notes" htmlFor="notes">
-          <Input id="notes" placeholder="Optional" {...register('notes')} />
-        </Field>
 
         {error ? (
           <p

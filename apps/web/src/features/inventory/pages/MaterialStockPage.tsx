@@ -13,6 +13,7 @@ import {
   formatRs,
   HEALTH_LABELS,
   MOVEMENT_LABELS,
+  unitLabel,
   type StockMovement,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
@@ -202,29 +203,24 @@ export default function MaterialStockPage() {
        * actually is.
        */}
       <section className="border-ink-200 mt-4 rounded-[var(--radius-lg)] border bg-white p-4 shadow-[var(--shadow-card)]">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="w-48">
-            <Field
-              label="Reorder level"
-              htmlFor="reorderLevel"
-              hint={`Stock at or below this reads as low. Blank means nobody is watching.`}
-            >
-              <Input
-                id="reorderLevel"
-                inputMode="decimal"
-                value={level}
-                onChange={(event) => setLevelDraft(event.target.value)}
-                placeholder="None set"
-              />
-            </Field>
-          </div>
+        <div className="flex items-end gap-3">
+          <Field label="Reorder level" htmlFor="reorderLevel">
+            <Input
+              id="reorderLevel"
+              inputMode="decimal"
+              value={level}
+              onChange={(event) => setLevelDraft(event.target.value)}
+              placeholder="None set"
+            />
+          </Field>
+
           <Button
             variant="secondary"
             onClick={() => void saveLevel()}
             loading={setLevel.isPending}
             disabled={levelDraft === null}
           >
-            Save level
+            Save
           </Button>
         </div>
       </section>
@@ -279,6 +275,22 @@ export default function MaterialStockPage() {
                     </td>
                     <td className="text-ink-400 px-4 py-3 text-right tabular-nums">
                       {formatNumber(batch.initialQuantity, 2)}
+                      {/*
+                       * What the delivery note said, when it was in another
+                       * unit. This is the whole reason it is stored: a batch
+                       * that reads 2,000 kg cannot otherwise be checked against
+                       * a note that says 2 tonnes.
+                       */}
+                      {batch.purchaseUnit ? (
+                        <span className="text-ink-400 block text-xs font-normal">
+                          {/* Whole tonnes read as "2 ton", not "2.000 ton". */}
+                          {formatNumber(
+                            batch.purchaseQuantity ?? 0,
+                            (batch.purchaseQuantity ?? 0) % 1 === 0 ? 0 : 3,
+                          )}{' '}
+                          {unitLabel(batch.purchaseUnit)}
+                        </span>
+                      ) : null}
                     </td>
                     <td className="text-ink-500 px-4 py-3">{batch.location}</td>
                     <td className="text-ink-500 px-4 py-3 text-right tabular-nums">

@@ -28,36 +28,86 @@ const optionalText = (max: number) =>
     .default('')
     .transform((value) => (value.toUpperCase() === 'NA' ? '' : value));
 
-export const receiveStockSchema = z.object({
-  materialId: z.string().min(1, 'Choose a material'),
-  /**
-   * The supplier's lot number, or one the office invents.
-   *
-   * Required, because a batch nobody can name cannot be matched to a delivery
-   * note when the count comes up short. Unique per material, which the server
-   * enforces — two deliveries with one code would be indistinguishable.
-   */
-  batchCode: z.string().trim().min(1, 'Enter a batch or lot number').max(60),
-  quantity: quantity('Quantity'),
-  /** Free text. The works has one building; a location table nobody maintains
-   * is worse than a field somebody types. */
-  location: z
-    .string()
-    .trim()
-    .max(80)
-    .default('')
-    .transform((value) => value || 'NA'),
-  receivedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter the date as yyyy-mm-dd'),
-  /** What was actually paid. Optional — the catalogue rate stands in. */
-  ratePerUnit: z
-    .union([z.literal(''), z.null(), z.undefined()])
-    .transform(() => null)
-    .or(z.coerce.number().positive('Rate must be more than 0'))
-    .nullable()
-    .default(null),
-  reference: optionalText(120),
-  notes: optionalText(500),
+/**
+ * A material the works has not bought before.
+ *
+ * Given instead of `materialId`, and created as the delivery is recorded. A new
+ * film turning up is an ordinary event — the alternative is the office being
+ * unable to book in a delivery until somebody with the rates module adds it,
+ * which means the stock is wrong until then.
+ *
+ * It lands in the rates catalogue with no price, which is where a price belongs
+ * and where the Rates screen will show it as needing one. The rate on the
+ * delivery is recorded on the batch, not on the catalogue: what one supplier
+ * charged on one day is not the works' rate for the material.
+ */
+export const newMaterialSchema = z.object({
+  name: z.string().trim().min(2, 'Enter the material’s name').max(80),
+  category: materialCategorySchema,
+  /** The unit its rate will be quoted in, and stock held in. */
+  unit: z.string().trim().min(1).max(10).default('KG'),
 });
+
+export const receiveStockSchema = z
+  .object({
+    /** One of these two. See the refinement below. */
+    materialId: z.string().min(1).nullable().default(null),
+    newMaterial: newMaterialSchema.nullable().default(null),
+    /**
+     * The unit on the delivery note.
+     *
+     * Converted to the material's own unit on the way in — 2 TON becomes 2,000
+     * KG — because value, costing and every screen measure in that one. The
+     * server refuses a unit that cannot be converted rather than guessing; see
+     * `convertQuantity`.
+     */
+    unit: z.string().trim().min(1).max(10).default(''),
+    /**
+     * The supplier's lot number, or one the office invents.
+     *
+     * Required, because a batch nobody can name cannot be matched to a delivery
+     * note when the count comes up short. Unique per material, which the server
+     * enforces — two deliveries with one code would be indistinguishable.
+     */
+    batchCode: z.string().trim().min(1, 'Enter a batch or lot number').max(60),
+    quantity: quantity('Quantity'),
+    /** Free text. The works has one building; a location table nobody maintains
+     * is worse than a field somebody types. */
+    location: z
+      .string()
+      .trim()
+      .max(80)
+      .default('')
+      .transform((value) => value || 'NA'),
+    receivedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter the date as yyyy-mm-dd'),
+    /**
+     * What was actually paid, **per the unit above**.
+     *
+     * Rs. 205,000 a tonne is stored as Rs. 205 a kilogram, because value is
+     * quantity times rate and the quantity has been converted. Getting that
+     * inverse the wrong way round would overstate the stock by a factor of a
+     * million — see `convertRate`.
+     *
+     * Optional: the lorry often arrives before the invoice, and the catalogue
+     * rate stands in for valuation until somebody fills this in.
+     */
+    ratePerUnit: z
+      .union([z.literal(''), z.null(), z.undefined()])
+      .transform(() => null)
+      .or(z.coerce.number().positive('Rate must be more than 0'))
+      .nullable()
+      .default(null),
+    reference: optionalText(120),
+    notes: optionalText(500),
+  })
+  /*
+   * Exactly one of the two. Both would be ambiguous — which material is the
+   * delivery against — and neither leaves nothing to receive into.
+   */
+  .refine((value) => Boolean(value.materialId) !== Boolean(value.newMaterial), {
+    message: 'Choose a material, or give the details of a new one',
+    path: ['materialId'],
+  });
 
 export const issueStockSchema = z.object({
   batchId: z.string().min(1, 'Choose which batch it came from'),

@@ -789,9 +789,21 @@ model StockBatch {
 
   receivedOn DateTime @map("received_on") @db.Date
 
-  /// What arrived. Kept alongside `quantity` so a batch can still say how much
-  /// of it has gone.
+  /// What arrived, in the material's own unit. Kept alongside `quantity` so a
+  /// batch can still say how much of it has gone.
   initialQuantity Decimal @map("initial_quantity") @db.Decimal(14, 3)
+
+  /**
+   * What the delivery note said, before conversion.
+   *
+   * Film is bought by the tonne and stocked by the kilogram. `initialQuantity`
+   * holds the kilograms because that is what everything downstream measures in;
+   * these two hold the 2 and the TON, so the batch can still be checked against
+   * the paperwork it came with. Null when the two units were the same, which is
+   * most deliveries.
+   */
+  purchaseQuantity Decimal? @map("purchase_quantity") @db.Decimal(14, 3)
+  purchaseUnit     String?  @map("purchase_unit")
 
   /**
    * What is left, in the material's own unit.

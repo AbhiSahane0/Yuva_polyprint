@@ -20,6 +20,8 @@ const receipt = {
   receivedOn: '2026-09-01',
 };
 
+const newMaterial = { name: 'Nylon 15µm', category: 'FILM' as const, unit: 'KG' };
+
 describe('receiveStockSchema', () => {
   it('takes a delivery with the rate left blank', () => {
     // The lorry often arrives before the invoice. The catalogue rate stands in
@@ -53,6 +55,54 @@ describe('receiveStockSchema', () => {
 
   it('treats the importer’s NA as an empty note', () => {
     expect(receiveStockSchema.parse({ ...receipt, notes: 'NA' }).notes).toBe('');
+  });
+
+  it('takes a material that is not on the rates list yet', () => {
+    /*
+     * A film the works has not bought before is an ordinary event. The
+     * alternative is the office unable to book in a delivery until somebody
+     * with the rates module adds it — which leaves the stock wrong until then.
+     */
+    const result = receiveStockSchema.parse({
+      batchCode: 'NY-001',
+      quantity: 800,
+      receivedOn: '2026-09-01',
+      newMaterial,
+    });
+    expect(result.materialId).toBeNull();
+    expect(result.newMaterial).toEqual(newMaterial);
+  });
+
+  it('refuses both a material and a new one', () => {
+    // Which is the delivery against? Neither answer is safe to guess.
+    expect(receiveStockSchema.safeParse({ ...receipt, newMaterial }).success).toBe(false);
+  });
+
+  it('refuses neither', () => {
+    const result = receiveStockSchema.safeParse({
+      batchCode: 'X-1',
+      quantity: 10,
+      receivedOn: '2026-09-01',
+    });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toContain('Choose a material');
+  });
+
+  it('needs a real name for a new material', () => {
+    expect(
+      receiveStockSchema.safeParse({
+        batchCode: 'X-1',
+        quantity: 10,
+        receivedOn: '2026-09-01',
+        newMaterial: { ...newMaterial, name: 'P' },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('carries the unit on the delivery note', () => {
+    // Converted server-side against the material's own unit; the schema only
+    // has to keep it.
+    expect(receiveStockSchema.parse({ ...receipt, unit: 'TON' }).unit).toBe('TON');
   });
 });
 

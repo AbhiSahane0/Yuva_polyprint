@@ -36,6 +36,13 @@ export interface StockBatch {
   receivedOn: string;
   initialQuantity: number;
   quantity: number;
+  /**
+   * What the delivery note said, when it was in a different unit — 2 and 'TON'
+   * against an `initialQuantity` of 2000 kg. Null on an ordinary delivery.
+   */
+  purchaseQuantity: number | null;
+  purchaseUnit: string | null;
+  /** Per the stocked unit, whatever unit it was bought in. */
   ratePerUnit: number | null;
   reference: string;
   notes: string;

@@ -1,5 +1,7 @@
 import {
   batchValue,
+  convertQuantity,
+  convertRate,
   needsAttention,
   round,
   signedQuantity,
@@ -93,6 +95,8 @@ function toBatch(row: BatchRow, currentRate: number | null): StockBatch {
     receivedOn: toISODate(row.receivedOn),
     initialQuantity: toNumber(row.initialQuantity),
     quantity,
+    purchaseQuantity: toNullableNumber(row.purchaseQuantity),
+    purchaseUnit: row.purchaseUnit,
     ratePerUnit,
     reference: row.reference,
     notes: row.notes,
@@ -210,42 +214,118 @@ async function lockedBatch(tx: Prisma.TransactionClient, batchId: string) {
   return batch;
 }
 
-/** Material arrived: a new batch, and the receipt that created it. */
+/**
+ * Material arrived: a new batch, and the receipt that created it.
+ *
+ * The delivery may be in a different unit from the one the material is stocked
+ * in — film comes by the tonne — so the quantity and the rate are both
+ * converted here, before anything is written. Everything downstream measures in
+ * the stocked unit and none of it has to know a conversion happened.
+ */
 export async function receiveStock(
   input: ReceiveStockInput,
   enteredBy: string,
 ): Promise<StockBatch> {
-  const material = await prisma.material.findUnique({
-    where: { id: input.materialId },
-    select: { id: true, isActive: true },
-  });
-  if (!material) throw ApiError.notFound('That material is not on the rates list');
-  if (!material.isActive) {
-    throw ApiError.badRequest('That material has been retired — bring it back under Rates first');
-  }
-
-  const clash = await prisma.stockBatch.findUnique({
-    where: { materialId_batchCode: { materialId: input.materialId, batchCode: input.batchCode } },
-    select: { id: true },
-  });
-  if (clash) {
-    // Named rather than generic: the office is holding a delivery note and
-    // needs to know it has already keyed this one in.
-    throw ApiError.conflict(`Batch ${input.batchCode} is already on record for this material`);
-  }
-
   const batch = await prisma.$transaction(async (tx) => {
+    /*
+     * The material, or a new one created as the delivery is booked in.
+     *
+     * Created inside the transaction with the batch: a material that exists
+     * with no stock against it, because the receipt then failed, is a row
+     * somebody has to notice and tidy up.
+     */
+    let material: { id: string; name: string; unit: string };
+
+    if (input.newMaterial) {
+      const clash = await tx.material.findUnique({
+        where: { name: input.newMaterial.name },
+        select: { id: true, name: true, unit: true, isActive: true },
+      });
+      if (clash) {
+        // Reused rather than refused. Two people booking in the same new film
+        // on the same morning should not produce an error neither can explain;
+        // reviving a retired one is what receiving it means.
+        if (!clash.isActive) {
+          await tx.material.update({ where: { id: clash.id }, data: { isActive: true } });
+        }
+        material = clash;
+      } else {
+        material = await tx.material.create({
+          data: {
+            name: input.newMaterial.name,
+            category: input.newMaterial.category,
+            unit: input.newMaterial.unit,
+            // No rate, and no density. Both belong on the Rates screen, where
+            // there is room to get them right — what one supplier charged on
+            // one day is not the works' rate for the material.
+            sortOrder: 999,
+          },
+          select: { id: true, name: true, unit: true },
+        });
+      }
+    } else {
+      const existing = await tx.material.findUnique({
+        where: { id: input.materialId ?? '' },
+        select: { id: true, name: true, unit: true, isActive: true },
+      });
+      if (!existing) throw ApiError.notFound('That material is not on the rates list');
+      if (!existing.isActive) {
+        throw ApiError.badRequest(
+          'That material has been retired — bring it back under Rates first',
+        );
+      }
+      material = existing;
+    }
+
+    /*
+     * The delivery note's figures, in the unit the material is stocked in.
+     *
+     * Refused rather than guessed when the two units do not convert: litres
+     * into kilograms is a property of the substance, and treating one as the
+     * other would put a wrong weight into stock and a wrong figure into the
+     * inventory value, with nothing on any screen to contradict it.
+     */
+    const purchaseUnit = input.unit || material.unit;
+    const quantity = convertQuantity(input.quantity, purchaseUnit, material.unit);
+    if (quantity === null || quantity <= 0) {
+      throw ApiError.badRequest(
+        `${material.name} is stocked in ${material.unit}, which ${purchaseUnit} does not convert to`,
+      );
+    }
+
+    // The inverse: Rs. 205,000 a tonne is Rs. 205 a kilogram.
+    const ratePerUnit =
+      input.ratePerUnit === null
+        ? null
+        : convertRate(input.ratePerUnit, purchaseUnit, material.unit);
+
+    const clash = await tx.stockBatch.findUnique({
+      where: { materialId_batchCode: { materialId: material.id, batchCode: input.batchCode } },
+      select: { id: true },
+    });
+    if (clash) {
+      // Named rather than generic: the office is holding a delivery note and
+      // needs to know it has already keyed this one in.
+      throw ApiError.conflict(`Batch ${input.batchCode} is already on record for this material`);
+    }
+
+    const sameUnit = purchaseUnit.toUpperCase() === material.unit.toUpperCase();
+
     const created = await tx.stockBatch.create({
       data: {
-        materialId: input.materialId,
+        materialId: material.id,
         batchCode: input.batchCode,
         location: input.location,
         receivedOn: parseDate(input.receivedOn),
-        initialQuantity: input.quantity,
+        initialQuantity: quantity,
+        // Only when it differs — recording "3000 KG arrived as 3000 KG" on
+        // every ordinary delivery is noise in the one place it would be read.
+        purchaseQuantity: sameUnit ? null : input.quantity,
+        purchaseUnit: sameUnit ? null : purchaseUnit.toUpperCase(),
         // Starts empty; the receipt below puts the stock in, so a batch's
         // quantity is the sum of its movements from its very first row.
         quantity: 0,
-        ratePerUnit: input.ratePerUnit,
+        ratePerUnit,
         reference: input.reference,
         notes: input.notes,
       },
@@ -254,9 +334,9 @@ export async function receiveStock(
 
     await record(tx, {
       batchId: created.id,
-      materialId: input.materialId,
+      materialId: material.id,
       kind: 'RECEIPT',
-      quantity: signedQuantity('RECEIPT', input.quantity),
+      quantity: signedQuantity('RECEIPT', quantity),
       toLocation: input.location,
       reference: input.reference,
       notes: input.notes,

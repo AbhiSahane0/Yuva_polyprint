@@ -901,12 +901,12 @@ refer to, and removing it would take the history with it.
 
 #### The four things you can do
 
-|                       | Asks for                             | Notes                                  |
-| --------------------- | ------------------------------------ | -------------------------------------- |
-| **Receive**           | Batch, quantity, rate paid, location | The only action that opens a batch     |
-| **Issue** / **Waste** | Batch, quantity, which job           | Two kinds, counted separately          |
-| **Count**             | What was counted                     | Not the difference — see below         |
-| **Transfer**          | Where it is going                    | Changes where stock is, never how much |
+|                       | Asks for                                   | Notes                                  |
+| --------------------- | ------------------------------------------ | -------------------------------------- |
+| **Receive**           | Material, batch, quantity, unit, rate paid | The only action that opens a batch     |
+| **Issue** / **Waste** | Batch, quantity, which job                 | Two kinds, counted separately          |
+| **Count**             | What was counted                           | Not the difference — see below         |
+| **Transfer**          | Where it is going                          | Changes where stock is, never how much |
 
 **Issue and Waste are separate kinds** because they answer different questions:
 one is what a job consumed, the other is what the works lost. Folding them
@@ -923,6 +923,43 @@ the history as "no change" rather than as a zero.
 is actually on hand — the usual cause is issuing from the wrong batch. Negative
 stock is always wrong, and allowing it hides whichever earlier movement was
 mistaken.
+
+#### Receiving something new, in whatever unit it came in
+
+The material is a **combobox, not a dropdown.** Type a name that is not on the
+rates list and the delivery creates it — a film the works has not bought before
+is an ordinary event, and the alternative is the office unable to book in a
+delivery until somebody with the rates module adds it, which leaves the stock
+wrong until then. Only then does it ask for a category and the unit it will be
+stocked in.
+
+It lands in the rates catalogue **with no price**, showing on the Rates screen
+as needing one. The rate on the delivery goes on the batch, not on the
+catalogue: what one supplier charged on one day is not the works' rate for the
+material.
+
+**The quantity carries the unit on the delivery note.** Film is bought by the
+tonne and stocked by the kilogram, so the dialog takes 2 TON and says _"goes
+into stock as 2000 KG"_ while you type — a tonne entered as a kilogram is a
+thousand-fold error, and it is only obvious next to the figure it produces. The
+rate follows: the label reads **Rate paid per ton**, and Rs. 205,000 a tonne is
+stored as Rs. 205 a kilogram. Either way the delivery is worth the same money.
+
+The batch keeps what the note said — `2 ton` under the 2,000.00 — so it can
+still be checked against the paperwork it arrived with. Ordinary deliveries, in
+the unit the material is stocked in, record nothing extra.
+
+**Only conversions within one family are offered.** Grams, kilograms and tonnes;
+millilitres, litres and kilolitres. A film cannot be received in litres whatever
+the supplier's note says, and the server refuses rather than guesses.
+
+> Litres to kilograms is a property of the substance, not arithmetic, and none
+> of the four inks has a density recorded. Ink is priced at Rs. 640 and costed
+> in quotations as GSM x rate — which only works if that figure is per kilogram.
+> **Whether it actually is has not been confirmed**, and until it is, ink is
+> received in the unit it is priced in. If the Rs. 640 turns out to be per
+> litre, quotations are costing ink wrongly today, and that is worth looking at
+> on its own.
 
 #### Stock movement history
 
