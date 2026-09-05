@@ -7,6 +7,7 @@ import { Field, Input, Textarea } from '@/components/ui/Field';
 import { Spinner } from '@/components/ui/Spinner';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
+import { useCustomer } from '@/features/customers/api/customer-api';
 import { useQuotation, useQuotationEmails, useSendQuotation } from '../api/quotation-api';
 
 /** The import put 'NA' in every blank field, so it is not an address. */
@@ -74,6 +75,16 @@ export function SendQuotationModal({
   const open = quotation !== null;
   // The summary in the list has no email on it; the detail does.
   const { data: detail } = useQuotation(quotation?.id ?? null);
+  /*
+   * The customer as they are **today**, which is not what the quotation holds.
+   *
+   * A quotation snapshots the address and number it was issued against, so the
+   * printed page never changes under the customer's feet. That is right for the
+   * document and wrong for this dialog: a quotation written before anyone had
+   * the customer's email carries a blank one forever, and the office would go
+   * on typing an address that is already on the customer record.
+   */
+  const { data: customer } = useCustomer(detail?.customerId ?? null);
   const { data: history } = useQuotationEmails(quotation?.id ?? null);
   const send = useSendQuotation();
 
@@ -111,7 +122,17 @@ export function SendQuotationModal({
    * modal opens — so this fills it in when it lands rather than on open. It only
    * ever seeds an empty list, so it cannot overwrite what someone has typed.
    */
-  const customerEmail = realEmail(detail?.email);
+  /*
+   * The quotation's own address wins where it has one, and the customer record
+   * fills the gap where it does not.
+   *
+   * That order matters both ways. An address typed onto this quotation was a
+   * decision about this document — a particular buyer at the company — and must
+   * not be replaced by the company's general one. But a blank is not a
+   * decision, and falling back is what stops a saved email being invisible to
+   * the only screen that needs it.
+   */
+  const customerEmail = realEmail(detail?.email) ?? realEmail(customer?.email);
   useEffect(() => {
     if (customerEmail) setTo((current) => (current.length === 0 ? [customerEmail] : current));
   }, [customerEmail]);
@@ -123,7 +144,7 @@ export function SendQuotationModal({
    * imported row holds a pair of landlines in a single cell, and a chip reading
    * "222394, 222044" would be a number nobody can be reached on.
    */
-  const customerMobile = normaliseMobile(detail?.mobile);
+  const customerMobile = normaliseMobile(detail?.mobile) ?? normaliseMobile(customer?.mobile);
   useEffect(() => {
     if (customerMobile)
       setMobiles((current) => (current.length === 0 ? [customerMobile] : current));
