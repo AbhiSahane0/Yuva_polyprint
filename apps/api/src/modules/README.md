@@ -11,6 +11,10 @@ One folder per business module. Built so far:
 | `customers`  | Customers and their job specifications                           |
 | `quotations` | Quotations, their costing, and the generated PDF                 |
 | `materials`  | The rate catalogue and daily rates                               |
+| `inventory`  | Stock as a ledger — batches, movements, and what is running out  |
+| `purchase`   | Suppliers and orders; receiving is where buying becomes stock    |
+| `gstin`      | Verifying a customer's GST registration                          |
+| `monitor`    | Sign-in history, for administrators                              |
 | `settings`   | Editable costing defaults                                        |
 
 Access is applied in [`routes/index.ts`](../routes/index.ts), not inside these

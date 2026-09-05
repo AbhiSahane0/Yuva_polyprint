@@ -361,6 +361,33 @@ total anybody can use.
 2,410" needs an answer that is not "trust it". It recomputes every batch from
 its own movements and reports what does not match.
 
+### Purchase & Suppliers
+
+| Method | Path                           | Notes                                                            |
+| ------ | ------------------------------ | ---------------------------------------------------------------- |
+| GET    | `/purchase/suppliers`          | With what each supplies and last charged, derived from orders    |
+| POST   | `/purchase/suppliers`          | Add a supplier                                                   |
+| PATCH  | `/purchase/suppliers/:id`      | Edit, or retire — orders already placed still name them          |
+| GET    | `/purchase/orders`             | Open first, with the totals                                      |
+| POST   | `/purchase/orders`             | Raise an order. Several lines, each in the unit it is ordered in |
+| GET    | `/purchase/orders/next-number` | A peek, not a reservation                                        |
+| GET    | `/purchase/orders/:id`         | One order, its lines and its deliveries                          |
+| PATCH  | `/purchase/orders/:id`         | Expected date, notes, or status                                  |
+| POST   | `/purchase/receipts`           | **Record a delivery.** The join to inventory                     |
+| POST   | `/purchase/lines/close`        | Give up on the balance of a line, with a reason                  |
+
+Query on `GET /purchase/orders`: `q` (PO number or supplier), `status`,
+`supplierId`, `delayedOnly`.
+
+`POST /purchase/receipts` needs the **inventory** module as well as purchase: it
+creates stock, and somebody who may raise orders but not touch the ledger should
+not reach it through a second door.
+
+`PATCH /purchase/orders/:id` accepts only ORDERED, IN_TRANSIT and CANCELLED, and
+refuses even those once deliveries exist — the status follows the receipts by
+then, and relabelling would make the order disagree with a ledger it cannot
+undo.
+
 ### Settings
 
 | Method | Path        | Notes                                 |

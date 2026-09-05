@@ -166,7 +166,7 @@ export function NewOrderModal({ open, onClose }: { open: boolean; onClose: () =>
                 className="border-ink-200 text-ink-600 hover:bg-ink-50 cursor-pointer rounded-[var(--radius-sm)] border bg-white px-2.5 py-1 text-xs font-medium"
               >
                 <Plus className="mr-1 inline size-3" />
-                Add a line
+                Add material
               </button>
             ) : null}
           </div>

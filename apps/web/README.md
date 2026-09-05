@@ -47,6 +47,10 @@ src/
 │   ├── users/             user management (admins only)
 │   ├── customers/         customer list, edit modal, job specification editor
 │   ├── quotations/        quotation list, form, PDF preview
+│   ├── inventory/         stock, batches, the movement ledger
+│   ├── purchase/          suppliers, orders, receiving into stock
+│   ├── gstin/             GSTIN field and lookup, shared by two screens
+│   ├── monitor/           sign-in log (admins only)
 │   └── rates/             daily material rates
 ├── hooks/useDebounce.ts
 ├── lib/
@@ -1267,6 +1271,16 @@ fetched when someone opens it.
 **Adding a feature**
 
 1. Put the request/response contract in `packages/shared`.
-2. Create `features/<feature>/api/` with a query-key factory and hooks.
-3. Build pages under `features/<feature>/pages/`, components alongside.
-4. Register the route in `app/router.tsx` and the nav item in `AppShell`.
+2. Add the module key to `APP_MODULES` in `packages/shared/src/constants/modules.ts`
+   — the same list feeds the user editor's tick boxes, `RequireModule` and the
+   nav, so a feature added anywhere else is unreachable and invisible.
+3. Create `features/<feature>/api/` with a query-key factory and hooks.
+4. Build pages under `features/<feature>/pages/`, components alongside.
+5. Register the route in `app/router.tsx` and the nav item in `AppShell`.
+
+A mutation that changes something **another feature reads** invalidates that
+feature's keys too. Receiving a purchase delivery creates stock, so
+`useReceivePurchaseLine` clears `inventoryKeys.all` as well as its own — an
+inventory screen open in another tab would otherwise go on showing the figure
+from before the lorry arrived, and stock is the one thing this app must not show
+stale.
