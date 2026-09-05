@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { formatNumber, type MaterialStock, type StockBatch, type CustomerJob } from '@yuva/shared';
+import {
+  adjustStockSchema,
+  formatNumber,
+  issueStockSchema,
+  transferStockSchema,
+  type CustomerJob,
+  type MaterialStock,
+  type StockBatch,
+} from '@yuva/shared';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Select } from '@/components/ui/Field';
@@ -118,14 +126,30 @@ export function StockActionModal({
     const kind = action;
     if (!kind) return;
 
+    /*
+     * Checked here against the same schema the server uses, so the office is
+     * told which field is wrong and why.
+     *
+     * The server validates too — it must, it is the only thing that can be
+     * trusted — but its answer for a bad field is the generic "Validation
+     * failed", with the useful part in a details object this dialog would have
+     * to unpack. Parsing here means "Say briefly what the count found" reaches
+     * the screen instead, and without a round trip.
+     */
+    /** The first thing wrong with it, in the schema's own words. */
+    const complain = (issues: { message: string }[]) =>
+      setError(issues[0]?.message ?? 'Check the figures and try again.');
+
     try {
       if (kind === 'ADJUST') {
-        const movement = await adjust.mutateAsync({
+        const parsed = adjustStockSchema.safeParse({
           batchId,
-          countedQuantity: Number(quantity),
+          countedQuantity: quantity,
           notes,
           reference,
         });
+        if (!parsed.success) return complain(parsed.error.issues);
+        const movement = await adjust.mutateAsync(parsed.data);
         const delta = movement.quantity;
         toast.success(
           delta === 0
@@ -133,17 +157,21 @@ export function StockActionModal({
             : `Count recorded — ${delta > 0 ? 'up' : 'down'} ${formatNumber(Math.abs(delta), 3)} ${stock.summary.unit}`,
         );
       } else if (kind === 'TRANSFER') {
-        await transfer.mutateAsync({ batchId, toLocation, notes });
+        const parsed = transferStockSchema.safeParse({ batchId, toLocation, notes });
+        if (!parsed.success) return complain(parsed.error.issues);
+        await transfer.mutateAsync(parsed.data);
         toast.success(`Moved to ${toLocation}`);
       } else {
-        await issue.mutateAsync({
+        const parsed = issueStockSchema.safeParse({
           batchId,
-          quantity: Number(quantity),
+          quantity,
           kind,
           jobId: jobId || null,
           reference,
           notes,
         });
+        if (!parsed.success) return complain(parsed.error.issues);
+        await issue.mutateAsync(parsed.data);
         toast.success(
           `${kind === 'WASTE' ? 'Waste' : 'Issue'} of ${formatNumber(Number(quantity), 2)} ${stock.summary.unit} recorded`,
         );

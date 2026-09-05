@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batchValue, signedQuantity, signOf, stockHealth } from './inventory.js';
+import { batchValue, needsAttention, signedQuantity, signOf, stockHealth } from './inventory.js';
 
 /**
  * The three rules the whole module rests on.
@@ -65,11 +65,37 @@ describe('stockHealth', () => {
     expect(stockHealth(501, 500)).toBe('HEALTHY');
   });
 
-  it('says out of stock before it says anything else', () => {
-    // Nothing on hand is worth reporting as its own state, level or no level.
-    expect(stockHealth(0, null)).toBe('OUT');
-    expect(stockHealth(0, 500)).toBe('OUT');
-    expect(stockHealth(-5, 500)).toBe('OUT');
+  it('says out of stock for something that has run out', () => {
+    expect(stockHealth(0, 500, true)).toBe('OUT');
+    expect(stockHealth(0, null, true)).toBe('OUT');
+    expect(stockHealth(-5, 500, true)).toBe('OUT');
+  });
+
+  it('does not call a material this works has never held "out of stock"', () => {
+    /*
+     * Every material in the rates catalogue appears on the inventory screen, so
+     * on a system nobody has received anything into yet, treating them all as
+     * out would read as "all seventeen need reordering". An alarm that means
+     * nothing is one the office learns to ignore.
+     *
+     * Running out is an event. Never having stocked something is not.
+     */
+    expect(stockHealth(0, null, false)).toBe('NOT_STOCKED');
+    expect(needsAttention(stockHealth(0, null, false))).toBe(false);
+  });
+
+  it('treats a level somebody set as a statement that it is watched', () => {
+    // Setting a reorder level before the first delivery is how the office says
+    // "we intend to hold this" — so it counts as out, not as never stocked.
+    expect(stockHealth(0, 500, false)).toBe('OUT');
+  });
+
+  it('flags exactly the two states somebody has to act on', () => {
+    expect(needsAttention('LOW')).toBe(true);
+    expect(needsAttention('OUT')).toBe(true);
+    expect(needsAttention('HEALTHY')).toBe(false);
+    expect(needsAttention('UNSET')).toBe(false);
+    expect(needsAttention('NOT_STOCKED')).toBe(false);
   });
 });
 

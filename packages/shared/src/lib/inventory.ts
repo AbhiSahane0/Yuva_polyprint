@@ -51,28 +51,53 @@ export function signedQuantity(kind: StockMovementKind, quantity: number): numbe
 }
 
 /** How stock is doing against the level somebody set for it. */
-export type StockHealth = 'HEALTHY' | 'LOW' | 'OUT' | 'UNSET';
+export type StockHealth = 'HEALTHY' | 'LOW' | 'OUT' | 'UNSET' | 'NOT_STOCKED';
 
 export const HEALTH_LABELS: Record<StockHealth, string> = {
   HEALTHY: 'Healthy',
   LOW: 'Low stock',
   OUT: 'Out of stock',
   UNSET: 'No level set',
+  NOT_STOCKED: 'Not stocked',
 };
+
+/** The two states that mean somebody has to do something. */
+export function needsAttention(health: StockHealth): boolean {
+  return health === 'LOW' || health === 'OUT';
+}
 
 /**
  * Whether a material needs reordering.
  *
- * `UNSET` rather than `HEALTHY` when no reorder level exists, because those are
- * different facts: one says the stock is fine, the other says nobody has said
- * what fine would be. Reporting the second as the first is how a material sits
- * at 3 kg for a month without anybody being told.
+ * Four states, and three of the distinctions matter:
  *
- * A level of zero is a real level — "shout only when we have run out" — which
- * is why this tests for null rather than for falsiness.
+ * - `UNSET` rather than `HEALTHY` when there is stock but no reorder level.
+ *   One says the stock is fine, the other says nobody has said what fine would
+ *   be — reporting the second as the first is how a material sits at 3 kg for a
+ *   month without anybody being told.
+ * - `NOT_STOCKED` rather than `OUT` for a material this works has never held.
+ *   Every material in the rates catalogue is on the inventory screen, and on a
+ *   system nobody has received anything into yet that would read as "all
+ *   seventeen need reordering" — an alarm that means nothing is one the office
+ *   learns to ignore. **Running out is an event; never having stocked something
+ *   is not.**
+ * - A level of zero is a real level — "shout only when we have run out" — which
+ *   is why this tests for null rather than for falsiness.
+ *
+ * `everStocked` is whether anything has ever moved against it, not whether
+ * there is stock now.
  */
-export function stockHealth(quantity: number, reorderLevel: number | null): StockHealth {
-  if (quantity <= 0) return 'OUT';
+export function stockHealth(
+  quantity: number,
+  reorderLevel: number | null,
+  everStocked = true,
+): StockHealth {
+  if (quantity <= 0) {
+    // A level somebody set is itself a statement that this is watched, so it
+    // counts as stocked even before the first delivery arrives.
+    const watched = everStocked || (reorderLevel !== null && reorderLevel !== undefined);
+    return watched ? 'OUT' : 'NOT_STOCKED';
+  }
   if (reorderLevel === null || reorderLevel === undefined) return 'UNSET';
   return quantity <= reorderLevel ? 'LOW' : 'HEALTHY';
 }

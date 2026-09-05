@@ -954,6 +954,18 @@ Blank and zero are different. Blank means nobody is watching; **zero means
 low **at** the level, not one kilogram below it — at the reorder level is when
 to reorder.
 
+#### "Not stocked" is not "out of stock"
+
+Every material in the rates catalogue appears here, so a works that has never
+received anything would otherwise open the screen to **"17 need reordering"** —
+an alarm that means nothing, and one the office learns to ignore within a week.
+
+A material only reads as **out of stock** once it has a history: something was
+received against it, or somebody set a reorder level, which is itself a
+statement that the works intends to hold it. Everything else reads as **not
+stocked** and is counted in neither figure. Running out is an event; never
+having stocked something is not.
+
 ### Rates — `/rates`
 
 Today's raw material prices, grouped by Films / Ink / Adhesive / Solvents.

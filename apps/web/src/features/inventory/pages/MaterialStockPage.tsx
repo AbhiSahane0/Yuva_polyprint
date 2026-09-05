@@ -31,6 +31,9 @@ const HEALTH_TONE = {
   LOW: 'warning',
   OUT: 'warning',
   UNSET: 'neutral',
+  // Never received here. Grey, because it is not a problem — it is a material
+  // on the price list that this works does not hold.
+  NOT_STOCKED: 'neutral',
 } as const;
 
 /** dd-mm-yyyy, matching the quotation list. */

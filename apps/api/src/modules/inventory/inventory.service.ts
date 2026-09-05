@@ -1,5 +1,6 @@
 import {
   batchValue,
+  needsAttention,
   round,
   signedQuantity,
   stockHealth,
@@ -465,6 +466,9 @@ export async function listStock(query: ListStockQuery): Promise<StockList> {
 
     const reorderLevel = toNullableNumber(material.reorderLevel);
     const moved = lastMovedAt.get(material.id) ?? null;
+    // Ever moved, not "has stock now" — a material that ran out has a history
+    // and is out; one nobody has ever received is simply not stocked here.
+    const everStocked = moved !== null;
 
     return {
       materialId: material.id,
@@ -476,7 +480,7 @@ export async function listStock(query: ListStockQuery): Promise<StockList> {
       // its history but is not somewhere stock can be found.
       batchCount: batches.filter((batch) => toNumber(batch.quantity) > 0).length,
       reorderLevel,
-      health: stockHealth(quantity, reorderLevel),
+      health: stockHealth(quantity, reorderLevel, everStocked),
       currentRate,
       value,
       locations: [
@@ -500,7 +504,7 @@ export async function listStock(query: ListStockQuery): Promise<StockList> {
    */
   const totals = {
     materialsInStock: items.filter((item) => item.quantity > 0).length,
-    lowStock: items.filter((item) => item.health === 'LOW' || item.health === 'OUT').length,
+    lowStock: items.filter((item) => needsAttention(item.health)).length,
     withoutLevel: items.filter((item) => item.health === 'UNSET').length,
     totalValue: round(
       items.reduce((total, item) => total + item.value, 0),
@@ -508,9 +512,7 @@ export async function listStock(query: ListStockQuery): Promise<StockList> {
     ),
   };
 
-  const visible = query.lowOnly
-    ? items.filter((item) => item.health === 'LOW' || item.health === 'OUT')
-    : items;
+  const visible = query.lowOnly ? items.filter((item) => needsAttention(item.health)) : items;
 
   return { items: visible, totals };
 }
@@ -559,7 +561,7 @@ export async function getMaterialStock(materialId: string): Promise<MaterialStoc
       quantity,
       batchCount: mapped.filter((batch) => batch.quantity > 0).length,
       reorderLevel,
-      health: stockHealth(quantity, reorderLevel),
+      health: stockHealth(quantity, reorderLevel, movements.length > 0),
       currentRate,
       value: round(
         mapped.reduce((total, batch) => total + batch.value, 0),

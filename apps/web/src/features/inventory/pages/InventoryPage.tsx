@@ -28,6 +28,9 @@ const HEALTH_TONE: Record<StockHealth, 'neutral' | 'success' | 'warning' | 'bran
   LOW: 'warning',
   OUT: 'warning',
   UNSET: 'neutral',
+  // Never received here. Grey, because it is not a problem — it is a material
+  // on the price list that this works does not hold.
+  NOT_STOCKED: 'neutral',
 };
 
 const CATEGORIES: (MaterialCategory | 'ALL')[] = [
