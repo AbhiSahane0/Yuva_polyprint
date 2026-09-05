@@ -274,10 +274,34 @@ returns to the "needs a customer" worklist.
 
 ### Quotations — `/quotations`
 
-The list reads as a **work queue, not a diary**: Draft first, then Sent, then
-Won and Lost, with the newest at the top of each group. Drafts need finishing
-and sent quotations need chasing, so whatever still needs doing sits at the top.
-Search by number, customer or job name, and the same four filters narrow it.
+By default the list reads as a **work queue, not a diary**: Draft first, then
+Sent, then Won and Lost, with the newest at the top of each group. Drafts need
+finishing and sent quotations need chasing, so whatever still needs doing sits
+at the top. Search by number, customer or job name, and the same four filters
+narrow it.
+
+**Number, Customer, Date and Status sort.** Click a header to order by it, click
+again to reverse, and a third time to come back to the work queue. That third
+click is the one that matters: the queue is what the list is for, and without it
+the default order is unreachable once anything has been sorted.
+
+Each of those headers carries a faint double arrow whether or not it is the
+active column, which darkens into a single arrow pointing the way it is
+currently ordered. An arrow that only appears on hover is invisible to anyone
+who has not already hovered, so the feature would only ever be found by
+accident.
+
+Text columns open ascending and the rest descending, because that is what each
+is wanted for — names are looked up alphabetically, numbers and dates are asked
+about newest-first.
+
+**The sort happens in the database.** The list is paginated, so re-ordering in
+the browser would only shuffle the twenty-five rows on screen and quietly lie
+about which quotation is the oldest. Every sort carries the quotation number
+behind it as a tie-break; without one, two quotations sharing a date — which is
+most of them, the office writes several a day — have no defined order, and
+Postgres is free to return them differently on each page. That reads as rows
+jumping about while paging.
 
 Each row previews, records the outcome, emails, downloads, edits or deletes.
 The outcome tick is hidden on drafts — the status a quotation moves through is
@@ -412,19 +436,57 @@ plies to three keeps everything already typed and only asks for the new one.
 > printed PET and the metallised ply assumed. The client could not read what he
 > was quoting off that control.
 
-**There is no thickness box.** Every film in the rates master is named with its
-gauge — `PET 12µm`, `PE 60µm`, `PVC / PETG 45µm` — because a 12µ PET and a 19µ
-PET are bought, stocked and priced as two different materials. The film _is_ the
-thickness, so choosing it sets the micron and the two cannot disagree. Typing
-them separately is how quotation #123 came to carry a "PET 19µm" ply recorded at
-60 microns.
+**The gauge is typed, and the film fills it in.** Every film in the rates master
+is named with its gauge — `PET 12µm`, `PE 60µm`, `PVC / PETG 45µm` — because a
+12µ PET and a 19µ PET are bought, stocked and priced as two different materials.
+Choosing the film puts its gauge in the **Micron** box, so the two agree without
+anyone typing twice.
 
-The consequence worth knowing: **a gauge the works wants to quote has to exist
-in the rates master.** A 70µ polythene needs `PE 70µm` adding under Rates, which
-is where a new film belongs anyway — it has its own price. The one film named
-without a gauge, `PP Woven`, is specified by GSM rather than thickness, and it
-alone still shows a thickness box; guessing at it would silently under-weigh the
-laminate and report a confident, wrong cost per kilogram.
+The box stays editable, because **the works quotes gauges the rates master does
+not stock.** A 20µ PET is a real enquiry; a dropdown of stocked films cannot
+offer a number nobody has priced, and for a while that meant such a job could
+not be quoted without a developer adding the film first.
+
+#### A gauge off the price list has to be priced
+
+Type a gauge the chosen film is not stocked at and the row asks for a rate:
+
+```
+Layer 1   [ PET 12µm ▾ ]   Micron [ 20 ]   Rate for this gauge [ Rs. / kg ]
+                                            PET 12µm is priced at 12µ — Rs. 210.00/kg
+```
+
+Neither the 12µ nor the 19µ rate is right for a 20µ PET, so the alternative to
+asking is costing the ply at whichever price happens to be on file — **a
+confident, wrong margin that nothing on screen contradicts.** The caption names
+the gauge the film _is_ priced at, so it is obvious that a 20 was typed where
+the list holds a 12, rather than reading as an unpriced film.
+
+Until it is given, **the line does not cost itself.** The margin reads as a dash
+and the material cost is blank, exactly as for a film with no rate on record.
+Asking for the rate is only half the job: while the ply still fell back to the
+stocked gauge's price, a 20µ PET reported an 87.7% margin with an empty rate box
+beside it, and nothing on the screen said the figure was invented.
+
+**That rate is used for this quotation and stored on it. It does not reach the
+Rates master.** A figure keyed in the middle of quoting is a decision about one
+document; letting it edit the price list would make every quotation a chance to
+change what every other quotation costs. Adding `PET 20µm` properly is a job for
+the Rates screen, where it gets a rate history like every other material.
+
+Swapping the film clears any rate typed for the previous one — 245 was the price
+of a 20µ PET and must not survive onto a `Foil 7µm` ply.
+
+Reopening a saved quotation puts the rate back in the box. Nothing records that
+an override happened and nothing needs to: the ply keeps the film's name, and a
+name stating a gauge different from the one quoted **is** the override. That
+rule lives in `@yuva/shared` because the server reads it too — it carries the
+rate through when repricing from storage, and if the two disagreed a quotation
+would display one rate and be repriced at another.
+
+The one film named without a gauge, `PP Woven`, is specified by GSM rather than
+thickness. Its rate applies at whatever micron is typed, so it is never asked
+about.
 
 Only two and three plies are offered, which is what the works produces. The
 engine and the schema handle four, so a foil laminate can be quoted the day it
@@ -530,6 +592,38 @@ away entirely, replaced by a line saying so:
 Choose **— New design —** and it comes back, with repeat width and height, the
 number of cylinders, and transport.
 
+**The repeats are suggested from the size**, and stay editable. The cylinder's
+circumference is the film's height times the repeat around, so the repeat is
+what decides whether a job lands on a cylinder the works owns — left at 1, a
+250mm pouch was asking for a 250mm cylinder, which is below anything in the
+racks, and the cylinder cost that followed was wrong by whatever the real one
+would have been.
+
+The rule is read off the works' own records, not invented. Of the 418 imported
+jobs, 347 record a cylinder, and on **84% of those the recorded circumference is
+an exact multiple of the design height** — which is the same relationship the
+engine uses. Those circumferences run 310–740mm and cluster around 480, so the
+suggestion is the multiple landing closest to 490, and the lanes across are as
+many as fit the 800mm face.
+
+Checked back against the same jobs, that reproduces the repeat the works
+actually chose on **85%**. The remaining 15% are designs where two repeats both
+fit the machine and the works took the other one — which cylinder was free that
+week, not arithmetic. **That is the whole reason the figure is suggested rather
+than calculated and locked**; a locked one would make those jobs unquotable
+without a developer.
+
+The panel says which it is showing — "Repeats suggested from the size" until
+someone edits one, after which it offers to put the suggestion back. A box that
+fills itself in is otherwise indistinguishable from one somebody already typed,
+and the office needs to know whose figure it is before trusting it. Once taken
+over it stays taken over: suggesting again after a decision would quietly undo
+it the next time the size was touched.
+
+A repeat order is left alone. Its cylinders exist, and their size is a fact
+about what was engraved rather than something to work out again from the size on
+screen.
+
 **It follows the design, not the customer.** A customer of ten years ordering a
 new pouch still needs a set engraved, which is exactly what the printed terms
 say — so the trigger is which job the line is for, not who is ordering it.
@@ -622,8 +716,21 @@ The cylinder row is **identical in every column** — they do not scale with the
 order. That is the whole reason for quoting more than one quantity, and it only
 reads as a comparison side by side.
 
-Then **Save as draft**, which keeps it editable, or **Save and send**, which
-opens the printed quotation so it can be checked before it goes out.
+Then **Save as draft**, which keeps it editable, or **Save and send**.
+
+**Neither of them sends anything.** Both save, and both open the printed
+quotation; Save and send is the one that puts a **Send** button on it. Pressing
+that asks who it goes to, and the send happens there.
+
+The order matters: the document is looked at before the question of who gets it
+is asked. Sending from a wizard step means committing to a page nobody has seen
+in the form it will arrive in.
+
+> Save and send used to set the status to **Sent** as it saved, before any email
+> existed. Every quotation then said it had been sent whether or not one ever
+> left — and the list is ordered by that status, so the queue of what still
+> needs chasing filled up with documents nobody had received. The status is now
+> advanced by the send itself, once the provider accepts the message.
 
 ### Record the outcome — won or lost
 
@@ -671,6 +778,33 @@ last one back; pasting several addresses at once splits them.
 has one — and the hint says so, rather than leaving a mystery address in the
 box. Where there is none, it says that too, so an empty field does not look
 broken. `NA` from the spreadsheet import is treated as no address, not as one.
+
+#### WhatsApp numbers
+
+The dialog also asks for mobile numbers, prefilled from the customer the same
+way. **WhatsApp delivery is not live yet** — the numbers are recorded against
+the send so that nothing the office decided is lost, and the hint says exactly
+that rather than implying a message went out.
+
+Numbers are stored in E.164 — `+919545390337` — however they were typed. The
+office types `9545390337`, and a paste can arrive as `+91 95453 90337` or
+`09545390337`; a history recording those as three different recipients would
+make "did we send this to him" unanswerable. Chips show the readable form while
+the state stays E.164, so screen and storage cannot drift apart.
+
+**A landline is refused, not dropped.** Indian mobiles are ten digits beginning
+6–9, and nothing else can receive a WhatsApp message. One imported customer row
+holds a pair of landlines in a single cell — `222394, 222044` — and accepting
+either would store a number that can never be delivered to, with nothing to
+suggest doubt until a message silently failed months later.
+
+**Email is still required.** WhatsApp is an addition, not a replacement: the PDF
+is the deliverable and email is what carries it, so a send with no address would
+mean pressing Send and nothing leaving the building.
+
+The history line shows the numbers with **(pending)** beside them while
+`whatsappSentAt` is null. Numbers with no timestamp are what was intended, not
+what was delivered, and the two must not read alike.
 
 The dialog also lists what has already been sent, with recipients and who sent
 it, because the common question before sending is whether someone already did.

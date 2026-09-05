@@ -49,6 +49,8 @@ export function QuantityFields({
   showsPouches = true,
   results,
   errors,
+  selectedQuantity,
+  onSelectQuantity,
 }: {
   control: Control<CreateQuotationFormValues>;
   register: UseFormRegister<CreateQuotationFormValues>;
@@ -67,6 +69,15 @@ export function QuantityFields({
   /** One per row, in order. Absent entries render as blanks, not zeroes. */
   results: (QuantityResult | undefined)[];
   errors?: Record<string, { message?: string } | undefined>[];
+  /**
+   * Which quantity the customer is quoted, 1-based.
+   *
+   * One quotation-wide choice rather than one per job, because it decides which
+   * column the document has: two jobs quoted at different quantities would not
+   * make a table.
+   */
+  selectedQuantity?: number;
+  onSelectQuantity?: (position: number) => void;
 }) {
   const { fields, append, remove } = useFieldArray({
     control,
@@ -117,6 +128,9 @@ export function QuantityFields({
           ) : (
             <span className="text-ink-400 text-xs">Sold per kilogram</span>
           )}
+          {onSelectQuantity && fields.length > 1 ? (
+            <span className="text-ink-400 text-xs">Ticked one is quoted</span>
+          ) : null}
           {fields.length < 3 ? (
             <button
               type="button"
@@ -135,8 +149,31 @@ export function QuantityFields({
         {fields.map((field, index) => {
           const result = results[index];
 
+          const chosen = (selectedQuantity ?? 1) === index + 1;
+          const showsRadio = Boolean(onSelectQuantity) && fields.length > 1;
+
           return (
             <div key={field.id} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-12">
+              {/*
+               * Which quantity the customer actually gets.
+               *
+               * Only shown once there is something to choose between. A radio
+               * beside a single row is a decision nobody has to make, and reads
+               * as though the row might somehow be switched off.
+               */}
+              {showsRadio ? (
+                <div className="col-span-2 flex items-center pb-3 sm:col-span-1 sm:justify-center">
+                  <input
+                    type="radio"
+                    name={`items.${itemIndex}.selectedQuantity`}
+                    checked={chosen}
+                    onChange={() => onSelectQuantity?.(index + 1)}
+                    aria-label={`Quote quantity ${index + 1}`}
+                    title="Quote this quantity — the others stay as working"
+                    className="accent-brand-600 size-4 cursor-pointer"
+                  />
+                </div>
+              ) : null}
               <div className="col-span-1 sm:col-span-2">
                 <Field
                   label={`Quantity ${index + 1}`}
@@ -190,7 +227,7 @@ export function QuantityFields({
                * choosing a price here and the margin is the thing they are
                * actually watching.
                */}
-              <div className="col-span-2 sm:col-span-7">
+              <div className={cn('col-span-2', showsRadio ? 'sm:col-span-6' : 'sm:col-span-7')}>
                 <div className="text-ink-500 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 pb-2 text-xs">
                   {result ? (
                     <>

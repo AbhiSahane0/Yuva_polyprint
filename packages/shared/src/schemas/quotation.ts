@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { JOB_KINDS, POUCH_TYPES, PRICING_BASES, pricingBasisFor } from '../constants/job.js';
 import { paginationQuerySchema } from './common.js';
+import { isMobile, normaliseMobile } from '../lib/phone.js';
 
 export const quotationStatusSchema = z.enum(['DRAFT', 'SENT', 'WON', 'LOST']);
 export type QuotationStatus = z.infer<typeof quotationStatusSchema>;
@@ -23,6 +24,27 @@ export const quotationLayerSchema = z.object({
   /** Null leaves the ply unchosen, which makes the line uncostable — not free. */
   materialId: z.string().min(1).nullable().default(null),
   micron: positiveNumber('Thickness'),
+  /**
+   * Rupees per kilogram the office typed, when the film's own rate cannot apply.
+   *
+   * The rates master prices a film at the gauge it is stocked in: `PET 12µm` and
+   * `PET 19µm` are two materials at two prices. Quote a 20µ PET and neither rate
+   * is the right one — so rather than silently cost it at the 12µ price, the
+   * line asks, and what is typed is used for this quotation and stored on it.
+   *
+   * **It does not reach the rates master.** A figure keyed in the middle of
+   * quoting is a decision about one document, and letting it edit the price list
+   * would mean every quotation is a chance to change what every other quotation
+   * costs. Adding `PET 20µm` properly is a job for the Rates screen.
+   *
+   * Null means "use the film's own rate", which is the ordinary case.
+   */
+  rateOverride: z
+    .union([z.literal(''), z.null(), z.undefined()])
+    .transform(() => null)
+    .or(z.coerce.number().positive('Rate must be more than 0'))
+    .nullable()
+    .default(null),
 });
 
 /** One quantity a line is priced at. */
@@ -242,6 +264,21 @@ const createQuotationBaseSchema = z.object({
   gstNumber: z.string().trim().toUpperCase().max(20).default(''),
   email: z.string().trim().max(160).default(''),
 
+  /**
+   * Which quantity the printed quotation is for, counting from 1.
+   *
+   * The office may price a job at two or three quantities to see what volume
+   * does to the margin, but the customer is quoted **one**. This says which,
+   * and the document, its totals and the advance are all built from that one
+   * alone; the others stay on the wizard as working.
+   *
+   * Clamped rather than validated against the number of quantities, because the
+   * two arrive together and a quotation trimmed from three quantities to one
+   * would otherwise be rejected for pointing at a column that had just gone.
+   * See `resolveSelectedQuantity`.
+   */
+  selectedQuantity: z.coerce.number().int().min(1).max(3).default(1),
+
   /** Rates may be overridden per quotation; omitted means "use the settings". */
   cylinderRate: z.coerce.number().positive().optional(),
   gstPercent: z.coerce.number().min(0).max(100).optional(),
@@ -274,9 +311,31 @@ export const createQuotationSchema = createQuotationBaseSchema
  */
 export const updateQuotationSchema = createQuotationBaseSchema.partial();
 
+/**
+ * The columns the list can be ordered by.
+ *
+ * A closed set rather than a free string: the value reaches Prisma's `orderBy`,
+ * and anything the office can type there is a column name it could guess at.
+ * Only these four are offered because only these four are on the table as
+ * sortable columns — sorting by a figure nobody can see is not a feature.
+ */
+export const QUOTATION_SORT_FIELDS = ['number', 'customerName', 'date', 'status'] as const;
+export const quotationSortFieldSchema = z.enum(QUOTATION_SORT_FIELDS);
+export type QuotationSortField = (typeof QUOTATION_SORT_FIELDS)[number];
+
+export const sortDirectionSchema = z.enum(['asc', 'desc']);
+export type SortDirection = z.infer<typeof sortDirectionSchema>;
+
 export const listQuotationsQuerySchema = paginationQuerySchema.extend({
   q: z.string().trim().max(200).optional(),
   status: quotationStatusSchema.optional(),
+  /**
+   * Absent means the work queue — see `listQuotations`. That default is not
+   * expressed here because it is two columns, not one, and a caller asking for
+   * no particular order should get the useful order rather than a column.
+   */
+  sort: quotationSortFieldSchema.optional(),
+  dir: sortDirectionSchema.optional(),
 });
 
 export type QuotationItemInput = z.infer<typeof quotationItemSchema>;
@@ -351,12 +410,43 @@ const recipients = z
   .max(20, 'That is more recipients than a quotation needs')
   .transform((values) => [...new Set(values)]);
 
+/**
+ * Mobile numbers a send is also addressed to, normalised to E.164 here.
+ *
+ * Normalising in the schema rather than in the caller means the stored number
+ * is the same shape however it was typed — `9545390337`, `+91 95453 90337` and
+ * `09545390337` are one number, and a history that recorded three would make
+ * "did we send this to him" unanswerable.
+ *
+ * A number that is not a mobile is rejected rather than dropped. Silently
+ * discarding it would leave the office believing a message was addressed to a
+ * landline that can never receive one.
+ */
+const mobiles = z
+  .array(z.string().trim())
+  .max(10, 'Ten numbers is the most one send can carry')
+  .default([])
+  .transform((values) => values.map((value) => normaliseMobile(value) ?? value))
+  .refine(
+    (values) => values.every((value) => isMobile(value)),
+    'Every number must be a ten-digit Indian mobile',
+  )
+  .transform((values) => [...new Set(values)]);
+
 export const sendQuotationSchema = z.object({
+  /**
+   * Email is required even when WhatsApp numbers are given.
+   *
+   * The PDF is the deliverable and email is what carries it; a send with no
+   * address would mean pressing Send and nothing leaving the building.
+   */
   to: recipients.refine((values) => values.length > 0, 'Add at least one recipient'),
   cc: recipients.default([]),
   subject: z.string().trim().min(1, 'Enter a subject').max(200),
   /** Free text above the standard body. Plain text — it is escaped, never HTML. */
   message: z.string().trim().max(4000).default(''),
+  /** Recorded against the send; delivery follows when WhatsApp is wired up. */
+  whatsappTo: mobiles,
 });
 
 export type SendQuotationInput = z.infer<typeof sendQuotationSchema>;

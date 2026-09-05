@@ -1,6 +1,7 @@
 import {
   formatNumber,
   formatRs,
+  resolveSelectedQuantity,
   type Quotation,
   type QuotationItem,
   type QuotationItemQuantity,
@@ -94,13 +95,20 @@ export function renderQuotationHtml(quotation: Quotation): string {
   const tiers = [...quotation.tiers].sort((a, b) => a.position - b.position);
 
   /*
-   * A quotation may now be priced at two or three quantities. They are printed
-   * as extra ROWS rather than extra columns: the table is already sixteen
-   * columns on a 194mm page, and four more per quantity would not fit — but a
-   * job's geometry and its cylinders do not vary by quantity anyway, so those
-   * cells span the rows instead and only the money repeats.
+   * **One quantity reaches the customer.**
+   *
+   * A job may be priced at two or three while the office is deciding what to
+   * charge — the margin at 5,000 against the margin at 50,000 — but that is
+   * working, not an offer. Printing all of them turns one price into a menu and
+   * invites the customer to negotiate against the office's own arithmetic.
+   *
+   * Which one is `quotation.selectedQuantity`, chosen on the Jobs step and
+   * resolved here against the tiers that actually exist, so a quotation trimmed
+   * from three quantities to one still prints rather than pointing at a column
+   * that has gone.
    */
-  const columns = tiers.length > 0 ? tiers : [null];
+  const chosen = resolveSelectedQuantity(quotation.selectedQuantity, tiers.length);
+  const columns = tiers.length > 0 ? [tiers[chosen - 1] ?? tiers[0]] : [null];
 
   /** Which line to read for a job at a given quantity. */
   const quantityAt = (item: QuotationItem, position: number): QuotationItemQuantity | null =>

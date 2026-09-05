@@ -14,6 +14,9 @@ import {
   type QuotationTier,
   computeItemGeometry,
   computeTier,
+  overriddenRate,
+  plyRatePerKg,
+  resolveSelectedQuantity,
   totalMicronForLayers,
   type QuotationSummary,
   type QuotationEmail as QuotationEmailRecord,
@@ -146,8 +149,26 @@ function toItem(row: ItemRow): QuotationItem {
  * open — a list row needs one number, and "what they agreed to" beats "the
  * biggest figure on the page" every time.
  */
-function headlineTier(row: { wonTierId: string | null; tiers: QuotationRow['tiers'] }) {
-  return row.tiers.find((t) => t.id === row.wonTierId) ?? row.tiers[0] ?? null;
+/**
+ * The quantity a quotation's headline figures are taken from.
+ *
+ * The one the customer accepted, if they have; otherwise **the one the document
+ * was written for**. It used to fall back to the first tier, which was the same
+ * thing only while every quantity was printed — now that the office picks which
+ * one the customer sees, the list would otherwise show a total off a column
+ * that was never sent.
+ */
+function headlineTier(row: {
+  wonTierId: string | null;
+  selectedQuantity: number;
+  tiers: QuotationRow['tiers'];
+}) {
+  const won = row.tiers.find((t) => t.id === row.wonTierId);
+  if (won) return won;
+
+  const byPosition = [...row.tiers].sort((a, b) => a.position - b.position);
+  const chosen = resolveSelectedQuantity(row.selectedQuantity, byPosition.length);
+  return byPosition[chosen - 1] ?? byPosition[0] ?? null;
 }
 
 /**
@@ -195,6 +216,7 @@ function toSummary(row: QuotationRow): QuotationSummary {
     customerName: row.customerName,
     itemCount: row.items.length,
     version: row.version,
+    selectedQuantity: row.selectedQuantity,
     isLatest: row.isLatest,
     tierCount: row.tiers.length,
     // The tier they agreed to, or the smallest while the answer is open.
@@ -273,7 +295,22 @@ function priceQuotation(
         name: material?.name ?? 'Not chosen',
         micron,
         density,
-        ratePerKg: costing.rateOfId(layer.materialId ?? null),
+        /*
+         * The film's own rate, unless the office typed one over it — and
+         * nothing at all when the gauge quoted is off the price list and no
+         * rate was given.
+         *
+         * Shared with the form, so what was on screen is what gets stored. See
+         * `plyRatePerKg`: costing a 20µ PET at the 12µ price would be a
+         * confident wrong number, and a null here makes the line read as
+         * uncostable instead, exactly as an unpriced film does.
+         */
+        ratePerKg: plyRatePerKg({
+          materialName: material?.name ?? null,
+          micron,
+          stockRate: costing.rateOfId(layer.materialId ?? null),
+          override: layer.rateOverride ?? null,
+        }),
         gsm: density === null ? 0 : round(micron * density, 3),
       };
     });
@@ -436,6 +473,41 @@ async function nextQuotationNumber(tx: Prisma.TransactionClient): Promise<number
   return Math.max((latest?.number ?? 0) + 1, settings.quotationStartNumber);
 }
 
+/**
+ * How the list is ordered.
+ *
+ * With no `sort` asked for, **work order**: drafts need finishing, sent ones
+ * need chasing, and won or lost are settled — so the list reads as a queue with
+ * whatever still needs doing at the top. Sorting on the enum is enough, because
+ * Postgres orders enum values by declaration and QuotationStatus is declared
+ * DRAFT, SENT, WON, LOST, which is exactly that sequence.
+ *
+ * Ordering happens **in the database, not the page**. The list is paginated, so
+ * re-sorting in the browser would only shuffle the twenty-five rows on screen
+ * and quietly lie about which quotation is the oldest.
+ *
+ * Every sort carries `number: 'desc'` behind it as a tie-break. Without one,
+ * two quotations sharing a date — which is most of them, the office writes
+ * several a day — have no defined order, and Postgres is free to return them
+ * differently on each page. That reads as rows jumping about while paging.
+ */
+export function listOrderBy(
+  query: ListQuotationsQuery,
+): Prisma.QuotationOrderByWithRelationInput[] {
+  if (!query.sort) return [{ status: 'asc' }, { number: 'desc' }];
+
+  const dir = query.dir ?? 'asc';
+  if (query.sort === 'number') return [{ number: dir }];
+
+  /*
+   * The snapshot on the quotation, not the customer's current name. It is what
+   * the row displays, and a quotation keeps the name it was issued under even
+   * after the customer master is corrected — sorting by the live name would
+   * order the list by something not on screen.
+   */
+  return [{ [query.sort]: dir }, { number: 'desc' }];
+}
+
 export async function listQuotations(query: ListQuotationsQuery) {
   const filters: Prisma.QuotationWhereInput[] = [];
 
@@ -467,18 +539,7 @@ export async function listQuotations(query: ListQuotationsQuery) {
     prisma.quotation.findMany({
       where,
       include: QUOTATION_INCLUDE,
-      /*
-       * Work order, not date order: drafts need finishing, sent ones need
-       * chasing, and won or lost are settled. So the list reads as a queue
-       * with whatever still needs doing at the top.
-       *
-       * Sorting on the enum itself is enough — Postgres orders enum values by
-       * the order they were declared, and QuotationStatus is declared
-       * DRAFT, SENT, WON, LOST, which is exactly this sequence. Sorting in the
-       * database rather than the page matters because the list is paginated;
-       * re-ordering one page in the browser would only shuffle that page.
-       */
-      orderBy: [{ status: 'asc' }, { number: 'desc' }],
+      orderBy: listOrderBy(query),
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     }),
@@ -602,6 +663,9 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
             mobile: input.mobile,
             email: input.email,
             gstNumber: input.gstNumber,
+            // Clamped against the quantities that actually arrived — see
+            // `resolveSelectedQuantity`.
+            selectedQuantity: resolveSelectedQuantity(input.selectedQuantity, tiers.length),
             ...rates,
             terms: input.terms.length > 0 ? input.terms : DEFAULT_TERMS,
             notes: input.notes,
@@ -789,6 +853,24 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
       layers: byPosition(item.layers).map((layer) => ({
         materialId: layer.materialId,
         micron: toNumber(layer.micron),
+        /*
+         * A rate the office typed cannot be looked up again, so it is carried.
+         *
+         * This path reprices from storage when a PATCH does not resend the
+         * lines. Every other figure can be re-derived from the material; a rate
+         * quoted for a gauge the rates master does not stock cannot be, and
+         * dropping it here would silently reprice a 20µ PET at the 12µ rate on
+         * the next unrelated edit.
+         *
+         * Recognised by the mismatch rather than a stored flag: the ply keeps
+         * the material's name, and a name that states a gauge different from
+         * the one quoted is exactly the case the override exists for.
+         */
+        rateOverride: overriddenRate({
+          materialName: layer.materialName,
+          micron: toNumber(layer.micron),
+          ratePerKg: layer.ratePerKg === null ? null : toNumber(layer.ratePerKg),
+        }),
       })),
       /*
        * Fed back as stored, both units populated. Which pair is actually read
@@ -847,6 +929,10 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
         ...(input.gstNumber !== undefined ? { gstNumber: input.gstNumber } : {}),
         ...(input.terms ? { terms: input.terms } : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        selectedQuantity: resolveSelectedQuantity(
+          input.selectedQuantity ?? existing.selectedQuantity,
+          tiers.length,
+        ),
         ...(becomingSent ? { sentAt: new Date() } : {}),
         ...rates,
         tiers: { create: tiers },
@@ -1215,6 +1301,15 @@ export async function sendQuotationEmail(
         to: input.to,
         cc: input.cc,
         subject: input.subject,
+        /*
+         * Recorded, not delivered.
+         *
+         * `whatsappSentAt` stays null until a provider actually accepts a
+         * message, so this row reads as "meant for these numbers, not yet
+         * sent". Writing a timestamp here to keep the columns tidy would make
+         * the history claim a delivery that never happened.
+         */
+        whatsappTo: input.whatsappTo,
         providerId,
         sentBy,
       },
@@ -1253,6 +1348,8 @@ export async function listQuotationEmails(id: string): Promise<QuotationEmailRec
     to: row.to,
     cc: row.cc,
     subject: row.subject,
+    whatsappTo: row.whatsappTo,
+    whatsappSentAt: row.whatsappSentAt ? row.whatsappSentAt.toISOString() : null,
     sentBy: row.sentBy,
     createdAt: row.createdAt.toISOString(),
   }));

@@ -14,6 +14,7 @@ import {
   type CreateQuotationFormValues,
   type CreateQuotationInput,
   type CustomerJob,
+  type QuotationSummary,
   MAX_PAGE_SIZE,
   type ItemGeometry,
   type MaterialCostResult,
@@ -27,6 +28,11 @@ import {
   computeItemGeometry,
   computeMargin,
   computeMaterialCostPerKg,
+  overriddenRate,
+  plyRatePerKg,
+  resolveSelectedQuantity,
+  suggestRepeatHeight,
+  suggestRepeatWidth,
   computeTier,
   computeTotals,
   createQuotationSchema,
@@ -68,6 +74,7 @@ import {
   type CustomerDetails,
 } from '../lib/step-save';
 import { QuotationPreview } from '../components/QuotationPreview';
+import { SendQuotationModal } from '../components/SendQuotationModal';
 import { LayerFields } from '../components/LayerFields';
 import { QuantityFields, type QuantityResult } from '../components/QuantityFields';
 import { StepIndicator, type Step } from '../components/StepIndicator';
@@ -133,8 +140,8 @@ const BLANK_DESIGN = {
   gazetteLeft: 0,
   gazetteRight: 0,
   layers: [
-    { materialId: null, micron: PET_MICRON_PER_LAYER },
-    { materialId: null, micron: 50 },
+    { materialId: null, micron: PET_MICRON_PER_LAYER, rateOverride: '' },
+    { materialId: null, micron: 50, rateOverride: '' },
   ],
   repeatWidth: 1,
   repeatHeight: 1,
@@ -219,6 +226,15 @@ export default function QuotationFormPage() {
   const [furthest, setFurthest] = useState(0);
   const [customerMode, setCustomerMode] = useState<'existing' | 'new'>('existing');
   const [previewId, setPreviewId] = useState<string | null>(null);
+  /**
+   * The saved quotation the office asked to send, or null.
+   *
+   * Two pieces of state rather than one because they answer different
+   * questions: `previewId` is what is on screen, and this is whether Send
+   * belongs on it. Saving as a draft opens the same preview with no Send.
+   */
+  const [reviewing, setReviewing] = useState<QuotationSummary | null>(null);
+  const [sending, setSending] = useState<QuotationSummary | null>(null);
 
   const { data: settings } = useSettings();
   // Only asked for on a new quotation; an existing one already has its number.
@@ -264,6 +280,7 @@ export default function QuotationFormPage() {
       date: today(),
       customerId: null,
       saveAsCustomer: false,
+      selectedQuantity: 1,
       customerName: '',
       brandName: '',
       addressLine1: '',
@@ -283,6 +300,18 @@ export default function QuotationFormPage() {
   const { control, register, handleSubmit, setValue, trigger, formState, reset } = form;
   const items = useFieldArray({ control, name: 'items' });
   const watched = useWatch({ control });
+
+  /*
+   * Which quantity the customer is quoted, 1-based.
+   *
+   * Clamped against the quantities that exist, using the same rule the server
+   * applies on save — removing the quantity that was ticked must fall back to
+   * one that is there rather than leave the document pointing at nothing.
+   */
+  const selectedQuantity = resolveSelectedQuantity(
+    Number(watched.selectedQuantity ?? 1),
+    watched.items?.[0]?.quantities?.length ?? 1,
+  );
 
   /*
    * Searched on the server, not filtered in the browser.
@@ -361,6 +390,7 @@ export default function QuotationFormPage() {
       date: existing.date,
       customerId: existing.customerId,
       saveAsCustomer: false,
+      selectedQuantity: existing.selectedQuantity,
       customerName: existing.customerName,
       /*
        * Blank, not from the quotation: the brand lives on the customer and is
@@ -396,6 +426,18 @@ export default function QuotationFormPage() {
         layers: item.layers.map((layer) => ({
           materialId: layer.materialId,
           micron: layer.micron,
+          /*
+           * A rate that was typed goes back in the box; one that came from the
+           * film does not.
+           *
+           * There is no stored flag saying which it was, and there does not
+           * need to be: the ply keeps the film's name, and a name stating a
+           * gauge different from the one quoted is exactly the case the box is
+           * shown for. Reading it back this way means reopening a quotation
+           * shows what was actually charged rather than an empty box beside a
+           * price nobody can account for.
+           */
+          rateOverride: overriddenRate(layer),
         })),
         quantities: item.quantities.map((quantity) => ({
           quantityKg: quantity.quantityKg,
@@ -464,11 +506,24 @@ export default function QuotationFormPage() {
 
       const layers = (item?.layers ?? []).map((layer) => {
         const film = layer?.materialId ? filmById.get(String(layer.materialId)) : undefined;
+        const override = num(layer?.rateOverride);
         return {
           name: film?.name ?? 'Not chosen',
           micron: num(layer?.micron),
           density: film?.density ?? null,
-          ratePerKg: film?.currentRate ?? null,
+          /*
+           * Shared, so the margin shown while a price is being chosen is the
+           * one the quotation is saved with. It also refuses to guess: a gauge
+           * off the price list with no rate yet costs nothing, so the line
+           * reads as uncostable rather than quietly borrowing the stocked
+           * gauge's price.
+           */
+          ratePerKg: plyRatePerKg({
+            materialName: film?.name ?? null,
+            micron: num(layer?.micron),
+            stockRate: film?.currentRate ?? null,
+            override: override > 0 ? override : null,
+          }),
         };
       });
 
@@ -740,11 +795,22 @@ export default function QuotationFormPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  async function save(status: 'DRAFT' | 'SENT') {
+  /**
+   * Save, then show what the customer would get.
+   *
+   * **Nothing is sent from here.** `intent` decides only what happens after the
+   * save: either back to the list, or the printed quotation on screen with a
+   * Send button on it.
+   *
+   * The status is not touched. It used to be set to SENT by this button, which
+   * made every quotation say it had been sent whether or not an email ever left
+   * — and the office's own work queue is ordered by that status. Sending is what
+   * advances it, and that happens once the provider accepts the message.
+   */
+  async function save(intent: 'CLOSE' | 'REVIEW') {
     await handleSubmit(async (values) => {
       const payload = {
         ...values,
-        status,
         saveAsCustomer: customerMode === 'new',
         brandName: values.brandName ?? '',
         customerId: customerMode === 'existing' ? values.customerId : null,
@@ -756,6 +822,7 @@ export default function QuotationFormPage() {
           : await createQuotation.mutateAsync(payload);
         toast.success(`Quotation ${saved.number} saved`);
         setPreviewId(saved.id);
+        setReviewing(intent === 'REVIEW' ? saved : null);
       } catch (cause) {
         toast.error(cause instanceof ApiClientError ? cause.message : 'Could not save.');
       }
@@ -994,6 +1061,10 @@ export default function QuotationFormPage() {
                 errors={formState.errors.items?.[index] as JobErrors | undefined}
                 canRemove={items.fields.length > 1}
                 onRemove={() => items.remove(index)}
+                selectedQuantity={selectedQuantity}
+                onSelectQuantity={(position) =>
+                  setValue('selectedQuantity', position as never, { shouldDirty: true })
+                }
               />
             ))}
 
@@ -1023,6 +1094,7 @@ export default function QuotationFormPage() {
             tierTotals={tierTotals}
             gstPercent={settings?.gstPercent ?? 18}
             register={register}
+            selectedQuantity={selectedQuantity}
           />
         ) : null}
 
@@ -1039,10 +1111,10 @@ export default function QuotationFormPage() {
             </Button>
           ) : (
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => void save('DRAFT')} loading={busy}>
+              <Button variant="secondary" onClick={() => void save('CLOSE')} loading={busy}>
                 Save as draft
               </Button>
-              <Button onClick={() => void save('SENT')} loading={busy}>
+              <Button onClick={() => void save('REVIEW')} loading={busy}>
                 <Check className="size-4" />
                 Save and send
               </Button>
@@ -1051,10 +1123,49 @@ export default function QuotationFormPage() {
         </div>
       </form>
 
+      {/*
+       * The saved quotation, exactly as it prints, with Send on it.
+       *
+       * `onSend` is passed only when the office asked to send — pressing Save
+       * as draft opens the same preview without it, because offering Send there
+       * would make "draft" and "send" the same button with different wording.
+       */}
       <QuotationPreview
         id={previewId}
+        onSend={
+          reviewing
+            ? () => {
+                /*
+                 * The preview closes before the dialog opens, matching the list.
+                 * `Modal` installs its own Escape handler and focus trap, so two
+                 * at once fight over both — Escape would dismiss whichever
+                 * bound last rather than the one on top.
+                 */
+                setPreviewId(null);
+                setSending(reviewing);
+              }
+            : undefined
+        }
         onClose={() => {
           setPreviewId(null);
+          setReviewing(null);
+          navigate('/quotations');
+        }}
+      />
+
+      {/*
+       * Who it goes to, asked after the document has been looked at rather than
+       * before. The dialog owns the actual send; this screen never sends.
+       *
+       * Closing it leaves for the list either way. The quotation is saved by
+       * this point, so staying on a wizard whose work is already recorded would
+       * invite a second save of the same document.
+       */}
+      <SendQuotationModal
+        quotation={sending}
+        onClose={() => {
+          setSending(null);
+          setReviewing(null);
           navigate('/quotations');
         }}
       />
@@ -1078,6 +1189,8 @@ function JobCard({
   errors,
   canRemove,
   onRemove,
+  selectedQuantity,
+  onSelectQuantity,
 }: {
   index: number;
   control: Control<CreateQuotationFormValues>;
@@ -1091,10 +1204,74 @@ function JobCard({
   errors: JobErrors | undefined;
   canRemove: boolean;
   onRemove: () => void;
+  /** Quotation-wide: which quantity the customer is quoted, 1-based. */
+  selectedQuantity: number;
+  onSelectQuantity: (position: number) => void;
 }) {
   const jobKind = (item?.jobKind ?? 'POUCH') as 'POUCH' | 'ROLL';
   const pouchType = (item?.pouchType || null) as PouchType | null;
   const basis = basisOf(item);
+
+  /*
+   * Whether the office has taken the repeats over.
+   *
+   * Held here rather than in the form, because it is about how this screen is
+   * being used and not about the quotation: a saved document records the
+   * repeats it was priced with, and nothing about who typed them.
+   *
+   * Once set it stays set for the life of the card. Suggesting again after
+   * someone has decided would quietly undo their decision the next time the
+   * size is touched, which is worse than not suggesting at all.
+   */
+  const [repeatsTaken, setRepeatsTaken] = useState(false);
+
+  /** False on a repeat order, whose cylinders already exist. */
+  const charged = item?.chargeCylinders !== false;
+
+  /*
+   * The film the cylinder actually carries — the pouch plus any gusset.
+   *
+   * Read from the costed geometry rather than recomputed, so the suggestion and
+   * the cylinder size it produces cannot disagree.
+   */
+  const filmWidthMm = cost?.geometry.filmWidthMm ?? 0;
+  const filmHeightMm = cost?.geometry.filmHeightMm ?? 0;
+
+  /**
+   * Fill the repeats in as the size is typed, until the office says otherwise.
+   *
+   * The circumference is the design's height times the repeat, so the repeat is
+   * what decides whether the job lands on a cylinder the works owns. Left at 1,
+   * a 250mm pouch asks for a 250mm cylinder — below anything in the racks — and
+   * the cylinder cost that follows is wrong by whatever the real one would be.
+   *
+   * Only for a design being charged for. A repeat order's cylinders exist, and
+   * their size is a fact about what was engraved rather than something to work
+   * out again from the size on screen.
+   */
+  useEffect(() => {
+    if (repeatsTaken || !charged) return;
+    if (filmWidthMm <= 0 || filmHeightMm <= 0) return;
+
+    const width = suggestRepeatWidth(filmWidthMm);
+    const height = suggestRepeatHeight(filmHeightMm);
+
+    /*
+     * Compared before writing, and that comparison is what stops this looping.
+     *
+     * The effect depends on `item`, which its own `setValue` changes — so it
+     * runs again after every write. Writing only on a difference means the
+     * second run is a no-op and it settles, where writing unconditionally would
+     * not. Written as strings, matching every other number the form holds while
+     * it is being typed; the schema coerces on submit.
+     */
+    if (num(item?.repeatWidth) !== width) {
+      setValue(`items.${index}.repeatWidth`, String(width) as never, { shouldDirty: true });
+    }
+    if (num(item?.repeatHeight) !== height) {
+      setValue(`items.${index}.repeatHeight`, String(height) as never, { shouldDirty: true });
+    }
+  }, [filmWidthMm, filmHeightMm, repeatsTaken, charged, index, setValue, item]);
 
   /*
    * Whether this line is quoted for cylinders.
@@ -1466,6 +1643,8 @@ function JobCard({
             }
             results={cost?.quantities ?? []}
             errors={errors?.quantities as never}
+            selectedQuantity={selectedQuantity}
+            onSelectQuantity={onSelectQuantity}
           />
         </div>
 
@@ -1484,25 +1663,55 @@ function JobCard({
                 <span className="text-ink-500 text-xs font-semibold tracking-wide uppercase">
                   Cylinders
                 </span>
-                <span className="text-ink-400 text-xs">New design — charged once</span>
+                <div className="flex items-center gap-3">
+                  {/*
+                   * Said out loud, because a box that fills itself in is
+                   * otherwise indistinguishable from one somebody already typed
+                   * — and the office needs to know whether the figure is theirs
+                   * before they trust it. Once they change one, the label goes
+                   * and stays gone.
+                   */}
+                  {repeatsTaken ? (
+                    <button
+                      type="button"
+                      onClick={() => setRepeatsTaken(false)}
+                      className="text-brand-600 hover:text-brand-700 cursor-pointer text-xs underline underline-offset-2"
+                    >
+                      Fit to the size again
+                    </button>
+                  ) : (
+                    <span className="text-ink-400 text-xs">Fitted to the size</span>
+                  )}
+                  <span className="text-ink-400 text-xs">New design — charged once</span>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-12">
                 <div className="sm:col-span-3">
-                  <Field label="Repeat width" htmlFor={`items.${index}.repeatWidth`}>
+                  {/*
+                   * "Repeat width" read as a measurement — a width in
+                   * millimetres — when it is a count of how many pouches sit
+                   * side by side across the web. "Ups" is the works' own word
+                   * for it and the column the jobs table has always used.
+                   */}
+                  <Field label="Ups across" htmlFor={`items.${index}.repeatWidth`}>
                     <Input
                       id={`items.${index}.repeatWidth`}
                       inputMode="decimal"
-                      {...register(`items.${index}.repeatWidth`)}
+                      {...register(`items.${index}.repeatWidth`, {
+                        onChange: () => setRepeatsTaken(true),
+                      })}
                     />
                   </Field>
                 </div>
                 <div className="sm:col-span-3">
-                  <Field label="Repeat height" htmlFor={`items.${index}.repeatHeight`}>
+                  <Field label="Repeats around" htmlFor={`items.${index}.repeatHeight`}>
                     <Input
                       id={`items.${index}.repeatHeight`}
                       inputMode="decimal"
-                      {...register(`items.${index}.repeatHeight`)}
+                      {...register(`items.${index}.repeatHeight`, {
+                        onChange: () => setRepeatsTaken(true),
+                      })}
                     />
                   </Field>
                 </div>
@@ -1574,21 +1783,36 @@ function ReviewStep({
   tierTotals,
   gstPercent,
   register,
+  selectedQuantity,
 }: {
   items: Partial<ItemValues>[];
   costed: ItemCosting[];
   tierTotals: ReturnType<typeof computeTotals>[];
   gstPercent: number;
   register: UseFormRegister<CreateQuotationFormValues>;
+  selectedQuantity: number;
 }) {
+  /*
+   * The step is called "What the customer sees", so it shows one column.
+   *
+   * The others were priced to find out what volume does to the margin, which is
+   * the office's business. Showing all three here and one on the PDF would make
+   * this screen a rehearsal of a different document.
+   */
+  const priced = tierTotals.length;
+  const chosen = Math.min(Math.max(selectedQuantity, 1), Math.max(priced, 1)) - 1;
+  const total = tierTotals[chosen];
+
   return (
     <div className="flex flex-col gap-5">
       <section className="border-ink-200 overflow-hidden rounded-[var(--radius-lg)] border bg-white shadow-[var(--shadow-card)]">
         <div className="border-ink-100 border-b px-4 py-3">
           <h2 className="text-ink-900 text-base font-semibold">What the customer sees</h2>
           <p className="text-ink-500 mt-0.5 text-sm">
-            {tierTotals.length > 1
-              ? `Priced at ${tierTotals.length} quantities. The cylinders cost the same in every column — which is why the unit price falls.`
+            {priced > 1
+              ? `Quoted at quantity ${chosen + 1}. The other ${priced - 1} ${
+                  priced === 2 ? 'was' : 'were'
+                } priced to compare and stay off the document — go back to Jobs to quote a different one.`
               : 'Priced at one quantity.'}
           </p>
         </div>
@@ -1598,11 +1822,7 @@ function ReviewStep({
             <thead>
               <tr className="bg-ink-50 text-ink-500 text-xs tracking-wide uppercase">
                 <th className="px-4 py-2 text-left font-semibold">Job</th>
-                {tierTotals.map((_, index) => (
-                  <th key={index} className="px-4 py-2 text-right font-semibold">
-                    Quantity {index + 1}
-                  </th>
-                ))}
+                <th className="px-4 py-2 text-right font-semibold">Quantity {chosen + 1}</th>
               </tr>
             </thead>
             <tbody className="divide-ink-100 divide-y">
@@ -1611,44 +1831,30 @@ function ReviewStep({
                   <td className="text-ink-800 px-4 py-2.5">
                     {item?.jobName || `Job ${index + 1}`}
                   </td>
-                  {tierTotals.map((_, tier) => (
-                    <td key={tier} className="text-ink-700 px-4 py-2.5 text-right tabular-nums">
-                      {formatRs(costed[index]?.quantities[tier]?.totalAmount ?? 0)}
-                    </td>
-                  ))}
+                  <td className="text-ink-700 px-4 py-2.5 text-right tabular-nums">
+                    {formatRs(costed[index]?.quantities[chosen]?.totalAmount ?? 0)}
+                  </td>
                 </tr>
               ))}
               <tr className="bg-ink-50/70">
                 <td className="text-ink-800 px-4 py-2.5 font-medium">Cylinders</td>
-                {tierTotals.map((total, tier) => (
-                  <td
-                    key={tier}
-                    className="text-ink-800 px-4 py-2.5 text-right font-medium tabular-nums"
-                  >
-                    {formatRs(total.cylinderSubtotal)}
-                  </td>
-                ))}
+                <td className="text-ink-800 px-4 py-2.5 text-right font-medium tabular-nums">
+                  {formatRs(total?.cylinderSubtotal ?? 0)}
+                </td>
               </tr>
               <tr className="bg-brand-50/60">
                 <td className="text-ink-900 px-4 py-3 font-semibold">
                   Total including {gstPercent}% GST
                 </td>
-                {tierTotals.map((total, tier) => (
-                  <td
-                    key={tier}
-                    className="text-ink-900 px-4 py-3 text-right font-semibold tabular-nums"
-                  >
-                    {formatRs(total.grandWithGst)}
-                  </td>
-                ))}
+                <td className="text-ink-900 px-4 py-3 text-right font-semibold tabular-nums">
+                  {formatRs(total?.grandWithGst ?? 0)}
+                </td>
               </tr>
               <tr>
                 <td className="text-ink-500 px-4 py-2.5">Advance</td>
-                {tierTotals.map((total, tier) => (
-                  <td key={tier} className="text-ink-600 px-4 py-2.5 text-right tabular-nums">
-                    {formatRs(total.totalAdvance)}
-                  </td>
-                ))}
+                <td className="text-ink-600 px-4 py-2.5 text-right tabular-nums">
+                  {formatRs(total?.totalAdvance ?? 0)}
+                </td>
               </tr>
             </tbody>
           </table>

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   CircleCheckBig,
   Download,
   Eye,
@@ -15,8 +18,10 @@ import {
 import {
   formatRs,
   QUOTATION_STATUS_LABELS,
+  type QuotationSortField,
   type QuotationStatus,
   type QuotationSummary,
+  type SortDirection,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Field';
@@ -63,11 +68,77 @@ function formatDate(iso: string): string {
   return `${day}-${month}-${year}`;
 }
 
+/**
+ * A column header that sorts.
+ *
+ * The icon is always present, not only on the active column. A sort arrow that
+ * appears on hover is invisible to anyone who has not already hovered, which
+ * means the feature is only found by accident — the faint double arrow says
+ * "this column sorts" before anyone touches it, and darkens into a single
+ * arrow pointing the way it is currently ordered.
+ *
+ * `aria-sort` on the cell is what a screen reader announces; the arrow alone
+ * would say nothing. The button carries the full sentence, so the title on
+ * hover and the accessible name agree.
+ */
+function SortableHeader({
+  field,
+  sort,
+  onSort,
+  children,
+}: {
+  field: QuotationSortField;
+  sort: { field: QuotationSortField; dir: SortDirection } | null;
+  onSort: (field: QuotationSortField) => void;
+  children: React.ReactNode;
+}) {
+  const active = sort?.field === field;
+  const dir = active ? sort.dir : null;
+  const Icon = dir === 'asc' ? ArrowUp : dir === 'desc' ? ArrowDown : ArrowUpDown;
+
+  const next = active
+    ? dir === (field === 'customerName' || field === 'status' ? 'asc' : 'desc')
+      ? 'reverse the order'
+      : 'go back to the default order'
+    : 'sort by this column';
+
+  return (
+    <th
+      className="px-4 py-3 font-semibold"
+      aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none'}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(field)}
+        title={`Click to ${next}`}
+        className={cn(
+          'focus-visible:ring-brand-500 -mx-1 flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-sm)] px-1 py-0.5 transition focus-visible:ring-2 focus-visible:outline-none',
+          active ? 'text-ink-900' : 'hover:text-ink-700',
+        )}
+      >
+        {children}
+        <Icon
+          className={cn('size-3.5 shrink-0', active ? 'text-brand-600' : 'text-ink-300')}
+          aria-hidden
+        />
+      </button>
+    </th>
+  );
+}
+
 export default function QuotationsPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<QuotationStatus | 'ALL'>('ALL');
   const [page, setPage] = useState(1);
+  /**
+   * Null is the default work-queue order, not "unsorted".
+   *
+   * Kept as one piece of state rather than a column and a direction, so there
+   * is no state where a direction is set for no column — and so returning to
+   * the default is a single assignment rather than clearing two things.
+   */
+  const [sort, setSort] = useState<{ field: QuotationSortField; dir: SortDirection } | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<QuotationSummary | null>(null);
   const [sending, setSending] = useState<QuotationSummary | null>(null);
@@ -78,7 +149,7 @@ export default function QuotationsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, status]);
+  }, [debouncedSearch, status, sort]);
 
   const params = useMemo<QuotationListParams>(
     () => ({
@@ -86,13 +157,36 @@ export default function QuotationsPage() {
       pageSize: PAGE_SIZE,
       ...(debouncedSearch ? { q: debouncedSearch } : {}),
       ...(status !== 'ALL' ? { status } : {}),
+      ...(sort ? { sort: sort.field, dir: sort.dir } : {}),
     }),
-    [page, debouncedSearch, status],
+    [page, debouncedSearch, status, sort],
   );
 
   const { data, isPending, isFetching, isError, error, refetch } = useQuotations(params);
   const quotations = data?.items ?? [];
   const pagination = data?.pagination;
+
+  /**
+   * Click a column: sort by it, click again to reverse, a third time to go back
+   * to the work queue.
+   *
+   * The third click matters. Without it the default order — the queue of what
+   * still needs doing — is unreachable once anything has been sorted, short of
+   * reloading the page, and that order is the one the list is actually for.
+   *
+   * Text starts ascending and everything else descending, because that is what
+   * each is wanted for: names are looked up alphabetically, while numbers and
+   * dates are asked about newest-first.
+   */
+  function toggleSort(field: QuotationSortField) {
+    setSort((current) => {
+      if (current?.field !== field) {
+        return { field, dir: field === 'customerName' || field === 'status' ? 'asc' : 'desc' };
+      }
+      const first = field === 'customerName' || field === 'status' ? 'asc' : 'desc';
+      return current.dir === first ? { field, dir: first === 'asc' ? 'desc' : 'asc' } : null;
+    });
+  }
 
   async function confirmDelete() {
     if (!deleting) return;
@@ -218,13 +312,21 @@ export default function QuotationsPage() {
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-ink-200 bg-ink-25 text-ink-500 border-b text-left">
-                    <th className="px-4 py-3 font-semibold">No.</th>
-                    <th className="px-4 py-3 font-semibold">Customer</th>
-                    <th className="px-4 py-3 font-semibold">Date</th>
+                    <SortableHeader field="number" sort={sort} onSort={toggleSort}>
+                      No.
+                    </SortableHeader>
+                    <SortableHeader field="customerName" sort={sort} onSort={toggleSort}>
+                      Customer
+                    </SortableHeader>
+                    <SortableHeader field="date" sort={sort} onSort={toggleSort}>
+                      Date
+                    </SortableHeader>
                     <th className="px-4 py-3 text-right font-semibold">Jobs</th>
                     <th className="px-4 py-3 text-right font-semibold">Grand total</th>
                     <th className="px-4 py-3 text-right font-semibold">Advance</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <SortableHeader field="status" sort={sort} onSort={toggleSort}>
+                      Status
+                    </SortableHeader>
                     <th className="px-4 py-3">
                       <span className="sr-only">Actions</span>
                     </th>

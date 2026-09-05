@@ -120,6 +120,13 @@ export interface QuotationSummary {
   isLatest: boolean;
   /** How many quantities this document is priced at. */
   tierCount: number;
+  /**
+   * Which of those the customer is quoted, 1-based.
+   *
+   * The others are the office's working: priced to see what volume does to the
+   * margin, and left off the printed page.
+   */
+  selectedQuantity: number;
 
   /**
    * The headline figures, taken from the tier the customer accepted, or from
@@ -172,6 +179,15 @@ export interface QuotationEmail {
   to: string[];
   cc: string[];
   subject: string;
+  /** Mobile numbers the same send was addressed to, in E.164. */
+  whatsappTo: string[];
+  /**
+   * When WhatsApp actually accepted a message, or null while it is pending.
+   *
+   * Numbers with no timestamp are what the office intended, not what was
+   * delivered — the history says so rather than implying a message went out.
+   */
+  whatsappSentAt: string | null;
   sentBy: string;
   createdAt: string;
 }

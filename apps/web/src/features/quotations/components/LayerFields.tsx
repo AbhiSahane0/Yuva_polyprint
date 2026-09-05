@@ -6,7 +6,13 @@ import {
   type UseFormSetValue,
 } from 'react-hook-form';
 import { Layers } from 'lucide-react';
-import { formatRs, micronFromFilmName, type CreateQuotationFormValues } from '@yuva/shared';
+import {
+  filmFamily,
+  formatRs,
+  micronFromFilmName,
+  resolveFilm,
+  type CreateQuotationFormValues,
+} from '@yuva/shared';
 import { Field, Input, Select } from '@/components/ui/Field';
 import { cn } from '@/lib/utils';
 
@@ -21,13 +27,16 @@ import { cn } from '@/lib/utils';
  * Choosing the count adds or removes rows rather than swapping the form, so
  * moving 2 → 3 keeps everything already typed and only asks for the new ply.
  *
- * There is no thickness box. Every film in the rates master is named with its
- * gauge — a 12µ PET and a 19µ PET are two separate materials, bought and priced
- * separately — so the film IS the thickness, and asking for it again only
- * created a way for the two to disagree. Choosing the film sets the micron
- * silently. A film whose name states no gauge is the one exception and asks for
- * the figure, because guessing at it would silently under-weigh the laminate
- * and report a confident, wrong cost.
+ * **The film and the gauge are two questions, asked once each.** The dropdown
+ * offers families — PET, PE, MET PET — and the gauge is typed beside it. The
+ * rates master holds `PET 12µm` and `PET 19µm` as separate rows because they
+ * are bought at separate prices, but they are one film to anybody at the
+ * machine, and listing both asked the same question twice.
+ *
+ * Family plus gauge names a stocked film, and that film's rate is used: PET at
+ * 19 finds `PET 19µm` and costs the ply at its price without asking anybody
+ * anything. Only a gauge the master does not stock — a 20µ PET — has no price
+ * to find, and that is the one case the line asks about. See `resolveFilm`.
  */
 
 /**
@@ -60,7 +69,7 @@ export function LayerFields({
   setValue: UseFormSetValue<CreateQuotationFormValues>;
   itemIndex: number;
   films: Film[];
-  errors?: { micron?: { message?: string } }[];
+  errors?: { micron?: { message?: string }; rateOverride?: { message?: string } }[];
 }) {
   const { fields, append, remove } = useFieldArray({
     control,
@@ -76,6 +85,13 @@ export function LayerFields({
 
   const filmById = new Map(films.map((film) => [film.id, film]));
 
+  /*
+   * The families, in the order the rates master lists them, without repeats.
+   * Nine entries where there were eleven — PET and PE each appeared twice, once
+   * per stocked gauge.
+   */
+  const families = [...new Set(films.map((film) => filmFamily(film.name)))];
+
   function setCount(next: number) {
     // Add to the inside of the structure and remove from there too, so the
     // outer printed ply and the sealant — the two the office actually chose —
@@ -87,14 +103,43 @@ export function LayerFields({
     for (let i = fields.length - 1; i >= next; i -= 1) remove(i);
   }
 
-  /** Picking a film carries its gauge onto the ply. */
-  function chooseFilm(index: number, filmId: string) {
-    setValue(`items.${itemIndex}.layers.${index}.materialId`, filmId || null, {
+  /**
+   * Point a ply at the stocked film its family and gauge name between them.
+   *
+   * The form stores a material id, so the family on screen is really "the
+   * family of whatever film is currently set". Changing either the family or
+   * the gauge re-resolves it — which is what makes typing 19 against PET move
+   * the ply from `PET 12µm` to `PET 19µm` and pick up its own rate.
+   */
+  function point(index: number, family: string, micron: number) {
+    const film = family ? resolveFilm(family, micron, films) : undefined;
+    setValue(`items.${itemIndex}.layers.${index}.materialId`, film?.id ?? null, {
+      shouldDirty: true,
+    });
+    return film;
+  }
+
+  /**
+   * Picking a family fills the gauge in, and clears any rate typed for the old one.
+   *
+   * The rate is cleared because it belonged to the previous film: a figure
+   * entered for a 20µ PET must not survive a switch to Foil and go on costing
+   * it. Leaving it would be a wrong price that nobody typed.
+   *
+   * The gauge is only filled in when the box is empty or the family cannot hold
+   * what is in it. Overwriting a typed gauge would undo the office's own figure
+   * the moment they corrected the film beside it.
+   */
+  function chooseFamily(index: number, family: string) {
+    setValue(`items.${itemIndex}.layers.${index}.rateOverride`, '' as never, {
       shouldDirty: true,
     });
 
-    const film = filmId ? filmById.get(filmId) : undefined;
-    const micron = film ? micronFromFilmName(film.name) : null;
+    const typed = Number(layers[index]?.micron ?? 0);
+    const film = point(index, family, typed);
+    if (!film || typed > 0) return;
+
+    const micron = micronFromFilmName(film.name);
     if (micron === null) return;
 
     // As a string: the form holds these while they are being typed, and the
@@ -104,6 +149,23 @@ export function LayerFields({
       shouldDirty: true,
       shouldValidate: true,
     });
+  }
+
+  /** Retyping the gauge can move the ply onto a different stocked film. */
+  function changeMicron(index: number, raw: string) {
+    const family = currentFamily(index);
+    if (!family) return;
+    point(index, family, Number(raw));
+    setValue(`items.${itemIndex}.layers.${index}.rateOverride`, '' as never, {
+      shouldDirty: true,
+    });
+  }
+
+  /** The family shown in the dropdown: that of the film the ply points at. */
+  function currentFamily(index: number): string {
+    const id = (layers[index]?.materialId ?? null) as string | null;
+    const film = id ? filmById.get(id) : undefined;
+    return film ? filmFamily(film.name) : '';
   }
 
   return (
@@ -140,44 +202,92 @@ export function LayerFields({
           const filmId = (layer?.materialId ?? null) as string | null;
           const film = filmId ? filmById.get(filmId) : undefined;
 
-          // The one case the film cannot answer: a name that states no gauge.
-          const needsMicron = Boolean(film) && micronFromFilmName(film!.name) === null;
+          /*
+           * The gauge the film is stocked and priced at, or null when its name
+           * states none — `PP Woven`, which is specified by GSM.
+           */
+          const stocked = film ? micronFromFilmName(film.name) : null;
+          const typed = Number(layer?.micron ?? 0);
+
+          /*
+           * A gauge this film is not priced at, so its rate cannot be used.
+           *
+           * Only once both are known and the typed figure is a real number: an
+           * empty box mid-edit is not an override, and asking for a rate the
+           * moment a digit is deleted would make the row flicker.
+           */
+          const offStock = Boolean(film) && stocked !== null && typed > 0 && typed !== stocked;
 
           return (
             <div key={field.id} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-12">
-              <div className="col-span-2 sm:col-span-5">
+              <div className="col-span-2 sm:col-span-4">
                 <Field
                   label={`Layer ${index + 1}`}
                   htmlFor={`items.${itemIndex}.layers.${index}.materialId`}
                 >
                   <Select
                     id={`items.${itemIndex}.layers.${index}.materialId`}
-                    value={filmId ?? ''}
-                    onChange={(event) => chooseFilm(index, event.target.value)}
+                    value={currentFamily(index)}
+                    onChange={(event) => chooseFamily(index, event.target.value)}
                   >
                     <option value="">— Choose a film —</option>
-                    {films.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
-                        {option.currentRate === null ? ' (no rate)' : ''}
+                    {families.map((family) => (
+                      <option key={family} value={family}>
+                        {family}
                       </option>
                     ))}
                   </Select>
                 </Field>
               </div>
 
-              {needsMicron ? (
-                <div className="col-span-1 sm:col-span-2">
+              {/*
+               * Always asked for, never derived silently.
+               *
+               * The film fills this in, but the works quotes gauges the rates
+               * master does not stock — a 20µ PET when 12 and 19 are on the
+               * list — and a dropdown of stocked films cannot express one.
+               * Leaving it editable is what makes those quotable at all.
+               */}
+              <div className="col-span-1 sm:col-span-2">
+                <Field
+                  label="Micron"
+                  htmlFor={`items.${itemIndex}.layers.${index}.micron`}
+                  error={errors?.[index]?.micron?.message}
+                >
+                  <Input
+                    id={`items.${itemIndex}.layers.${index}.micron`}
+                    inputMode="decimal"
+                    invalid={Boolean(errors?.[index]?.micron)}
+                    {...register(`items.${itemIndex}.layers.${index}.micron`, {
+                      onChange: (event) => changeMicron(index, event.target.value),
+                    })}
+                  />
+                </Field>
+              </div>
+
+              {/*
+               * The rate, asked for only when the film's own cannot apply.
+               *
+               * `PET 12µm` prices a 12µ PET. Quote 20µ against it and neither
+               * the 12µ nor the 19µ rate is right, so rather than cost the ply
+               * at a price that happens to be on file, the row asks. Used for
+               * this quotation and stored on it; the rates master is not
+               * touched, because a figure keyed while quoting should not
+               * change what every other quotation costs.
+               */}
+              {offStock ? (
+                <div className="col-span-1 sm:col-span-3">
                   <Field
-                    label="Thickness"
-                    htmlFor={`items.${itemIndex}.layers.${index}.micron`}
-                    error={errors?.[index]?.micron?.message}
+                    label="Rate for this gauge"
+                    htmlFor={`items.${itemIndex}.layers.${index}.rateOverride`}
+                    error={errors?.[index]?.rateOverride?.message}
                   >
                     <Input
-                      id={`items.${itemIndex}.layers.${index}.micron`}
+                      id={`items.${itemIndex}.layers.${index}.rateOverride`}
                       inputMode="decimal"
-                      invalid={Boolean(errors?.[index]?.micron)}
-                      {...register(`items.${itemIndex}.layers.${index}.micron`)}
+                      placeholder="Rs. / kg"
+                      invalid={Boolean(errors?.[index]?.rateOverride)}
+                      {...register(`items.${itemIndex}.layers.${index}.rateOverride`)}
                     />
                   </Field>
                 </div>
@@ -202,30 +312,29 @@ export function LayerFields({
               <div
                 className={cn(
                   'text-ink-500 pb-2.5 text-xs',
-                  needsMicron ? 'col-span-1 sm:col-span-5' : 'col-span-2 sm:col-span-7',
+                  offStock ? 'col-span-2 sm:col-span-3' : 'col-span-1 sm:col-span-6',
                 )}
               >
-                {film ? (
-                  film.currentRate === null ? (
-                    <span className="text-warning-600">No rate on record</span>
-                  ) : (
-                    <span className="text-ink-800 font-medium tabular-nums">
-                      {formatRs(film.currentRate, 2)}
-                      <span className="text-ink-400 font-normal"> / kg</span>
-                    </span>
-                  )
-                ) : null}
+                {!film ? null : offStock ? (
+                  /*
+                   * Which rate is on file and why it is not being used. Saying
+                   * only "enter a rate" leaves the office wondering whether the
+                   * film is unpriced; naming the stocked gauge makes it obvious
+                   * that a 20 was typed where the list holds a 12.
+                   */
+                  <span className="text-warning-700">
+                    {film.name} is priced at {stocked}µ
+                    {film.currentRate === null ? '' : ` — ${formatRs(film.currentRate, 2)}/kg`}
+                  </span>
+                ) : film.currentRate === null ? (
+                  <span className="text-warning-600">No rate on record</span>
+                ) : (
+                  <span className="text-ink-800 font-medium tabular-nums">
+                    {formatRs(film.currentRate, 2)}
+                    <span className="text-ink-400 font-normal"> / kg</span>
+                  </span>
+                )}
               </div>
-
-              {/*
-               * A gauge the film cannot state is still a validation error worth
-               * surfacing, and there is no input here to hang it on.
-               */}
-              {!needsMicron && errors?.[index]?.micron?.message ? (
-                <p className="text-danger-600 col-span-2 text-xs sm:col-span-12">
-                  {errors[index]!.micron!.message}
-                </p>
-              ) : null}
             </div>
           );
         })}

@@ -171,3 +171,134 @@ export function micronFromFilmName(name: string): number | null {
   const micron = Number(match[1]);
   return Number.isFinite(micron) && micron > 0 ? micron : null;
 }
+
+/**
+ * A film's name with its gauge taken off — the material as the office names it.
+ *
+ * `PET 12µm` and `PET 19µm` are two rows in the rates master with two prices,
+ * but they are one film to anybody standing at the machine: PET. The gauge is
+ * typed on the line, so offering both in a dropdown asks the same question
+ * twice and invites the two answers to disagree.
+ *
+ * A name that states no gauge comes back unchanged — `PP Woven` is its own
+ * family of one.
+ */
+export function filmFamily(name: string): string {
+  return name
+    .replace(/(\d+(?:\.\d+)?)\s*(?:µm?|mic(?:ron)?s?)/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * The stocked film a family and a gauge name between them.
+ *
+ * An exact gauge match first, because that is a real material with its own
+ * price: choosing PET and typing 19 must find `PET 19µm` and cost the ply at
+ * its rate, not ask for one. Asking would be worse than pointless — the same
+ * film would end up quoted at two different prices on two quotations.
+ *
+ * With no exact match — a 20µ PET, which the works quotes and the master does
+ * not stock — the nearest gauge in the family is returned instead. That is not
+ * a price: `plyRatePerKg` sees the name state a different gauge and refuses to
+ * cost it until the office gives a rate. It is there for the **density**, which
+ * is a property of the polymer rather than of the gauge (every PET in the
+ * master is 1.4, every PE 0.94), and for a name to show on the line.
+ *
+ * Undefined when the family holds nothing at all.
+ */
+export function resolveFilm<T extends { name: string }>(
+  family: string,
+  micron: number,
+  films: readonly T[],
+): T | undefined {
+  const inFamily = films.filter((film) => filmFamily(film.name) === family);
+  if (inFamily.length === 0) return undefined;
+
+  const exact = inFamily.find((film) => micronFromFilmName(film.name) === micron);
+  if (exact) return exact;
+
+  // A family named without a gauge is stocked at whatever thickness is typed.
+  const gaugeless = inFamily.find((film) => micronFromFilmName(film.name) === null);
+  if (gaugeless) return gaugeless;
+
+  if (!Number.isFinite(micron) || micron <= 0) return inFamily[0];
+
+  return inFamily.reduce((nearest, film) => {
+    const a = Math.abs((micronFromFilmName(film.name) ?? 0) - micron);
+    const b = Math.abs((micronFromFilmName(nearest.name) ?? 0) - micron);
+    return a < b ? film : nearest;
+  });
+}
+
+/**
+ * What one ply costs per kilogram, once the gauge and the film are both known.
+ *
+ * Three cases, and the third is the one worth stating:
+ *
+ * - The gauge the film is stocked at: the film's own rate.
+ * - A gauge off the price list, with a rate typed: that rate.
+ * - **A gauge off the price list with no rate: null, which makes the whole line
+ *   uncostable.**
+ *
+ * Falling back to the film's rate in that third case is the failure this exists
+ * to prevent. `PET 12µm` at 20 microns would be costed at the 12µ price and
+ * report a margin of 87.7% — a confident figure, wrong, and contradicted by
+ * nothing on screen. Asking for the rate is only half the job; refusing to
+ * invent one until it arrives is the other half.
+ *
+ * Null is how the engine already says "cannot be costed", so this needs no new
+ * handling downstream: the margin reads as a dash until the rate is given, the
+ * same as for a film with no rate on record.
+ */
+export function plyRatePerKg(ply: {
+  /** Null when no film has been chosen at all. */
+  materialName: string | null;
+  micron: number;
+  /** The chosen film's current rate, or null when it has none on record. */
+  stockRate: number | null;
+  /** What the office typed, when it was asked for. */
+  override: number | null;
+}): number | null {
+  if (ply.override !== null && ply.override > 0) return ply.override;
+  if (ply.materialName === null) return null;
+
+  const stocked = micronFromFilmName(ply.materialName);
+  // A film named without a gauge — PP Woven, priced by GSM — is sold at its
+  // rate whatever thickness is quoted, so there is nothing to disagree with.
+  if (stocked === null) return ply.stockRate;
+
+  // The gauge quoted is not the gauge priced, and nobody has said what it costs.
+  if (ply.micron > 0 && ply.micron !== stocked) return null;
+
+  return ply.stockRate;
+}
+
+/**
+ * The rate on a stored ply, when the office typed it rather than the film supplying it.
+ *
+ * The rates master prices a film at the gauge it is stocked in — `PET 12µm` and
+ * `PET 19µm` are two materials at two prices — so quoting a 20µ PET means
+ * neither rate applies and the office is asked for one. Nothing records that
+ * this happened, and nothing needs to: the ply keeps the film's name, so a name
+ * stating a gauge different from the one quoted **is** the override.
+ *
+ * Null in every ordinary case, which leaves repricing free to pick up the
+ * material's current rate as it always has.
+ *
+ * Shared because the server and the form must agree on it. The server carries
+ * this rate through when repricing from storage, and the form puts it back in
+ * the box when a quotation is reopened; if the two read it differently, a
+ * quotation would show one rate and be repriced at another.
+ */
+export function overriddenRate(layer: {
+  materialName: string;
+  micron: number | string;
+  ratePerKg: number | string | null;
+}): number | null {
+  if (layer.ratePerKg === null) return null;
+  const stocked = micronFromFilmName(layer.materialName);
+  if (stocked === null || stocked === Number(layer.micron)) return null;
+  const rate = Number(layer.ratePerKg);
+  return Number.isFinite(rate) ? rate : null;
+}
