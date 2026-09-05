@@ -392,6 +392,37 @@ refuses even those once deliveries exist — the status follows the receipts by
 then, and relabelling would make the order disagree with a ledger it cannot
 undo.
 
+### Design & Cylinders
+
+| Method | Path                      | Notes                                                        |
+| ------ | ------------------------- | ------------------------------------------------------------ |
+| GET    | `/cylinders`              | Designs with a registered set, and the totals                |
+| GET    | `/cylinders/unregistered` | Designs the job says need a set but have none — the worklist |
+| GET    | `/cylinders/out`          | Every cylinder off the shelf, whatever design it belongs to  |
+| GET    | `/cylinders/:id`          | One design in full. **`:id` is the job id**                  |
+| POST   | `/cylinders`              | Register a set against a design                              |
+| POST   | `/cylinders/events`       | Record what happened to one or more cylinders                |
+| PATCH  | `/cylinders/:id`          | Correct a cylinder — not its status, not its number          |
+
+Query on `GET /cylinders`: `q` (design, customer or cylinder number), `status`,
+`customerId`, `attentionOnly`.
+
+`:id` is a **job** id on the design endpoints and a **cylinder** id on the PATCH.
+They are different things at the same position, which is worth knowing before
+wiring a client: a design is a job, and the cylinders hang off it.
+
+`PATCH /cylinders/:id` refuses two fields. **Status** follows the events, and
+typing it separately is what lets a cylinder claim to be in store while the
+history says it went out. **The number** is painted on the cylinder, and changing
+it here would leave the two disagreeing.
+
+Only jobs with cylinders registered appear in `GET /cylinders`. 382 record a
+cylinder _count_, and a count is not a set — `/cylinders/unregistered` is where
+those live, largest first, because the biggest sets cost most to lose.
+
+Totals are counted over every cylinder rather than over the rows returned, so a
+filter cannot move the damaged figure.
+
 ### Settings
 
 | Method | Path        | Notes                                 |
