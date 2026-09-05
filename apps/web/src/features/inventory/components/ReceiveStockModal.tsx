@@ -9,7 +9,7 @@ import {
 } from '@yuva/shared';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Field, Input, Select } from '@/components/ui/Field';
+import { Field, Input, Select, NumberInput } from '@/components/ui/Field';
 import { Combobox } from '@/components/ui/Combobox';
 import { useMaterials } from '@/features/rates/api/rate-api';
 import { ApiClientError } from '@/lib/api-client';
@@ -254,9 +254,8 @@ export function ReceiveStockModal({
                   : `As it appears on the note`
               }
             >
-              <Input
+              <NumberInput
                 id="quantity"
-                inputMode="decimal"
                 value={quantity}
                 onChange={(event) => setQuantity(event.target.value)}
               />
@@ -284,9 +283,8 @@ export function ReceiveStockModal({
             htmlFor="ratePerUnit"
             hint="Optional — today's rate is used if blank"
           >
-            <Input
+            <NumberInput
               id="ratePerUnit"
-              inputMode="decimal"
               value={rate}
               onChange={(event) => setRate(event.target.value)}
               placeholder="Rs."

@@ -10,7 +10,7 @@ import {
 } from '@yuva/shared';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Field, Input, Select } from '@/components/ui/Field';
+import { Field, Input, Select, NumberInput } from '@/components/ui/Field';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 import { useAdjustStock, useIssueStock, useTransferStock } from '../api/inventory-api';
@@ -250,9 +250,8 @@ export function StockActionModal({
                   : undefined
               }
             >
-              <Input
+              <NumberInput
                 id="quantity"
-                inputMode="decimal"
                 value={quantity}
                 onChange={(event) => setQuantity(event.target.value)}
               />
@@ -269,9 +268,8 @@ export function StockActionModal({
         ) : (
           <>
             <Field label="Quantity" htmlFor="quantity">
-              <Input
+              <NumberInput
                 id="quantity"
-                inputMode="decimal"
                 value={quantity}
                 onChange={(event) => setQuantity(event.target.value)}
               />

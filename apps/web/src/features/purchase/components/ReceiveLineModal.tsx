@@ -7,7 +7,7 @@ import {
 } from '@yuva/shared';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Field, Input } from '@/components/ui/Field';
+import { Field, Input, NumberInput } from '@/components/ui/Field';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 import { useReceivePurchaseLine } from '../api/purchase-api';
@@ -137,9 +137,8 @@ export function ReceiveLineModal({
                 : 'Goes into stock'
             }
           >
-            <Input
+            <NumberInput
               id="acceptedQuantity"
-              inputMode="decimal"
               value={accepted}
               onChange={(event) => setAccepted(event.target.value)}
             />
@@ -153,9 +152,8 @@ export function ReceiveLineModal({
             htmlFor="rejectedQuantity"
             hint="Faulty or short — never enters stock"
           >
-            <Input
+            <NumberInput
               id="rejectedQuantity"
-              inputMode="decimal"
               value={rejected}
               onChange={(event) => setRejected(event.target.value)}
               placeholder="0"

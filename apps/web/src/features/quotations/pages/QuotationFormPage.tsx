@@ -43,7 +43,15 @@ import {
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { Field, FieldSection, Input, ReadOnlyValue, Select, Textarea } from '@/components/ui/Field';
+import {
+  Field,
+  FieldSection,
+  Input,
+  ReadOnlyValue,
+  Select,
+  NumberInput,
+  Textarea,
+} from '@/components/ui/Field';
 import { Combobox } from '@/components/ui/Combobox';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
@@ -1412,9 +1420,8 @@ function JobCard({
             hint="mm"
             error={errors?.widthMm?.message}
           >
-            <Input
+            <NumberInput
               id={`items.${index}.widthMm`}
-              inputMode="decimal"
               invalid={Boolean(errors?.widthMm)}
               {...register(`items.${index}.widthMm`)}
             />
@@ -1427,9 +1434,8 @@ function JobCard({
             hint="mm"
             error={errors?.heightMm?.message}
           >
-            <Input
+            <NumberInput
               id={`items.${index}.heightMm`}
-              inputMode="decimal"
               invalid={Boolean(errors?.heightMm)}
               {...register(`items.${index}.heightMm`)}
             />
@@ -1584,9 +1590,8 @@ function JobCard({
                         htmlFor={`items.${index}.${field}`}
                         error={errors?.[field]?.message}
                       >
-                        <Input
+                        <NumberInput
                           id={`items.${index}.${field}`}
-                          inputMode="decimal"
                           invalid={Boolean(errors?.[field])}
                           {...register(`items.${index}.${field}`)}
                         />
@@ -1695,9 +1700,8 @@ function JobCard({
                    * for it and the column the jobs table has always used.
                    */}
                   <Field label="Ups across" htmlFor={`items.${index}.repeatWidth`}>
-                    <Input
+                    <NumberInput
                       id={`items.${index}.repeatWidth`}
-                      inputMode="decimal"
                       {...register(`items.${index}.repeatWidth`, {
                         onChange: () => setRepeatsTaken(true),
                       })}
@@ -1706,9 +1710,8 @@ function JobCard({
                 </div>
                 <div className="sm:col-span-3">
                   <Field label="Repeats around" htmlFor={`items.${index}.repeatHeight`}>
-                    <Input
+                    <NumberInput
                       id={`items.${index}.repeatHeight`}
-                      inputMode="decimal"
                       {...register(`items.${index}.repeatHeight`, {
                         onChange: () => setRepeatsTaken(true),
                       })}
@@ -1717,18 +1720,16 @@ function JobCard({
                 </div>
                 <div className="sm:col-span-3">
                   <Field label="Cylinders" htmlFor={`items.${index}.cylinderCount`}>
-                    <Input
+                    <NumberInput
                       id={`items.${index}.cylinderCount`}
-                      inputMode="numeric"
                       {...register(`items.${index}.cylinderCount`)}
                     />
                   </Field>
                 </div>
                 <div className="sm:col-span-3">
                   <Field label="Transport" htmlFor={`items.${index}.transportCost`} hint="Optional">
-                    <Input
+                    <NumberInput
                       id={`items.${index}.transportCost`}
-                      inputMode="decimal"
                       {...register(`items.${index}.transportCost`)}
                     />
                   </Field>

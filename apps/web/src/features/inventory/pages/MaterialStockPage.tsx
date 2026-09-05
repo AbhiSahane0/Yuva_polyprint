@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { Field, Input } from '@/components/ui/Field';
+import { Field, NumberInput } from '@/components/ui/Field';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { useMaterialStock, useSetReorderLevel } from '../api/inventory-api';
@@ -205,9 +205,8 @@ export default function MaterialStockPage() {
       <section className="border-ink-200 mt-4 rounded-[var(--radius-lg)] border bg-white p-4 shadow-[var(--shadow-card)]">
         <div className="flex items-end gap-3">
           <Field label="Reorder level" htmlFor="reorderLevel">
-            <Input
+            <NumberInput
               id="reorderLevel"
-              inputMode="decimal"
               value={level}
               onChange={(event) => setLevelDraft(event.target.value)}
               placeholder="None set"

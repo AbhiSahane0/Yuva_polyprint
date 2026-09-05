@@ -1219,6 +1219,7 @@ documented in [the API README](../api/README.md#calculations).
 | `Button`              | primary / secondary / ghost / danger, with a loading state                                                                                                        |
 | `Field`               | Label, hint and error in one consistent block                                                                                                                     |
 | `Input`, `Textarea`   | 44px tall, 15px text                                                                                                                                              |
+| `NumberInput`         | Digits only, and a lone `0` is replaced rather than prefixed — see below                                                                                          |
 | `Select`              | Native select with a **drawn chevron** — `appearance: none` removes the browser's arrow, and without one of ours the control is indistinguishable from a text box |
 | `Combobox`            | Suggestions you can pick **or type past**. Replaces `<datalist>`, whose arrow and popup the browser draws and cannot be styled                                    |
 | `Modal`               | Escape closes, background scroll locks, focus moves inside and Tab is trapped, backdrop click closes                                                              |
@@ -1253,6 +1254,30 @@ The animation slows rather than stops under `prefers-reduced-motion`: a spinner
 frozen mid-rotation reads as a broken image.
 
 ---
+
+### Numbers are typed into `NumberInput`, never a plain box
+
+Two problems the office hits daily, and neither is solved by `type="number"`.
+
+**A stray letter must not erase the figure.** `type="number"` reports an empty
+string for anything it cannot parse, so `12abc` arrives as `""` and what was
+typed is gone. It also brings spinner arrows that nudge a quantity when the page
+is scrolled with the cursor over the box. So the type stays `text` with a
+numeric keypad, and a keystroke that would not make a number is **refused rather
+than stripped** — nothing happening reads as "that key does not belong here",
+where a character vanishing as it is typed reads as a broken keyboard.
+
+**A default of `0` must not become a prefix.** A field showing `0` is one
+somebody types into, and typing 210 leaves `0210` — a different number that
+looks like a fault. The contents are selected on focus, so the first keystroke
+replaces a lone zero. A real figure is selected too, which is what everybody
+expects of a form field they have tabbed into.
+
+Rows of fields are **top-aligned, not bottom-aligned.** With `items-end` a hint
+under one field makes that column taller and floats its input above the rest of
+the row — which is exactly what happened to Rate on the purchase order form.
+Every label in these rows is one line, so aligning the tops aligns the inputs; a
+trailing icon button gets a label-height spacer so it lands level with them.
 
 ## Conventions
 

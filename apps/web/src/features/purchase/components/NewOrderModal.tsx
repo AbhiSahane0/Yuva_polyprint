@@ -3,7 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { createPurchaseOrderSchema, formatRs, purchaseUnitsFor, unitLabel } from '@yuva/shared';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Field, Input, Select } from '@/components/ui/Field';
+import { Field, Input, NumberInput, Select } from '@/components/ui/Field';
 import { useMaterials } from '@/features/rates/api/rate-api';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
@@ -177,7 +177,15 @@ export function NewOrderModal({ open, onClose }: { open: boolean; onClose: () =>
             const lineTotal = (Number(line.quantity) || 0) * (Number(line.ratePerUnit) || 0);
 
             return (
-              <div key={index} className="grid grid-cols-12 items-end gap-2">
+              /*
+               * Top-aligned, not bottom-aligned.
+               *
+               * With `items-end` the cells align by their bottoms, and the line
+               * total under Rate made that column taller — so its input and
+               * label floated above the rest of the row. Every label here is one
+               * line, so aligning the tops aligns the inputs.
+               */
+              <div key={index} className="grid grid-cols-12 items-start gap-2">
                 <div className="col-span-12 sm:col-span-4">
                   <Field label={`Material ${index + 1}`} htmlFor={`line-${index}-material`}>
                     <Select
@@ -196,9 +204,8 @@ export function NewOrderModal({ open, onClose }: { open: boolean; onClose: () =>
                 </div>
                 <div className="col-span-4 sm:col-span-2">
                   <Field label="Quantity" htmlFor={`line-${index}-qty`}>
-                    <Input
+                    <NumberInput
                       id={`line-${index}-qty`}
-                      inputMode="decimal"
                       value={line.quantity}
                       onChange={(event) => setLine(index, { quantity: event.target.value })}
                     />
@@ -226,21 +233,27 @@ export function NewOrderModal({ open, onClose }: { open: boolean; onClose: () =>
                     htmlFor={`line-${index}-rate`}
                     hint={lineTotal > 0 ? formatRs(lineTotal) : undefined}
                   >
-                    <Input
+                    <NumberInput
                       id={`line-${index}-rate`}
-                      inputMode="decimal"
                       value={line.ratePerUnit}
                       onChange={(event) => setLine(index, { ratePerUnit: event.target.value })}
                     />
                   </Field>
                 </div>
-                <div className="col-span-1 pb-2.5">
+                <div className="col-span-1">
+                  {/*
+                   * A spacer the height of a label, so the button lands level
+                   * with the inputs rather than with the labels above them.
+                   */}
+                  <span aria-hidden className="block text-sm font-medium">
+                    &nbsp;
+                  </span>
                   {lines.length > 1 ? (
                     <button
                       type="button"
                       onClick={() => setLines((current) => current.filter((_, i) => i !== index))}
                       aria-label={`Remove line ${index + 1}`}
-                      className="text-ink-400 hover:text-danger-600 cursor-pointer p-1"
+                      className="text-ink-400 hover:text-danger-600 mt-1.5 cursor-pointer p-2.5"
                     >
                       <Trash2 className="size-4" />
                     </button>

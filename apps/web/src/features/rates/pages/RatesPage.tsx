@@ -7,7 +7,7 @@ import {
   type MaterialCategory,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
-import { Field, Input } from '@/components/ui/Field';
+import { Field, Input, NumberInput } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -185,8 +185,7 @@ export default function RatesPage() {
                           {base === null ? '—' : formatNumber(base, 2)}
                         </td>
                         <td className="px-4 py-2.5">
-                          <Input
-                            inputMode="decimal"
+                          <NumberInput
                             aria-label={`New rate for ${material.name}`}
                             placeholder={base === null ? '0.00' : formatNumber(base, 2)}
                             value={draft}
