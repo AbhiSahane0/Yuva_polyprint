@@ -6,6 +6,12 @@ import {
   createQuotationSchema,
   createUserSchema,
   listCustomersQuerySchema,
+  adjustStockSchema,
+  issueStockSchema,
+  listStockQuerySchema,
+  receiveStockSchema,
+  setReorderLevelSchema,
+  transferStockSchema,
   listQuotationsQuerySchema,
   loginSchema,
   recordOutcomeSchema,
@@ -197,6 +203,13 @@ export function buildOpenApiDocument(serverUrl: string) {
       { name: 'Jobs', description: 'One design at a time.' },
       { name: 'Quotations', description: 'Quoting, pricing, sending, and the outcome.' },
       { name: 'Materials', description: 'Films, inks and adhesives, and the day’s rates.' },
+      {
+        name: 'Inventory',
+        description:
+          'What the works holds. A ledger: every change is a movement, and what is on hand ' +
+          'is the sum of them. Movements are never edited or deleted — a mistake is corrected ' +
+          'by an adjustment that says so.',
+      },
       { name: 'GSTIN', description: 'Verifying a customer’s GST registration.' },
       { name: 'Settings', description: 'The rates and percentages costing depends on.' },
       { name: 'Users', description: 'Accounts and module access. Administrators only.' },
@@ -333,6 +346,95 @@ export function buildOpenApiDocument(serverUrl: string) {
         },
       },
 
+      '/api/inventory': {
+        get: {
+          tags: ['Inventory'],
+          summary: 'Stock, by material',
+          description:
+            'Every active material, including ones with no stock — a material missing from ' +
+            'the list because it is empty is exactly the one that needs ordering. Totals are ' +
+            'over everything the filters matched, not over one page.',
+          parameters: query(listStockQuerySchema),
+          responses: { 200: ok('Materials with their stock, and the totals.'), ...AUTH_FAILURES },
+        },
+      },
+      '/api/inventory/reconcile': {
+        get: {
+          tags: ['Inventory'],
+          summary: 'Prove the cached quantities agree with the ledger',
+          description:
+            'Administrators only. Recomputes every batch from its own movements and reports ' +
+            'what does not match. Answers “the system says 2,450 and the shelf says 2,410” ' +
+            'with something other than “trust it”.',
+          responses: { 200: ok('`{ balanced, mismatches }`.'), ...AUTH_FAILURES },
+        },
+      },
+      '/api/inventory/{id}': {
+        get: {
+          tags: ['Inventory'],
+          summary: 'One material’s stock in full',
+          description: 'Its batches, oldest first, and the last 200 movements, newest first.',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('Summary, batches and history.'), ...COMMON },
+        },
+      },
+      '/api/inventory/receive': {
+        post: {
+          tags: ['Inventory'],
+          summary: 'Record a delivery',
+          description:
+            'The only action that opens a batch. The batch code must be new for this ' +
+            'material — two deliveries sharing one would be indistinguishable on a count.',
+          requestBody: body(receiveStockSchema),
+          responses: { 201: ok('The batch that was opened.'), ...COMMON },
+        },
+      },
+      '/api/inventory/issue': {
+        post: {
+          tags: ['Inventory'],
+          summary: 'Issue material, or record waste',
+          description:
+            'Refused when the batch holds less than is being issued: negative stock is ' +
+            'always wrong, and allowing it hides whichever earlier movement was mistaken. ' +
+            'Waste is a separate kind because it answers a different question from ' +
+            'consumption.',
+          requestBody: body(issueStockSchema),
+          responses: { 201: ok('The movement that was recorded.'), ...COMMON },
+        },
+      },
+      '/api/inventory/adjust': {
+        post: {
+          tags: ['Inventory'],
+          summary: 'Record a cycle count',
+          description:
+            'Takes what was counted, not the difference — the server works out the ' +
+            'correction, which is the arithmetic a count exists to check. A count that ' +
+            'agrees with the books is still recorded, as evidence the shelf was checked.',
+          requestBody: body(adjustStockSchema),
+          responses: { 201: ok('The correction that was recorded.'), ...COMMON },
+        },
+      },
+      '/api/inventory/transfer': {
+        post: {
+          tags: ['Inventory'],
+          summary: 'Move a batch to another location',
+          description: 'Changes where stock is, never how much. Recorded with quantity zero.',
+          requestBody: body(transferStockSchema),
+          responses: { 201: ok('The movement that was recorded.'), ...COMMON },
+        },
+      },
+      '/api/inventory/{id}/reorder-level': {
+        patch: {
+          tags: ['Inventory'],
+          summary: 'Set the level below which stock reads as low',
+          description:
+            'Null clears it. Cleared is not the same as zero: a material with no level never ' +
+            'raises an alarm, where a level of zero means “shout only when we have run out”.',
+          parameters: [ID_PARAM],
+          requestBody: body(setReorderLevelSchema),
+          responses: { 200: ok('The material’s stock summary.'), ...COMMON },
+        },
+      },
       '/api/quotations': {
         get: {
           tags: ['Quotations'],

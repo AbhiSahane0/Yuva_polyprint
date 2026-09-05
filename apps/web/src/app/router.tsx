@@ -16,6 +16,8 @@ const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'));
 const CustomersPage = lazy(() => import('@/features/customers/pages/CustomersPage'));
 const QuotationsPage = lazy(() => import('@/features/quotations/pages/QuotationsPage'));
 const RatesPage = lazy(() => import('@/features/rates/pages/RatesPage'));
+const InventoryPage = lazy(() => import('@/features/inventory/pages/InventoryPage'));
+const MaterialStockPage = lazy(() => import('@/features/inventory/pages/MaterialStockPage'));
 const QuotationFormPage = lazy(() => import('@/features/quotations/pages/QuotationFormPage'));
 const UsersPage = lazy(() => import('@/features/users/pages/UsersPage'));
 const MonitorPage = lazy(() => import('@/features/monitor/pages/MonitorPage'));
@@ -122,6 +124,22 @@ function AppRoutes() {
             element={
               <RequireModule module="rates">
                 <RatesPage />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="/inventory"
+            element={
+              <RequireModule module="inventory">
+                <InventoryPage />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="/inventory/:id"
+            element={
+              <RequireModule module="inventory">
+                <MaterialStockPage />
               </RequireModule>
             }
           />

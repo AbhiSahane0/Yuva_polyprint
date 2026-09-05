@@ -2,6 +2,7 @@ import { Router } from 'express';
 import authRoutes from '../modules/auth/auth.routes.js';
 import customerRoutes from '../modules/customers/customer.routes.js';
 import gstinRoutes from '../modules/gstin/gstin.routes.js';
+import inventoryRoutes from '../modules/inventory/inventory.routes.js';
 import jobRoutes from '../modules/jobs/job.routes.js';
 import materialRoutes from '../modules/materials/material.routes.js';
 import monitorRoutes from '../modules/monitor/monitor.routes.js';
@@ -44,6 +45,15 @@ router.use('/jobs', authenticate, requireModule('customers'), jobRoutes);
  * enforced in the module's own routes, where the write endpoint is.
  */
 router.use('/materials', authenticate, materialRoutes);
+
+/*
+ * Stock, readable by anyone signed in for the same reason rates are: the
+ * quotation screens need to know what is on hand, and gating the read would
+ * break pricing for a user who has quotations but not inventory. Every write —
+ * receive, issue, adjust, transfer — needs the inventory module, and each of
+ * those endpoints applies that guard in the module's own routes.
+ */
+router.use('/inventory', authenticate, inventoryRoutes);
 
 router.use('/settings', authenticate, settingsRoutes);
 

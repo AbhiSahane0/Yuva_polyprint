@@ -195,6 +195,9 @@ model Job {
   /// 1-based row number in the source CSV, so any imported row can be traced
   /// back to the exact line it came from.
   quotationItems QuotationItem[]
+  /// Material issued against this design. Nullable on that side, so retiring a
+  /// job leaves the stock ledger readable.
+  stockMovements StockMovement[]
 
   sourceRow Int @map("source_row")
 
@@ -539,6 +542,13 @@ model Material {
    */
   density Decimal? @db.Decimal(6, 4)
 
+  /**
+   * Stock at or below this reads as low. Null means nobody has set one, which
+   * is not the same as zero — a material with no level never raises an alarm,
+   * where a level of 0 would mean "only shout when we have run out".
+   */
+  reorderLevel Decimal? @map("reorder_level") @db.Decimal(14, 3)
+
   /// Retired materials stay for the sake of old quotations but leave the form.
   isActive  Boolean @default(true) @map("is_active")
   sortOrder Int     @default(0) @map("sort_order")
@@ -547,6 +557,8 @@ model Material {
   /// Plies quoted against this material. The link is nullable on that side, so
   /// retiring a material leaves old quotations readable.
   quotationItemLayers QuotationItemLayer[]
+  stockBatches        StockBatch[]
+  stockMovements      StockMovement[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -711,7 +723,9 @@ model QuotationEmail {
   /// provider, so a record with numbers and no timestamp reads as pending
   /// rather than as delivered. That distinction is the whole reason these are
   /// two columns and not one.
-  whatsappTo     String[]  @map("whatsapp_to")
+  /// Defaulted so the column could be added ahead of the code that writes it —
+  /// the build running at the time inserted rows without it.
+  whatsappTo     String[]  @default([]) @map("whatsapp_to")
   whatsappSentAt DateTime? @map("whatsapp_sent_at")
 
   /// Resend's id for the message, for chasing a delivery with their dashboard.
@@ -725,4 +739,145 @@ model QuotationEmail {
 
   @@index([quotationId, createdAt])
   @@map("quotation_emails")
+}
+
+
+/// Where a batch sits, and what a movement did.
+///
+/// A ledger rather than a stock figure that gets edited: every change to a
+/// quantity is a row, and the quantity itself is the sum of them. That is what
+/// makes "we are 40 kg short of what the system says" a question with an
+/// answer, and it is why movements are never edited or deleted — a mistake is
+/// corrected by an ADJUSTMENT that says so, leaving both the error and the
+/// correction on the record.
+enum StockMovementKind {
+  /// Material arrived. The only kind that creates a batch.
+  RECEIPT
+  /// Taken to the floor for a job.
+  ISSUE
+  /// Scrapped. Separate from ISSUE because the two answer different questions:
+  /// one is what a job consumed, the other is what the works lost.
+  WASTE
+  /// A cycle count correcting the books to what is physically there.
+  ADJUSTMENT
+  /// Moved between locations. Changes where stock is, never how much.
+  TRANSFER
+}
+
+/// One delivery of one material, as it sits in the works.
+///
+/// Batch rather than roll: how much PET is there, what is it worth, and is it
+/// running out are the questions the office actually asks, and they are
+/// answered per batch. Roll numbers become worth keying in when a production
+/// module exists to consume them — until then they would be typing with no
+/// reader.
+model StockBatch {
+  id String @id @default(cuid())
+
+  materialId String   @map("material_id")
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Restrict)
+
+  /// The supplier's batch or lot number, or one the office invents. Unique per
+  /// material so two deliveries cannot be confused, but repeatable across
+  /// materials because suppliers number their own lots.
+  batchCode String @map("batch_code")
+
+  /// Free text — 'Warehouse A', 'A-01'. Not a managed list: the works has one
+  /// building, and a location table nobody maintains is worse than a field
+  /// somebody types.
+  location String @default("NA")
+
+  receivedOn DateTime @map("received_on") @db.Date
+
+  /// What arrived. Kept alongside `quantity` so a batch can still say how much
+  /// of it has gone.
+  initialQuantity Decimal @map("initial_quantity") @db.Decimal(14, 3)
+
+  /**
+   * What is left, in the material's own unit.
+   *
+   * Cached from the ledger and written in the same transaction as every
+   * movement, so the two cannot drift. Kept rather than summed on read because
+   * every screen wants it and a sum per batch per page is a lot of arithmetic
+   * for a number that changes a few times a day.
+   */
+  quantity Decimal @db.Decimal(14, 3)
+
+  /**
+   * Rupees per unit actually paid for this delivery.
+   *
+   * Null when nobody recorded it, in which case the material's current rate
+   * stands in for valuation. Stored per batch because that is what the stock is
+   * worth — today's rate values what it would cost to replace, which is a
+   * different question and not the one a stock sheet answers.
+   */
+  ratePerUnit Decimal? @map("rate_per_unit") @db.Decimal(12, 4)
+
+  /// Supplier, invoice or delivery note. Free text.
+  reference String @default("")
+  notes     String @default("")
+
+  movements StockMovement[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([materialId, batchCode])
+  @@index([materialId, receivedOn])
+  @@map("stock_batches")
+}
+
+/// One change to a batch's quantity, or to where it sits.
+///
+/// Immutable. Nothing edits or deletes one of these — the running balance on
+/// every later row would be wrong, and a stock ledger that can be rewritten
+/// answers nothing. Corrections are ADJUSTMENT rows.
+model StockMovement {
+  id String @id @default(cuid())
+
+  batchId String     @map("batch_id")
+  batch   StockBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  /// Denormalised from the batch, which never changes material. Lets the whole
+  /// of one material's history be read without a join, and lets consumption be
+  /// totalled per material without walking every batch.
+  materialId String   @map("material_id")
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Restrict)
+
+  kind StockMovementKind
+
+  /**
+   * Signed, in the material's unit: positive added, negative taken away.
+   *
+   * Zero on a TRANSFER, which moves stock without changing how much there is.
+   */
+  quantity Decimal @db.Decimal(14, 3)
+
+  /// The material's total across every batch, immediately after this movement.
+  /// Stored so the history reads without a window function, and so a balance
+  /// printed last month still says what the books said last month.
+  balanceAfter Decimal @map("balance_after") @db.Decimal(14, 3)
+
+  /// What it was issued for. Only meaningful on an ISSUE or WASTE, and nullable
+  /// so retiring a job leaves the movement readable.
+  jobId String? @map("job_id")
+  job   Job?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  /// Where it went and came from. Only set on a TRANSFER.
+  fromLocation String @default("") @map("from_location")
+  toLocation   String @default("") @map("to_location")
+
+  /// Delivery note, PO number, cycle-count sheet — whatever names this event.
+  reference String @default("")
+  notes     String @default("")
+
+  /// Display name of whoever recorded it, matching `entered_by` on rates.
+  enteredBy String @map("entered_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([materialId, createdAt])
+  @@index([batchId, createdAt])
+  @@index([jobId])
+  @@map("stock_movements")
 }

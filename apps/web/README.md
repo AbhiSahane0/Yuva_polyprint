@@ -866,6 +866,94 @@ Nothing is repriced when a revision is created. It copies plies, quantities,
 tiers and totals verbatim, because pressing the button should not silently move
 a figure the customer has already been quoted; it reprices on the first save.
 
+### Inventory — `/inventory`
+
+What the works holds, what it is worth, and what is running out.
+
+Four figures across the top: materials in stock, **need reordering**, **no level
+set**, and stock value. The middle two are why anybody opens this screen twice,
+and they are counted separately on purpose — a material nobody has set a level
+for is not known to be fine, it is simply not being watched. "Need reordering"
+is clickable and filters the list to it; nothing else is, because a figure that
+looks clickable and does nothing is worse than one that plainly does not.
+
+**Every active material appears, including ones with no stock at all.** A
+material missing from the screen because it happens to be empty is exactly the
+one somebody needs to order.
+
+Filter by category — Films, Ink, Adhesive, Solvents, Consumables — and search by
+name. Totals are over everything the filters matched rather than over a page: an
+inventory value that changes when you click a category filter is not a total
+anybody can use.
+
+#### One material — `/inventory/:id`
+
+Stock, the batches it is spread over, and every movement against it.
+
+**Batch level, not roll level.** How much PET is there, what is it worth, and is
+it running out are the questions the office asks, and all three are answered per
+batch. Individual roll numbers become worth keying in when there is a production
+module to consume them; until then they would be typing with no reader.
+
+Batches are listed **oldest first**, which is the order they should be used in,
+and an emptied batch stays on the list greyed out — it is what its movements
+refer to, and removing it would take the history with it.
+
+#### The four things you can do
+
+|                       | Asks for                             | Notes                                  |
+| --------------------- | ------------------------------------ | -------------------------------------- |
+| **Receive**           | Batch, quantity, rate paid, location | The only action that opens a batch     |
+| **Issue** / **Waste** | Batch, quantity, which job           | Two kinds, counted separately          |
+| **Count**             | What was counted                     | Not the difference — see below         |
+| **Transfer**          | Where it is going                    | Changes where stock is, never how much |
+
+**Issue and Waste are separate kinds** because they answer different questions:
+one is what a job consumed, the other is what the works lost. Folding them
+together overstates consumption and hides the losses.
+
+**A count asks what was on the shelf, not the correction.** The office counts
+and types the figure; the server works out the difference and its sign. Asking
+for the difference means doing that subtraction by hand — which is exactly the
+arithmetic a cycle count exists to check. A count that agrees with the books is
+still recorded, because it is evidence the shelf was checked, and it shows in
+the history as "no change" rather than as a zero.
+
+**An issue larger than the batch holds is refused**, and the message says what
+is actually on hand — the usual cause is issuing from the wrong batch. Negative
+stock is always wrong, and allowing it hides whichever earlier movement was
+mistaken.
+
+#### Stock movement history
+
+Every change, newest first, with the material's running balance beside it. A
+transfer shows the two locations instead of a quantity, because zero in a
+quantity column reads as "nothing moved" when the truth is "stock moved, the
+amount did not".
+
+**Nothing edits or deletes a movement.** The balance stored on every later row
+would be wrong, and a stock ledger that can be rewritten answers nothing — a
+mistake is corrected by an adjustment, which leaves both the error and the
+correction on the record.
+
+#### Value at cost, not at today's rate
+
+Stock is valued at **what was paid** for each batch, falling back to the
+material's current rate only where a batch never recorded one. Today's rate
+answers what it would cost to _replace_ the stock, which is a different question
+— and valuing at it makes the inventory figure jump every morning when the rates
+are keyed in, which reads as stock appearing and disappearing overnight.
+
+#### The reorder level
+
+Set on the material's own page rather than under Rates: it is a stock decision,
+and this is where somebody looking at a nearly-empty shelf actually is.
+
+Blank and zero are different. Blank means nobody is watching; **zero means
+"shout only when we have run out"**, which is a choice somebody made. Stock is
+low **at** the level, not one kilogram below it — at the reorder level is when
+to reorder.
+
 ### Rates — `/rates`
 
 Today's raw material prices, grouped by Films / Ink / Adhesive / Solvents.

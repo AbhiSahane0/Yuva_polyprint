@@ -976,6 +976,39 @@ no effect; they are not in the input schema at all.
 
 ---
 
+## Stock is a ledger
+
+Every change to a quantity is a row in `stock_movements`, and what is on hand is
+the sum of them. `stock_batches.quantity` is a **cache** of that sum, written
+inside the same transaction as the movement that changed it, so the two cannot
+drift.
+
+Three rules hold it together, and all three are enforced rather than documented:
+
+- **One write path.** `record()` is the only function that touches a quantity.
+  It updates the batch and creates the movement together, so there is exactly
+  one place a balance is computed and exactly one place that could get it wrong.
+  A source-level test asserts there is exactly one `increment` in the file.
+- **Nothing rewrites history.** No update, no delete, no upsert on a movement —
+  the balance stored on every later row would become a lie. A mistake is
+  corrected by an `ADJUSTMENT` that leaves both the error and the correction on
+  the record. The same test asserts the absence of those calls, because a delete
+  that is never called cannot be caught by calling the code.
+- **The sign comes from the kind.** `signedQuantity` decides direction from
+  `RECEIPT` / `ISSUE` / `WASTE`, so a caller passing a negative receipt cannot
+  add stock that never arrived. Only `ADJUSTMENT` carries its own sign, derived
+  on the server from the counted figure against the books.
+
+Batches are locked for the length of the transaction — Prisma has no
+`SELECT … FOR UPDATE`, so a no-op write to the row takes the lock — which is
+what stops two people issuing from the same batch and both reading the quantity
+before either has written.
+
+`GET /api/inventory/reconcile` recomputes every batch from its own movements and
+reports what does not match. It exists because "the system says 2,450 and the
+shelf says 2,410" needs an answer that is not "trust it": this says whether the
+discrepancy is in the books or on the floor.
+
 ## Data model
 
 Full diagram and column reference: [`docs/database-schema.md`](../../docs/database-schema.md).
@@ -992,6 +1025,8 @@ Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 | `quotation_tiers`           | One quoted quantity and the document totals at it.                                        |
 | `materials`                 | The rate catalogue, with density for films.                                               |
 | `material_rates`            | One material's price on one date — one row per active material per day.                   |
+| `stock_batches`             | One delivery of one material, and what is left of it. Unique batch code per material.     |
+| `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.         |
 | `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.             |
 | `app_settings`              | Editable rates and costing defaults.                                                      |
 | `users`                     | Accounts, their password hash and which modules each may reach.                           |
