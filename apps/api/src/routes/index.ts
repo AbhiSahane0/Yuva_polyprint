@@ -6,6 +6,7 @@ import inventoryRoutes from '../modules/inventory/inventory.routes.js';
 import jobRoutes from '../modules/jobs/job.routes.js';
 import materialRoutes from '../modules/materials/material.routes.js';
 import monitorRoutes from '../modules/monitor/monitor.routes.js';
+import purchaseRoutes from '../modules/purchase/purchase.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
 import settingsRoutes from '../modules/settings/settings.routes.js';
 import userRoutes from '../modules/users/user.routes.js';
@@ -54,6 +55,15 @@ router.use('/materials', authenticate, materialRoutes);
  * those endpoints applies that guard in the module's own routes.
  */
 router.use('/inventory', authenticate, inventoryRoutes);
+
+/*
+ * Buying. Readable by anyone signed in — knowing what is on order is part of
+ * knowing what the works can commit to. Raising an order needs
+ * requireModule('purchase'); recording a delivery needs inventory as well,
+ * because it creates stock and should not be reachable through a second door by
+ * somebody who may not touch the ledger.
+ */
+router.use('/purchase', authenticate, purchaseRoutes);
 
 router.use('/settings', authenticate, settingsRoutes);
 

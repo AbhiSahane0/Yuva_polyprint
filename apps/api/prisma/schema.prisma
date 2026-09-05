@@ -559,6 +559,7 @@ model Material {
   quotationItemLayers QuotationItemLayer[]
   stockBatches        StockBatch[]
   stockMovements      StockMovement[]
+  purchaseOrderLines  PurchaseOrderLine[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -830,6 +831,9 @@ model StockBatch {
   notes     String @default("")
 
   movements StockMovement[]
+  /// The delivery this batch came from, when it came from an order rather than
+  /// being received by hand.
+  purchaseReceipt PurchaseReceipt?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -892,4 +896,178 @@ model StockMovement {
   @@index([batchId, createdAt])
   @@index([jobId])
   @@map("stock_movements")
+}
+
+
+/// Where a purchase order is in its life.
+///
+/// Three of these are decisions somebody makes — the order was placed, it is on
+/// the road, it was cancelled. Two are **facts about what has arrived**, and are
+/// set by recording a receipt rather than by choosing them: an order nobody has
+/// remembered to mark as received is exactly the order somebody is chasing.
+///
+/// Delay is deliberately absent. It is a fact about today's date against the
+/// expected one, so it is computed rather than stored — a stored flag needs a
+/// nightly job or a human, and is wrong in between.
+enum PurchaseOrderStatus {
+  ORDERED
+  IN_TRANSIT
+  /// Some of the order has arrived. Set by the service, never chosen.
+  PARTIALLY_RECEIVED
+  /// Every line is settled — accepted, rejected, or short-closed.
+  RECEIVED
+  CANCELLED
+}
+
+/// Who the works buys from.
+///
+/// What they supply and what they last charged are **not** stored here. Both
+/// are answered by the orders placed with them, and a second copy would be a
+/// list somebody has to keep up to date and nobody would.
+model Supplier {
+  id String @id @default(cuid())
+
+  name          String  @unique
+  contactPerson String  @default("NA") @map("contact_person")
+  mobile        String  @default("NA")
+  email         String  @default("NA")
+  address       String  @default("NA")
+  /// GSTIN. 'NA' where unknown, matching customers.
+  gstNumber     String  @default("NA") @map("gst_number")
+  notes         String  @default("")
+
+  /// Retired suppliers stay for the sake of old orders but leave the form.
+  isActive Boolean @default(true) @map("is_active")
+
+  purchaseOrders PurchaseOrder[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, name])
+  @@map("suppliers")
+}
+
+/// One order placed with one supplier.
+model PurchaseOrder {
+  id String @id @default(cuid())
+
+  /// Sequential and human-facing, shown as PO-4488. Unique, unlike a quotation
+  /// number — an order is never revised into a second version.
+  number Int @unique
+
+  supplierId String   @map("supplier_id")
+  /// Restricted rather than nullable: an order with no supplier cannot be
+  /// chased, and a supplier with orders against them should be retired, not
+  /// deleted.
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  status PurchaseOrderStatus @default(ORDERED)
+
+  orderedOn DateTime  @map("ordered_on") @db.Date
+  /// When it was promised. Null when the supplier would not say; a line with no
+  /// expected date can never be late, which is honest — nothing was promised.
+  expectedOn DateTime? @map("expected_on") @db.Date
+
+  notes String @default("")
+
+  /// Display name of whoever raised it, matching `entered_by` on rates.
+  raisedBy String @map("raised_by")
+
+  lines    PurchaseOrderLine[]
+  receipts PurchaseReceipt[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status, orderedOn])
+  @@index([supplierId])
+  @@map("purchase_orders")
+}
+
+/// One material on one order.
+model PurchaseOrderLine {
+  id String @id @default(cuid())
+
+  orderId String        @map("order_id")
+  order   PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  position Int
+
+  materialId String   @map("material_id")
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Restrict)
+
+  /// What was ordered, in the unit it was ordered in — film is bought by the
+  /// tonne. Receipts are entered in the same unit and converted to the
+  /// material's stocked unit on the way into inventory.
+  quantity Decimal @db.Decimal(14, 3)
+  unit     String
+
+  /// Rupees per `unit`, as agreed with the supplier.
+  ratePerUnit Decimal @map("rate_per_unit") @db.Decimal(12, 4)
+
+  /**
+   * Closed short, with what happened written down.
+   *
+   * A supplier who sends 380 of 400 and will not send the rest leaves a line
+   * that is neither open nor complete. Without this it stays on the pending
+   * list forever and the office learns to ignore that list.
+   */
+  closedAt     DateTime? @map("closed_at")
+  closedReason String    @default("") @map("closed_reason")
+
+  receipts PurchaseReceipt[]
+
+  @@unique([orderId, position])
+  @@index([materialId])
+  @@map("purchase_order_lines")
+}
+
+/// One delivery against one line, and what became of it.
+///
+/// The join between buying and holding: the accepted quantity opens a stock
+/// batch through the same path a manual receipt uses, so there is one way stock
+/// comes into existence and one ledger recording it. `batchId` is that batch.
+///
+/// Rejected material is recorded and **never reaches stock**. Faulty goods are
+/// not inventory, and counting them would overstate what the works can actually
+/// print with.
+model PurchaseReceipt {
+  id String @id @default(cuid())
+
+  lineId String            @map("line_id")
+  line   PurchaseOrderLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+
+  /// Denormalised from the line, which never changes order. Lets an order's
+  /// deliveries be read without walking its lines.
+  orderId String        @map("order_id")
+  order   PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  receivedOn DateTime @map("received_on") @db.Date
+
+  /// In the line's own unit, both of them.
+  acceptedQuantity Decimal @map("accepted_quantity") @db.Decimal(14, 3)
+  rejectedQuantity Decimal @default(0) @map("rejected_quantity") @db.Decimal(14, 3)
+  /// Required whenever anything was rejected — a rejection nobody explained is
+  /// one nobody can take up with the supplier.
+  rejectionReason  String  @default("") @map("rejection_reason")
+
+  /**
+   * The stock this delivery became.
+   *
+   * Null when everything was rejected, which is the one case a delivery creates
+   * no stock. Nullable rather than absent so the receipt still records that a
+   * lorry came and what was wrong with it.
+   */
+  batchId String?     @unique @map("batch_id")
+  batch   StockBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  notes     String @default("")
+  enteredBy String @map("entered_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([orderId, receivedOn])
+  @@index([lineId])
+  @@map("purchase_receipts")
 }

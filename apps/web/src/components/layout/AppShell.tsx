@@ -9,6 +9,7 @@ import {
   Menu,
   ShieldCheck,
   Package,
+  Truck,
   Users,
   X,
 } from 'lucide-react';
@@ -42,6 +43,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     group: 'Materials',
     items: [
       { to: '/inventory', label: 'Inventory', icon: Package, module: 'inventory' },
+      { to: '/purchase', label: 'Purchase', icon: Truck, module: 'purchase' },
       { to: '/rates', label: 'Rates', icon: IndianRupee, module: 'rates' },
     ],
   },

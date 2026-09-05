@@ -18,6 +18,8 @@ const QuotationsPage = lazy(() => import('@/features/quotations/pages/Quotations
 const RatesPage = lazy(() => import('@/features/rates/pages/RatesPage'));
 const InventoryPage = lazy(() => import('@/features/inventory/pages/InventoryPage'));
 const MaterialStockPage = lazy(() => import('@/features/inventory/pages/MaterialStockPage'));
+const PurchasePage = lazy(() => import('@/features/purchase/pages/PurchasePage'));
+const PurchaseOrderPage = lazy(() => import('@/features/purchase/pages/PurchaseOrderPage'));
 const QuotationFormPage = lazy(() => import('@/features/quotations/pages/QuotationFormPage'));
 const UsersPage = lazy(() => import('@/features/users/pages/UsersPage'));
 const MonitorPage = lazy(() => import('@/features/monitor/pages/MonitorPage'));
@@ -140,6 +142,22 @@ function AppRoutes() {
             element={
               <RequireModule module="inventory">
                 <MaterialStockPage />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="/purchase"
+            element={
+              <RequireModule module="purchase">
+                <PurchasePage />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="/purchase/:id"
+            element={
+              <RequireModule module="purchase">
+                <PurchaseOrderPage />
               </RequireModule>
             }
           />

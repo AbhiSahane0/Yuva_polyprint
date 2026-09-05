@@ -1003,6 +1003,83 @@ statement that the works intends to hold it. Everything else reads as **not
 stocked** and is counted in neither figure. Running out is an event; never
 having stocked something is not.
 
+### Purchase & Suppliers — `/purchase`
+
+What is on order, who it is with, and what has arrived.
+
+Four figures across the top. **Delayed** is clickable and filters to it. The
+fourth is **On order**, not spend: money committed to orders not yet delivered.
+Calling that spend makes a cash position look worse than it is, so the month's
+actual spend — what has been accepted into stock — sits on hover instead.
+
+Orders are listed **open first**: Postgres orders an enum by declaration, and
+the statuses are declared Ordered, In transit, Part received, Received,
+Cancelled, which is exactly what-still-needs-chasing first.
+
+**Delayed is a separate badge, not a status.** An order can be part received
+_and_ late, and folding them into one label would hide whichever the office
+needed to see. It is computed against today and never stored — a stored flag
+needs a nightly job to maintain and is wrong every hour in between. An order
+with no expected date is never late: nothing was promised, and inventing a
+deadline the supplier never gave puts orders on the chase list that nobody
+undertook to chase.
+
+**Suppliers do not store what they supply or what they last charged.** Both are
+read off the orders placed with them. A stored list is one somebody has to keep
+up to date, and it is the copy that would be wrong.
+
+#### One order — `/purchase/:id`
+
+Its lines, and every delivery against them.
+
+An order carries **several lines**, because one order to one supplier usually
+covers more than one material and a part-delivery of one should not block the
+others. Each line has its own unit — film is ordered by the tonne — and that is
+the unit deliveries against it are entered in, so the order reads the way the
+supplier invoices it.
+
+**Status is chosen only while nothing has arrived.** Ordered, In transit and
+Cancelled are decisions; Part received and Received are facts about deliveries
+and are set by recording one. Once stock exists against an order the dropdown
+disappears — relabelling it would make the order disagree with the ledger
+without undoing anything.
+
+#### Receiving: where buying becomes holding
+
+A delivery records two quantities:
+
+|              |                                                 |
+| ------------ | ----------------------------------------------- |
+| **Accepted** | Opens a stock batch and appears in Inventory    |
+| **Rejected** | Recorded against the order, and goes no further |
+
+**Faulty material is not inventory.** Counting what was sent back would
+overstate what the works can actually print with, so a rejection is recorded on
+the order — with a reason, which is what gets taken up with the supplier — and
+never reaches the ledger.
+
+The accepted quantity goes into stock **through the same path a manual receipt
+takes.** One way stock comes into existence, one ledger recording it, one place
+that converts units. A second implementation living in the purchase module would
+drift from the first within a month. Both are written in one transaction, so a
+receipt naming a batch that was never created cannot happen.
+
+The units convert on the way: **1.8 TON accepted against an order at Rs. 205,000
+a tonne becomes 1,800 KG in stock at Rs. 205 a kilogram**, in a batch referenced
+`PO-4471`, which still records that the delivery note said 1.8 ton. The join is
+visible from both ends — the order names the batch, the batch names the order.
+
+**More than was ordered is refused.** A supplier sending 4,000 against an order
+for 400 has made a mistake somebody needs to ring them about, and finding out
+from the stock figure a week later costs far more than an extra line today.
+
+#### Closing a line short
+
+A supplier who sends 380 of 400 and will not send the rest leaves a line that is
+neither open nor complete. **Close** it with a reason and the order can complete.
+Without that it sits on the pending list forever — and a pending list with
+permanent residents stops being read.
+
 ### Rates — `/rates`
 
 Today's raw material prices, grouped by Films / Ink / Adhesive / Solvents.

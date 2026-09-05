@@ -185,6 +185,10 @@ guard is visible in that diff; a guard forgotten three files away is not.
              write — receive, issue, adjust, transfer — needs
              requireModule('inventory'), applied on those endpoints.
              /inventory/reconcile is requireAdmin on top.
+/purchase    authenticate — knowing what is on order is part of knowing what the
+             works can commit to. Raising one needs requireModule('purchase');
+             recording a delivery needs inventory as well, because it creates
+             stock and must not be reachable through a second door.
 /users       authenticate + requireAdmin
 ```
 
@@ -1082,6 +1086,44 @@ booking in the same new film on one morning should not produce an error neither
 can explain — and a retired one is brought back, because receiving it is what
 that means.
 
+## Buying joins holding in one place
+
+`receivePurchaseLine` does not write stock. It calls `receiveStock` — the same
+function a manual receipt uses — and hands it the open transaction:
+
+```
+accepted 1.8 TON  ->  receiveStock(..., tx)  ->  1,800 KG batch, ref PO-4471
+rejected 0.2 TON  ->  recorded on the receipt, never stocked
+```
+
+Three consequences, and each is the reason for the shape:
+
+- **One way stock is created.** Units convert once, the ledger is written once,
+  and there is one place a balance could be wrong. A second implementation in
+  the purchase module would have its own conversion and drift within a month. A
+  source-level test asserts this module never touches `stockBatch` or
+  `stockMovement` directly.
+- **The batch and the receipt commit together.** Prisma has no nested
+  transactions, so `receiveStock` takes an optional client and joins the
+  caller's rather than opening a second that would deadlock. A receipt naming a
+  batch that was never created is worse than no receipt.
+- **Faulty goods never reach the ledger.** They are recorded against the order,
+  with a reason, because that is what gets taken up with the supplier — but
+  counting them as stock would overstate what the works can print with.
+
+An order's progress is derived by `restatus` from its own receipts, never ticked
+by hand: an order somebody forgot to mark as received is exactly the order they
+are chasing. Only ORDERED, IN_TRANSIT and CANCELLED can be chosen, and even
+those are refused once deliveries exist — stock is already there, and
+relabelling would not undo it.
+
+> One thing worth knowing if you extend this: **a deep `include` inside a
+> transaction is a trap.** Prisma issues a multi-level include as several
+> queries and may run them concurrently, which on a transaction's single
+> connection is a use-after-busy that `pg` warns about. `createPurchaseOrder`
+> creates inside the transaction and reads back outside it for exactly this
+> reason.
+
 ## Data model
 
 Full diagram and column reference: [`docs/database-schema.md`](../../docs/database-schema.md).
@@ -1099,6 +1141,10 @@ Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 | `materials`                 | The rate catalogue, with density for films.                                                                                                                 |
 | `material_rates`            | One material's price on one date — one row per active material per day.                                                                                     |
 | `stock_batches`             | One delivery of one material, and what is left of it. Unique batch code per material. Keeps the delivery note's own figure when it arrived in another unit. |
+| `suppliers`                 | Who the works buys from. What they supply is derived from their orders, never stored.                                                                       |
+| `purchase_orders`           | One order to one supplier. Progress follows its receipts; delay is computed, not stored.                                                                    |
+| `purchase_order_lines`      | One material on an order, in the unit it was ordered in.                                                                                                    |
+| `purchase_receipts`         | One delivery against a line. Accepted stock names the batch it became; rejected stock names nothing.                                                        |
 | `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.                                                                           |
 | `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.                                                                               |
 | `app_settings`              | Editable rates and costing defaults.                                                                                                                        |

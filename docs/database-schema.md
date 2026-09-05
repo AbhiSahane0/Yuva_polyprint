@@ -46,6 +46,24 @@ erDiagram
   materials {
     text id PK
   }
+  purchase_order_lines {
+    text id PK
+    text order_id FK
+    integer position
+    text material_id FK
+  }
+  purchase_orders {
+    text id PK
+    integer number
+    text supplier_id FK
+    PurchaseOrderStatus status
+  }
+  purchase_receipts {
+    text id PK
+    text line_id FK
+    text order_id FK
+    text batch_id FK
+  }
   quotation_emails {
     text id PK
     text quotation_id FK
@@ -105,6 +123,10 @@ erDiagram
     text material_id FK
     text job_id FK
   }
+  suppliers {
+    text id PK
+    text mobile
+  }
   users {
     text id PK
   }
@@ -127,6 +149,12 @@ erDiagram
   stock_batches ||--|{ stock_movements : "batch_id"
   materials ||--|{ stock_movements : "material_id"
   jobs ||--o{ stock_movements : "job_id"
+  suppliers ||--|{ purchase_orders : "supplier_id"
+  purchase_orders ||--|{ purchase_order_lines : "order_id"
+  materials ||--|{ purchase_order_lines : "material_id"
+  purchase_order_lines ||--|{ purchase_receipts : "line_id"
+  purchase_orders ||--|{ purchase_receipts : "order_id"
+  stock_batches ||--o{ purchase_receipts : "batch_id"
 ```
 
 ## Tables
@@ -139,6 +167,9 @@ erDiagram
 | `login_events` | 7 | 35 |  |
 | `material_rates` | 6 | 202 |  |
 | `materials` | 10 | 17 |  |
+| `purchase_order_lines` | 9 | 2 |  |
+| `purchase_orders` | 10 | 1 |  |
+| `purchase_receipts` | 11 | 1 |  |
 | `quotation_emails` | 10 | 1 |  |
 | `quotation_item_layers` | 9 | 8 |  |
 | `quotation_item_quantities` | 13 | 6 |  |
@@ -146,8 +177,9 @@ erDiagram
 | `quotation_tiers` | 14 | 6 |  |
 | `quotations` | 28 | 4 | Customer-facing quotations, with totals frozen at save. |
 | `sessions` | 6 | 16 |  |
-| `stock_batches` | 14 | 4 |  |
+| `stock_batches` | 14 | 0 |  |
 | `stock_movements` | 13 | 5 |  |
+| `suppliers` | 11 | 1 |  |
 | `users` | 10 | 2 |  |
 
 ## Relationships
@@ -173,6 +205,12 @@ erDiagram
 | `stock_movements.batch_id` | `stock_batches.id` | CASCADE |  |
 | `stock_movements.material_id` | `materials.id` | RESTRICT |  |
 | `stock_movements.job_id` | `jobs.id` | SET NULL |  |
+| `purchase_orders.supplier_id` | `suppliers.id` | RESTRICT |  |
+| `purchase_order_lines.order_id` | `purchase_orders.id` | CASCADE |  |
+| `purchase_order_lines.material_id` | `materials.id` | RESTRICT |  |
+| `purchase_receipts.line_id` | `purchase_order_lines.id` | CASCADE |  |
+| `purchase_receipts.order_id` | `purchase_orders.id` | CASCADE |  |
+| `purchase_receipts.batch_id` | `stock_batches.id` | SET NULL |  |
 
 ## Enums
 
@@ -184,6 +222,7 @@ erDiagram
 | `MaterialCategory` | `FILM`, `INK`, `ADHESIVE`, `SOLVENT`, `CONSUMABLE` |
 | `PouchType` | `STANDUP`, `STANDUP_ZIPPER`, `ZIPPER`, `SPOUT`, `CENTRE_SEAL`, `THREE_SIDE_SEAL`, `OTHER` |
 | `PricingBasis` | `PER_KG`, `PER_POUCH` |
+| `PurchaseOrderStatus` | `ORDERED`, `IN_TRANSIT`, `PARTIALLY_RECEIVED`, `RECEIVED`, `CANCELLED` |
 | `QuotationStatus` | `DRAFT`, `SENT`, `WON`, `LOST` |
 | `StockMovementKind` | `RECEIPT`, `ISSUE`, `WASTE`, `ADJUSTMENT`, `TRANSFER` |
 
@@ -316,6 +355,51 @@ erDiagram
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
 | `reorder_level` | `decimal(14,3)` | ✓ |  |
+
+### `purchase_order_lines`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `order_id` | `text` |  | FK → `purchase_orders.id` |
+| `position` | `integer` |  | unique |
+| `material_id` | `text` |  | FK → `materials.id` |
+| `quantity` | `decimal(14,3)` |  |  |
+| `unit` | `text` |  |  |
+| `rate_per_unit` | `decimal(12,4)` |  |  |
+| `closed_at` | `timestamp` | ✓ |  |
+| `closed_reason` | `text` |  |  |
+
+### `purchase_orders`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `number` | `integer` |  | unique |
+| `supplier_id` | `text` |  | FK → `suppliers.id` |
+| `status` | `PurchaseOrderStatus` (enum) |  |  |
+| `ordered_on` | `date` |  |  |
+| `expected_on` | `date` | ✓ |  |
+| `notes` | `text` |  |  |
+| `raised_by` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+
+### `purchase_receipts`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `line_id` | `text` |  | FK → `purchase_order_lines.id` |
+| `order_id` | `text` |  | FK → `purchase_orders.id` |
+| `received_on` | `date` |  |  |
+| `accepted_quantity` | `decimal(14,3)` |  |  |
+| `rejected_quantity` | `decimal(14,3)` |  |  |
+| `rejection_reason` | `text` |  |  |
+| `batch_id` | `text` | ✓ | FK → `stock_batches.id` |
+| `notes` | `text` |  |  |
+| `entered_by` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
 
 ### `quotation_emails`
 
@@ -499,6 +583,22 @@ erDiagram
 | `notes` | `text` |  |  |
 | `entered_by` | `text` |  |  |
 | `created_at` | `timestamp` |  |  |
+
+### `suppliers`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `name` | `text` |  | unique |
+| `contact_person` | `text` |  |  |
+| `mobile` | `text` |  |  |
+| `email` | `text` |  |  |
+| `address` | `text` |  |  |
+| `gst_number` | `text` |  |  |
+| `notes` | `text` |  |  |
+| `is_active` | `boolean` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
 
 ### `users`
 

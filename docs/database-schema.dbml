@@ -42,6 +42,14 @@ Enum PricingBasis {
   PER_POUCH
 }
 
+Enum PurchaseOrderStatus {
+  ORDERED
+  IN_TRANSIT
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
 Enum QuotationStatus {
   DRAFT
   SENT
@@ -183,6 +191,51 @@ Table materials {
   reorder_level decimal(14,3)
 
   Note: '17 row(s) at time of generation'
+}
+
+Table purchase_order_lines {
+  id text [pk]
+  order_id text [unique, not null]
+  position integer [unique, not null]
+  material_id text [not null]
+  quantity decimal(14,3) [not null]
+  unit text [not null]
+  rate_per_unit decimal(12,4) [not null]
+  closed_at timestamp
+  closed_reason text [not null, default: `''`]
+
+  Note: '2 row(s) at time of generation'
+}
+
+Table purchase_orders {
+  id text [pk]
+  number integer [unique, not null]
+  supplier_id text [not null]
+  status PurchaseOrderStatus [not null, default: `'ORDERED'::"PurchaseOrderStatus"`]
+  ordered_on date [not null]
+  expected_on date
+  notes text [not null, default: `''`]
+  raised_by text [not null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+
+  Note: '1 row(s) at time of generation'
+}
+
+Table purchase_receipts {
+  id text [pk]
+  line_id text [not null]
+  order_id text [not null]
+  received_on date [not null]
+  accepted_quantity decimal(14,3) [not null]
+  rejected_quantity decimal(14,3) [not null, default: `0`]
+  rejection_reason text [not null, default: `''`]
+  batch_id text [unique]
+  notes text [not null, default: `''`]
+  entered_by text [not null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+
+  Note: '1 row(s) at time of generation'
 }
 
 Table quotation_emails {
@@ -347,7 +400,7 @@ Table stock_batches {
   purchase_quantity decimal(14,3)
   purchase_unit text
 
-  Note: '4 row(s) at time of generation'
+  Note: '0 row(s) at time of generation'
 }
 
 Table stock_movements {
@@ -366,6 +419,22 @@ Table stock_movements {
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
   Note: '5 row(s) at time of generation'
+}
+
+Table suppliers {
+  id text [pk]
+  name text [unique, not null]
+  contact_person text [not null, default: `'NA'`]
+  mobile text [not null, default: `'NA'`]
+  email text [not null, default: `'NA'`]
+  address text [not null, default: `'NA'`]
+  gst_number text [not null, default: `'NA'`]
+  notes text [not null, default: `''`]
+  is_active boolean [not null, default: `true`]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+
+  Note: '1 row(s) at time of generation'
 }
 
 Table users {
@@ -402,3 +471,9 @@ Ref: stock_batches.material_id > materials.id [delete: restrict]
 Ref: stock_movements.batch_id > stock_batches.id [delete: cascade]
 Ref: stock_movements.material_id > materials.id [delete: restrict]
 Ref: stock_movements.job_id > jobs.id [delete: set null]
+Ref: purchase_orders.supplier_id > suppliers.id [delete: restrict]
+Ref: purchase_order_lines.order_id > purchase_orders.id [delete: cascade]
+Ref: purchase_order_lines.material_id > materials.id [delete: restrict]
+Ref: purchase_receipts.line_id > purchase_order_lines.id [delete: cascade]
+Ref: purchase_receipts.order_id > purchase_orders.id [delete: cascade]
+Ref: purchase_receipts.batch_id > stock_batches.id [delete: set null]

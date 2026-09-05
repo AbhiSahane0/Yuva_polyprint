@@ -225,8 +225,18 @@ async function lockedBatch(tx: Prisma.TransactionClient, batchId: string) {
 export async function receiveStock(
   input: ReceiveStockInput,
   enteredBy: string,
+  /**
+   * The caller's transaction, when a receipt is part of something larger.
+   *
+   * A purchase delivery writes both a stock batch and the receipt that points
+   * at it, and neither should survive the other failing — a receipt naming a
+   * batch that was never created is worse than no receipt. Prisma has no nested
+   * transactions, so a caller already inside one passes it here rather than
+   * opening a second that would deadlock against the first.
+   */
+  client?: Prisma.TransactionClient,
 ): Promise<StockBatch> {
-  const batch = await prisma.$transaction(async (tx) => {
+  const run = async (tx: Prisma.TransactionClient) => {
     /*
      * The material, or a new one created as the delivery is booked in.
      *
@@ -347,7 +357,9 @@ export async function receiveStock(
       where: { id: created.id },
       include: { material: { select: { name: true, unit: true } } },
     });
-  });
+  };
+
+  const batch = client ? await run(client) : await prisma.$transaction(run);
 
   const rates = await currentRates([batch.materialId]);
   return toBatch(batch, rates.get(batch.materialId) ?? null);

@@ -7,8 +7,16 @@ import {
   createUserSchema,
   listCustomersQuerySchema,
   adjustStockSchema,
+  closePurchaseLineSchema,
+  createPurchaseOrderSchema,
   issueStockSchema,
   listStockQuerySchema,
+  listPurchaseOrdersQuerySchema,
+  listSuppliersQuerySchema,
+  receivePurchaseLineSchema,
+  supplierSchema,
+  updatePurchaseOrderSchema,
+  updateSupplierSchema,
   receiveStockSchema,
   setReorderLevelSchema,
   transferStockSchema,
@@ -204,6 +212,13 @@ export function buildOpenApiDocument(serverUrl: string) {
       { name: 'Quotations', description: 'Quoting, pricing, sending, and the outcome.' },
       { name: 'Materials', description: 'Films, inks and adhesives, and the day’s rates.' },
       {
+        name: 'Purchase',
+        description:
+          'Suppliers and orders. Receiving a delivery is where buying becomes holding: the ' +
+          'accepted quantity opens a stock batch, and rejected material is recorded but never ' +
+          'stocked.',
+      },
+      {
         name: 'Inventory',
         description:
           'What the works holds. A ledger: every change is a movement, and what is on hand ' +
@@ -346,6 +361,104 @@ export function buildOpenApiDocument(serverUrl: string) {
         },
       },
 
+      '/api/purchase/suppliers': {
+        get: {
+          tags: ['Purchase'],
+          summary: 'Suppliers, with what the orders say about them',
+          description:
+            'What each supplies and what they last charged are derived from the orders placed ' +
+            'with them, never stored — a second copy is a list nobody maintains.',
+          parameters: query(listSuppliersQuerySchema),
+          responses: { 200: ok('Suppliers.'), ...AUTH_FAILURES },
+        },
+        post: {
+          tags: ['Purchase'],
+          summary: 'Add a supplier',
+          requestBody: body(supplierSchema),
+          responses: { 201: ok('The supplier.'), ...COMMON },
+        },
+      },
+      '/api/purchase/suppliers/{id}': {
+        patch: {
+          tags: ['Purchase'],
+          summary: 'Edit a supplier, or retire one',
+          description: 'Retired rather than deleted — orders already placed still name them.',
+          parameters: [ID_PARAM],
+          requestBody: body(updateSupplierSchema),
+          responses: { 200: ok('The supplier.'), ...COMMON },
+        },
+      },
+      '/api/purchase/orders': {
+        get: {
+          tags: ['Purchase'],
+          summary: 'Purchase orders, open first',
+          description:
+            'Ordered by status then number, so what still needs chasing is at the top. ' +
+            '`isDelayed` is computed against today, never stored.',
+          parameters: query(listPurchaseOrdersQuerySchema),
+          responses: { 200: ok('Orders and the totals.'), ...AUTH_FAILURES },
+        },
+        post: {
+          tags: ['Purchase'],
+          summary: 'Raise an order',
+          description:
+            'Several lines, each with its own unit — film is ordered by the tonne. That unit ' +
+            'is the one deliveries are entered in.',
+          requestBody: body(createPurchaseOrderSchema),
+          responses: { 201: ok('The order.'), ...COMMON },
+        },
+      },
+      '/api/purchase/orders/next-number': {
+        get: {
+          tags: ['Purchase'],
+          summary: 'The number the next order will take',
+          description: 'A peek, not a reservation — it is allocated on create.',
+          responses: { 200: ok('`{ number }`.'), ...AUTH_FAILURES },
+        },
+      },
+      '/api/purchase/orders/{id}': {
+        get: {
+          tags: ['Purchase'],
+          summary: 'One order, its lines and its deliveries',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The order.'), ...COMMON },
+        },
+        patch: {
+          tags: ['Purchase'],
+          summary: 'Change the expected date, notes, or status',
+          description:
+            'Only ORDERED, IN_TRANSIT and CANCELLED may be set. Part-received and received are ' +
+            'facts about what has arrived, and an order with deliveries against it refuses a ' +
+            'status change — stock exists, and relabelling would not undo it.',
+          parameters: [ID_PARAM],
+          requestBody: body(updatePurchaseOrderSchema),
+          responses: { 200: ok('The order.'), ...COMMON },
+        },
+      },
+      '/api/purchase/receipts': {
+        post: {
+          tags: ['Purchase'],
+          summary: 'Record a delivery against a line',
+          description:
+            '**The join to inventory.** The accepted quantity opens a stock batch through the ' +
+            'same path a manual receipt takes — one way stock comes into existence, one ledger ' +
+            'recording it. Rejected material is recorded and never reaches stock: faulty goods ' +
+            'are not inventory. Needs the inventory module as well as purchase.',
+          requestBody: body(receivePurchaseLineSchema),
+          responses: { 201: ok('The order, restated from its receipts.'), ...COMMON },
+        },
+      },
+      '/api/purchase/lines/close': {
+        post: {
+          tags: ['Purchase'],
+          summary: 'Give up on the balance of a line',
+          description:
+            'A supplier who sends 380 of 400 and will not send the rest leaves a line that is ' +
+            'neither open nor complete, and it would sit on the pending list forever.',
+          requestBody: body(closePurchaseLineSchema),
+          responses: { 200: ok('The order.'), ...COMMON },
+        },
+      },
       '/api/inventory': {
         get: {
           tags: ['Inventory'],
