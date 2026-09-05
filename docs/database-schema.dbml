@@ -8,6 +8,31 @@ Enum CustomerSource {
   BRAND_INFERRED
 }
 
+Enum CylinderEventKind {
+  ENGRAVED
+  ALLOCATED
+  IN_USE
+  RETURNED
+  DAMAGED
+  REWORKED
+  TRANSFERRED
+  RETIRED
+}
+
+Enum CylinderOwnership {
+  CUSTOMER_OWNED
+  YUVA_OWNED
+}
+
+Enum CylinderStatus {
+  IN_STORE
+  ALLOCATED
+  IN_USE
+  DAMAGED
+  NEEDS_REWORK
+  RETIRED
+}
+
 Enum JobCustomerSource {
   EXPLICIT
   INFERRED
@@ -93,6 +118,43 @@ Table customers {
   brand_name text [not null, default: `'NA'`]
 
   Note: '71 row(s) at time of generation'
+}
+
+Table cylinder_events {
+  id text [pk]
+  cylinder_id text [not null]
+  kind CylinderEventKind [not null]
+  occurred_on date [not null]
+  status_after CylinderStatus [not null]
+  reference text [not null, default: `''`]
+  from_location text [not null, default: `''`]
+  to_location text [not null, default: `''`]
+  notes text [not null, default: `''`]
+  entered_by text [not null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+
+  Note: '19 row(s) at time of generation'
+}
+
+Table cylinders {
+  id text [pk]
+  code text [unique, not null]
+  job_id text [not null]
+  colour text [not null, default: `'NA'`]
+  position integer
+  ownership CylinderOwnership [not null, default: `'YUVA_OWNED'::"CylinderOwnership"`]
+  status CylinderStatus [not null, default: `'IN_STORE'::"CylinderStatus"`]
+  location text [not null, default: `'NA'`]
+  diameter_mm decimal(10,2)
+  circumference_mm decimal(10,2)
+  cost decimal(12,2)
+  engraver text [not null, default: `'NA'`]
+  engraved_on date
+  notes text [not null, default: `''`]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+
+  Note: '4 row(s) at time of generation'
 }
 
 Table jobs {
@@ -477,3 +539,5 @@ Ref: purchase_order_lines.material_id > materials.id [delete: restrict]
 Ref: purchase_receipts.line_id > purchase_order_lines.id [delete: cascade]
 Ref: purchase_receipts.order_id > purchase_orders.id [delete: cascade]
 Ref: purchase_receipts.batch_id > stock_batches.id [delete: set null]
+Ref: cylinders.job_id > jobs.id [delete: restrict]
+Ref: cylinder_events.cylinder_id > cylinders.id [delete: cascade]

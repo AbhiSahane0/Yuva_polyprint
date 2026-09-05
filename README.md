@@ -398,8 +398,9 @@ The script refuses to run if an active administrator already exists.
 
 **Access is two tiers and no more.** An administrator sees everything and manages
 users; everyone else sees only the sections ticked for them — Customers,
-Quotations, Rates, Inventory, Purchase, Jobs. The sidebar hides the rest, and
-the API refuses it independently, because hiding a link is not access control.
+Quotations, Rates, Inventory, Purchase, Design & Cylinders, Jobs. The sidebar
+hides the rest, and the API refuses it independently, because hiding a link is
+not access control.
 
 Full detail, including how sessions and passwords are stored:
 [`apps/api/README.md`](./apps/api/README.md#authentication-and-access).

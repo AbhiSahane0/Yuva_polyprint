@@ -8,6 +8,10 @@ import {
   listCustomersQuerySchema,
   adjustStockSchema,
   closePurchaseLineSchema,
+  listCylindersQuerySchema,
+  recordCylinderEventSchema,
+  registerCylindersSchema,
+  updateCylinderSchema,
   createPurchaseOrderSchema,
   issueStockSchema,
   listStockQuerySchema,
@@ -212,6 +216,13 @@ export function buildOpenApiDocument(serverUrl: string) {
       { name: 'Quotations', description: 'Quoting, pricing, sending, and the outcome.' },
       { name: 'Materials', description: 'Films, inks and adhesives, and the day’s rates.' },
       {
+        name: 'Cylinders',
+        description:
+          'The design register. A design is a job; this adds the engraved cylinders, each ' +
+          'identifiable, so a set is not re-cut because nobody could find the old one. Status ' +
+          'follows the events, like stock quantity follows movements.',
+      },
+      {
         name: 'Purchase',
         description:
           'Suppliers and orders. Receiving a delivery is where buying becomes holding: the ' +
@@ -361,6 +372,78 @@ export function buildOpenApiDocument(serverUrl: string) {
         },
       },
 
+      '/api/cylinders': {
+        get: {
+          tags: ['Cylinders'],
+          summary: 'Designs with a registered set',
+          description:
+            'A design **is** a job — the customer, product, colours and expected cylinder count ' +
+            'already live there. Only jobs with cylinders registered appear: 382 record a count, ' +
+            'and a count is not a set. Totals are over every cylinder, not over the rows shown, ' +
+            'so a filter cannot move the damaged figure.',
+          parameters: query(listCylindersQuerySchema),
+          responses: { 200: ok('Designs and the totals.'), ...AUTH_FAILURES },
+        },
+        post: {
+          tags: ['Cylinders'],
+          summary: 'Register a set against a design',
+          description:
+            'Each cylinder gets an ENGRAVED event as it is created, so its history starts where ' +
+            'it actually started. A register whose earliest entry is "returned to store" cannot ' +
+            'say where the cylinder came from.',
+          requestBody: body(registerCylindersSchema),
+          responses: { 201: ok('The design, with its set.'), ...COMMON },
+        },
+      },
+      '/api/cylinders/unregistered': {
+        get: {
+          tags: ['Cylinders'],
+          summary: 'Designs that need a set but have none',
+          description: 'The register’s own worklist, largest sets first — those cost most to lose.',
+          responses: { 200: ok('Designs awaiting registration.'), ...AUTH_FAILURES },
+        },
+      },
+      '/api/cylinders/out': {
+        get: {
+          tags: ['Cylinders'],
+          summary: 'Every cylinder off the shelf',
+          description: 'Allocated or in use, whatever design it belongs to.',
+          responses: { 200: ok('Cylinders out of the store.'), ...AUTH_FAILURES },
+        },
+      },
+      '/api/cylinders/{id}': {
+        get: {
+          tags: ['Cylinders'],
+          summary: 'One design: its cylinders and their history',
+          description: 'The id is the **job** id, because a design is a job.',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The design in full.'), ...COMMON },
+        },
+        patch: {
+          tags: ['Cylinders'],
+          summary: 'Correct a cylinder’s details',
+          description:
+            'Neither its status nor its number can be changed here. Status follows the events — ' +
+            'typing it separately is what lets a cylinder claim to be in store while the history ' +
+            'says it went out. The number is painted on the cylinder.',
+          parameters: [ID_PARAM],
+          requestBody: body(updateCylinderSchema),
+          responses: { 200: ok('The cylinder.'), ...COMMON },
+        },
+      },
+      '/api/cylinders/events': {
+        post: {
+          tags: ['Cylinders'],
+          summary: 'Record what happened to one or more cylinders',
+          description:
+            'A set moves together, so this takes a list — recording four separately means four ' +
+            'requests for one job starting, and the fourth is the one that gets forgotten. The ' +
+            'resulting status is derived from the kind, never sent. A retired cylinder refuses ' +
+            'everything but re-engraving: it is not there to be mounted.',
+          requestBody: body(recordCylinderEventSchema),
+          responses: { 201: ok('The events recorded.'), ...COMMON },
+        },
+      },
       '/api/purchase/suppliers': {
         get: {
           tags: ['Purchase'],

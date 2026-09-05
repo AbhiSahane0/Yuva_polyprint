@@ -49,6 +49,7 @@ src/
 │   ├── quotations/        quotation list, form, PDF preview
 │   ├── inventory/         stock, batches, the movement ledger
 │   ├── purchase/          suppliers, orders, receiving into stock
+│   ├── cylinders/         the design register and cylinder history
 │   ├── gstin/             GSTIN field and lookup, shared by two screens
 │   ├── monitor/           sign-in log (admins only)
 │   └── rates/             daily material rates
@@ -1083,6 +1084,65 @@ A supplier who sends 380 of 400 and will not send the rest leaves a line that is
 neither open nor complete. **Close** it with a reason and the order can complete.
 Without that it sits on the pending list forever — and a pending list with
 permanent residents stops being read.
+
+### Design & Cylinders — `/cylinders`
+
+Every design and the engraved set it prints from — where each cylinder is, and
+what state it is in.
+
+**A design is a job.** The 420 jobs already on record are the design register:
+customer, product, colours and the expected cylinder count all live there, and
+the quotation wizard already treats a saved job as the design it charges
+cylinders for. This screen adds the thing that was missing — the individual
+cylinders, each identifiable — so "where is the cyan one for Krishna Dairy" has
+an answer. That question is what stops a set being re-engraved because nobody
+could find the old one.
+
+Only designs with cylinders registered are listed. 382 jobs record a cylinder
+_count_, but a count is not a set; listing all of them would bury the ones that
+exist. **Register a set** offers exactly those 382 as its worklist, largest
+first — the biggest sets cost most to lose.
+
+Numbers collapse to a range where they run on: `CYL-3301 – 3304`, which is how
+the office says it aloud. And a set registered short of what the job expects
+says so — **"4 of 8 registered"** in amber — because two cylinders unaccounted
+for is precisely what this register exists to surface.
+
+The totals across the top count **every** cylinder, not the rows on screen. A
+filter that moved the damaged figure would make it useless as an alarm.
+
+#### One design — `/cylinders/:id`
+
+Its cylinders, and their history. Clicking a cylinder narrows the history to
+that one; the heading says which you are looking at.
+
+**Status follows the events.** It is never typed. A cylinder marked "in store"
+by hand while it is on a machine is exactly the one nobody can find — so
+recording what happened is the only way the status moves, the same way stock
+quantity only moves through the ledger.
+
+| Event                        | Leaves it                                    |
+| ---------------------------- | -------------------------------------------- |
+| Engraved, Returned, Reworked | In store                                     |
+| Allocated                    | Allocated                                    |
+| In use                       | In use                                       |
+| Damaged                      | Damaged                                      |
+| Retired                      | Retired                                      |
+| **Transferred**              | **unchanged** — it moved shelves, not stages |
+
+**A set moves together**, so recording takes a selection and defaults to the
+whole set. Four separate dialogs for one job starting means the fourth is the
+one somebody forgets, which is how a cylinder goes missing from the books.
+
+**The design's own status is the worst of its cylinders.** Five good ones and a
+damaged one cannot print, and reporting that as "in store" would be a lie of
+omission — the damaged one would be discovered at the machine.
+
+Damaged and Retired both require a note. Those are the two events somebody will
+be asked about months later, and a rejection nobody explained teaches nothing.
+
+A retired cylinder refuses everything but re-engraving: it has been scrapped or
+gone back to the customer, and it is not there to be mounted.
 
 ### Rates — `/rates`
 

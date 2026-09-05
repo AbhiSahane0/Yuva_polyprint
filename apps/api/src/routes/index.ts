@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import authRoutes from '../modules/auth/auth.routes.js';
 import customerRoutes from '../modules/customers/customer.routes.js';
+import cylinderRoutes from '../modules/cylinders/cylinder.routes.js';
 import gstinRoutes from '../modules/gstin/gstin.routes.js';
 import inventoryRoutes from '../modules/inventory/inventory.routes.js';
 import jobRoutes from '../modules/jobs/job.routes.js';
@@ -64,6 +65,14 @@ router.use('/inventory', authenticate, inventoryRoutes);
  * somebody who may not touch the ledger.
  */
 router.use('/purchase', authenticate, purchaseRoutes);
+
+/*
+ * The cylinder register. Readable by anyone signed in — whether a design
+ * already has a set is what stops a second one being ordered, and the quotation
+ * screens ask the same question when deciding whether to charge for cylinders.
+ * Registering or moving one needs requireModule('cylinders').
+ */
+router.use('/cylinders', authenticate, cylinderRoutes);
 
 router.use('/settings', authenticate, settingsRoutes);
 

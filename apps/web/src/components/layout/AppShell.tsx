@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   ShieldCheck,
+  Disc3,
   Package,
   Truck,
   Users,
@@ -49,7 +50,10 @@ const NAV: { group: string; items: NavItem[] }[] = [
   },
   {
     group: 'Production',
-    items: [{ to: '/jobs', label: 'Jobs', icon: Boxes, module: 'jobs', disabled: true }],
+    items: [
+      { to: '/cylinders', label: 'Design & Cylinders', icon: Disc3, module: 'cylinders' },
+      { to: '/jobs', label: 'Jobs', icon: Boxes, module: 'jobs', disabled: true },
+    ],
   },
   {
     group: 'Administration',

@@ -26,6 +26,16 @@ erDiagram
     boolean is_verified
     CustomerSource source
   }
+  cylinder_events {
+    text id PK
+    text cylinder_id FK
+  }
+  cylinders {
+    text id PK
+    text job_id FK
+    integer position
+    CylinderStatus status
+  }
   jobs {
     text id PK
     text job_code
@@ -155,6 +165,8 @@ erDiagram
   purchase_order_lines ||--|{ purchase_receipts : "line_id"
   purchase_orders ||--|{ purchase_receipts : "order_id"
   stock_batches ||--o{ purchase_receipts : "batch_id"
+  jobs ||--|{ cylinders : "job_id"
+  cylinders ||--|{ cylinder_events : "cylinder_id"
 ```
 
 ## Tables
@@ -163,6 +175,8 @@ erDiagram
 | --- | ---: | ---: | --- |
 | `app_settings` | 3 | 0 | Editable rates: cylinder rate, GST %, advance %. |
 | `customers` | 17 | 71 | Companies that order from Yuva Polyprint. |
+| `cylinder_events` | 11 | 19 |  |
+| `cylinders` | 16 | 4 |  |
 | `jobs` | 55 | 420 | Products and their full engineering specification. |
 | `login_events` | 7 | 35 |  |
 | `material_rates` | 6 | 202 |  |
@@ -211,12 +225,17 @@ erDiagram
 | `purchase_receipts.line_id` | `purchase_order_lines.id` | CASCADE |  |
 | `purchase_receipts.order_id` | `purchase_orders.id` | CASCADE |  |
 | `purchase_receipts.batch_id` | `stock_batches.id` | SET NULL |  |
+| `cylinders.job_id` | `jobs.id` | RESTRICT |  |
+| `cylinder_events.cylinder_id` | `cylinders.id` | CASCADE |  |
 
 ## Enums
 
 | Type | Values |
 | --- | --- |
 | `CustomerSource` | `SHEET`, `BRAND_INFERRED` |
+| `CylinderEventKind` | `ENGRAVED`, `ALLOCATED`, `IN_USE`, `RETURNED`, `DAMAGED`, `REWORKED`, `TRANSFERRED`, `RETIRED` |
+| `CylinderOwnership` | `CUSTOMER_OWNED`, `YUVA_OWNED` |
+| `CylinderStatus` | `IN_STORE`, `ALLOCATED`, `IN_USE`, `DAMAGED`, `NEEDS_REWORK`, `RETIRED` |
 | `JobCustomerSource` | `EXPLICIT`, `INFERRED`, `NONE` |
 | `JobKind` | `ROLL`, `POUCH` |
 | `MaterialCategory` | `FILM`, `INK`, `ADHESIVE`, `SOLVENT`, `CONSUMABLE` |
@@ -257,6 +276,43 @@ erDiagram
 | `source` | `CustomerSource` (enum) |  |  |
 | `gst_number` | `text` |  |  |
 | `brand_name` | `text` |  |  |
+
+### `cylinder_events`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `cylinder_id` | `text` |  | FK → `cylinders.id` |
+| `kind` | `CylinderEventKind` (enum) |  |  |
+| `occurred_on` | `date` |  |  |
+| `status_after` | `CylinderStatus` (enum) |  |  |
+| `reference` | `text` |  |  |
+| `from_location` | `text` |  |  |
+| `to_location` | `text` |  |  |
+| `notes` | `text` |  |  |
+| `entered_by` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+
+### `cylinders`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `code` | `text` |  | unique |
+| `job_id` | `text` |  | FK → `jobs.id` |
+| `colour` | `text` |  |  |
+| `position` | `integer` | ✓ |  |
+| `ownership` | `CylinderOwnership` (enum) |  |  |
+| `status` | `CylinderStatus` (enum) |  |  |
+| `location` | `text` |  |  |
+| `diameter_mm` | `decimal(10,2)` | ✓ |  |
+| `circumference_mm` | `decimal(10,2)` | ✓ |  |
+| `cost` | `decimal(12,2)` | ✓ |  |
+| `engraver` | `text` |  |  |
+| `engraved_on` | `date` | ✓ |  |
+| `notes` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
 
 ### `jobs`
 

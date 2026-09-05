@@ -189,6 +189,10 @@ guard is visible in that diff; a guard forgotten three files away is not.
              works can commit to. Raising one needs requireModule('purchase');
              recording a delivery needs inventory as well, because it creates
              stock and must not be reachable through a second door.
+/cylinders   authenticate — whether a design already has a set is what stops a
+             second one being ordered, and the quotation screens ask the same
+             question. Registering or moving one needs
+             requireModule('cylinders').
 /users       authenticate + requireAdmin
 ```
 

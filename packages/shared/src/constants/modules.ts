@@ -12,6 +12,7 @@ export const APP_MODULES = [
   'rates',
   'inventory',
   'purchase',
+  'cylinders',
   'jobs',
 ] as const;
 
@@ -23,6 +24,7 @@ export const MODULE_LABELS: Record<AppModule, string> = {
   rates: 'Rates',
   inventory: 'Inventory',
   purchase: 'Purchase & Suppliers',
+  cylinders: 'Design & Cylinders',
   jobs: 'Jobs',
 };
 

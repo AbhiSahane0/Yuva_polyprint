@@ -198,6 +198,9 @@ model Job {
   /// Material issued against this design. Nullable on that side, so retiring a
   /// job leaves the stock ledger readable.
   stockMovements StockMovement[]
+  /// The engraved set this design prints from. A job is the design — see the
+  /// Cylinder model.
+  cylinders      Cylinder[]
 
   sourceRow Int @map("source_row")
 
@@ -1070,4 +1073,157 @@ model PurchaseReceipt {
   @@index([orderId, receivedOn])
   @@index([lineId])
   @@map("purchase_receipts")
+}
+
+
+/// Who paid for a cylinder, and therefore who it belongs to.
+///
+/// The distinction the office actually needs: a customer-owned set goes back if
+/// they leave, and cannot be scrapped without asking. Yuva-owned is an asset on
+/// the books.
+enum CylinderOwnership {
+  CUSTOMER_OWNED
+  YUVA_OWNED
+}
+
+/// Where a cylinder is in its life.
+///
+/// Set by recording an event, never chosen directly — a cylinder somebody
+/// forgot to mark as returned is exactly the one nobody can find. See
+/// `statusAfter` in `@yuva/shared`.
+enum CylinderStatus {
+  /// On the shelf, ready to mount.
+  IN_STORE
+  /// Reserved for a run but not yet on the machine.
+  ALLOCATED
+  /// Mounted and printing.
+  IN_USE
+  /// Off the machine and unusable until reworked.
+  DAMAGED
+  /// Usable but due for re-engraving before its next run.
+  NEEDS_REWORK
+  /// Scrapped or returned to the customer. Kept for the history.
+  RETIRED
+}
+
+/// What happened to a cylinder.
+///
+/// A ledger, like stock movements: the events are the truth and `status` is a
+/// cache of the latest one. Nothing edits or deletes an event — "who had it
+/// last and when" is the whole point, and a history that can be rewritten
+/// answers nothing.
+enum CylinderEventKind {
+  /// Cut, and on the shelf for the first time.
+  ENGRAVED
+  /// Reserved for a run.
+  ALLOCATED
+  /// Mounted and printing.
+  IN_USE
+  /// Back on the shelf, cleaned.
+  RETURNED
+  /// Found unusable.
+  DAMAGED
+  /// Re-engraved and usable again.
+  REWORKED
+  /// Moved shelves. Changes where it is, not what it is doing.
+  TRANSFERRED
+  /// Scrapped, or gone back to the customer.
+  RETIRED
+}
+
+/// One engraved cylinder.
+///
+/// **A design is a job.** The 420 jobs already on record are the design
+/// register — customer, product, colours, diameter and count all live there and
+/// the quotation wizard already treats a saved job as the design it charges
+/// cylinders for. This model adds the thing that was missing: the individual
+/// cylinders, each identifiable, so "where is the cyan one for Krishna Dairy"
+/// has an answer. That question is what stops a set being re-engraved because
+/// nobody could find the old one.
+model Cylinder {
+  id String @id @default(cuid())
+
+  /// The works' own number, as painted on the cylinder. Unique across the
+  /// works — two cylinders sharing one cannot be told apart on a shelf.
+  code String @unique
+
+  /// The design it prints. Restricted rather than nullable: a cylinder with no
+  /// design is one nobody can identify the purpose of, and a job with cylinders
+  /// against it should not be deleted.
+  jobId String @map("job_id")
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Restrict)
+
+  /// Which separation it carries — Cyan, White, a spot colour. Free text,
+  /// because a spot colour is named by whatever the customer calls it.
+  colour String @default("NA")
+  /// Print station order, where the works records it.
+  position Int?
+
+  ownership CylinderOwnership @default(YUVA_OWNED)
+  status    CylinderStatus    @default(IN_STORE)
+
+  /// Free text, like a stock location. 'Cylinder Store A-1'.
+  location String @default("NA")
+
+  /// The engraved geometry. Held here as well as on the job because a
+  /// replacement cylinder is sometimes cut to a different repeat, and the job
+  /// records what was designed rather than what is on the shelf.
+  diameterMm      Decimal? @map("diameter_mm") @db.Decimal(10, 2)
+  circumferenceMm Decimal? @map("circumference_mm") @db.Decimal(10, 2)
+
+  /// What this one cost to engrave. Per cylinder, so a set's cost is the sum
+  /// and a single replacement does not have to be apportioned by hand.
+  cost Decimal? @db.Decimal(12, 2)
+
+  /// Who cut it, and when it came in.
+  engraver   String    @default("NA")
+  engravedOn DateTime? @map("engraved_on") @db.Date
+
+  notes String @default("")
+
+  events CylinderEvent[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([jobId])
+  @@index([status])
+  @@map("cylinders")
+}
+
+/// One thing that happened to one cylinder. Immutable.
+model CylinderEvent {
+  id String @id @default(cuid())
+
+  cylinderId String   @map("cylinder_id")
+  cylinder   Cylinder @relation(fields: [cylinderId], references: [id], onDelete: Cascade)
+
+  kind       CylinderEventKind
+  occurredOn DateTime          @map("occurred_on") @db.Date
+
+  /// The status this event left the cylinder in, stored so the history reads
+  /// without replaying it, and so a line printed last month still says what the
+  /// books said last month.
+  statusAfter CylinderStatus @map("status_after")
+
+  /**
+   * What it was for — a job number, a works order, a delivery note.
+   *
+   * Free text on purpose. The wireframe shows "#1024", which is a production
+   * order, and there is no production module yet; a foreign key to something
+   * that does not exist would be worse than a string somebody can read.
+   */
+  reference String @default("")
+
+  /// Where it went, on a TRANSFERRED event.
+  fromLocation String @default("") @map("from_location")
+  toLocation   String @default("") @map("to_location")
+
+  notes     String @default("")
+  enteredBy String @map("entered_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([cylinderId, occurredOn])
+  @@map("cylinder_events")
 }
