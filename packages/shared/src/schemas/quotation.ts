@@ -23,6 +23,27 @@ export const quotationLayerSchema = z.object({
   /** Null leaves the ply unchosen, which makes the line uncostable — not free. */
   materialId: z.string().min(1).nullable().default(null),
   micron: positiveNumber('Thickness'),
+  /**
+   * Rupees per kilogram the office typed, when the film's own rate cannot apply.
+   *
+   * The rates master prices a film at the gauge it is stocked in: `PET 12µm` and
+   * `PET 19µm` are two materials at two prices. Quote a 20µ PET and neither rate
+   * is the right one — so rather than silently cost it at the 12µ price, the
+   * line asks, and what is typed is used for this quotation and stored on it.
+   *
+   * **It does not reach the rates master.** A figure keyed in the middle of
+   * quoting is a decision about one document, and letting it edit the price list
+   * would mean every quotation is a chance to change what every other quotation
+   * costs. Adding `PET 20µm` properly is a job for the Rates screen.
+   *
+   * Null means "use the film's own rate", which is the ordinary case.
+   */
+  rateOverride: z
+    .union([z.literal(''), z.null(), z.undefined()])
+    .transform(() => null)
+    .or(z.coerce.number().positive('Rate must be more than 0'))
+    .nullable()
+    .default(null),
 });
 
 /** One quantity a line is priced at. */
@@ -274,9 +295,31 @@ export const createQuotationSchema = createQuotationBaseSchema
  */
 export const updateQuotationSchema = createQuotationBaseSchema.partial();
 
+/**
+ * The columns the list can be ordered by.
+ *
+ * A closed set rather than a free string: the value reaches Prisma's `orderBy`,
+ * and anything the office can type there is a column name it could guess at.
+ * Only these four are offered because only these four are on the table as
+ * sortable columns — sorting by a figure nobody can see is not a feature.
+ */
+export const QUOTATION_SORT_FIELDS = ['number', 'customerName', 'date', 'status'] as const;
+export const quotationSortFieldSchema = z.enum(QUOTATION_SORT_FIELDS);
+export type QuotationSortField = (typeof QUOTATION_SORT_FIELDS)[number];
+
+export const sortDirectionSchema = z.enum(['asc', 'desc']);
+export type SortDirection = z.infer<typeof sortDirectionSchema>;
+
 export const listQuotationsQuerySchema = paginationQuerySchema.extend({
   q: z.string().trim().max(200).optional(),
   status: quotationStatusSchema.optional(),
+  /**
+   * Absent means the work queue — see `listQuotations`. That default is not
+   * expressed here because it is two columns, not one, and a caller asking for
+   * no particular order should get the useful order rather than a column.
+   */
+  sort: quotationSortFieldSchema.optional(),
+  dir: sortDirectionSchema.optional(),
 });
 
 export type QuotationItemInput = z.infer<typeof quotationItemSchema>;

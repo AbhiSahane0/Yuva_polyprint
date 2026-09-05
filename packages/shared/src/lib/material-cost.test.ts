@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   computeMargin,
   computeMaterialCostPerKg,
+  overriddenRate,
   totalMicronForLayers,
   type LayerInput,
 } from './material-cost.js';
@@ -126,5 +127,44 @@ describe('computeMargin', () => {
 
   it('says nothing when there is no cost to compare against', () => {
     expect(computeMargin(500, null)).toBeNull();
+  });
+});
+
+/**
+ * Whether a stored ply was priced by its film or by hand.
+ *
+ * There is no column recording it, so this is inferred — which makes it worth
+ * pinning. The server carries the rate through when repricing from storage and
+ * the form puts it back in the box on reopening; both read it from here, and if
+ * they ever disagreed a quotation would display one rate and be repriced at
+ * another.
+ */
+describe('overriddenRate', () => {
+  it('is null when the gauge quoted is the gauge the film is stocked at', () => {
+    expect(overriddenRate({ materialName: 'PET 12µm', micron: 12, ratePerKg: 210 })).toBeNull();
+  });
+
+  it('returns the rate when a gauge off the price list was quoted', () => {
+    // The case it exists for: 12 and 19 are stocked, 20 was quoted, so neither
+    // rate on file applies and the office typed one.
+    expect(overriddenRate({ materialName: 'PET 12µm', micron: 20, ratePerKg: 245 })).toBe(245);
+  });
+
+  it('is null for a film whose name states no gauge', () => {
+    // PP Woven is specified by GSM, so its rate applies at any thickness and a
+    // typed micron is not an override.
+    expect(overriddenRate({ materialName: 'PP Woven', micron: 90, ratePerKg: 150 })).toBeNull();
+  });
+
+  it('is null when nothing was ever priced', () => {
+    expect(overriddenRate({ materialName: 'PET 12µm', micron: 20, ratePerKg: null })).toBeNull();
+  });
+
+  it('reads Decimal columns handed over as strings', () => {
+    // Prisma Decimals JSON-serialise as strings, so a ply read back over the
+    // wire carries "20" where the form carries 20. Comparing those as they
+    // arrive would make every reloaded ply look overridden.
+    expect(overriddenRate({ materialName: 'PET 12µm', micron: '12', ratePerKg: '210' })).toBeNull();
+    expect(overriddenRate({ materialName: 'PET 12µm', micron: '20', ratePerKg: '245' })).toBe(245);
   });
 });

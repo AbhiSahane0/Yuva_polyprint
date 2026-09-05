@@ -14,6 +14,7 @@ import {
   type QuotationTier,
   computeItemGeometry,
   computeTier,
+  overriddenRate,
   totalMicronForLayers,
   type QuotationSummary,
   type QuotationEmail as QuotationEmailRecord,
@@ -273,7 +274,16 @@ function priceQuotation(
         name: material?.name ?? 'Not chosen',
         micron,
         density,
-        ratePerKg: costing.rateOfId(layer.materialId ?? null),
+        /*
+         * The film's own rate, unless the office typed one over it.
+         *
+         * An override is asked for when the gauge quoted is not the gauge the
+         * film is stocked at — a 20µ PET priced at the 12µ rate would be a
+         * confident wrong number, which is worse than a question. What is typed
+         * is used here and snapshotted onto the line; it never reaches the
+         * rates master. See `rateOverride` on the layer schema.
+         */
+        ratePerKg: layer.rateOverride ?? costing.rateOfId(layer.materialId ?? null),
         gsm: density === null ? 0 : round(micron * density, 3),
       };
     });
@@ -436,6 +446,41 @@ async function nextQuotationNumber(tx: Prisma.TransactionClient): Promise<number
   return Math.max((latest?.number ?? 0) + 1, settings.quotationStartNumber);
 }
 
+/**
+ * How the list is ordered.
+ *
+ * With no `sort` asked for, **work order**: drafts need finishing, sent ones
+ * need chasing, and won or lost are settled — so the list reads as a queue with
+ * whatever still needs doing at the top. Sorting on the enum is enough, because
+ * Postgres orders enum values by declaration and QuotationStatus is declared
+ * DRAFT, SENT, WON, LOST, which is exactly that sequence.
+ *
+ * Ordering happens **in the database, not the page**. The list is paginated, so
+ * re-sorting in the browser would only shuffle the twenty-five rows on screen
+ * and quietly lie about which quotation is the oldest.
+ *
+ * Every sort carries `number: 'desc'` behind it as a tie-break. Without one,
+ * two quotations sharing a date — which is most of them, the office writes
+ * several a day — have no defined order, and Postgres is free to return them
+ * differently on each page. That reads as rows jumping about while paging.
+ */
+export function listOrderBy(
+  query: ListQuotationsQuery,
+): Prisma.QuotationOrderByWithRelationInput[] {
+  if (!query.sort) return [{ status: 'asc' }, { number: 'desc' }];
+
+  const dir = query.dir ?? 'asc';
+  if (query.sort === 'number') return [{ number: dir }];
+
+  /*
+   * The snapshot on the quotation, not the customer's current name. It is what
+   * the row displays, and a quotation keeps the name it was issued under even
+   * after the customer master is corrected — sorting by the live name would
+   * order the list by something not on screen.
+   */
+  return [{ [query.sort]: dir }, { number: 'desc' }];
+}
+
 export async function listQuotations(query: ListQuotationsQuery) {
   const filters: Prisma.QuotationWhereInput[] = [];
 
@@ -467,18 +512,7 @@ export async function listQuotations(query: ListQuotationsQuery) {
     prisma.quotation.findMany({
       where,
       include: QUOTATION_INCLUDE,
-      /*
-       * Work order, not date order: drafts need finishing, sent ones need
-       * chasing, and won or lost are settled. So the list reads as a queue
-       * with whatever still needs doing at the top.
-       *
-       * Sorting on the enum itself is enough — Postgres orders enum values by
-       * the order they were declared, and QuotationStatus is declared
-       * DRAFT, SENT, WON, LOST, which is exactly this sequence. Sorting in the
-       * database rather than the page matters because the list is paginated;
-       * re-ordering one page in the browser would only shuffle that page.
-       */
-      orderBy: [{ status: 'asc' }, { number: 'desc' }],
+      orderBy: listOrderBy(query),
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     }),
@@ -789,6 +823,24 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
       layers: byPosition(item.layers).map((layer) => ({
         materialId: layer.materialId,
         micron: toNumber(layer.micron),
+        /*
+         * A rate the office typed cannot be looked up again, so it is carried.
+         *
+         * This path reprices from storage when a PATCH does not resend the
+         * lines. Every other figure can be re-derived from the material; a rate
+         * quoted for a gauge the rates master does not stock cannot be, and
+         * dropping it here would silently reprice a 20µ PET at the 12µ rate on
+         * the next unrelated edit.
+         *
+         * Recognised by the mismatch rather than a stored flag: the ply keeps
+         * the material's name, and a name that states a gauge different from
+         * the one quoted is exactly the case the override exists for.
+         */
+        rateOverride: overriddenRate({
+          materialName: layer.materialName,
+          micron: toNumber(layer.micron),
+          ratePerKg: layer.ratePerKg === null ? null : toNumber(layer.ratePerKg),
+        }),
       })),
       /*
        * Fed back as stored, both units populated. Which pair is actually read

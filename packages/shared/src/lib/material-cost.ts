@@ -171,3 +171,32 @@ export function micronFromFilmName(name: string): number | null {
   const micron = Number(match[1]);
   return Number.isFinite(micron) && micron > 0 ? micron : null;
 }
+
+/**
+ * The rate on a stored ply, when the office typed it rather than the film supplying it.
+ *
+ * The rates master prices a film at the gauge it is stocked in — `PET 12µm` and
+ * `PET 19µm` are two materials at two prices — so quoting a 20µ PET means
+ * neither rate applies and the office is asked for one. Nothing records that
+ * this happened, and nothing needs to: the ply keeps the film's name, so a name
+ * stating a gauge different from the one quoted **is** the override.
+ *
+ * Null in every ordinary case, which leaves repricing free to pick up the
+ * material's current rate as it always has.
+ *
+ * Shared because the server and the form must agree on it. The server carries
+ * this rate through when repricing from storage, and the form puts it back in
+ * the box when a quotation is reopened; if the two read it differently, a
+ * quotation would show one rate and be repriced at another.
+ */
+export function overriddenRate(layer: {
+  materialName: string;
+  micron: number | string;
+  ratePerKg: number | string | null;
+}): number | null {
+  if (layer.ratePerKg === null) return null;
+  const stocked = micronFromFilmName(layer.materialName);
+  if (stocked === null || stocked === Number(layer.micron)) return null;
+  const rate = Number(layer.ratePerKg);
+  return Number.isFinite(rate) ? rate : null;
+}

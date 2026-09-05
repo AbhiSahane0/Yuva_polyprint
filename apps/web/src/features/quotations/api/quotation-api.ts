@@ -5,12 +5,14 @@ import type {
   Paginated,
   Quotation,
   QuotationEmail as QuotationEmailRecord,
+  QuotationSortField,
   QuotationStatus,
   RecordOutcomeInput,
   RecordOutcomeResult,
   QuotationSummary,
   SendQuotationInput,
   SendQuotationResult,
+  SortDirection,
   UpdateQuotationInput,
 } from '@yuva/shared';
 import { request, requestBlob } from '@/lib/api-client';
@@ -20,6 +22,9 @@ export interface QuotationListParams {
   pageSize: number;
   q?: string;
   status?: QuotationStatus;
+  /** Omitted for the default work-queue order. */
+  sort?: QuotationSortField;
+  dir?: SortDirection;
 }
 
 export const quotationKeys = {

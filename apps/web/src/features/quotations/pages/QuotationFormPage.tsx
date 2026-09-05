@@ -27,6 +27,9 @@ import {
   computeItemGeometry,
   computeMargin,
   computeMaterialCostPerKg,
+  overriddenRate,
+  suggestRepeatHeight,
+  suggestRepeatWidth,
   computeTier,
   computeTotals,
   createQuotationSchema,
@@ -133,8 +136,8 @@ const BLANK_DESIGN = {
   gazetteLeft: 0,
   gazetteRight: 0,
   layers: [
-    { materialId: null, micron: PET_MICRON_PER_LAYER },
-    { materialId: null, micron: 50 },
+    { materialId: null, micron: PET_MICRON_PER_LAYER, rateOverride: '' },
+    { materialId: null, micron: 50, rateOverride: '' },
   ],
   repeatWidth: 1,
   repeatHeight: 1,
@@ -396,6 +399,18 @@ export default function QuotationFormPage() {
         layers: item.layers.map((layer) => ({
           materialId: layer.materialId,
           micron: layer.micron,
+          /*
+           * A rate that was typed goes back in the box; one that came from the
+           * film does not.
+           *
+           * There is no stored flag saying which it was, and there does not
+           * need to be: the ply keeps the film's name, and a name stating a
+           * gauge different from the one quoted is exactly the case the box is
+           * shown for. Reading it back this way means reopening a quotation
+           * shows what was actually charged rather than an empty box beside a
+           * price nobody can account for.
+           */
+          rateOverride: overriddenRate(layer),
         })),
         quantities: item.quantities.map((quantity) => ({
           quantityKg: quantity.quantityKg,
@@ -464,11 +479,15 @@ export default function QuotationFormPage() {
 
       const layers = (item?.layers ?? []).map((layer) => {
         const film = layer?.materialId ? filmById.get(String(layer.materialId)) : undefined;
+        // The typed rate wins, matching what the server will store. If these
+        // disagreed, the margin shown while choosing a price would not be the
+        // one the quotation is saved with.
+        const override = num(layer?.rateOverride);
         return {
           name: film?.name ?? 'Not chosen',
           micron: num(layer?.micron),
           density: film?.density ?? null,
-          ratePerKg: film?.currentRate ?? null,
+          ratePerKg: override > 0 ? override : (film?.currentRate ?? null),
         };
       });
 
@@ -1097,6 +1116,67 @@ function JobCard({
   const basis = basisOf(item);
 
   /*
+   * Whether the office has taken the repeats over.
+   *
+   * Held here rather than in the form, because it is about how this screen is
+   * being used and not about the quotation: a saved document records the
+   * repeats it was priced with, and nothing about who typed them.
+   *
+   * Once set it stays set for the life of the card. Suggesting again after
+   * someone has decided would quietly undo their decision the next time the
+   * size is touched, which is worse than not suggesting at all.
+   */
+  const [repeatsTaken, setRepeatsTaken] = useState(false);
+
+  /** False on a repeat order, whose cylinders already exist. */
+  const charged = item?.chargeCylinders !== false;
+
+  /*
+   * The film the cylinder actually carries — the pouch plus any gusset.
+   *
+   * Read from the costed geometry rather than recomputed, so the suggestion and
+   * the cylinder size it produces cannot disagree.
+   */
+  const filmWidthMm = cost?.geometry.filmWidthMm ?? 0;
+  const filmHeightMm = cost?.geometry.filmHeightMm ?? 0;
+
+  /**
+   * Fill the repeats in as the size is typed, until the office says otherwise.
+   *
+   * The circumference is the design's height times the repeat, so the repeat is
+   * what decides whether the job lands on a cylinder the works owns. Left at 1,
+   * a 250mm pouch asks for a 250mm cylinder — below anything in the racks — and
+   * the cylinder cost that follows is wrong by whatever the real one would be.
+   *
+   * Only for a design being charged for. A repeat order's cylinders exist, and
+   * their size is a fact about what was engraved rather than something to work
+   * out again from the size on screen.
+   */
+  useEffect(() => {
+    if (repeatsTaken || !charged) return;
+    if (filmWidthMm <= 0 || filmHeightMm <= 0) return;
+
+    const width = suggestRepeatWidth(filmWidthMm);
+    const height = suggestRepeatHeight(filmHeightMm);
+
+    /*
+     * Compared before writing, and that comparison is what stops this looping.
+     *
+     * The effect depends on `item`, which its own `setValue` changes — so it
+     * runs again after every write. Writing only on a difference means the
+     * second run is a no-op and it settles, where writing unconditionally would
+     * not. Written as strings, matching every other number the form holds while
+     * it is being typed; the schema coerces on submit.
+     */
+    if (num(item?.repeatWidth) !== width) {
+      setValue(`items.${index}.repeatWidth`, String(width) as never, { shouldDirty: true });
+    }
+    if (num(item?.repeatHeight) !== height) {
+      setValue(`items.${index}.repeatHeight`, String(height) as never, { shouldDirty: true });
+    }
+  }, [filmWidthMm, filmHeightMm, repeatsTaken, charged, index, setValue, item]);
+
+  /*
    * Whether this line is quoted for cylinders.
    *
    * Keyed on `chargeCylinders`, not on whether the line has a job id. Those
@@ -1484,7 +1564,27 @@ function JobCard({
                 <span className="text-ink-500 text-xs font-semibold tracking-wide uppercase">
                   Cylinders
                 </span>
-                <span className="text-ink-400 text-xs">New design — charged once</span>
+                <div className="flex items-center gap-3">
+                  {/*
+                   * Said out loud, because a box that fills itself in is
+                   * otherwise indistinguishable from one somebody already typed
+                   * — and the office needs to know whether the figure is theirs
+                   * before they trust it. Once they change one, the label goes
+                   * and stays gone.
+                   */}
+                  {repeatsTaken ? (
+                    <button
+                      type="button"
+                      onClick={() => setRepeatsTaken(false)}
+                      className="text-brand-600 hover:text-brand-700 cursor-pointer text-xs underline underline-offset-2"
+                    >
+                      Use the suggested repeats
+                    </button>
+                  ) : (
+                    <span className="text-ink-400 text-xs">Repeats suggested from the size</span>
+                  )}
+                  <span className="text-ink-400 text-xs">New design — charged once</span>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-12">
@@ -1493,7 +1593,9 @@ function JobCard({
                     <Input
                       id={`items.${index}.repeatWidth`}
                       inputMode="decimal"
-                      {...register(`items.${index}.repeatWidth`)}
+                      {...register(`items.${index}.repeatWidth`, {
+                        onChange: () => setRepeatsTaken(true),
+                      })}
                     />
                   </Field>
                 </div>
@@ -1502,7 +1604,9 @@ function JobCard({
                     <Input
                       id={`items.${index}.repeatHeight`}
                       inputMode="decimal"
-                      {...register(`items.${index}.repeatHeight`)}
+                      {...register(`items.${index}.repeatHeight`, {
+                        onChange: () => setRepeatsTaken(true),
+                      })}
                     />
                   </Field>
                 </div>
