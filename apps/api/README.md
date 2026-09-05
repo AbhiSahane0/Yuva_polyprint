@@ -626,6 +626,24 @@ costPerCylinder       = (cylinderWidth × cylinderCircumference ÷ 100) × cylin
 totalCylinderCost     = costPerCylinder × cylinderCount + transportCost
 ```
 
+Both repeats are **suggested** by `suggestRepeatWidth` and `suggestRepeatHeight`,
+and both stay editable. The rules come out of the works' own records rather than
+being chosen:
+
+| From the 347 imported jobs that record a cylinder                |            |
+| ---------------------------------------------------------------- | ---------- |
+| Recorded circumference is an exact multiple of the design height | 84%        |
+| Range of those circumferences                                    | 310–740mm  |
+| Where they cluster                                               | around 480 |
+| `width × ups + 80` at or under 800mm                             | 95%        |
+
+So the height repeat is the whole number putting the circumference inside
+310–740 and closest to 490, and the width repeat is as many lanes as an 800mm
+face will take. Replayed against the same jobs, that reproduces the repeat the
+works actually chose on **85%**; the rest are designs where two repeats both fit
+and the works took the other — which cylinder was free, not arithmetic, and the
+reason these are suggestions.
+
 **Transport is part of this total.** It is the one term that is not derived from
 the cylinder's size, so checking the figure as cylinders × cost-per-cylinder
 comes up short by exactly the transport and looks like an error. A line with
@@ -775,10 +793,36 @@ costPerKg = Σ(componentGsm × componentRate) ÷ compositeGsm
 margin %  = (sellingRate − costPerKg) ÷ sellingRate × 100
 ```
 
-Every ply is costed against **its own material's rate**, so a metallised PET is
-priced as MET PET and not as the plain PET beside it — same 12µ and the same
+A ply may carry a **rate the office typed** instead. The rates master prices a
+film at the gauge it is stocked in, so quoting a 20µ PET when 12 and 19 are on
+the list means neither rate applies — the line asks for one, and what is typed
+is stored on the ply. It never reaches the rates master. Recognised on reload by
+`overriddenRate`: the ply keeps the film's name, and a name stating a gauge
+different from the one quoted is the override, so no flag has to be stored.
+
+Otherwise every ply is costed against **its own material's rate**, so a
+metallised PET is priced as MET PET and not as the plain PET beside it — same 12µ and the same
 density, so quoted prices and pouch counts are identical either way, but a
 different material at a different price.
+
+**The margin does not move with the quantity, and that is correct.** Both sides
+are per kilogram, so the ratio cannot depend on how many kilograms are bought:
+1,000 pouches at ₹10 and 100,000 at ₹10 both come to ₹1,623/kg against ₹213.65
+of material, and both report 86.84%. Ordering twice as much at the same price
+earns twice the money at the same margin.
+
+What genuinely improves with volume is the **all-in cost of a pouch**, because
+the cylinders are charged once whatever the order:
+
+```
+1,000 pouches   ₹10,000 + ₹21,500 cylinders  ÷ 1,000    = ₹31.50 each
+100,000 pouches ₹1,000,000 + ₹21,500         ÷ 100,000  = ₹10.22 each
+```
+
+That is the figure behind "order more and it gets cheaper", and it is the whole
+reason a quotation carries two or three quantities side by side. It is a
+document-level number, not a line-level one, so it appears on the Review step
+and the printed page rather than beside the rate.
 
 **The margin is material only.** Films, ink and adhesive are in it; cylinders,
 printing, lamination, slitting and wastage are not. It answers "what does the
