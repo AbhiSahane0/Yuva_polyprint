@@ -5,13 +5,18 @@ import type { CreateQuotationFormValues } from '@yuva/shared';
 import { LayerFields } from './LayerFields';
 
 /**
- * The gauge is typed, and a gauge off the price list has to be priced.
+ * The film and the gauge are two questions, asked once each.
  *
- * The rates master prices a film at the gauge it is stocked in — `PET 12µm` and
- * `PET 19µm` are two materials at two prices. Quote a 20µ PET and neither rate
- * applies, so the row has to ask rather than cost the ply at whichever price
- * happens to be on file. Costing it silently is the failure this guards: it
- * produces a confident, wrong margin that nothing on screen contradicts.
+ * The dropdown offers families — PET, PE — and the gauge is typed beside it.
+ * The rates master holds `PET 12µm` and `PET 19µm` separately because they are
+ * bought at separate prices, but they are one film at the machine, and listing
+ * both asked the same question twice.
+ *
+ * Family plus gauge names a stocked film and uses its rate. Only a gauge the
+ * master does not stock has no price to find, and that is the one case the row
+ * asks about — costing it silently at the neighbouring gauge's price is the
+ * failure guarded here, because it produces a confident wrong margin that
+ * nothing on screen contradicts.
  */
 
 const FILMS = [
@@ -53,6 +58,11 @@ const rateBox = (n = 0) =>
   document.getElementById(`items.0.layers.${n}.rateOverride`) as HTMLInputElement | null;
 const filmSelect = (n = 0) =>
   document.getElementById(`items.0.layers.${n}.materialId`) as HTMLSelectElement;
+/** Picking a family, which is what the dropdown now holds. */
+const pick = (family: string, n = 0) =>
+  fireEvent.change(filmSelect(n), { target: { value: family } });
+const type = (micron: string, n = 0) =>
+  fireEvent.change(micronBox(n), { target: { value: micron } });
 
 describe('LayerFields', () => {
   it('asks for the micron on every ply, chosen film or not', () => {
@@ -63,65 +73,98 @@ describe('LayerFields', () => {
     expect(micronBox(1)).toBeTruthy();
   });
 
-  it('fills the micron in from the film that was picked', () => {
+  it('fills the micron in from the family when the box is empty', () => {
+    render(<Host layers={[{ materialId: null, micron: '', rateOverride: '' }, {}]} />);
+    pick('PET');
+    // The thinnest PET on the list, as a starting point.
+    expect(micronBox(0).value).toBe('12');
+  });
+
+  it('does not overwrite a gauge already typed', () => {
     render(<Host />);
-    fireEvent.change(filmSelect(0), { target: { value: 'pet19' } });
+    type('19');
+    pick('PET');
+    // Overwriting would undo the office's own figure the moment they corrected
+    // the film beside it.
     expect(micronBox(0).value).toBe('19');
+  });
+
+  it('lists families, not one row per stocked gauge', () => {
+    render(<Host />);
+    const options = [...filmSelect(0).options].map((o) => o.text.trim());
+    expect(options).toContain('PET');
+    expect(options).not.toContain('PET 12µm');
+    expect(options).not.toContain('PET 19µm');
+    // PET and PE each appeared twice before, once per gauge.
+    expect(options.filter((o) => o === 'PET')).toHaveLength(1);
+  });
+
+  it('uses the stocked rate when the gauge typed is one the master holds', () => {
+    render(<Host />);
+    pick('PET');
+    type('19');
+    // PET 19µm is a real material at Rs. 218. Asking for a rate here would end
+    // with the same film quoted at two prices on two quotations.
+    expect(rateBox(0)).toBeNull();
+    expect(screen.getByText(/218\.00/)).toBeTruthy();
   });
 
   it('does not ask for a rate at the gauge the film is stocked at', () => {
     render(<Host />);
-    fireEvent.change(filmSelect(0), { target: { value: 'pet12' } });
+    pick('PET');
     expect(rateBox(0)).toBeNull();
     expect(screen.getByText(/210\.00/)).toBeTruthy();
   });
 
   it('asks for a rate once a gauge off the price list is typed', () => {
     render(<Host />);
-    fireEvent.change(filmSelect(0), { target: { value: 'pet12' } });
-    fireEvent.change(micronBox(0), { target: { value: '20' } });
+    pick('PET');
+    type('20');
 
     expect(rateBox(0)).toBeTruthy();
-    // And says which gauge the film IS priced at, so it is obvious that a 20
-    // was typed where the list holds a 12 — rather than reading as an unpriced
-    // film.
-    expect(screen.getByText(/PET 12µm is priced at 12µ/)).toBeTruthy();
+    /*
+     * And names the nearest gauge the master does stock, so it is obvious that
+     * a 20 was typed against a list holding 12 and 19 — rather than reading as
+     * an unpriced film. The nearest is also the ply's density carrier: density
+     * is a property of the polymer, not the gauge, so any PET answers for it.
+     */
+    expect(screen.getByText(/PET 19µm is priced at 19µ/)).toBeTruthy();
   });
 
   it('stops asking when the gauge is put back', () => {
     render(<Host />);
-    fireEvent.change(filmSelect(0), { target: { value: 'pet12' } });
-    fireEvent.change(micronBox(0), { target: { value: '20' } });
+    pick('PET');
+    type('20');
     expect(rateBox(0)).toBeTruthy();
 
-    fireEvent.change(micronBox(0), { target: { value: '12' } });
+    type('12');
     expect(rateBox(0)).toBeNull();
   });
 
   it('does not ask while the box is empty mid-edit', () => {
     render(<Host />);
-    fireEvent.change(filmSelect(0), { target: { value: 'pet12' } });
-    fireEvent.change(micronBox(0), { target: { value: '' } });
+    pick('PET');
+    type('');
     // Asking for a rate the moment a digit is deleted makes the row flicker.
     expect(rateBox(0)).toBeNull();
   });
 
   it('never asks for a film whose name states no gauge', () => {
     render(<Host />);
-    fireEvent.change(filmSelect(0), { target: { value: 'ppw' } });
-    fireEvent.change(micronBox(0), { target: { value: '90' } });
+    pick('PP Woven');
+    type('90');
     // PP Woven is priced by GSM, so its rate applies at any thickness.
     expect(rateBox(0)).toBeNull();
   });
 
   it('clears a typed rate when the film is swapped', () => {
     render(<Host />);
-    fireEvent.change(filmSelect(0), { target: { value: 'pet12' } });
-    fireEvent.change(micronBox(0), { target: { value: '20' } });
+    pick('PET');
+    type('20');
     fireEvent.change(rateBox(0)!, { target: { value: '245' } });
 
-    fireEvent.change(filmSelect(0), { target: { value: 'pe50' } });
-    fireEvent.change(micronBox(0), { target: { value: '20' } });
+    pick('PE');
+    type('20');
 
     // 245 was the price of a 20µ PET. Carrying it onto a polythene ply would
     // cost that ply at a rate nobody entered for it.

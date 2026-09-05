@@ -261,6 +261,14 @@ model Quotation {
   /// issued against, even if the customer master is corrected later.
   gstNumber    String @default("NA") @map("gst_number")
 
+  /// Which quantity the document is for, 1-based, among this quotation's tiers.
+  ///
+  /// The office may price a job at two or three quantities to see what volume
+  /// does to the margin; the customer is quoted one. Stored rather than derived
+  /// because it is a decision, and defaulted to 1 so every existing quotation
+  /// keeps showing the quantity it was written for.
+  selectedQuantity Int @default(1) @map("selected_quantity")
+
   /// Rates as they stood when this quotation was made.
   cylinderRate           Decimal @map("cylinder_rate") @db.Decimal(10, 4)
   gstPercent             Decimal @map("gst_percent") @db.Decimal(5, 2)

@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   computeMargin,
   computeMaterialCostPerKg,
+  filmFamily,
   overriddenRate,
   plyRatePerKg,
+  resolveFilm,
   totalMicronForLayers,
   type LayerInput,
 } from './material-cost.js';
@@ -238,5 +240,94 @@ describe('plyRatePerKg', () => {
     });
     expect(cost.costPerKg).toBeNull();
     expect(computeMargin(1623, cost.costPerKg)).toBeNull();
+  });
+});
+
+/**
+ * Families, and the film a family plus a gauge names between them.
+ *
+ * The rates master holds `PET 12µm` and `PET 19µm` as separate rows because
+ * they are bought at separate prices, but they are one film to anybody at the
+ * machine. The gauge is typed on the line, so listing both asked the same
+ * question twice and let the two answers disagree.
+ */
+describe('filmFamily', () => {
+  it.each([
+    ['PET 12µm', 'PET'],
+    ['PET 19µm', 'PET'],
+    ['MET PET 12µm', 'MET PET'],
+    ['PE 60µm', 'PE'],
+    ['PVC / PETG 45µm', 'PVC / PETG'],
+    ['Foil 7µm', 'Foil'],
+  ])('%s belongs to %s', (name, family) => {
+    expect(filmFamily(name)).toBe(family);
+  });
+
+  it('leaves a name that states no gauge alone', () => {
+    // PP Woven is specified by GSM, and is its own family of one.
+    expect(filmFamily('PP Woven')).toBe('PP Woven');
+  });
+
+  it('collapses the master to one entry per film', () => {
+    const names = [
+      'PET 12µm',
+      'PET 19µm',
+      'MET PET 12µm',
+      'PE 50µm',
+      'PE 60µm',
+      'LDPE 60µm',
+      'BOPP 20µm',
+      'Foil 7µm',
+      'PVC / PETG 45µm',
+      'POF 40µm',
+      'PP Woven',
+    ];
+    // Eleven rows, nine films: PET and PE each appeared twice.
+    expect(new Set(names.map(filmFamily)).size).toBe(9);
+  });
+});
+
+describe('resolveFilm', () => {
+  const FILMS = [
+    { name: 'PET 12µm' },
+    { name: 'PET 19µm' },
+    { name: 'PE 50µm' },
+    { name: 'PE 60µm' },
+    { name: 'PP Woven' },
+  ];
+
+  it('finds the stocked film when the gauge is one the master holds', () => {
+    // The point of the whole change: PET at 19 is a real material with a real
+    // price, and must not be treated as an unpriced gauge.
+    expect(resolveFilm('PET', 19, FILMS)?.name).toBe('PET 19µm');
+    expect(resolveFilm('PET', 12, FILMS)?.name).toBe('PET 12µm');
+    expect(resolveFilm('PE', 60, FILMS)?.name).toBe('PE 60µm');
+  });
+
+  it('falls back to the nearest gauge in the family for a gauge nobody stocks', () => {
+    /*
+     * Not a price — `plyRatePerKg` sees the name state 19 against a quoted 20
+     * and refuses to cost it until the office gives a rate. This is for the
+     * density, which is a property of the polymer rather than the gauge, and
+     * for a name to show on the line.
+     */
+    expect(resolveFilm('PET', 20, FILMS)?.name).toBe('PET 19µm');
+    expect(resolveFilm('PE', 45, FILMS)?.name).toBe('PE 50µm');
+  });
+
+  it('answers at any gauge for a family named without one', () => {
+    expect(resolveFilm('PP Woven', 90, FILMS)?.name).toBe('PP Woven');
+    expect(resolveFilm('PP Woven', 120, FILMS)?.name).toBe('PP Woven');
+  });
+
+  it('picks something while the gauge box is still empty', () => {
+    // Choosing a family before typing a gauge must land somewhere, or the ply
+    // would have no density and the line would read as uncostable.
+    expect(resolveFilm('PET', 0, FILMS)?.name).toBe('PET 12µm');
+  });
+
+  it('is undefined for a family that holds nothing', () => {
+    expect(resolveFilm('Nylon', 15, FILMS)).toBeUndefined();
+    expect(resolveFilm('', 15, FILMS)).toBeUndefined();
   });
 });

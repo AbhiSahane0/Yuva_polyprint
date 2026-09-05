@@ -120,6 +120,13 @@ export interface QuotationSummary {
   isLatest: boolean;
   /** How many quantities this document is priced at. */
   tierCount: number;
+  /**
+   * Which of those the customer is quoted, 1-based.
+   *
+   * The others are the office's working: priced to see what volume does to the
+   * margin, and left off the printed page.
+   */
+  selectedQuantity: number;
 
   /**
    * The headline figures, taken from the tier the customer accepted, or from

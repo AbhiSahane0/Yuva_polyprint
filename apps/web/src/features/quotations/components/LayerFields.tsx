@@ -6,7 +6,13 @@ import {
   type UseFormSetValue,
 } from 'react-hook-form';
 import { Layers } from 'lucide-react';
-import { formatRs, micronFromFilmName, type CreateQuotationFormValues } from '@yuva/shared';
+import {
+  filmFamily,
+  formatRs,
+  micronFromFilmName,
+  resolveFilm,
+  type CreateQuotationFormValues,
+} from '@yuva/shared';
 import { Field, Input, Select } from '@/components/ui/Field';
 import { cn } from '@/lib/utils';
 
@@ -21,14 +27,16 @@ import { cn } from '@/lib/utils';
  * Choosing the count adds or removes rows rather than swapping the form, so
  * moving 2 → 3 keeps everything already typed and only asks for the new ply.
  *
- * **The gauge is typed, and the film fills it in.** Choosing `PET 12µm` puts 12
- * in the box; the box stays editable, because the works quotes gauges the rates
- * master does not stock and a dropdown cannot offer a number nobody has priced.
+ * **The film and the gauge are two questions, asked once each.** The dropdown
+ * offers families — PET, PE, MET PET — and the gauge is typed beside it. The
+ * rates master holds `PET 12µm` and `PET 19µm` as separate rows because they
+ * are bought at separate prices, but they are one film to anybody at the
+ * machine, and listing both asked the same question twice.
  *
- * Typing a gauge the film is not stocked at is the interesting case. A 20µ PET
- * is not priced like a 12µ one, so the film's rate stops applying and the row
- * asks for the rate instead of quietly costing the ply at the wrong price. What
- * is typed is used for this quotation only — see `rateOverride` on the schema.
+ * Family plus gauge names a stocked film, and that film's rate is used: PET at
+ * 19 finds `PET 19µm` and costs the ply at its price without asking anybody
+ * anything. Only a gauge the master does not stock — a 20µ PET — has no price
+ * to find, and that is the one case the line asks about. See `resolveFilm`.
  */
 
 /**
@@ -77,6 +85,13 @@ export function LayerFields({
 
   const filmById = new Map(films.map((film) => [film.id, film]));
 
+  /*
+   * The families, in the order the rates master lists them, without repeats.
+   * Nine entries where there were eleven — PET and PE each appeared twice, once
+   * per stocked gauge.
+   */
+  const families = [...new Set(films.map((film) => filmFamily(film.name)))];
+
   function setCount(next: number) {
     // Add to the inside of the structure and remove from there too, so the
     // outer printed ply and the sealant — the two the office actually chose —
@@ -89,22 +104,42 @@ export function LayerFields({
   }
 
   /**
-   * Picking a film fills the gauge in, and clears any rate typed for the old one.
+   * Point a ply at the stocked film its family and gauge name between them.
    *
-   * The rate is cleared because it belonged to the previous film: a figure
-   * entered for a 20µ PET must not survive a switch to `Foil 7µm` and go on
-   * costing it. Leaving it would be a wrong price that nobody typed.
+   * The form stores a material id, so the family on screen is really "the
+   * family of whatever film is currently set". Changing either the family or
+   * the gauge re-resolves it — which is what makes typing 19 against PET move
+   * the ply from `PET 12µm` to `PET 19µm` and pick up its own rate.
    */
-  function chooseFilm(index: number, filmId: string) {
-    setValue(`items.${itemIndex}.layers.${index}.materialId`, filmId || null, {
+  function point(index: number, family: string, micron: number) {
+    const film = family ? resolveFilm(family, micron, films) : undefined;
+    setValue(`items.${itemIndex}.layers.${index}.materialId`, film?.id ?? null, {
       shouldDirty: true,
     });
+    return film;
+  }
+
+  /**
+   * Picking a family fills the gauge in, and clears any rate typed for the old one.
+   *
+   * The rate is cleared because it belonged to the previous film: a figure
+   * entered for a 20µ PET must not survive a switch to Foil and go on costing
+   * it. Leaving it would be a wrong price that nobody typed.
+   *
+   * The gauge is only filled in when the box is empty or the family cannot hold
+   * what is in it. Overwriting a typed gauge would undo the office's own figure
+   * the moment they corrected the film beside it.
+   */
+  function chooseFamily(index: number, family: string) {
     setValue(`items.${itemIndex}.layers.${index}.rateOverride`, '' as never, {
       shouldDirty: true,
     });
 
-    const film = filmId ? filmById.get(filmId) : undefined;
-    const micron = film ? micronFromFilmName(film.name) : null;
+    const typed = Number(layers[index]?.micron ?? 0);
+    const film = point(index, family, typed);
+    if (!film || typed > 0) return;
+
+    const micron = micronFromFilmName(film.name);
     if (micron === null) return;
 
     // As a string: the form holds these while they are being typed, and the
@@ -114,6 +149,23 @@ export function LayerFields({
       shouldDirty: true,
       shouldValidate: true,
     });
+  }
+
+  /** Retyping the gauge can move the ply onto a different stocked film. */
+  function changeMicron(index: number, raw: string) {
+    const family = currentFamily(index);
+    if (!family) return;
+    point(index, family, Number(raw));
+    setValue(`items.${itemIndex}.layers.${index}.rateOverride`, '' as never, {
+      shouldDirty: true,
+    });
+  }
+
+  /** The family shown in the dropdown: that of the film the ply points at. */
+  function currentFamily(index: number): string {
+    const id = (layers[index]?.materialId ?? null) as string | null;
+    const film = id ? filmById.get(id) : undefined;
+    return film ? filmFamily(film.name) : '';
   }
 
   return (
@@ -175,14 +227,13 @@ export function LayerFields({
                 >
                   <Select
                     id={`items.${itemIndex}.layers.${index}.materialId`}
-                    value={filmId ?? ''}
-                    onChange={(event) => chooseFilm(index, event.target.value)}
+                    value={currentFamily(index)}
+                    onChange={(event) => chooseFamily(index, event.target.value)}
                   >
                     <option value="">— Choose a film —</option>
-                    {films.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
-                        {option.currentRate === null ? ' (no rate)' : ''}
+                    {families.map((family) => (
+                      <option key={family} value={family}>
+                        {family}
                       </option>
                     ))}
                   </Select>
@@ -207,7 +258,9 @@ export function LayerFields({
                     id={`items.${itemIndex}.layers.${index}.micron`}
                     inputMode="decimal"
                     invalid={Boolean(errors?.[index]?.micron)}
-                    {...register(`items.${itemIndex}.layers.${index}.micron`)}
+                    {...register(`items.${itemIndex}.layers.${index}.micron`, {
+                      onChange: (event) => changeMicron(index, event.target.value),
+                    })}
                   />
                 </Field>
               </div>

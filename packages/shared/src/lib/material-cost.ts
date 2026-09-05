@@ -173,6 +173,65 @@ export function micronFromFilmName(name: string): number | null {
 }
 
 /**
+ * A film's name with its gauge taken off — the material as the office names it.
+ *
+ * `PET 12µm` and `PET 19µm` are two rows in the rates master with two prices,
+ * but they are one film to anybody standing at the machine: PET. The gauge is
+ * typed on the line, so offering both in a dropdown asks the same question
+ * twice and invites the two answers to disagree.
+ *
+ * A name that states no gauge comes back unchanged — `PP Woven` is its own
+ * family of one.
+ */
+export function filmFamily(name: string): string {
+  return name
+    .replace(/(\d+(?:\.\d+)?)\s*(?:µm?|mic(?:ron)?s?)/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * The stocked film a family and a gauge name between them.
+ *
+ * An exact gauge match first, because that is a real material with its own
+ * price: choosing PET and typing 19 must find `PET 19µm` and cost the ply at
+ * its rate, not ask for one. Asking would be worse than pointless — the same
+ * film would end up quoted at two different prices on two quotations.
+ *
+ * With no exact match — a 20µ PET, which the works quotes and the master does
+ * not stock — the nearest gauge in the family is returned instead. That is not
+ * a price: `plyRatePerKg` sees the name state a different gauge and refuses to
+ * cost it until the office gives a rate. It is there for the **density**, which
+ * is a property of the polymer rather than of the gauge (every PET in the
+ * master is 1.4, every PE 0.94), and for a name to show on the line.
+ *
+ * Undefined when the family holds nothing at all.
+ */
+export function resolveFilm<T extends { name: string }>(
+  family: string,
+  micron: number,
+  films: readonly T[],
+): T | undefined {
+  const inFamily = films.filter((film) => filmFamily(film.name) === family);
+  if (inFamily.length === 0) return undefined;
+
+  const exact = inFamily.find((film) => micronFromFilmName(film.name) === micron);
+  if (exact) return exact;
+
+  // A family named without a gauge is stocked at whatever thickness is typed.
+  const gaugeless = inFamily.find((film) => micronFromFilmName(film.name) === null);
+  if (gaugeless) return gaugeless;
+
+  if (!Number.isFinite(micron) || micron <= 0) return inFamily[0];
+
+  return inFamily.reduce((nearest, film) => {
+    const a = Math.abs((micronFromFilmName(film.name) ?? 0) - micron);
+    const b = Math.abs((micronFromFilmName(nearest.name) ?? 0) - micron);
+    return a < b ? film : nearest;
+  });
+}
+
+/**
  * What one ply costs per kilogram, once the gauge and the film are both known.
  *
  * Three cases, and the third is the one worth stating:

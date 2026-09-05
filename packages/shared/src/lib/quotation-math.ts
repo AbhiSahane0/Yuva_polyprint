@@ -513,3 +513,23 @@ export function formatNumber(value: number, decimals = 0): string {
     maximumFractionDigits: decimals,
   });
 }
+
+/**
+ * Which quantity a quotation is actually for, 1-based.
+ *
+ * Clamped rather than trusted. The selection and the quantities are edited on
+ * the same screen and saved together, so a quotation cut from three quantities
+ * down to one arrives still pointing at the third — and rejecting that would
+ * make trimming a quotation an error the office has to clear rather than an
+ * edit. Falling back to the first is the harmless reading: it is the quantity
+ * that certainly exists.
+ */
+export function resolveSelectedQuantity(
+  selected: number | null | undefined,
+  count: number,
+): number {
+  if (count <= 0) return 1;
+  const asked = Number(selected ?? 1);
+  if (!Number.isFinite(asked) || asked < 1) return 1;
+  return Math.min(Math.floor(asked), count);
+}

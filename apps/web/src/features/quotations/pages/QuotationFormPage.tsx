@@ -29,6 +29,7 @@ import {
   computeMaterialCostPerKg,
   overriddenRate,
   plyRatePerKg,
+  resolveSelectedQuantity,
   suggestRepeatHeight,
   suggestRepeatWidth,
   computeTier,
@@ -268,6 +269,7 @@ export default function QuotationFormPage() {
       date: today(),
       customerId: null,
       saveAsCustomer: false,
+      selectedQuantity: 1,
       customerName: '',
       brandName: '',
       addressLine1: '',
@@ -287,6 +289,18 @@ export default function QuotationFormPage() {
   const { control, register, handleSubmit, setValue, trigger, formState, reset } = form;
   const items = useFieldArray({ control, name: 'items' });
   const watched = useWatch({ control });
+
+  /*
+   * Which quantity the customer is quoted, 1-based.
+   *
+   * Clamped against the quantities that exist, using the same rule the server
+   * applies on save — removing the quantity that was ticked must fall back to
+   * one that is there rather than leave the document pointing at nothing.
+   */
+  const selectedQuantity = resolveSelectedQuantity(
+    Number(watched.selectedQuantity ?? 1),
+    watched.items?.[0]?.quantities?.length ?? 1,
+  );
 
   /*
    * Searched on the server, not filtered in the browser.
@@ -365,6 +379,7 @@ export default function QuotationFormPage() {
       date: existing.date,
       customerId: existing.customerId,
       saveAsCustomer: false,
+      selectedQuantity: existing.selectedQuantity,
       customerName: existing.customerName,
       /*
        * Blank, not from the quotation: the brand lives on the customer and is
@@ -1023,6 +1038,10 @@ export default function QuotationFormPage() {
                 errors={formState.errors.items?.[index] as JobErrors | undefined}
                 canRemove={items.fields.length > 1}
                 onRemove={() => items.remove(index)}
+                selectedQuantity={selectedQuantity}
+                onSelectQuantity={(position) =>
+                  setValue('selectedQuantity', position as never, { shouldDirty: true })
+                }
               />
             ))}
 
@@ -1052,6 +1071,7 @@ export default function QuotationFormPage() {
             tierTotals={tierTotals}
             gstPercent={settings?.gstPercent ?? 18}
             register={register}
+            selectedQuantity={selectedQuantity}
           />
         ) : null}
 
@@ -1107,6 +1127,8 @@ function JobCard({
   errors,
   canRemove,
   onRemove,
+  selectedQuantity,
+  onSelectQuantity,
 }: {
   index: number;
   control: Control<CreateQuotationFormValues>;
@@ -1120,6 +1142,9 @@ function JobCard({
   errors: JobErrors | undefined;
   canRemove: boolean;
   onRemove: () => void;
+  /** Quotation-wide: which quantity the customer is quoted, 1-based. */
+  selectedQuantity: number;
+  onSelectQuantity: (position: number) => void;
 }) {
   const jobKind = (item?.jobKind ?? 'POUCH') as 'POUCH' | 'ROLL';
   const pouchType = (item?.pouchType || null) as PouchType | null;
@@ -1556,6 +1581,8 @@ function JobCard({
             }
             results={cost?.quantities ?? []}
             errors={errors?.quantities as never}
+            selectedQuantity={selectedQuantity}
+            onSelectQuantity={onSelectQuantity}
           />
         </div>
 
@@ -1588,10 +1615,10 @@ function JobCard({
                       onClick={() => setRepeatsTaken(false)}
                       className="text-brand-600 hover:text-brand-700 cursor-pointer text-xs underline underline-offset-2"
                     >
-                      Use the suggested repeats
+                      Fit to the size again
                     </button>
                   ) : (
-                    <span className="text-ink-400 text-xs">Repeats suggested from the size</span>
+                    <span className="text-ink-400 text-xs">Fitted to the size</span>
                   )}
                   <span className="text-ink-400 text-xs">New design — charged once</span>
                 </div>
@@ -1599,7 +1626,13 @@ function JobCard({
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-12">
                 <div className="sm:col-span-3">
-                  <Field label="Repeat width" htmlFor={`items.${index}.repeatWidth`}>
+                  {/*
+                   * "Repeat width" read as a measurement — a width in
+                   * millimetres — when it is a count of how many pouches sit
+                   * side by side across the web. "Ups" is the works' own word
+                   * for it and the column the jobs table has always used.
+                   */}
+                  <Field label="Ups across" htmlFor={`items.${index}.repeatWidth`}>
                     <Input
                       id={`items.${index}.repeatWidth`}
                       inputMode="decimal"
@@ -1610,7 +1643,7 @@ function JobCard({
                   </Field>
                 </div>
                 <div className="sm:col-span-3">
-                  <Field label="Repeat height" htmlFor={`items.${index}.repeatHeight`}>
+                  <Field label="Repeats around" htmlFor={`items.${index}.repeatHeight`}>
                     <Input
                       id={`items.${index}.repeatHeight`}
                       inputMode="decimal"
@@ -1688,21 +1721,36 @@ function ReviewStep({
   tierTotals,
   gstPercent,
   register,
+  selectedQuantity,
 }: {
   items: Partial<ItemValues>[];
   costed: ItemCosting[];
   tierTotals: ReturnType<typeof computeTotals>[];
   gstPercent: number;
   register: UseFormRegister<CreateQuotationFormValues>;
+  selectedQuantity: number;
 }) {
+  /*
+   * The step is called "What the customer sees", so it shows one column.
+   *
+   * The others were priced to find out what volume does to the margin, which is
+   * the office's business. Showing all three here and one on the PDF would make
+   * this screen a rehearsal of a different document.
+   */
+  const priced = tierTotals.length;
+  const chosen = Math.min(Math.max(selectedQuantity, 1), Math.max(priced, 1)) - 1;
+  const total = tierTotals[chosen];
+
   return (
     <div className="flex flex-col gap-5">
       <section className="border-ink-200 overflow-hidden rounded-[var(--radius-lg)] border bg-white shadow-[var(--shadow-card)]">
         <div className="border-ink-100 border-b px-4 py-3">
           <h2 className="text-ink-900 text-base font-semibold">What the customer sees</h2>
           <p className="text-ink-500 mt-0.5 text-sm">
-            {tierTotals.length > 1
-              ? `Priced at ${tierTotals.length} quantities. The cylinders cost the same in every column — which is why the unit price falls.`
+            {priced > 1
+              ? `Quoted at quantity ${chosen + 1}. The other ${priced - 1} ${
+                  priced === 2 ? 'was' : 'were'
+                } priced to compare and stay off the document — go back to Jobs to quote a different one.`
               : 'Priced at one quantity.'}
           </p>
         </div>
@@ -1712,11 +1760,7 @@ function ReviewStep({
             <thead>
               <tr className="bg-ink-50 text-ink-500 text-xs tracking-wide uppercase">
                 <th className="px-4 py-2 text-left font-semibold">Job</th>
-                {tierTotals.map((_, index) => (
-                  <th key={index} className="px-4 py-2 text-right font-semibold">
-                    Quantity {index + 1}
-                  </th>
-                ))}
+                <th className="px-4 py-2 text-right font-semibold">Quantity {chosen + 1}</th>
               </tr>
             </thead>
             <tbody className="divide-ink-100 divide-y">
@@ -1725,44 +1769,30 @@ function ReviewStep({
                   <td className="text-ink-800 px-4 py-2.5">
                     {item?.jobName || `Job ${index + 1}`}
                   </td>
-                  {tierTotals.map((_, tier) => (
-                    <td key={tier} className="text-ink-700 px-4 py-2.5 text-right tabular-nums">
-                      {formatRs(costed[index]?.quantities[tier]?.totalAmount ?? 0)}
-                    </td>
-                  ))}
+                  <td className="text-ink-700 px-4 py-2.5 text-right tabular-nums">
+                    {formatRs(costed[index]?.quantities[chosen]?.totalAmount ?? 0)}
+                  </td>
                 </tr>
               ))}
               <tr className="bg-ink-50/70">
                 <td className="text-ink-800 px-4 py-2.5 font-medium">Cylinders</td>
-                {tierTotals.map((total, tier) => (
-                  <td
-                    key={tier}
-                    className="text-ink-800 px-4 py-2.5 text-right font-medium tabular-nums"
-                  >
-                    {formatRs(total.cylinderSubtotal)}
-                  </td>
-                ))}
+                <td className="text-ink-800 px-4 py-2.5 text-right font-medium tabular-nums">
+                  {formatRs(total?.cylinderSubtotal ?? 0)}
+                </td>
               </tr>
               <tr className="bg-brand-50/60">
                 <td className="text-ink-900 px-4 py-3 font-semibold">
                   Total including {gstPercent}% GST
                 </td>
-                {tierTotals.map((total, tier) => (
-                  <td
-                    key={tier}
-                    className="text-ink-900 px-4 py-3 text-right font-semibold tabular-nums"
-                  >
-                    {formatRs(total.grandWithGst)}
-                  </td>
-                ))}
+                <td className="text-ink-900 px-4 py-3 text-right font-semibold tabular-nums">
+                  {formatRs(total?.grandWithGst ?? 0)}
+                </td>
               </tr>
               <tr>
                 <td className="text-ink-500 px-4 py-2.5">Advance</td>
-                {tierTotals.map((total, tier) => (
-                  <td key={tier} className="text-ink-600 px-4 py-2.5 text-right tabular-nums">
-                    {formatRs(total.totalAdvance)}
-                  </td>
-                ))}
+                <td className="text-ink-600 px-4 py-2.5 text-right tabular-nums">
+                  {formatRs(total?.totalAdvance ?? 0)}
+                </td>
               </tr>
             </tbody>
           </table>

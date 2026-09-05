@@ -16,6 +16,7 @@ import {
   computeTier,
   overriddenRate,
   plyRatePerKg,
+  resolveSelectedQuantity,
   totalMicronForLayers,
   type QuotationSummary,
   type QuotationEmail as QuotationEmailRecord,
@@ -148,8 +149,26 @@ function toItem(row: ItemRow): QuotationItem {
  * open — a list row needs one number, and "what they agreed to" beats "the
  * biggest figure on the page" every time.
  */
-function headlineTier(row: { wonTierId: string | null; tiers: QuotationRow['tiers'] }) {
-  return row.tiers.find((t) => t.id === row.wonTierId) ?? row.tiers[0] ?? null;
+/**
+ * The quantity a quotation's headline figures are taken from.
+ *
+ * The one the customer accepted, if they have; otherwise **the one the document
+ * was written for**. It used to fall back to the first tier, which was the same
+ * thing only while every quantity was printed — now that the office picks which
+ * one the customer sees, the list would otherwise show a total off a column
+ * that was never sent.
+ */
+function headlineTier(row: {
+  wonTierId: string | null;
+  selectedQuantity: number;
+  tiers: QuotationRow['tiers'];
+}) {
+  const won = row.tiers.find((t) => t.id === row.wonTierId);
+  if (won) return won;
+
+  const byPosition = [...row.tiers].sort((a, b) => a.position - b.position);
+  const chosen = resolveSelectedQuantity(row.selectedQuantity, byPosition.length);
+  return byPosition[chosen - 1] ?? byPosition[0] ?? null;
 }
 
 /**
@@ -197,6 +216,7 @@ function toSummary(row: QuotationRow): QuotationSummary {
     customerName: row.customerName,
     itemCount: row.items.length,
     version: row.version,
+    selectedQuantity: row.selectedQuantity,
     isLatest: row.isLatest,
     tierCount: row.tiers.length,
     // The tier they agreed to, or the smallest while the answer is open.
@@ -643,6 +663,9 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
             mobile: input.mobile,
             email: input.email,
             gstNumber: input.gstNumber,
+            // Clamped against the quantities that actually arrived — see
+            // `resolveSelectedQuantity`.
+            selectedQuantity: resolveSelectedQuantity(input.selectedQuantity, tiers.length),
             ...rates,
             terms: input.terms.length > 0 ? input.terms : DEFAULT_TERMS,
             notes: input.notes,
@@ -906,6 +929,10 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
         ...(input.gstNumber !== undefined ? { gstNumber: input.gstNumber } : {}),
         ...(input.terms ? { terms: input.terms } : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        selectedQuantity: resolveSelectedQuantity(
+          input.selectedQuantity ?? existing.selectedQuantity,
+          tiers.length,
+        ),
         ...(becomingSent ? { sentAt: new Date() } : {}),
         ...rates,
         tiers: { create: tiers },

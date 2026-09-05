@@ -263,6 +263,21 @@ const createQuotationBaseSchema = z.object({
   gstNumber: z.string().trim().toUpperCase().max(20).default(''),
   email: z.string().trim().max(160).default(''),
 
+  /**
+   * Which quantity the printed quotation is for, counting from 1.
+   *
+   * The office may price a job at two or three quantities to see what volume
+   * does to the margin, but the customer is quoted **one**. This says which,
+   * and the document, its totals and the advance are all built from that one
+   * alone; the others stay on the wizard as working.
+   *
+   * Clamped rather than validated against the number of quantities, because the
+   * two arrive together and a quotation trimmed from three quantities to one
+   * would otherwise be rejected for pointing at a column that had just gone.
+   * See `resolveSelectedQuantity`.
+   */
+  selectedQuantity: z.coerce.number().int().min(1).max(3).default(1),
+
   /** Rates may be overridden per quotation; omitted means "use the settings". */
   cylinderRate: z.coerce.number().positive().optional(),
   gstPercent: z.coerce.number().min(0).max(100).optional(),
