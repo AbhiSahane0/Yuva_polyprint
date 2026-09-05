@@ -38,9 +38,9 @@ src/
 │   ├── query-client.ts    TanStack Query defaults and retry policy
 │   └── router.tsx         route map; pages are lazy-loaded
 ├── components/
-│   ├── ui/                Button, Field, Input, Select, Combobox, Modal,
-│   │                      Badge, EmptyState, Toaster, ReadOnlyValue,
-│   │                      Spinner, LoadingState
+│   ├── ui/                Button, Field, Input, NumberInput, Select,
+│   │                      Combobox, Modal, Badge, EmptyState, Toaster,
+│   │                      ReadOnlyValue, Spinner, LoadingState
 │   └── layout/AppShell    sidebar on desktop, slide-over drawer on mobile
 ├── features/
 │   ├── auth/              login, session store, route guards
@@ -1218,7 +1218,7 @@ documented in [the API README](../api/README.md#calculations).
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Button`              | primary / secondary / ghost / danger, with a loading state                                                                                                        |
 | `Field`               | Label, hint and error in one consistent block                                                                                                                     |
-| `Input`, `Textarea`   | 44px tall, 15px text                                                                                                                                              |
+| `Input`, `Textarea`   | 44px tall; 15px text on a mouse, 16px on touch so iOS does not zoom on focus                                                                                      |
 | `NumberInput`         | Digits only, and a lone `0` is replaced rather than prefixed — see below                                                                                          |
 | `Select`              | Native select with a **drawn chevron** — `appearance: none` removes the browser's arrow, and without one of ours the control is indistinguishable from a text box |
 | `Combobox`            | Suggestions you can pick **or type past**. Replaces `<datalist>`, whose arrow and popup the browser draws and cannot be styled                                    |
@@ -1283,8 +1283,16 @@ trailing icon button gets a label-height spacer so it lands level with them.
 
 **Mobile-first.** Every screen starts at 375px. Tables become **cards** below
 `md` rather than scrolling sideways — a squeezed table is unusable on a phone.
-Inputs are 16px so iOS never zoom-jumps on focus, and the layout respects safe
-areas.
+The layout respects safe areas.
+
+Controls are **15px on a mouse and 16px on a touch device**, because iOS zooms
+the page when focusing anything under 16px and the shop floor is on tablets.
+That rule lives outside `@layer` in `styles/index.css`, deliberately: it was in
+the base layer for months and did nothing, because Tailwind's utilities layer
+beats base whatever the specificity — so the `text-[15px]` on every control won
+and inputs measured 15px on the tablet too. It is scoped to `pointer: coarse`
+rather than to a width, since it is touch that zooms and a narrow desktop window
+should keep the size the design was drawn at.
 
 **Design tokens, not hex values.** Tailwind v4 is configured in CSS via `@theme`
 in `styles/index.css` — there is no `tailwind.config.js`. The palette came from

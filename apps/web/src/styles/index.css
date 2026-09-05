@@ -63,14 +63,27 @@
     padding-right: env(safe-area-inset-right);
   }
 
-  /* Shop-floor inputs must never trigger the iOS zoom-on-focus behaviour. */
+  :focus-visible {
+    @apply outline-brand-600 outline-2 outline-offset-2;
+  }
+}
+
+/*
+ * Touch devices get 16px inputs, so iOS never zooms the page on focus.
+ *
+ * Deliberately outside `@layer`. This lived in the base layer and did nothing:
+ * Tailwind's utilities layer beats base whatever the specificity, so the
+ * `text-[15px]` on every control won and inputs measured 15px — one pixel under
+ * the threshold, and the shop-floor tablet zoomed on every tap. An unlayered
+ * rule sits above all layers in the cascade, which is what makes this hold.
+ *
+ * Scoped to a coarse pointer rather than to a width: it is touch that zooms, and
+ * a narrow desktop window should keep the 15px the design was drawn at.
+ */
+@media (pointer: coarse) {
   input,
   select,
   textarea {
     font-size: 16px;
-  }
-
-  :focus-visible {
-    @apply outline-brand-600 outline-2 outline-offset-2;
   }
 }
