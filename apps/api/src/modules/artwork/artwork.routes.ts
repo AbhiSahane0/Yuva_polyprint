@@ -69,4 +69,17 @@ router.delete(
   asyncHandler(controller.remove),
 );
 
+/*
+ * Erasing the file for good — a separate path, not a flag on the line above.
+ * A query parameter that turns "hide it" into "erase a customer's artwork" is
+ * one typo away from a file nobody can get back, and it would not show up in
+ * this table at all.
+ */
+router.delete(
+  '/:id/file',
+  requireModule('cylinders'),
+  validate({ params: idParamSchema }),
+  asyncHandler(controller.purge),
+);
+
 export default router;

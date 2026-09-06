@@ -1,4 +1,5 @@
 import {
+  hasFile,
   isPreviewable,
   resolveContentType,
   type Artwork,
@@ -14,6 +15,7 @@ import { prisma } from '../../lib/prisma.js';
 import {
   artworkKey,
   deleteObject,
+  deleteObjectOrThrow,
   isStorageConfigured,
   signDownload,
   signUpload,
@@ -59,6 +61,8 @@ function toArtwork(row: ArtworkRow): Artwork {
     notes: row.notes,
     uploadedBy: row.uploadedBy,
     uploadedAt: row.uploadedAt?.toISOString() ?? null,
+    deletedBy: row.deletedBy,
+    deletedAt: row.deletedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -111,11 +115,14 @@ export async function listForJob(jobId: string, query: ListArtworkQuery): Promis
   return Promise.all(
     live.map(async (row): Promise<ArtworkFile> => {
       const wantsPreview =
-        isStorageConfigured() && row.status !== 'PENDING' && isPreviewable(row.contentType);
+        isStorageConfigured() &&
+        hasFile(row.status) &&
+        row.storageKey !== null &&
+        isPreviewable(row.contentType);
 
       const previewUrl = wantsPreview
         ? (
-            await signDownload(row.storageKey, row.filename, {
+            await signDownload(row.storageKey as string, row.filename, {
               download: false,
               contentType: row.contentType,
             })
@@ -211,6 +218,9 @@ export async function confirmUpload(id: string): Promise<Artwork> {
     throw ApiError.badRequest('That upload has already been settled');
   }
 
+  /* PENDING always carries its key; the guard is for the type, not the case. */
+  if (row.storageKey === null) throw ApiError.badRequest('That upload has no storage key');
+
   const object = await statObject(row.storageKey);
   if (object === null) {
     throw ApiError.badRequest('That file did not reach storage. Try the upload again.');
@@ -254,6 +264,11 @@ export async function linkFor(id: string, download: boolean): Promise<ArtworkLin
 
   const row = await findOrThrow(id);
   if (row.status === 'PENDING') throw ApiError.badRequest('That file has not finished uploading');
+  if (row.status === 'DELETED' || row.storageKey === null) {
+    throw ApiError.badRequest(
+      `That file was deleted${row.deletedBy ? ` by ${row.deletedBy}` : ''} and no longer exists`,
+    );
+  }
 
   return signDownload(row.storageKey, row.filename, { download, contentType: row.contentType });
 }
@@ -262,6 +277,7 @@ export async function linkFor(id: string, download: boolean): Promise<ArtworkLin
 export async function update(id: string, input: UpdateArtworkInput): Promise<Artwork> {
   const row = await findOrThrow(id);
   if (row.status === 'PENDING') throw ApiError.badRequest('That file has not finished uploading');
+  if (row.status === 'DELETED') throw ApiError.badRequest('That file was deleted');
 
   const updated = await prisma.jobArtwork.update({
     where: { id: row.id },
@@ -287,10 +303,11 @@ export async function remove(id: string): Promise<Artwork> {
 
   if (row.status === 'PENDING') {
     await prisma.jobArtwork.delete({ where: { id: row.id } });
-    if (isStorageConfigured()) await deleteObject(row.storageKey);
+    if (isStorageConfigured() && row.storageKey) await deleteObject(row.storageKey);
     return toArtwork({ ...row, status: 'REMOVED' });
   }
 
+  if (row.status === 'DELETED') throw ApiError.badRequest('That file was already deleted');
   if (row.status === 'REMOVED') return toArtwork(row);
 
   const updated = await prisma.jobArtwork.update({
@@ -300,9 +317,67 @@ export async function remove(id: string): Promise<Artwork> {
   return toArtwork(updated);
 }
 
+/**
+ * Erases the file for good.
+ *
+ * The bytes go and the **row stays**. Those answer different questions: the
+ * bytes are what the engraver needs, and the row is what the office needs when
+ * it asks where the artwork went. "There were three files and now there are
+ * two" is not something anybody can act on; "deleted by Sudeep on 6 September"
+ * is.
+ *
+ * The object goes first, then the record. If it went the other way and the
+ * second step failed, the register would say a customer's artwork had been
+ * erased while it sat in the bucket — worse than either step failing alone.
+ * This order can only leave a row whose file is already gone, which is the
+ * state the row is about to claim anyway.
+ *
+ * A revision chain survives it. Nothing is deleted at the database level, so
+ * the foreign key from the file that replaced this one still has its target,
+ * and "v3 replaced v2, which was deleted" stays readable.
+ */
+export async function purge(id: string, deletedBy: string): Promise<Artwork> {
+  const row = await findOrThrow(id);
+
+  /* Already gone. Saying so beats a second delete reporting success. */
+  if (row.status === 'DELETED') {
+    throw ApiError.badRequest(
+      `That file was already deleted${row.deletedBy ? ` by ${row.deletedBy}` : ''}`,
+    );
+  }
+
+  /*
+   * A PENDING row has nothing worth a record: the upload never completed, so
+   * there is no file anybody sent and nothing to explain later.
+   */
+  if (row.status === 'PENDING') return remove(id);
+
+  if (!isStorageConfigured()) throw storageUnavailable();
+  if (row.storageKey === null) throw ApiError.badRequest('That file has no object to erase');
+
+  await deleteObjectOrThrow(row.storageKey);
+
+  const updated = await prisma.jobArtwork.update({
+    where: { id: row.id },
+    data: {
+      status: 'DELETED',
+      /* Nulled so nothing can sign a URL for a key that is no longer there. */
+      storageKey: null,
+      deletedBy,
+      deletedAt: new Date(),
+    },
+  });
+
+  return toArtwork(updated);
+}
+
 /** Puts a removed file back. The object never went anywhere. */
 export async function restore(id: string): Promise<Artwork> {
   const row = await findOrThrow(id);
+  if (row.status === 'DELETED') {
+    /* There is nothing to put back — the object was erased, not filed away. */
+    throw ApiError.badRequest('That file was deleted and cannot be restored');
+  }
   if (row.status !== 'REMOVED') throw ApiError.badRequest('That file is not removed');
 
   /*

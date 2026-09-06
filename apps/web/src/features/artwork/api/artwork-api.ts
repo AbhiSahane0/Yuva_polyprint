@@ -158,6 +158,20 @@ export function useRemoveArtwork() {
   });
 }
 
+/**
+ * Erases the file for good. The row stays, marked deleted, with who and when.
+ *
+ * A different endpoint from remove rather than a flag, so nothing about this
+ * call can be mistaken for the reversible one.
+ */
+export function usePurgeArtwork() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (id: string) => request<Artwork>({ url: `/artwork/${id}/file`, method: 'DELETE' }),
+    onSuccess: invalidate,
+  });
+}
+
 export function useRestoreArtwork() {
   const invalidate = useInvalidate();
   return useMutation({

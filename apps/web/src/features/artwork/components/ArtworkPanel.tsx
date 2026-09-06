@@ -14,6 +14,7 @@ import {
   ARTWORK_STATUS_LABELS,
   formatBytes,
   formatKind,
+  hasFile,
   isPreviewable,
   type Artwork,
   type ArtworkFile,
@@ -24,13 +25,15 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
-import {
-  artworkLink,
-  useJobArtwork,
-  useRemoveArtwork,
-  useRestoreArtwork,
-} from '../api/artwork-api';
+import { artworkLink, useJobArtwork, useRestoreArtwork } from '../api/artwork-api';
+import { RemoveArtworkModal } from './RemoveArtworkModal';
 import { UploadArtworkModal } from './UploadArtworkModal';
+
+/** dd-mm-yyyy, as every other date on these screens reads. */
+function formatDate(iso: string): string {
+  const [year, month, day] = iso.slice(0, 10).split('-');
+  return `${day}-${month}-${year}`;
+}
 
 /**
  * The files on one design.
@@ -39,11 +42,21 @@ import { UploadArtworkModal } from './UploadArtworkModal';
  * either way and only the buttons are withheld — the floor needs to see the
  * artwork a job prints, and an empty panel would tell them it does not exist.
  */
-export function ArtworkPanel({ jobId, canEdit }: { jobId: string; canEdit: boolean }) {
+export function ArtworkPanel({
+  jobId,
+  canEdit,
+  cylinderCount,
+}: {
+  jobId: string;
+  canEdit: boolean;
+  /** Only so the delete warning can say what may have been cut from a file. */
+  cylinderCount: number;
+}) {
   const [showArchived, setShowArchived] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [dropped, setDropped] = useState<File | null>(null);
   const [replacing, setReplacing] = useState<Artwork | null>(null);
+  const [removing, setRemoving] = useState<Artwork | null>(null);
   const [dragging, setDragging] = useState(false);
 
   /*
@@ -58,10 +71,9 @@ export function ArtworkPanel({ jobId, canEdit }: { jobId: string; canEdit: boole
   const { data: all, isPending } = useJobArtwork(jobId, true);
 
   const archived = (all ?? []).filter(
-    (file) => file.status === 'SUPERSEDED' || file.status === 'REMOVED',
+    (file) => file.status !== 'ACTIVE' && file.status !== 'PENDING',
   );
   const files = showArchived ? all : (all ?? []).filter((file) => !archived.includes(file));
-  const remove = useRemoveArtwork();
   const restore = useRestoreArtwork();
 
   function openUpload(file: File | null, replaces: Artwork | null) {
@@ -158,7 +170,7 @@ export function ArtworkPanel({ jobId, canEdit }: { jobId: string; canEdit: boole
               <button
                 type="button"
                 onClick={() => void open(file, false)}
-                disabled={file.status === 'PENDING'}
+                disabled={!hasFile(file.status)}
                 className="bg-ink-25 border-ink-100 flex h-32 items-center justify-center border-b"
                 title="Open"
               >
@@ -197,19 +209,32 @@ export function ArtworkPanel({ jobId, canEdit }: { jobId: string; canEdit: boole
                   ) : null}
                 </div>
 
+                {file.status === 'DELETED' ? (
+                  <p className="text-warning-700 text-xs">
+                    File erased{file.deletedBy ? ` by ${file.deletedBy}` : ''}
+                    {file.deletedAt ? ` on ${formatDate(file.deletedAt)}` : ''}. The record is kept;
+                    the file is not recoverable.
+                  </p>
+                ) : null}
+
                 {file.notes ? <p className="text-ink-600 text-xs">{file.notes}</p> : null}
 
                 <div className="mt-auto flex flex-wrap items-center gap-1 pt-1">
-                  {isPreviewable(file.contentType) || file.contentType === 'application/pdf' ? (
-                    <Button variant="ghost" size="sm" onClick={() => void open(file, false)}>
-                      <ExternalLink className="size-4" />
-                      Open
-                    </Button>
+                  {/* An erased file has nothing to open, and no button offers to. */}
+                  {hasFile(file.status) ? (
+                    <>
+                      {isPreviewable(file.contentType) || file.contentType === 'application/pdf' ? (
+                        <Button variant="ghost" size="sm" onClick={() => void open(file, false)}>
+                          <ExternalLink className="size-4" />
+                          Open
+                        </Button>
+                      ) : null}
+                      <Button variant="ghost" size="sm" onClick={() => void open(file, true)}>
+                        <Download className="size-4" />
+                        Save
+                      </Button>
+                    </>
                   ) : null}
-                  <Button variant="ghost" size="sm" onClick={() => void open(file, true)}>
-                    <Download className="size-4" />
-                    Save
-                  </Button>
 
                   {canEdit && file.status === 'ACTIVE' ? (
                     <>
@@ -220,8 +245,8 @@ export function ArtworkPanel({ jobId, canEdit }: { jobId: string; canEdit: boole
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => remove.mutate(file.id)}
-                        title="Take it off this screen. The file itself is kept."
+                        onClick={() => setRemoving(file)}
+                        title="Remove it, or delete the file for good"
                       >
                         <Trash2 className="size-4" />
                       </Button>
@@ -229,10 +254,20 @@ export function ArtworkPanel({ jobId, canEdit }: { jobId: string; canEdit: boole
                   ) : null}
 
                   {canEdit && file.status === 'REMOVED' ? (
-                    <Button variant="ghost" size="sm" onClick={() => restore.mutate(file.id)}>
-                      <RotateCcw className="size-4" />
-                      Put back
-                    </Button>
+                    <>
+                      <Button variant="ghost" size="sm" onClick={() => restore.mutate(file.id)}>
+                        <RotateCcw className="size-4" />
+                        Put back
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setRemoving(file)}
+                        title="Delete the file for good"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </>
                   ) : null}
                 </div>
               </div>
@@ -240,6 +275,12 @@ export function ArtworkPanel({ jobId, canEdit }: { jobId: string; canEdit: boole
           ))}
         </ul>
       )}
+
+      <RemoveArtworkModal
+        file={removing}
+        onClose={() => setRemoving(null)}
+        cylinderCount={cylinderCount}
+      />
 
       <UploadArtworkModal
         open={uploading}

@@ -41,6 +41,17 @@ export async function remove(req: Request, res: Response) {
   ok(res, await artworkService.remove(req.params.id as string));
 }
 
+/**
+ * Erases the file for good.
+ *
+ * Its own endpoint rather than a flag on DELETE. A query parameter that turns
+ * "hide it" into "erase it" is one typo away from destroying a customer's
+ * artwork, and it would not be visible in a route table.
+ */
+export async function purge(req: Request, res: Response) {
+  ok(res, await artworkService.purge(req.params.id as string, actor(req)));
+}
+
 export async function restore(req: Request, res: Response) {
   ok(res, await artworkService.restore(req.params.id as string));
 }

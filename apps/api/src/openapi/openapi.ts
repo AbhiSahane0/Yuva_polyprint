@@ -230,8 +230,9 @@ export function buildOpenApiDocument(serverUrl: string) {
         description:
           'The files a design prints from. The bytes never pass through this API: an upload is ' +
           'a signed URL the browser PUTs to Cloudflare R2 itself, and every read is a signed URL ' +
-          'that expires in minutes. Nothing confirmed is deleted — a cylinder was engraved from ' +
-          'it, so a revision supersedes and both stay.',
+          'that expires in minutes. A revision supersedes rather than overwrites, because a ' +
+          'cylinder was engraved from one particular version. A file can be erased outright, ' +
+          'but its row never is.',
       },
       {
         name: 'Purchase',
@@ -515,9 +516,29 @@ export function buildOpenApiDocument(serverUrl: string) {
           description:
             'Marks it REMOVED and leaves the object in the bucket — removing is a filing ' +
             'decision, and the cylinders engraved from it are still on the shelf. Only an ' +
-            'upload that never completed is deleted outright.',
+            'upload that never completed is deleted outright. To erase the file itself, see ' +
+            '`DELETE /artwork/{id}/file`.',
           parameters: [ID_PARAM],
           responses: { 200: ok('The file, removed.'), ...COMMON },
+        },
+      },
+      '/api/artwork/{id}/file': {
+        delete: {
+          tags: ['Artwork'],
+          summary: 'Erase the file for good',
+          description:
+            'The bytes go and the **row stays**, marked DELETED with who erased it and when. ' +
+            'Those answer different questions: the bytes are what the engraver needs, and the ' +
+            'row is what the office needs when it asks where the artwork went — "there were ' +
+            'three files and now there are two" is not something anybody can act on.\n\n' +
+            'The object is erased before the row records it. The other order could leave the ' +
+            'register saying a customer’s artwork had been destroyed while it sat in the ' +
+            'bucket.\n\nIts own path rather than a flag on the line above: a query parameter ' +
+            'that turns "hide it" into "erase it" is one typo away from a file nobody can get ' +
+            'back. Afterwards the file cannot be opened, restored or deleted again, and each ' +
+            'refusal names who deleted it.',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The record of the file that was erased.'), ...COMMON },
         },
       },
       '/api/artwork/{id}/restore': {

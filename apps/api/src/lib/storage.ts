@@ -182,19 +182,35 @@ export async function statObject(key: string): Promise<StoredObject | null> {
 }
 
 /**
- * Deletes an object. Used only when a PENDING row is abandoned.
+ * Erases an object, and says whether it worked.
  *
- * Confirmed artwork is never deleted: a cylinder was engraved from it, and the
- * register is worth nothing if the file it names has gone. Removing artwork on
- * screen marks the row REMOVED and leaves the object alone.
+ * S3 delete is idempotent — removing a key that is not there succeeds — so a
+ * true result means "no object under this key", which is exactly what both
+ * callers need to hear.
  */
-export async function deleteObject(key: string): Promise<void> {
+export async function deleteObject(key: string): Promise<boolean> {
   try {
     await s3().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
+    return true;
   } catch (error) {
-    /* Not worth failing the caller: the row is already gone from the screen. */
     logger.warn({ err: error, key }, 'R2 delete failed; object left behind');
+    return false;
   }
+}
+
+/**
+ * Erases an object, or throws.
+ *
+ * For a deliberate permanent delete, where the caller is about to record that
+ * the file is gone. Reporting success on a failed delete would leave the
+ * register saying a customer's artwork was erased while it sat in the bucket —
+ * the one outcome worse than refusing.
+ */
+export async function deleteObjectOrThrow(key: string): Promise<void> {
+  if (await deleteObject(key)) return;
+  throw ApiError.badRequest(
+    'The file could not be erased from storage, so nothing was changed. Try again in a moment.',
+  );
 }
 
 /** Fingerprints the configuration for the health endpoint, without the secret. */

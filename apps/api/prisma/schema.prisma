@@ -1240,6 +1240,9 @@ enum ArtworkStatus {
   SUPERSEDED
   /// Taken off the design screen. The object stays in the bucket.
   REMOVED
+  /// The file itself has been erased from the bucket. The row stays — see the
+  /// JobArtwork model.
+  DELETED
 }
 
 /// A design file, held in Cloudflare R2 with only its description here.
@@ -1251,6 +1254,11 @@ enum ArtworkStatus {
 /// Files are never replaced in place. The cylinder on the shelf was engraved
 /// from one version of one file, and a store that overwrites cannot say which,
 /// so a revision supersedes its predecessor and both stay.
+///
+/// A file can be erased outright — a wrong upload should not sit in a bucket
+/// forever — but the ROW never goes. The bytes and the record answer different
+/// questions: the bytes are what the engraver needs, and the record is what
+/// the office needs when it asks where the artwork went.
 ///
 /// PENDING is the first state because the browser puts the bytes into R2
 /// itself — the API signs a URL and never touches the file. The row is written
@@ -1267,7 +1275,12 @@ model JobArtwork {
 
   /// The object key in the bucket. Unique: two rows pointing at one object
   /// means removing either loses the other's file.
-  storageKey String @unique @map("storage_key")
+  ///
+  /// Null once the file has been erased. Nulled deliberately rather than left
+  /// dangling: a key that cannot be read is a key nothing can accidentally
+  /// sign a URL for, and Postgres does not treat nulls as colliding on a
+  /// unique index. Where it *was* is of no use once the object is gone.
+  storageKey String? @unique @map("storage_key")
 
   /// What the designer called it. Kept for display and for the download name;
   /// the key is a sanitised form of it and is not shown.
@@ -1291,6 +1304,14 @@ model JobArtwork {
   uploadedBy String    @map("uploaded_by")
   /// When the object was confirmed present. Null while PENDING.
   uploadedAt DateTime? @map("uploaded_at")
+
+  /// Who erased the file, and when. Set only on DELETED.
+  ///
+  /// This is the whole reason the row outlives the bytes. "There were three
+  /// files and now there are two" is not something anybody can act on; the
+  /// office asks where the artwork went, and a name and a date is an answer.
+  deletedBy String?   @map("deleted_by")
+  deletedAt DateTime? @map("deleted_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

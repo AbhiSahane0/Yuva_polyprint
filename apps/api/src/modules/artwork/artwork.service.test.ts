@@ -17,12 +17,66 @@ const ROUTES = read('./artwork.routes.ts');
 const STORAGE = read('../../lib/storage.ts');
 
 describe('the artwork store', () => {
-  it('never deletes a confirmed file', () => {
+  it('erases the object before recording that it is gone', () => {
     /*
-     * A cylinder on the shelf was engraved from one of these. A register that
-     * names a file which has gone is worth less than no register, so removing
-     * on screen is a status and the object stays in the bucket. The one delete
-     * is of a PENDING row, where nothing arrived to keep.
+     * The other order has a failure mode worth avoiding: if the row were
+     * marked DELETED first and the erase then failed, the register would say a
+     * customer's artwork had been destroyed while it sat in the bucket. This
+     * order can only leave a row whose file is already gone — which is exactly
+     * what the row is about to claim.
+     */
+    const purge = SERVICE.slice(
+      SERVICE.indexOf('export async function purge'),
+      SERVICE.indexOf('export async function restore'),
+    );
+    expect(purge.indexOf('deleteObjectOrThrow')).toBeLessThan(purge.indexOf('jobArtwork.update'));
+    /* And a failed erase must stop the whole thing, not be logged past. */
+    expect(purge).not.toContain('await deleteObject(');
+  });
+
+  it('keeps the row when the file is erased', () => {
+    /*
+     * The bytes and the record answer different questions. "There were three
+     * files and now there are two" is not something anybody can act on; the
+     * office asks where the artwork went, and a name and a date is an answer.
+     */
+    const purge = SERVICE.slice(
+      SERVICE.indexOf('export async function purge'),
+      SERVICE.indexOf('export async function restore'),
+    );
+    expect(purge).toContain("status: 'DELETED'");
+    expect(purge).toContain('deletedBy');
+    expect(purge).toContain('deletedAt');
+    /* No row deletion in this path — a PENDING one is handed to remove(). */
+    expect(purge).not.toContain('jobArtwork.delete(');
+
+    /* Nulling the key is what stops anything signing a URL for it later. */
+    expect(purge).toContain('storageKey: null');
+  });
+
+  it('offers nothing to open on a file that no longer exists', () => {
+    /*
+     * Every read path has to say so rather than sign a URL that 404s at
+     * Cloudflare — an error from R2 reads as a broken app, not as a file
+     * somebody deleted on purpose.
+     */
+    const link = SERVICE.slice(
+      SERVICE.indexOf('export async function linkFor'),
+      SERVICE.indexOf('export async function update'),
+    );
+    expect(link).toContain("status === 'DELETED'");
+
+    const restore = SERVICE.slice(SERVICE.indexOf('export async function restore'));
+    expect(restore).toContain("status === 'DELETED'");
+  });
+
+  it('never deletes the row for a confirmed file, even when erasing it', () => {
+    /*
+     * A cylinder on the shelf was engraved from one of these. The bytes can go
+     * — a wrong upload should not sit in a bucket forever — but the row must
+     * not, or the design silently has one fewer file than it did and nobody
+     * can say why. So removing on screen is a status, erasing is a status, and
+     * the only row ever deleted is a PENDING one where nothing arrived.
      */
     const remove = SERVICE.slice(
       SERVICE.indexOf('export async function remove'),
@@ -127,6 +181,17 @@ describe('storage', () => {
 });
 
 describe('artwork routes', () => {
+  it('gives erasing its own path rather than a flag on remove', () => {
+    /*
+     * A query parameter that turns "hide it" into "erase a customer's artwork"
+     * is one typo away from a file nobody can get back, and it would not show
+     * up in a route table at all.
+     */
+    expect(ROUTES).toContain("'/:id/file'");
+    const remove = ROUTES.slice(ROUTES.indexOf("router.delete(\n  '/:id'"));
+    expect(remove.slice(0, remove.indexOf(');'))).not.toContain('permanent');
+  });
+
   it('guards every write on the cylinders module and no read', () => {
     /*
      * Reading is open to anyone signed in: the floor works to the file the job

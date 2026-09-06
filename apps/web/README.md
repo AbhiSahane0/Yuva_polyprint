@@ -1170,10 +1170,25 @@ cannot say which. The new file becomes v2 and **Show replaced** brings the old
 one back into view. Nothing is superseded unless you replace it explicitly —
 a design legitimately carries a front and a back panel.
 
-**Remove is filing, not deletion.** The file leaves the screen and stays in the
-bucket, and **Put back** returns it. If something replaced it meanwhile it comes
-back as history, because a design cannot have two current files claiming to be
-the same artwork.
+**The trash button offers two different things**, because they are two different
+decisions and the office should see both before choosing.
+
+**Remove it from this design** is filing: the file leaves the screen and stays
+in the bucket, and **Put back** returns it. If something replaced it meanwhile
+it comes back as history, because a design cannot have two current files
+claiming to be the same artwork.
+
+**Delete the file for good** erases it from storage. It takes two presses, and
+the second one warns you how many cylinders this design has — if they were
+engraved from that file, nothing will be able to show what they were cut from.
+That is a warning rather than a refusal: nothing records which file a cylinder
+was cut from, so the works owner is the one who can answer it.
+
+Either way **the record stays**. A deleted file keeps its card under _Show
+replaced_, reading _"File erased by Sudeep Hase on 06-09-2026"_, with nothing to
+open. The design should be able to say what was there and who removed it; a file
+that simply vanishes leaves the office asking a question the system cannot
+answer.
 
 Every **Open** and **Save** fetches a fresh link that expires in five minutes.
 A URL that ends up in a chat message stops working, rather than standing as a

@@ -39,7 +39,7 @@ export const ARTWORK_KIND_HINTS: Record<ArtworkKind, string> = {
  * did not issue. A PENDING row whose upload failed is a row, not a mystery
  * object in a bucket.
  */
-export const ARTWORK_STATUSES = ['PENDING', 'ACTIVE', 'SUPERSEDED', 'REMOVED'] as const;
+export const ARTWORK_STATUSES = ['PENDING', 'ACTIVE', 'SUPERSEDED', 'REMOVED', 'DELETED'] as const;
 export type ArtworkStatus = (typeof ARTWORK_STATUSES)[number];
 
 export const ARTWORK_STATUS_LABELS: Record<ArtworkStatus, string> = {
@@ -47,7 +47,28 @@ export const ARTWORK_STATUS_LABELS: Record<ArtworkStatus, string> = {
   ACTIVE: 'Current',
   SUPERSEDED: 'Replaced',
   REMOVED: 'Removed',
+  DELETED: 'Deleted',
 };
+
+/**
+ * Whether the file itself is gone.
+ *
+ * DELETED is the one status where the bytes no longer exist. The row stays,
+ * because "there were three files and now there are two" is not an answer
+ * anybody can work with — the office asks where the artwork went, and "deleted
+ * by Sudeep on 6 September" is a real answer where silence is not.
+ *
+ * REMOVED, by contrast, is a filing decision: the file is off the screen and
+ * still in the bucket, and Put back returns it.
+ */
+export function isErased(status: ArtworkStatus): boolean {
+  return status === 'DELETED';
+}
+
+/** Whether there is a file behind the row to open, download or preview. */
+export function hasFile(status: ArtworkStatus): boolean {
+  return status !== 'PENDING' && status !== 'DELETED';
+}
 
 /** 50 MB. A packaged rotogravure artwork with its linked images reaches this. */
 export const MAX_ARTWORK_BYTES = 50 * 1024 * 1024;

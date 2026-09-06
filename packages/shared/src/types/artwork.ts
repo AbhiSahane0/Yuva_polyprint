@@ -25,6 +25,14 @@ export interface Artwork {
   notes: string;
   uploadedBy: string;
   uploadedAt: string | null;
+
+  /**
+   * Who erased the file, and when. Set only on DELETED, and kept — the row
+   * outlives the bytes so the design can still say what was there.
+   */
+  deletedBy: string | null;
+  deletedAt: string | null;
+
   createdAt: string;
 }
 

@@ -134,7 +134,7 @@ export default function DesignPage() {
        * usually here to look at the file.
        */}
       <div className="mt-8">
-        <ArtworkPanel jobId={design.jobId} canEdit={canEdit} />
+        <ArtworkPanel jobId={design.jobId} canEdit={canEdit} cylinderCount={design.cylinderCount} />
       </div>
 
       <h2 className="text-ink-900 mt-8 mb-3 text-base font-semibold">Cylinders</h2>

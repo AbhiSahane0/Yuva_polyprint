@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   ARTWORK_ACCEPT,
+  ARTWORK_STATUSES,
+  hasFile,
+  isErased,
   extensionOf,
   formatBytes,
   isPreviewable,
@@ -104,6 +107,28 @@ describe('ARTWORK_ACCEPT', () => {
   it('offers the trade formats, since the picker filters on extension', () => {
     for (const extension of ['.pdf', '.cdr', '.ai', '.eps', '.tif', '.zip']) {
       expect(ARTWORK_ACCEPT).toContain(extension);
+    }
+  });
+});
+
+describe('hasFile', () => {
+  it('separates the two ways a file leaves the screen', () => {
+    /*
+     * REMOVED is a filing decision — the object is still in the bucket, and
+     * Put back returns it. DELETED means the bytes are gone; the row survives
+     * only to say what was there and who erased it.
+     */
+    expect(hasFile('REMOVED')).toBe(true);
+    expect(hasFile('SUPERSEDED')).toBe(true);
+    expect(hasFile('DELETED')).toBe(false);
+    /* And nothing has arrived yet while an upload is in flight. */
+    expect(hasFile('PENDING')).toBe(false);
+  });
+
+  it('is the inverse of isErased for everything that has finished', () => {
+    for (const status of ARTWORK_STATUSES) {
+      if (status === 'PENDING') continue;
+      expect(hasFile(status)).toBe(!isErased(status));
     }
   });
 });

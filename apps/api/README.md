@@ -435,15 +435,16 @@ stay in `/cylinders/unregistered`.
 
 ### Artwork
 
-| Method | Path                   | Notes                                              |
-| ------ | ---------------------- | -------------------------------------------------- |
-| GET    | `/artwork/job/:jobId`  | The files on one design. **`:jobId` is a job id**  |
-| GET    | `/artwork/:id/link`    | A signed URL to view or download one file          |
-| POST   | `/artwork/uploads`     | Sign an upload, and book the row it will belong to |
-| POST   | `/artwork/:id/confirm` | Confirm the file reached storage                   |
-| PATCH  | `/artwork/:id`         | Refile it — its kind and its note                  |
-| POST   | `/artwork/:id/restore` | Put a removed file back                            |
-| DELETE | `/artwork/:id`         | Take a file off the design screen                  |
+| Method | Path                   | Notes                                                |
+| ------ | ---------------------- | ---------------------------------------------------- |
+| GET    | `/artwork/job/:jobId`  | The files on one design. **`:jobId` is a job id**    |
+| GET    | `/artwork/:id/link`    | A signed URL to view or download one file            |
+| POST   | `/artwork/uploads`     | Sign an upload, and book the row it will belong to   |
+| POST   | `/artwork/:id/confirm` | Confirm the file reached storage                     |
+| PATCH  | `/artwork/:id`         | Refile it — its kind and its note                    |
+| POST   | `/artwork/:id/restore` | Put a removed file back                              |
+| DELETE | `/artwork/:id`         | Take a file off the design screen — the file is kept |
+| DELETE | `/artwork/:id/file`    | **Erase the file for good.** The row stays           |
 
 Query on the list: `includeArchived`. Off by default, so the screen shows what
 is current and the history is a click away.
@@ -477,13 +478,45 @@ extension decides the type, not the browser** — Chrome sends a `.cdr` as
 Illustrator file _is_ a PDF. SVG is deliberately not accepted: it is a document
 that can carry script.
 
-**Nothing confirmed is ever deleted.** A cylinder on the shelf was engraved from
-one of these files, and a register naming a file that has gone is worth less
-than no register. Removing on screen is a status and the object stays in the
-bucket; a revision **supersedes** its predecessor and both stay. Only a PENDING
-row whose upload never completed is deleted outright, since nothing arrived to
-keep. Nothing is superseded unless the upload names `replacesId` — a design
-legitimately carries a front and a back panel.
+**A revision supersedes; it never overwrites.** The cylinder on the shelf was
+engraved from one particular version of one particular file, and a store that
+overwrites cannot say which. Nothing is superseded unless the upload names
+`replacesId` — a design legitimately carries a front and a back panel.
+
+**The row outlives the bytes.** There are two ways a file leaves the screen and
+they are different decisions:
+
+|            | `DELETE /artwork/:id`              | `DELETE /artwork/:id/file`           |
+| ---------- | ---------------------------------- | ------------------------------------ |
+| Status     | `REMOVED`                          | `DELETED`                            |
+| The object | stays in the bucket                | **erased**                           |
+| Reversible | yes, `POST .../restore`            | no                                   |
+| For        | filing — artwork that is done with | a wrong upload that should not exist |
+
+Either way the **row stays**. "There were three files and now there are two" is
+not something anybody can act on: the office asks where the artwork went, and
+_"deleted by Sudeep on 6 September"_ is an answer where silence is not. So a
+`DELETED` row keeps the filename, the size, who uploaded it, who erased it and
+when — and nulls its `storage_key`, so nothing can sign a URL for a key that is
+no longer there. Afterwards it cannot be opened, restored or deleted again, and
+each refusal names who deleted it.
+
+**The object is erased before the row records it.** The other order has a worse
+failure: mark the row first, fail to erase, and the register now says a
+customer's artwork was destroyed while it sits in the bucket. This order can
+only leave a row whose file is already gone — which is what the row is about to
+claim anyway. A failed erase aborts the whole thing rather than being logged
+past.
+
+The revision chain survives all of it, because nothing is deleted at the
+database level: "v3 replaced v2, which was deleted" stays readable.
+
+Only a PENDING row whose upload never completed is deleted outright, since
+nothing arrived to keep and there is nothing to explain later.
+
+Erasing is a **separate path, not a flag** on remove. A query parameter that
+turns "hide it" into "erase a customer's artwork" is one typo away from a file
+nobody can get back, and it would not show up in a route table at all.
 
 Superseding happens at **confirmation**, not when the URL is signed: replacing
 the current file before the new one is actually in the bucket would leave the
@@ -1318,7 +1351,7 @@ Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 | `purchase_order_lines`      | One material on an order, in the unit it was ordered in.                                                                                                    |
 | `purchase_receipts`         | One delivery against a line. Accepted stock names the batch it became; rejected stock names nothing.                                                        |
 | `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.                                                                           |
-| `job_artwork`               | A design file, held in R2 with only its description here. Never overwritten: a revision supersedes and both stay.                                           |
+| `job_artwork`               | A design file, held in R2 with only its description here. A revision supersedes rather than overwrites; erasing the file keeps the row that describes it.   |
 | `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.                                                                               |
 | `app_settings`              | Editable rates and costing defaults.                                                                                                                        |
 | `users`                     | Accounts, their password hash and which modules each may reach.                                                                                             |
