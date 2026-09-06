@@ -1,10 +1,14 @@
 import { Router } from 'express';
+import artworkRoutes from '../modules/artwork/artwork.routes.js';
 import authRoutes from '../modules/auth/auth.routes.js';
 import customerRoutes from '../modules/customers/customer.routes.js';
+import cylinderRoutes from '../modules/cylinders/cylinder.routes.js';
 import gstinRoutes from '../modules/gstin/gstin.routes.js';
+import inventoryRoutes from '../modules/inventory/inventory.routes.js';
 import jobRoutes from '../modules/jobs/job.routes.js';
 import materialRoutes from '../modules/materials/material.routes.js';
 import monitorRoutes from '../modules/monitor/monitor.routes.js';
+import purchaseRoutes from '../modules/purchase/purchase.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
 import settingsRoutes from '../modules/settings/settings.routes.js';
 import userRoutes from '../modules/users/user.routes.js';
@@ -44,6 +48,44 @@ router.use('/jobs', authenticate, requireModule('customers'), jobRoutes);
  * enforced in the module's own routes, where the write endpoint is.
  */
 router.use('/materials', authenticate, materialRoutes);
+
+/*
+ * Stock, readable by anyone signed in for the same reason rates are: the
+ * quotation screens need to know what is on hand, and gating the read would
+ * break pricing for a user who has quotations but not inventory. Every write —
+ * receive, issue, adjust, transfer — needs the inventory module, and each of
+ * those endpoints applies that guard in the module's own routes.
+ */
+router.use('/inventory', authenticate, inventoryRoutes);
+
+/*
+ * Buying. Readable by anyone signed in — knowing what is on order is part of
+ * knowing what the works can commit to. Raising an order needs
+ * requireModule('purchase'); recording a delivery needs inventory as well,
+ * because it creates stock and should not be reachable through a second door by
+ * somebody who may not touch the ledger.
+ */
+router.use('/purchase', authenticate, purchaseRoutes);
+
+/*
+ * The cylinder register. Readable by anyone signed in — whether a design
+ * already has a set is what stops a second one being ordered, and the quotation
+ * screens ask the same question when deciding whether to charge for cylinders.
+ * Registering or moving one needs requireModule('cylinders').
+ */
+router.use('/cylinders', authenticate, cylinderRoutes);
+
+/*
+ * Design artwork. Readable by anyone signed in — the floor works to the file
+ * the job prints, and hiding it behind the cylinders module would hide it from
+ * exactly the people who need it. Every write needs requireModule('cylinders'),
+ * applied in the module's own routes.
+ *
+ * No endpoint here returns bytes: uploads and downloads are signed Cloudflare
+ * URLs the browser uses directly, so a 40 MB artwork never occupies this
+ * process.
+ */
+router.use('/artwork', authenticate, artworkRoutes);
 
 router.use('/settings', authenticate, settingsRoutes);
 

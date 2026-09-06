@@ -87,6 +87,74 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   );
 });
 
+interface NumberInputProps extends Omit<InputProps, 'type' | 'onChange'> {
+  /** Whether a minus sign is allowed. Off by default — most figures cannot be. */
+  allowNegative?: boolean;
+  /** Fired with the raw string, exactly like a text input. */
+  onChange?: InputHTMLAttributes<HTMLInputElement>['onChange'];
+}
+
+/**
+ * A box that only takes a number, and does not fight you over a leading zero.
+ *
+ * Two problems with a plain input, both of which the office hits daily.
+ *
+ * **Letters get in.** `type="number"` is not the answer: it silently reports an
+ * empty string for anything it cannot parse, so "12abc" arrives as "" and the
+ * figure that was typed is gone. It also brings spinner arrows that nudge a
+ * quantity when the page scrolls. So the type stays `text` with a numeric
+ * keypad, and non-numeric keystrokes are refused before they land.
+ *
+ * **A default of 0 becomes a prefix.** A field showing `0` is a field somebody
+ * types into, and typing 5 leaves `05` — which parses as 5 and looks like a
+ * mistake, or leaves `0210` where 210 was meant. Selecting the contents on
+ * focus makes the first keystroke replace a lone zero, which is what everybody
+ * expects, while a real figure stays selected and can still be edited rather
+ * than being destroyed.
+ */
+export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(function NumberInput(
+  { allowNegative = false, onChange, onFocus, className, ...props },
+  ref,
+) {
+  const pattern = allowNegative ? /^-?\d*\.?\d*$/ : /^\d*\.?\d*$/;
+
+  return (
+    <input
+      ref={ref}
+      /*
+       * Text, not number. `type="number"` reports "" for anything it cannot
+       * parse, so a stray letter erases the whole figure — and its spinners
+       * change a quantity when somebody scrolls the page with the cursor over
+       * the box.
+       */
+      type="text"
+      inputMode={allowNegative ? 'text' : 'decimal'}
+      autoComplete="off"
+      aria-invalid={props.invalid || undefined}
+      onFocus={(event) => {
+        // A lone zero is a placeholder somebody means to replace. Selecting it
+        // means the first keystroke does that rather than appending to it.
+        event.target.select();
+        onFocus?.(event);
+      }}
+      onChange={(event) => {
+        // Refused rather than stripped: silently deleting a character as it is
+        // typed reads as a broken keyboard, where nothing happening reads as
+        // "that key does not belong here".
+        if (!pattern.test(event.target.value)) return;
+        onChange?.(event);
+      }}
+      className={cn(
+        CONTROL,
+        'tabular-nums',
+        props.invalid ? 'border-danger-500' : 'border-ink-200',
+        className,
+      )}
+      {...props}
+    />
+  );
+});
+
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   invalid?: boolean;
 }

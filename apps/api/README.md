@@ -181,6 +181,23 @@ guard is visible in that diff; a guard forgotten three files away is not.
 /materials   authenticate — reading rates is open to any signed-in user,
              because quotation costing depends on it. Writing a rate needs
              requireModule('rates'), applied on the write endpoints themselves.
+/inventory   authenticate — reading stock is open for the same reason. Every
+             write — receive, issue, adjust, transfer — needs
+             requireModule('inventory'), applied on those endpoints.
+             /inventory/reconcile is requireAdmin on top.
+/purchase    authenticate — knowing what is on order is part of knowing what the
+             works can commit to. Raising one needs requireModule('purchase');
+             recording a delivery needs inventory as well, because it creates
+             stock and must not be reachable through a second door.
+/cylinders   authenticate — whether a design already has a set is what stops a
+             second one being ordered, and the quotation screens ask the same
+             question. Registering or moving one needs
+             requireModule('cylinders'); DELETING a design needs customers as
+             well, because the record it destroys is a job.
+/artwork     authenticate — the floor works to the file a job prints, and gating
+             that on the cylinders module hides it from exactly the people who
+             need it. Uploading, refiling and removing need
+             requireModule('cylinders'), which is where designs are owned.
 /users       authenticate + requireAdmin
 ```
 
@@ -327,6 +344,273 @@ cannot backdate anything.
 
 Rates are saved as a **batch, not per field** — the office keys the morning's
 rates in together, and a partial save would leave the day half-recorded.
+
+### Inventory
+
+| Method | Path                           | Notes                                                                  |
+| ------ | ------------------------------ | ---------------------------------------------------------------------- |
+| GET    | `/inventory`                   | Every active material with its stock, plus the totals                  |
+| GET    | `/inventory/:id`               | One material: batches oldest first, last 200 movements newest first    |
+| POST   | `/inventory/receive`           | Records a delivery and opens a batch. The only action that creates one |
+| POST   | `/inventory/issue`             | Issue or waste. Refused if the batch holds less than is being taken    |
+| POST   | `/inventory/adjust`            | A cycle count. Takes what was counted, not the difference              |
+| POST   | `/inventory/transfer`          | Moves a batch. Changes where stock is, never how much                  |
+| PATCH  | `/inventory/:id/reorder-level` | Sets or clears the level below which stock reads as low                |
+| GET    | `/inventory/reconcile`         | Admin. Proves the cached quantities agree with the ledger              |
+
+Query on `GET /inventory`: `q`, `category`, `lowOnly`.
+
+**Every active material is listed, including ones with no stock.** A material
+missing from the answer because it happens to be empty is exactly the one that
+needs ordering. Totals are over everything the filters matched rather than over
+a page — a stock value that changes when a category filter is clicked is not a
+total anybody can use.
+
+`/inventory/reconcile` exists because "the system says 2,450 and the shelf says
+2,410" needs an answer that is not "trust it". It recomputes every batch from
+its own movements and reports what does not match.
+
+### Purchase & Suppliers
+
+| Method | Path                           | Notes                                                            |
+| ------ | ------------------------------ | ---------------------------------------------------------------- |
+| GET    | `/purchase/suppliers`          | With what each supplies and last charged, derived from orders    |
+| POST   | `/purchase/suppliers`          | Add a supplier                                                   |
+| PATCH  | `/purchase/suppliers/:id`      | Edit, or retire — orders already placed still name them          |
+| GET    | `/purchase/orders`             | Open first, with the totals                                      |
+| POST   | `/purchase/orders`             | Raise an order. Several lines, each in the unit it is ordered in |
+| GET    | `/purchase/orders/next-number` | A peek, not a reservation                                        |
+| GET    | `/purchase/orders/:id`         | One order, its lines and its deliveries                          |
+| PATCH  | `/purchase/orders/:id`         | Expected date, notes, or status                                  |
+| POST   | `/purchase/receipts`           | **Record a delivery.** The join to inventory                     |
+| POST   | `/purchase/lines/close`        | Give up on the balance of a line, with a reason                  |
+
+Query on `GET /purchase/orders`: `q` (PO number or supplier), `status`,
+`supplierId`, `delayedOnly`.
+
+`POST /purchase/receipts` needs the **inventory** module as well as purchase: it
+creates stock, and somebody who may raise orders but not touch the ledger should
+not reach it through a second door.
+
+`PATCH /purchase/orders/:id` accepts only ORDERED, IN_TRANSIT and CANCELLED, and
+refuses even those once deliveries exist — the status follows the receipts by
+then, and relabelling would make the order disagree with a ledger it cannot
+undo.
+
+### Design & Cylinders
+
+| Method | Path                      | Notes                                                        |
+| ------ | ------------------------- | ------------------------------------------------------------ |
+| GET    | `/cylinders`              | Designs with a registered set, and the totals                |
+| GET    | `/cylinders/unregistered` | Designs the job says need a set but have none — the worklist |
+| GET    | `/cylinders/out`          | Every cylinder off the shelf, whatever design it belongs to  |
+| GET    | `/cylinders/:id`          | One design in full. **`:id` is the job id**                  |
+| POST   | `/cylinders`              | Register a set against a design                              |
+| POST   | `/cylinders/events`       | Record what happened to one or more cylinders                |
+| PATCH  | `/cylinders/:id`          | Correct a cylinder — not its status, not its number          |
+| GET    | `/cylinders/:id/deletion` | What deleting this design would destroy, counted             |
+| DELETE | `/cylinders/:id`          | Delete a design, its cylinders and its files                 |
+
+Query on `GET /cylinders`: `q` (design, customer or cylinder number), `status`,
+`customerId`, `attentionOnly`.
+
+`:id` is a **job** id on the design endpoints and a **cylinder** id on the PATCH.
+They are different things at the same position, which is worth knowing before
+wiring a client: a design is a job, and the cylinders hang off it.
+
+`PATCH /cylinders/:id` refuses two fields. **Status** follows the events, and
+typing it separately is what lets a cylinder claim to be in store while the
+history says it went out. **The number** is painted on the cylinder, and changing
+it here would leave the two disagreeing.
+
+Only jobs with cylinders registered appear in `GET /cylinders`. 382 record a
+cylinder _count_, and a count is not a set — `/cylinders/unregistered` is where
+those live, largest first, because the biggest sets cost most to lose.
+
+Totals are counted over every cylinder rather than over the rows returned, so a
+filter cannot move the damaged figure.
+
+#### Deleting a design
+
+`DELETE /cylinders/:id` removes the job, its cylinders, their whole history and
+its files. **The customer stays.** So does every quotation the design was priced
+on: a quotation snapshots the name, the geometry and every rate it was costed
+against, precisely so a sent document keeps saying what it said — only the live
+link goes, which `quotation_items.job_id` has always been nullable for.
+
+|                            | Deleting a design               |
+| -------------------------- | ------------------------------- |
+| Cylinders and their events | destroyed                       |
+| Design files               | erased from R2                  |
+| The customer               | untouched                       |
+| Quotations                 | kept — they hold their own copy |
+| Stock movements            | **refuses the deletion**        |
+
+**Material issued against the design refuses it, 409.** A quotation carries its
+own copy of everything, so the document survives. A stock movement carries only
+the link, so "what were these 200 kg issued for" would have no answer — and a
+ledger that cannot answer that is the one thing the inventory module exists to
+prevent.
+
+`GET /cylinders/:id/deletion` returns that impact **counted**, and the dialog is
+built from it. "8 cylinders, 16 events and 1 file" is a decision somebody can
+make; "are you sure?" is not.
+
+Two details in the order of operations:
+
+- **Files are erased before the rows cascade away.** Their rows go with the job,
+  so an object not erased by then is one nothing will ever point at again — a
+  customer's artwork in a bucket with no record it is there. A failure at that
+  step aborts the whole deletion, which is recoverable; the reverse is not.
+- **Cylinders are deleted explicitly, not by cascade.** Their foreign key is
+  `Restrict` on purpose — a job with cylinders against it must not vanish by
+  accident. Stepping around that deliberately, in one place that had to ask
+  first, is a different thing from loosening it everywhere.
+
+It needs **both** `requireModule('cylinders')` and `requireModule('customers')`.
+The screen belongs to the cylinder register, but the record being destroyed is a
+job, which is what `/jobs` is gated on. Somebody trusted with the cylinder
+register is not automatically somebody trusted to delete a customer's design,
+and one tick box should not answer both questions.
+
+A design is on the register once it has **either** a cylinder set **or** a file.
+Artwork comes first in the real order of work — the file is drawn and sent to
+the engraver, and the set comes back weeks later — so a design with artwork and
+no cylinders is precisely the one the office is waiting on. Jobs with neither
+stay in `/cylinders/unregistered`.
+
+### Artwork
+
+| Method | Path                   | Notes                                                |
+| ------ | ---------------------- | ---------------------------------------------------- |
+| GET    | `/artwork/job/:jobId`  | The files on one design. **`:jobId` is a job id**    |
+| GET    | `/artwork/:id/link`    | A signed URL to view or download one file            |
+| POST   | `/artwork/uploads`     | Sign an upload, and book the row it will belong to   |
+| POST   | `/artwork/:id/confirm` | Confirm the file reached storage                     |
+| PATCH  | `/artwork/:id`         | Refile it — its kind and its note                    |
+| POST   | `/artwork/:id/restore` | Put a removed file back                              |
+| DELETE | `/artwork/:id`         | Take a file off the design screen — the file is kept |
+| DELETE | `/artwork/:id/file`    | **Erase the file for good.** The row stays           |
+
+Query on the list: `includeArchived`. Off by default, so the screen shows what
+is current and the history is a click away.
+
+**No endpoint here returns bytes.** See below.
+
+### Design files live in Cloudflare R2
+
+**The bytes never pass through this API.** An upload is a presigned URL the
+browser PUTs to Cloudflare itself; a download is the same in reverse. A 40 MB
+artwork proxied through one Render instance would hold that process for the
+length of the upload, and the works' connection is not fast. Signing takes about
+a millisecond.
+
+That shapes the flow into three steps:
+
+1. `POST /artwork/uploads` writes a **PENDING** row and signs a URL for its key.
+2. The browser PUTs the file straight to R2.
+3. `POST /artwork/:id/confirm` asks R2 what actually arrived and, if it did,
+   makes the row **ACTIVE** with the size **R2** reports.
+
+The row before the object is the order that matters. Signing a key with no row
+would let anyone who could reach step 3 attach an arbitrary key — or another
+customer's artwork — to a design; and an upload that fails leaves a row that can
+be seen and ages out, rather than an object belonging to nothing.
+
+A file is checked twice on the way in: the browser refuses an oversized or
+unaccepted file before sending it, and the server refuses it again. **The
+extension decides the type, not the browser** — Chrome sends a `.cdr` as
+`application/octet-stream` and an `.ai` as `application/pdf`, because an
+Illustrator file _is_ a PDF. SVG is deliberately not accepted: it is a document
+that can carry script.
+
+**A revision supersedes; it never overwrites.** The cylinder on the shelf was
+engraved from one particular version of one particular file, and a store that
+overwrites cannot say which. Nothing is superseded unless the upload names
+`replacesId` — a design legitimately carries a front and a back panel.
+
+**The row outlives the bytes.** There are two ways a file leaves the screen and
+they are different decisions:
+
+|            | `DELETE /artwork/:id`              | `DELETE /artwork/:id/file`           |
+| ---------- | ---------------------------------- | ------------------------------------ |
+| Status     | `REMOVED`                          | `DELETED`                            |
+| The object | stays in the bucket                | **erased**                           |
+| Reversible | yes, `POST .../restore`            | no                                   |
+| For        | filing — artwork that is done with | a wrong upload that should not exist |
+
+Either way the **row stays**. "There were three files and now there are two" is
+not something anybody can act on: the office asks where the artwork went, and
+_"deleted by Sudeep on 6 September"_ is an answer where silence is not. So a
+`DELETED` row keeps the filename, the size, who uploaded it, who erased it and
+when — and nulls its `storage_key`, so nothing can sign a URL for a key that is
+no longer there. Afterwards it cannot be opened, restored or deleted again, and
+each refusal names who deleted it.
+
+**The object is erased before the row records it.** The other order has a worse
+failure: mark the row first, fail to erase, and the register now says a
+customer's artwork was destroyed while it sits in the bucket. This order can
+only leave a row whose file is already gone — which is what the row is about to
+claim anyway. A failed erase aborts the whole thing rather than being logged
+past.
+
+The revision chain survives all of it, because nothing is deleted at the
+database level: "v3 replaced v2, which was deleted" stays readable.
+
+Only a PENDING row whose upload never completed is deleted outright, since
+nothing arrived to keep and there is nothing to explain later.
+
+Erasing is a **separate path, not a flag** on remove. A query parameter that
+turns "hide it" into "erase a customer's artwork" is one typo away from a file
+nobody can get back, and it would not show up in a route table at all.
+
+Superseding happens at **confirmation**, not when the URL is signed: replacing
+the current file before the new one is actually in the bucket would leave the
+design with no artwork and an upload that may never finish.
+
+The bucket stays **private**. Every read is a signed URL that expires in five
+minutes, so a link that ends up in a chat message stops working rather than
+standing as a permanent public link to a customer's unreleased packaging.
+Thumbnails come signed with the list rather than one request per file — signing
+costs an HMAC and no network call — which is why the browser refetches the list
+inside that window.
+
+One thing measured rather than assumed: a presigned URL signs only `host`
+(`X-Amz-SignedHeaders=host`), so the `Content-Type` the browser sends with its
+PUT is accepted whatever it is. The header is still sent, so the object is
+_stored_ as the right type for anyone reading the bucket — but nothing depends
+on it, because every download overrides the served type from the record.
+
+#### Configuration
+
+Four keys, and it is all four or none — three out of four boots happily and then
+fails on the first upload with a signing error nobody can trace back to a
+missing line in `.env`, so that is refused at boot instead. Without any of them
+the app runs normally and only the artwork panel reports itself unavailable.
+
+| Key                    | Where it comes from                                             |
+| ---------------------- | --------------------------------------------------------------- |
+| `R2_ACCOUNT_ID`        | Cloudflare dashboard → R2 → "Account ID"                        |
+| `R2_BUCKET`            | The bucket you created                                          |
+| `R2_ACCESS_KEY_ID`     | R2 → Manage API Tokens → **Object Read & Write** on that bucket |
+| `R2_SECRET_ACCESS_KEY` | Shown once, when the token is created                           |
+| `R2_ENDPOINT`          | Optional — only for a jurisdiction-specific (`.eu.`) bucket     |
+
+The bucket also needs a **CORS rule**, or the browser's upload fails at the
+preflight with an error nobody can read. In R2 → the bucket → Settings → CORS
+Policy:
+
+```json
+[
+  {
+    "AllowedOrigins": ["http://localhost:5173", "https://<your app>"],
+    "AllowedMethods": ["PUT", "GET"],
+    "AllowedHeaders": ["content-type"],
+    "ExposeHeaders": ["etag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
 
 ### Settings
 
@@ -976,27 +1260,149 @@ no effect; they are not in the input schema at all.
 
 ---
 
+## Stock is a ledger
+
+Every change to a quantity is a row in `stock_movements`, and what is on hand is
+the sum of them. `stock_batches.quantity` is a **cache** of that sum, written
+inside the same transaction as the movement that changed it, so the two cannot
+drift.
+
+Three rules hold it together, and all three are enforced rather than documented:
+
+- **One write path.** `record()` is the only function that touches a quantity.
+  It updates the batch and creates the movement together, so there is exactly
+  one place a balance is computed and exactly one place that could get it wrong.
+  A source-level test asserts there is exactly one `increment` in the file.
+- **Nothing rewrites history.** No update, no delete, no upsert on a movement —
+  the balance stored on every later row would become a lie. A mistake is
+  corrected by an `ADJUSTMENT` that leaves both the error and the correction on
+  the record. The same test asserts the absence of those calls, because a delete
+  that is never called cannot be caught by calling the code.
+- **The sign comes from the kind.** `signedQuantity` decides direction from
+  `RECEIPT` / `ISSUE` / `WASTE`, so a caller passing a negative receipt cannot
+  add stock that never arrived. Only `ADJUSTMENT` carries its own sign, derived
+  on the server from the counted figure against the books.
+
+Batches are locked for the length of the transaction — Prisma has no
+`SELECT … FOR UPDATE`, so a no-op write to the row takes the lock — which is
+what stops two people issuing from the same batch and both reading the quantity
+before either has written.
+
+`GET /api/inventory/reconcile` recomputes every batch from its own movements and
+reports what does not match. It exists because "the system says 2,450 and the
+shelf says 2,410" needs an answer that is not "trust it": this says whether the
+discrepancy is in the books or on the floor.
+
+### Receiving converts, and may create the material
+
+A delivery arrives in whatever unit the supplier invoices in. Film is bought by
+the tonne and stocked by the kilogram, so `receiveStock` converts both figures
+before anything is written, and everything downstream measures in the stocked
+unit without knowing a conversion happened:
+
+```
+2 TON               -> initial_quantity 2000       (convertQuantity)
+Rs. 205,000 / TON   -> rate_per_unit    205        (convertRate — the inverse)
+purchase_quantity 2, purchase_unit 'TON'           (only when they differ)
+```
+
+The rate moves the **opposite way** to the quantity. Getting that backwards
+would value the stock at Rs. 205,000 a kilogram — out by a factor of a million,
+and exactly the sort of figure that gets believed because it is too large to be
+a typo. A test asserts the invariant directly: whichever unit it was entered in,
+the delivery is worth the same money.
+
+**Only conversions within one family are offered** — g/kg/ton, ml/l/kl. Litres
+to kilograms is a property of the substance rather than arithmetic, and none of
+the four inks has a density recorded, so the server refuses with the material's
+own unit named rather than guessing at one.
+
+> Ink is priced at Rs. 640 and costed as `GSM × rate`, which only works if that
+> figure is per kilogram. **Whether it is has not been confirmed.** Until it is,
+> ink is received in the unit it is priced in. If it turns out to be per litre,
+> quotations are costing ink wrongly today, independently of any of this.
+
+A receipt may also carry `newMaterial` instead of `materialId`, and creates the
+material in the same transaction. A film the works has not bought before is an
+ordinary event; the alternative is the office unable to book in a delivery until
+somebody with the rates module adds it, which leaves the stock wrong until they
+do. It is created **with no rate and no density** — both belong on the Rates
+screen, where there is room to get them right. What one supplier charged on one
+day is not the works' rate for the material.
+
+Creating it inside the transaction matters: a material that exists with no stock
+against it, because the receipt then failed, is a row somebody has to notice and
+tidy up. A name that already exists is reused rather than refused — two people
+booking in the same new film on one morning should not produce an error neither
+can explain — and a retired one is brought back, because receiving it is what
+that means.
+
+## Buying joins holding in one place
+
+`receivePurchaseLine` does not write stock. It calls `receiveStock` — the same
+function a manual receipt uses — and hands it the open transaction:
+
+```
+accepted 1.8 TON  ->  receiveStock(..., tx)  ->  1,800 KG batch, ref PO-4471
+rejected 0.2 TON  ->  recorded on the receipt, never stocked
+```
+
+Three consequences, and each is the reason for the shape:
+
+- **One way stock is created.** Units convert once, the ledger is written once,
+  and there is one place a balance could be wrong. A second implementation in
+  the purchase module would have its own conversion and drift within a month. A
+  source-level test asserts this module never touches `stockBatch` or
+  `stockMovement` directly.
+- **The batch and the receipt commit together.** Prisma has no nested
+  transactions, so `receiveStock` takes an optional client and joins the
+  caller's rather than opening a second that would deadlock. A receipt naming a
+  batch that was never created is worse than no receipt.
+- **Faulty goods never reach the ledger.** They are recorded against the order,
+  with a reason, because that is what gets taken up with the supplier — but
+  counting them as stock would overstate what the works can print with.
+
+An order's progress is derived by `restatus` from its own receipts, never ticked
+by hand: an order somebody forgot to mark as received is exactly the order they
+are chasing. Only ORDERED, IN_TRANSIT and CANCELLED can be chosen, and even
+those are refused once deliveries exist — stock is already there, and
+relabelling would not undo it.
+
+> One thing worth knowing if you extend this: **a deep `include` inside a
+> transaction is a trap.** Prisma issues a multi-level include as several
+> queries and may run them concurrently, which on a transaction's single
+> connection is a use-after-busy that `pg` warns about. `createPurchaseOrder`
+> creates inside the transaction and reads back outside it for exactly this
+> reason.
+
 ## Data model
 
 Full diagram and column reference: [`docs/database-schema.md`](../../docs/database-schema.md).
 Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 
-| Table                       | Holds                                                                                     |
-| --------------------------- | ----------------------------------------------------------------------------------------- |
-| `customers`                 | Companies that order. Text fields use `'NA'` where the imported sheet was blank.          |
-| `jobs`                      | Products and their full 55-column specification.                                          |
-| `quotations`                | Customer-facing documents. Totals frozen at save; `lost_reason` says why a loss was lost. |
-| `quotation_items`           | One priced line: its design, its gazette, its geometry and its cylinders.                 |
-| `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted.    |
-| `quotation_item_quantities` | One line's figures at one quoted quantity.                                                |
-| `quotation_tiers`           | One quoted quantity and the document totals at it.                                        |
-| `materials`                 | The rate catalogue, with density for films.                                               |
-| `material_rates`            | One material's price on one date — one row per active material per day.                   |
-| `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.             |
-| `app_settings`              | Editable rates and costing defaults.                                                      |
-| `users`                     | Accounts, their password hash and which modules each may reach.                           |
-| `sessions`                  | Live sign-ins. Deleted on expiry, so this table is always "right now".                    |
-| `login_events`              | Every successful sign-in, kept permanently. Survives the account being deleted.           |
+| Table                       | Holds                                                                                                                                                       |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `customers`                 | Companies that order. Text fields use `'NA'` where the imported sheet was blank.                                                                            |
+| `jobs`                      | Products and their full 55-column specification.                                                                                                            |
+| `quotations`                | Customer-facing documents. Totals frozen at save; `lost_reason` says why a loss was lost.                                                                   |
+| `quotation_items`           | One priced line: its design, its gazette, its geometry and its cylinders.                                                                                   |
+| `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted.                                                                      |
+| `quotation_item_quantities` | One line's figures at one quoted quantity.                                                                                                                  |
+| `quotation_tiers`           | One quoted quantity and the document totals at it.                                                                                                          |
+| `materials`                 | The rate catalogue, with density for films.                                                                                                                 |
+| `material_rates`            | One material's price on one date — one row per active material per day.                                                                                     |
+| `stock_batches`             | One delivery of one material, and what is left of it. Unique batch code per material. Keeps the delivery note's own figure when it arrived in another unit. |
+| `suppliers`                 | Who the works buys from. What they supply is derived from their orders, never stored.                                                                       |
+| `purchase_orders`           | One order to one supplier. Progress follows its receipts; delay is computed, not stored.                                                                    |
+| `purchase_order_lines`      | One material on an order, in the unit it was ordered in.                                                                                                    |
+| `purchase_receipts`         | One delivery against a line. Accepted stock names the batch it became; rejected stock names nothing.                                                        |
+| `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.                                                                           |
+| `job_artwork`               | A design file, held in R2 with only its description here. A revision supersedes rather than overwrites; erasing the file keeps the row that describes it.   |
+| `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.                                                                               |
+| `app_settings`              | Editable rates and costing defaults.                                                                                                                        |
+| `users`                     | Accounts, their password hash and which modules each may reach.                                                                                             |
+| `sessions`                  | Live sign-ins. Deleted on expiry, so this table is always "right now".                                                                                      |
+| `login_events`              | Every successful sign-in, kept permanently. Survives the account being deleted.                                                                             |
 
 Two deliberate choices:
 
@@ -1004,11 +1410,12 @@ Two deliberate choices:
 the source spreadsheet for genuinely different jobs. A surrogate `id` is the key
 until the client confirms the correct codes.
 
-**Nothing cascades except quotation lines.** Deleting a customer sets
+**Nothing cascades except quotation lines and artwork.** Deleting a customer sets
 `customer_id` to null on their jobs and quotations rather than destroying
 production history or a sent quotation. A line's plies and quantities do cascade
 with the line, and a quantity also cascades with its tier — they describe it and
-have no meaning apart from it.
+have no meaning apart from it. A job's artwork cascades with the job for the
+same reason: a design file with no design is a file nobody can identify.
 
 **A ply keeps its own copy of what it was costed against.** The material link is
 there for reporting, but the name, density and rate are snapshotted onto the row:

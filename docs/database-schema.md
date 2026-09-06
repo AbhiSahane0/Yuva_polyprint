@@ -26,6 +26,22 @@ erDiagram
     boolean is_verified
     CustomerSource source
   }
+  cylinder_events {
+    text id PK
+    text cylinder_id FK
+  }
+  cylinders {
+    text id PK
+    text job_id FK
+    integer position
+    CylinderStatus status
+  }
+  job_artwork {
+    text id PK
+    text job_id FK
+    ArtworkStatus status
+    text replaces_id FK
+  }
   jobs {
     text id PK
     text job_code
@@ -45,6 +61,24 @@ erDiagram
   }
   materials {
     text id PK
+  }
+  purchase_order_lines {
+    text id PK
+    text order_id FK
+    integer position
+    text material_id FK
+  }
+  purchase_orders {
+    text id PK
+    integer number
+    text supplier_id FK
+    PurchaseOrderStatus status
+  }
+  purchase_receipts {
+    text id PK
+    text line_id FK
+    text order_id FK
+    text batch_id FK
   }
   quotation_emails {
     text id PK
@@ -95,6 +129,20 @@ erDiagram
     text id PK
     text user_id FK
   }
+  stock_batches {
+    text id PK
+    text material_id FK
+  }
+  stock_movements {
+    text id PK
+    text batch_id FK
+    text material_id FK
+    text job_id FK
+  }
+  suppliers {
+    text id PK
+    text mobile
+  }
   users {
     text id PK
   }
@@ -113,6 +161,20 @@ erDiagram
   materials ||--o{ quotation_item_layers : "material_id"
   quotation_items ||--|{ quotation_item_quantities : "item_id"
   quotation_tiers ||--|{ quotation_item_quantities : "tier_id"
+  materials ||--|{ stock_batches : "material_id"
+  stock_batches ||--|{ stock_movements : "batch_id"
+  materials ||--|{ stock_movements : "material_id"
+  jobs ||--o{ stock_movements : "job_id"
+  suppliers ||--|{ purchase_orders : "supplier_id"
+  purchase_orders ||--|{ purchase_order_lines : "order_id"
+  materials ||--|{ purchase_order_lines : "material_id"
+  purchase_order_lines ||--|{ purchase_receipts : "line_id"
+  purchase_orders ||--|{ purchase_receipts : "order_id"
+  stock_batches ||--o{ purchase_receipts : "batch_id"
+  jobs ||--|{ cylinders : "job_id"
+  cylinders ||--|{ cylinder_events : "cylinder_id"
+  jobs ||--|{ job_artwork : "job_id"
+  job_artwork ||--o{ job_artwork : "replaces_id"
 ```
 
 ## Tables
@@ -120,18 +182,27 @@ erDiagram
 | Table | Columns | Rows | Purpose |
 | --- | ---: | ---: | --- |
 | `app_settings` | 3 | 0 | Editable rates: cylinder rate, GST %, advance %. |
-| `customers` | 16 | 68 | Companies that order from Yuva Polyprint. |
-| `jobs` | 55 | 414 | Products and their full engineering specification. |
-| `login_events` | 7 | 25 |  |
-| `material_rates` | 6 | 117 |  |
-| `materials` | 9 | 17 |  |
-| `quotation_emails` | 8 | 0 |  |
-| `quotation_item_layers` | 9 | 12 |  |
-| `quotation_item_quantities` | 13 | 5 |  |
-| `quotation_items` | 25 | 5 | One priced line on a quotation. |
-| `quotation_tiers` | 14 | 3 |  |
-| `quotations` | 27 | 3 | Customer-facing quotations, with totals frozen at save. |
-| `sessions` | 6 | 25 |  |
+| `customers` | 17 | 71 | Companies that order from Yuva Polyprint. |
+| `cylinder_events` | 11 | 8 |  |
+| `cylinders` | 16 | 12 |  |
+| `job_artwork` | 17 | 2 |  |
+| `jobs` | 55 | 420 | Products and their full engineering specification. |
+| `login_events` | 7 | 35 |  |
+| `material_rates` | 6 | 219 |  |
+| `materials` | 10 | 17 |  |
+| `purchase_order_lines` | 9 | 2 |  |
+| `purchase_orders` | 10 | 1 |  |
+| `purchase_receipts` | 11 | 1 |  |
+| `quotation_emails` | 10 | 1 |  |
+| `quotation_item_layers` | 9 | 8 |  |
+| `quotation_item_quantities` | 13 | 6 |  |
+| `quotation_items` | 31 | 4 | One priced line on a quotation. |
+| `quotation_tiers` | 14 | 6 |  |
+| `quotations` | 28 | 4 | Customer-facing quotations, with totals frozen at save. |
+| `sessions` | 6 | 16 |  |
+| `stock_batches` | 14 | 0 |  |
+| `stock_movements` | 13 | 5 |  |
+| `suppliers` | 11 | 1 |  |
 | `users` | 10 | 2 |  |
 
 ## Relationships
@@ -153,18 +224,39 @@ erDiagram
 | `quotation_item_layers.material_id` | `materials.id` | SET NULL |  |
 | `quotation_item_quantities.item_id` | `quotation_items.id` | CASCADE |  |
 | `quotation_item_quantities.tier_id` | `quotation_tiers.id` | CASCADE |  |
+| `stock_batches.material_id` | `materials.id` | RESTRICT |  |
+| `stock_movements.batch_id` | `stock_batches.id` | CASCADE |  |
+| `stock_movements.material_id` | `materials.id` | RESTRICT |  |
+| `stock_movements.job_id` | `jobs.id` | SET NULL |  |
+| `purchase_orders.supplier_id` | `suppliers.id` | RESTRICT |  |
+| `purchase_order_lines.order_id` | `purchase_orders.id` | CASCADE |  |
+| `purchase_order_lines.material_id` | `materials.id` | RESTRICT |  |
+| `purchase_receipts.line_id` | `purchase_order_lines.id` | CASCADE |  |
+| `purchase_receipts.order_id` | `purchase_orders.id` | CASCADE |  |
+| `purchase_receipts.batch_id` | `stock_batches.id` | SET NULL |  |
+| `cylinders.job_id` | `jobs.id` | RESTRICT |  |
+| `cylinder_events.cylinder_id` | `cylinders.id` | CASCADE |  |
+| `job_artwork.job_id` | `jobs.id` | CASCADE |  |
+| `job_artwork.replaces_id` | `job_artwork.id` | RESTRICT |  |
 
 ## Enums
 
 | Type | Values |
 | --- | --- |
+| `ArtworkKind` | `ARTWORK`, `PROOF`, `REFERENCE`, `OTHER` |
+| `ArtworkStatus` | `PENDING`, `ACTIVE`, `SUPERSEDED`, `REMOVED`, `DELETED` |
 | `CustomerSource` | `SHEET`, `BRAND_INFERRED` |
+| `CylinderEventKind` | `ENGRAVED`, `ALLOCATED`, `IN_USE`, `RETURNED`, `DAMAGED`, `REWORKED`, `TRANSFERRED`, `RETIRED` |
+| `CylinderOwnership` | `CUSTOMER_OWNED`, `YUVA_OWNED` |
+| `CylinderStatus` | `IN_STORE`, `ALLOCATED`, `IN_USE`, `DAMAGED`, `NEEDS_REWORK`, `RETIRED` |
 | `JobCustomerSource` | `EXPLICIT`, `INFERRED`, `NONE` |
 | `JobKind` | `ROLL`, `POUCH` |
 | `MaterialCategory` | `FILM`, `INK`, `ADHESIVE`, `SOLVENT`, `CONSUMABLE` |
 | `PouchType` | `STANDUP`, `STANDUP_ZIPPER`, `ZIPPER`, `SPOUT`, `CENTRE_SEAL`, `THREE_SIDE_SEAL`, `OTHER` |
 | `PricingBasis` | `PER_KG`, `PER_POUCH` |
+| `PurchaseOrderStatus` | `ORDERED`, `IN_TRANSIT`, `PARTIALLY_RECEIVED`, `RECEIVED`, `CANCELLED` |
 | `QuotationStatus` | `DRAFT`, `SENT`, `WON`, `LOST` |
+| `StockMovementKind` | `RECEIPT`, `ISSUE`, `WASTE`, `ADJUSTMENT`, `TRANSFER` |
 
 ## Full column reference
 
@@ -196,6 +288,66 @@ erDiagram
 | `updated_at` | `timestamp` |  |  |
 | `source` | `CustomerSource` (enum) |  |  |
 | `gst_number` | `text` |  |  |
+| `brand_name` | `text` |  |  |
+
+### `cylinder_events`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `cylinder_id` | `text` |  | FK → `cylinders.id` |
+| `kind` | `CylinderEventKind` (enum) |  |  |
+| `occurred_on` | `date` |  |  |
+| `status_after` | `CylinderStatus` (enum) |  |  |
+| `reference` | `text` |  |  |
+| `from_location` | `text` |  |  |
+| `to_location` | `text` |  |  |
+| `notes` | `text` |  |  |
+| `entered_by` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+
+### `cylinders`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `code` | `text` |  | unique |
+| `job_id` | `text` |  | FK → `jobs.id` |
+| `colour` | `text` |  |  |
+| `position` | `integer` | ✓ |  |
+| `ownership` | `CylinderOwnership` (enum) |  |  |
+| `status` | `CylinderStatus` (enum) |  |  |
+| `location` | `text` |  |  |
+| `diameter_mm` | `decimal(10,2)` | ✓ |  |
+| `circumference_mm` | `decimal(10,2)` | ✓ |  |
+| `cost` | `decimal(12,2)` | ✓ |  |
+| `engraver` | `text` |  |  |
+| `engraved_on` | `date` | ✓ |  |
+| `notes` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+
+### `job_artwork`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `job_id` | `text` |  | FK → `jobs.id` |
+| `kind` | `ArtworkKind` (enum) |  |  |
+| `status` | `ArtworkStatus` (enum) |  |  |
+| `storage_key` | `text` | ✓ | unique |
+| `filename` | `text` |  |  |
+| `content_type` | `text` |  |  |
+| `size_bytes` | `integer` |  |  |
+| `version` | `integer` |  |  |
+| `replaces_id` | `text` | ✓ | FK → `job_artwork.id` |
+| `notes` | `text` |  |  |
+| `uploaded_by` | `text` |  |  |
+| `uploaded_at` | `timestamp` | ✓ |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+| `deleted_at` | `timestamp` | ✓ |  |
+| `deleted_by` | `text` | ✓ |  |
 
 ### `jobs`
 
@@ -293,6 +445,52 @@ erDiagram
 | `sort_order` | `integer` |  |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
+| `reorder_level` | `decimal(14,3)` | ✓ |  |
+
+### `purchase_order_lines`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `order_id` | `text` |  | FK → `purchase_orders.id` |
+| `position` | `integer` |  | unique |
+| `material_id` | `text` |  | FK → `materials.id` |
+| `quantity` | `decimal(14,3)` |  |  |
+| `unit` | `text` |  |  |
+| `rate_per_unit` | `decimal(12,4)` |  |  |
+| `closed_at` | `timestamp` | ✓ |  |
+| `closed_reason` | `text` |  |  |
+
+### `purchase_orders`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `number` | `integer` |  | unique |
+| `supplier_id` | `text` |  | FK → `suppliers.id` |
+| `status` | `PurchaseOrderStatus` (enum) |  |  |
+| `ordered_on` | `date` |  |  |
+| `expected_on` | `date` | ✓ |  |
+| `notes` | `text` |  |  |
+| `raised_by` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+
+### `purchase_receipts`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `line_id` | `text` |  | FK → `purchase_order_lines.id` |
+| `order_id` | `text` |  | FK → `purchase_orders.id` |
+| `received_on` | `date` |  |  |
+| `accepted_quantity` | `decimal(14,3)` |  |  |
+| `rejected_quantity` | `decimal(14,3)` |  |  |
+| `rejection_reason` | `text` |  |  |
+| `batch_id` | `text` | ✓ | FK → `stock_batches.id` |
+| `notes` | `text` |  |  |
+| `entered_by` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
 
 ### `quotation_emails`
 
@@ -306,6 +504,8 @@ erDiagram
 | `provider_id` | `text` | ✓ |  |
 | `sent_by` | `text` |  |  |
 | `created_at` | `timestamp` |  |  |
+| `whatsapp_to` | `text[]` |  |  |
+| `whatsapp_sent_at` | `timestamp` | ✓ |  |
 
 ### `quotation_item_layers`
 
@@ -368,6 +568,12 @@ erDiagram
 | `pricing_basis` | `PricingBasis` (enum) |  |  |
 | `charge_cylinders` | `boolean` |  |  |
 | `composite_gsm` | `decimal(10,3)` |  |  |
+| `is_gazette` | `boolean` |  |  |
+| `gazette_bottom` | `decimal(10,2)` |  |  |
+| `gazette_left` | `decimal(10,2)` |  |  |
+| `gazette_right` | `decimal(10,2)` |  |  |
+| `film_width_mm` | `decimal(10,2)` |  |  |
+| `film_height_mm` | `decimal(10,2)` |  |  |
 
 ### `quotation_tiers`
 
@@ -419,6 +625,7 @@ erDiagram
 | `root_id` | `text` | ✓ | FK → `quotations.id` |
 | `is_latest` | `boolean` |  |  |
 | `won_tier_id` | `text` | ✓ | FK → `quotation_tiers.id` |
+| `selected_quantity` | `integer` |  |  |
 
 ### `sessions`
 
@@ -430,6 +637,59 @@ erDiagram
 | `expires_at` | `timestamp` |  |  |
 | `last_seen_at` | `timestamp` |  |  |
 | `created_at` | `timestamp` |  |  |
+
+### `stock_batches`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `material_id` | `text` |  | FK → `materials.id` |
+| `batch_code` | `text` |  | unique |
+| `location` | `text` |  |  |
+| `received_on` | `date` |  |  |
+| `initial_quantity` | `decimal(14,3)` |  |  |
+| `quantity` | `decimal(14,3)` |  |  |
+| `rate_per_unit` | `decimal(12,4)` | ✓ |  |
+| `reference` | `text` |  |  |
+| `notes` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+| `purchase_quantity` | `decimal(14,3)` | ✓ |  |
+| `purchase_unit` | `text` | ✓ |  |
+
+### `stock_movements`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `batch_id` | `text` |  | FK → `stock_batches.id` |
+| `material_id` | `text` |  | FK → `materials.id` |
+| `kind` | `StockMovementKind` (enum) |  |  |
+| `quantity` | `decimal(14,3)` |  |  |
+| `balance_after` | `decimal(14,3)` |  |  |
+| `job_id` | `text` | ✓ | FK → `jobs.id` |
+| `from_location` | `text` |  |  |
+| `to_location` | `text` |  |  |
+| `reference` | `text` |  |  |
+| `notes` | `text` |  |  |
+| `entered_by` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+
+### `suppliers`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `name` | `text` |  | unique |
+| `contact_person` | `text` |  |  |
+| `mobile` | `text` |  |  |
+| `email` | `text` |  |  |
+| `address` | `text` |  |  |
+| `gst_number` | `text` |  |  |
+| `notes` | `text` |  |  |
+| `is_active` | `boolean` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
 
 ### `users`
 

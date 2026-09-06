@@ -180,6 +180,7 @@ apps/api/
     ├── lib/
     │   ├── prisma.ts         PrismaClient singleton + pg driver adapter
     │   ├── password.ts       scrypt hashing and constant-time verification
+    │   ├── storage.ts        Cloudflare R2 — signs URLs, never moves bytes
     │   └── logger.ts         pino instance with credential redaction
     ├── middleware/
     │   ├── authenticate.ts   session lookup + requireAdmin / requireModule
@@ -398,8 +399,10 @@ The script refuses to run if an active administrator already exists.
 
 **Access is two tiers and no more.** An administrator sees everything and manages
 users; everyone else sees only the sections ticked for them — Customers,
-Quotations, Rates, Jobs. The sidebar hides the rest, and the API refuses it
-independently, because hiding a link is not access control.
+Quotations, Rates, Inventory, Purchase, Design & Cylinders (which carries its
+artwork), Jobs. The sidebar
+hides the rest, and the API refuses it independently, because hiding a link is
+not access control.
 
 Full detail, including how sessions and passwords are stored:
 [`apps/api/README.md`](./apps/api/README.md#authentication-and-access).
@@ -482,10 +485,18 @@ keeps its default of `/api` in every environment, exactly as in development.
    | `RESEND_API_KEY` | Optional. Enables emailing a quotation; without it every other screen still works                                                                                                               |
    | `MAIL_FROM`      | The sender, e.g. `Yuva Polyprint <quotations@yourdomain.com>`. **Decides whether customers can be emailed at all** — see [Sending quotations](./apps/api/README.md#sending-quotations-by-email) |
    | `GSTIN_API_KEY`  | Optional. Enables the **Verify** button on a GST number; the offline format and check-digit validation works without it                                                                         |
+   | `R2_*`           | Optional as a **set** of four — see [Design files live in Cloudflare R2](./apps/api/README.md#design-files-live-in-cloudflare-r2). Enables uploading artwork against a design                   |
 
-   Those three are optional. Leave them unset and the app runs normally, with
-   only "send quotation" and "verify GSTIN" reporting themselves unavailable.
-   `GSTIN_API_BASE_URL` is fixed in `render.yaml` and needs no prompt.
+   Those are optional. Leave them unset and the app runs normally, with only
+   "send quotation", "verify GSTIN" and the artwork panel reporting themselves
+   unavailable. `GSTIN_API_BASE_URL` is fixed in `render.yaml` and needs no
+   prompt.
+
+   The R2 keys are all four or none: three out of four boots happily and then
+   fails on the first upload with a signing error nobody can trace back to a
+   missing variable, so that is refused at boot instead. The bucket also needs a
+   CORS rule naming the Vercel origin, or uploads fail at the preflight — the
+   API README has the policy to paste in.
 
 4. Wait for the first build. It is slow — the image is ~1.8GB, mostly Chromium.
 5. Confirm `https://<service>.onrender.com/health/ready` returns
@@ -646,11 +657,28 @@ Four rules worth repeating here:
 
 1. Model it in `apps/api/prisma/schema.prisma`, then `npm run db:migrate`.
 2. Put the request/response contract in `packages/shared`.
-3. Build the API module in `apps/api/src/modules/<module>/` and register its
+3. **Add the module key to `APP_MODULES`** in
+   `packages/shared/src/constants/modules.ts`. One list feeds the user editor's
+   tick boxes, the sidebar and the API guards, so a module added anywhere else
+   is unreachable and invisible — `requireModule` will not compile without it.
+
+   Not every API module needs one. `artwork` has its own folder, routes and
+   service but no key: it is guarded by `cylinders`, because design files are
+   part of the design register and a separate tick box would only be one more
+   thing to forget. Give a module its own key when somebody could reasonably be
+   trusted with it and not with its neighbour.
+
+   A module can also require **two** keys. Deleting a design needs `cylinders`
+   and `customers`, because the screen belongs to one and the record being
+   destroyed belongs to the other.
+
+4. Build the API module in `apps/api/src/modules/<module>/` and register its
    router in `apps/api/src/routes/index.ts`.
-4. Build the web feature in `apps/web/src/features/<feature>/` and register its
-   routes in `apps/web/src/app/router.tsx`.
-5. Run `npm run lint && npm run typecheck && npm test`.
+5. Build the web feature in `apps/web/src/features/<feature>/`, register its
+   routes in `apps/web/src/app/router.tsx`, and add it to `NAV` in
+   `apps/web/src/components/layout/AppShell.tsx`.
+6. Add its paths to `apps/api/src/openapi/openapi.ts` so `/docs` covers it.
+7. Run `npm run lint && npm run typecheck && npm test`.
 
 ---
 
@@ -674,6 +702,25 @@ Four rules worth repeating here:
 - **The app requires a sign-in.** There is no anonymous access to any module.
   A fresh database therefore needs `seed:admin` before anyone can get in — see
   [Signing in](#signing-in).
-- **Rendering a quotation PDF takes 15–20 seconds** on Render's free tier, and
-  longer from cold, because Chromium lays the document out on the server. Every
-  screen that waits on it shows a spinner; do not mistake that for a hang.
+- **A quotation PDF takes a few seconds on Render's free tier, and the time is
+  almost all cold starts.** Measured: the render itself is ~130 ms locally and
+  ~370 ms with the CPU throttled 8×, so it is not the bottleneck. Neon's free
+  tier suspends after inactivity — a first query costs ~1.7 s against ~0.2 s
+  warm — and the web service sleeps after 15 minutes idle, so Chromium relaunches
+  too. Two idle systems waking on the same click. Every screen that waits shows a
+  spinner; do not mistake it for a hang.
+- **R2 has no versioning, so "Delete for good" is final.** Nothing in the
+  bucket is recoverable once erased — there is no undelete to fall back on, by
+  design, since the point of the action is that the file stops existing. The
+  row survives to say it was there and who erased it; the bytes do not.
+- **An R2 bucket's CORS policy names origins explicitly**, so a browser upload
+  that works locally fails in production until the deployed origin is added.
+  The failure is a preflight the browser blocks, which surfaces as a status of
+  `0` and no readable error — the upload code turns that into a message naming
+  CORS, because nothing else would.
+- **The letterhead artwork is 762 KB of PNG**, which becomes ~1 MB of base64 in
+  the HTML and ~670 KB of the finished 787 KB PDF. Resampling the header and
+  footer to around 800px wide would take the PDF to roughly 200 KB with no code
+  change — the asset loader reads dimensions from the file header, so the layout
+  follows. Worth doing for the download and the email attachment; it will not
+  move generation time much.

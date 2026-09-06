@@ -38,15 +38,21 @@ src/
 │   ├── query-client.ts    TanStack Query defaults and retry policy
 │   └── router.tsx         route map; pages are lazy-loaded
 ├── components/
-│   ├── ui/                Button, Field, Input, Select, Combobox, Modal,
-│   │                      Badge, EmptyState, Toaster, ReadOnlyValue,
-│   │                      Spinner, LoadingState
+│   ├── ui/                Button, Field, Input, NumberInput, Select,
+│   │                      Combobox, Modal, Badge, EmptyState, Toaster,
+│   │                      ReadOnlyValue, Spinner, LoadingState
 │   └── layout/AppShell    sidebar on desktop, slide-over drawer on mobile
 ├── features/
 │   ├── auth/              login, session store, route guards
 │   ├── users/             user management (admins only)
 │   ├── customers/         customer list, edit modal, job specification editor
 │   ├── quotations/        quotation list, form, PDF preview
+│   ├── inventory/         stock, batches, the movement ledger
+│   ├── purchase/          suppliers, orders, receiving into stock
+│   ├── cylinders/         the design register and cylinder history
+│   ├── artwork/           design files: upload to R2, versions, previews
+│   ├── gstin/             GSTIN field and lookup, shared by two screens
+│   ├── monitor/           sign-in log (admins only)
 │   └── rates/             daily material rates
 ├── hooks/useDebounce.ts
 ├── lib/
@@ -866,6 +872,360 @@ Nothing is repriced when a revision is created. It copies plies, quantities,
 tiers and totals verbatim, because pressing the button should not silently move
 a figure the customer has already been quoted; it reprices on the first save.
 
+### Inventory — `/inventory`
+
+What the works holds, what it is worth, and what is running out.
+
+Four figures across the top: materials in stock, **need reordering**, **no level
+set**, and stock value. The middle two are why anybody opens this screen twice,
+and they are counted separately on purpose — a material nobody has set a level
+for is not known to be fine, it is simply not being watched. "Need reordering"
+is clickable and filters the list to it; nothing else is, because a figure that
+looks clickable and does nothing is worse than one that plainly does not.
+
+**Every active material appears, including ones with no stock at all.** A
+material missing from the screen because it happens to be empty is exactly the
+one somebody needs to order.
+
+Filter by category — Films, Ink, Adhesive, Solvents, Consumables — and search by
+name. Totals are over everything the filters matched rather than over a page: an
+inventory value that changes when you click a category filter is not a total
+anybody can use.
+
+#### One material — `/inventory/:id`
+
+Stock, the batches it is spread over, and every movement against it.
+
+**Batch level, not roll level.** How much PET is there, what is it worth, and is
+it running out are the questions the office asks, and all three are answered per
+batch. Individual roll numbers become worth keying in when there is a production
+module to consume them; until then they would be typing with no reader.
+
+Batches are listed **oldest first**, which is the order they should be used in,
+and an emptied batch stays on the list greyed out — it is what its movements
+refer to, and removing it would take the history with it.
+
+#### The four things you can do
+
+|                       | Asks for                                   | Notes                                  |
+| --------------------- | ------------------------------------------ | -------------------------------------- |
+| **Receive**           | Material, batch, quantity, unit, rate paid | The only action that opens a batch     |
+| **Issue** / **Waste** | Batch, quantity, which job                 | Two kinds, counted separately          |
+| **Count**             | What was counted                           | Not the difference — see below         |
+| **Transfer**          | Where it is going                          | Changes where stock is, never how much |
+
+**Issue and Waste are separate kinds** because they answer different questions:
+one is what a job consumed, the other is what the works lost. Folding them
+together overstates consumption and hides the losses.
+
+**A count asks what was on the shelf, not the correction.** The office counts
+and types the figure; the server works out the difference and its sign. Asking
+for the difference means doing that subtraction by hand — which is exactly the
+arithmetic a cycle count exists to check. A count that agrees with the books is
+still recorded, because it is evidence the shelf was checked, and it shows in
+the history as "no change" rather than as a zero.
+
+**An issue larger than the batch holds is refused**, and the message says what
+is actually on hand — the usual cause is issuing from the wrong batch. Negative
+stock is always wrong, and allowing it hides whichever earlier movement was
+mistaken.
+
+#### Receiving something new, in whatever unit it came in
+
+The material is a **combobox, not a dropdown.** Type a name that is not on the
+rates list and the delivery creates it — a film the works has not bought before
+is an ordinary event, and the alternative is the office unable to book in a
+delivery until somebody with the rates module adds it, which leaves the stock
+wrong until then. Only then does it ask for a category and the unit it will be
+stocked in.
+
+It lands in the rates catalogue **with no price**, showing on the Rates screen
+as needing one. The rate on the delivery goes on the batch, not on the
+catalogue: what one supplier charged on one day is not the works' rate for the
+material.
+
+**The quantity carries the unit on the delivery note.** Film is bought by the
+tonne and stocked by the kilogram, so the dialog takes 2 TON and says _"goes
+into stock as 2000 KG"_ while you type — a tonne entered as a kilogram is a
+thousand-fold error, and it is only obvious next to the figure it produces. The
+rate follows: the label reads **Rate paid per ton**, and Rs. 205,000 a tonne is
+stored as Rs. 205 a kilogram. Either way the delivery is worth the same money.
+
+The batch keeps what the note said — `2 ton` under the 2,000.00 — so it can
+still be checked against the paperwork it arrived with. Ordinary deliveries, in
+the unit the material is stocked in, record nothing extra.
+
+**Only conversions within one family are offered.** Grams, kilograms and tonnes;
+millilitres, litres and kilolitres. A film cannot be received in litres whatever
+the supplier's note says, and the server refuses rather than guesses.
+
+> Litres to kilograms is a property of the substance, not arithmetic, and none
+> of the four inks has a density recorded. Ink is priced at Rs. 640 and costed
+> in quotations as GSM x rate — which only works if that figure is per kilogram.
+> **Whether it actually is has not been confirmed**, and until it is, ink is
+> received in the unit it is priced in. If the Rs. 640 turns out to be per
+> litre, quotations are costing ink wrongly today, and that is worth looking at
+> on its own.
+
+#### Stock movement history
+
+Every change, newest first, with the material's running balance beside it. A
+transfer shows the two locations instead of a quantity, because zero in a
+quantity column reads as "nothing moved" when the truth is "stock moved, the
+amount did not".
+
+**Nothing edits or deletes a movement.** The balance stored on every later row
+would be wrong, and a stock ledger that can be rewritten answers nothing — a
+mistake is corrected by an adjustment, which leaves both the error and the
+correction on the record.
+
+#### Value at cost, not at today's rate
+
+Stock is valued at **what was paid** for each batch, falling back to the
+material's current rate only where a batch never recorded one. Today's rate
+answers what it would cost to _replace_ the stock, which is a different question
+— and valuing at it makes the inventory figure jump every morning when the rates
+are keyed in, which reads as stock appearing and disappearing overnight.
+
+#### The reorder level
+
+Set on the material's own page rather than under Rates: it is a stock decision,
+and this is where somebody looking at a nearly-empty shelf actually is.
+
+Blank and zero are different. Blank means nobody is watching; **zero means
+"shout only when we have run out"**, which is a choice somebody made. Stock is
+low **at** the level, not one kilogram below it — at the reorder level is when
+to reorder.
+
+#### "Not stocked" is not "out of stock"
+
+Every material in the rates catalogue appears here, so a works that has never
+received anything would otherwise open the screen to **"17 need reordering"** —
+an alarm that means nothing, and one the office learns to ignore within a week.
+
+A material only reads as **out of stock** once it has a history: something was
+received against it, or somebody set a reorder level, which is itself a
+statement that the works intends to hold it. Everything else reads as **not
+stocked** and is counted in neither figure. Running out is an event; never
+having stocked something is not.
+
+### Purchase & Suppliers — `/purchase`
+
+What is on order, who it is with, and what has arrived.
+
+Four figures across the top. **Delayed** is clickable and filters to it. The
+fourth is **On order**, not spend: money committed to orders not yet delivered.
+Calling that spend makes a cash position look worse than it is, so the month's
+actual spend — what has been accepted into stock — sits on hover instead.
+
+Orders are listed **open first**: Postgres orders an enum by declaration, and
+the statuses are declared Ordered, In transit, Part received, Received,
+Cancelled, which is exactly what-still-needs-chasing first.
+
+**Delayed is a separate badge, not a status.** An order can be part received
+_and_ late, and folding them into one label would hide whichever the office
+needed to see. It is computed against today and never stored — a stored flag
+needs a nightly job to maintain and is wrong every hour in between. An order
+with no expected date is never late: nothing was promised, and inventing a
+deadline the supplier never gave puts orders on the chase list that nobody
+undertook to chase.
+
+**Suppliers do not store what they supply or what they last charged.** Both are
+read off the orders placed with them. A stored list is one somebody has to keep
+up to date, and it is the copy that would be wrong.
+
+#### One order — `/purchase/:id`
+
+Its lines, and every delivery against them.
+
+An order carries **several lines**, because one order to one supplier usually
+covers more than one material and a part-delivery of one should not block the
+others. Each line has its own unit — film is ordered by the tonne — and that is
+the unit deliveries against it are entered in, so the order reads the way the
+supplier invoices it.
+
+**Status is chosen only while nothing has arrived.** Ordered, In transit and
+Cancelled are decisions; Part received and Received are facts about deliveries
+and are set by recording one. Once stock exists against an order the dropdown
+disappears — relabelling it would make the order disagree with the ledger
+without undoing anything.
+
+#### Receiving: where buying becomes holding
+
+A delivery records two quantities:
+
+|              |                                                 |
+| ------------ | ----------------------------------------------- |
+| **Accepted** | Opens a stock batch and appears in Inventory    |
+| **Rejected** | Recorded against the order, and goes no further |
+
+**Faulty material is not inventory.** Counting what was sent back would
+overstate what the works can actually print with, so a rejection is recorded on
+the order — with a reason, which is what gets taken up with the supplier — and
+never reaches the ledger.
+
+The accepted quantity goes into stock **through the same path a manual receipt
+takes.** One way stock comes into existence, one ledger recording it, one place
+that converts units. A second implementation living in the purchase module would
+drift from the first within a month. Both are written in one transaction, so a
+receipt naming a batch that was never created cannot happen.
+
+The units convert on the way: **1.8 TON accepted against an order at Rs. 205,000
+a tonne becomes 1,800 KG in stock at Rs. 205 a kilogram**, in a batch referenced
+`PO-4471`, which still records that the delivery note said 1.8 ton. The join is
+visible from both ends — the order names the batch, the batch names the order.
+
+**More than was ordered is refused.** A supplier sending 4,000 against an order
+for 400 has made a mistake somebody needs to ring them about, and finding out
+from the stock figure a week later costs far more than an extra line today.
+
+#### Closing a line short
+
+A supplier who sends 380 of 400 and will not send the rest leaves a line that is
+neither open nor complete. **Close** it with a reason and the order can complete.
+Without that it sits on the pending list forever — and a pending list with
+permanent residents stops being read.
+
+### Design & Cylinders — `/cylinders`
+
+Every design and the engraved set it prints from — where each cylinder is, and
+what state it is in.
+
+**A design is a job.** The 420 jobs already on record are the design register:
+customer, product, colours and the expected cylinder count all live there, and
+the quotation wizard already treats a saved job as the design it charges
+cylinders for. This screen adds the thing that was missing — the individual
+cylinders, each identifiable — so "where is the cyan one for Krishna Dairy" has
+an answer. That question is what stops a set being re-engraved because nobody
+could find the old one.
+
+A design appears once it has **something on it**: a cylinder set, or a file.
+Not all 420 jobs — 382 record a cylinder _count_, and a count is not a set, so
+listing them all would bury the rows somebody can act on. Those live under
+**Designs without a set**, a collapsible list at the foot of the screen; open
+one to attach its artwork before the cylinders are cut, which is the real order
+of work. **Register a set** offers the same jobs as its worklist, largest first
+— the biggest sets cost most to lose.
+
+The **Files** column counts what is attached, current and replaced.
+
+**Register a set** finds its design by typing rather than by scrolling fifty
+rows of a dropdown. It searches the name, the customer and the job code, and
+each suggestion carries the customer and code on a second line — two designs on
+this works' books share a name _and_ a code, and that line is the only thing
+that tells them apart. Editing the box after choosing drops the choice, so it
+can never read one design while the form holds another.
+
+Numbers collapse to a range where they run on: `CYL-3301 – 3304`, which is how
+the office says it aloud. And a set registered short of what the job expects
+says so — **"4 of 8 registered"** in amber — because two cylinders unaccounted
+for is precisely what this register exists to surface.
+
+The totals across the top count **every** cylinder, not the rows on screen. A
+filter that moved the damaged figure would make it useless as an alarm.
+
+#### One design — `/cylinders/:id`
+
+Its cylinders, and their history. Clicking a cylinder narrows the history to
+that one; the heading says which you are looking at.
+
+**Status follows the events.** It is never typed. A cylinder marked "in store"
+by hand while it is on a machine is exactly the one nobody can find — so
+recording what happened is the only way the status moves, the same way stock
+quantity only moves through the ledger.
+
+| Event                        | Leaves it                                    |
+| ---------------------------- | -------------------------------------------- |
+| Engraved, Returned, Reworked | In store                                     |
+| Allocated                    | Allocated                                    |
+| In use                       | In use                                       |
+| Damaged                      | Damaged                                      |
+| Retired                      | Retired                                      |
+| **Transferred**              | **unchanged** — it moved shelves, not stages |
+
+**A set moves together**, so recording takes a selection and defaults to the
+whole set. Four separate dialogs for one job starting means the fourth is the
+one somebody forgets, which is how a cylinder goes missing from the books.
+
+**The design's own status is the worst of its cylinders.** Five good ones and a
+damaged one cannot print, and reporting that as "in store" would be a lie of
+omission — the damaged one would be discovered at the machine.
+
+Damaged and Retired both require a note. Those are the two events somebody will
+be asked about months later, and a rejection nobody explained teaches nothing.
+
+A retired cylinder refuses everything but re-engraving: it has been scrapped or
+gone back to the customer, and it is not there to be mounted.
+
+#### Deleting a design
+
+**Delete** in the header removes the design, its cylinders, their history and
+its files. It leads with what would actually go, counted from the database:
+
+> **Deleted with it** — Cylinders 8 · Cylinder history 16 · Design files 1
+> **Kept** — Ashoka, untouched · No quotations use this design
+
+**The customer is stated, not left to be inferred**, because that is the thing
+the office actually worries about. Quotations are stated too: one that used the
+design keeps its own copy of the name, the geometry and every rate, so the
+document still reads exactly as it was sent.
+
+It takes two presses, and the second warns that nothing comes back. **Material
+issued against the design refuses it outright** — a quotation holds its own
+copy, but a stock movement holds only the link, so deleting would leave the
+ledger unable to say what that material was issued for.
+
+The button only appears for someone who has **both** Design & Cylinders and
+Customers. The screen is the cylinder register's, but the record being destroyed
+is a job.
+
+#### Design files
+
+Above the cylinders, because the artwork is what a design **is** — the cylinders
+are how it gets printed, and somebody opening a design is usually here to look
+at the file.
+
+Drag artwork onto the panel or use **Add file**. PDF, JPG, PNG, TIFF, AI, EPS,
+CDR and ZIP, up to 50 MB. Images get a thumbnail; everything else gets its
+format on a tile, because a broken image icon is worse than no image.
+
+**The file goes straight from the browser to Cloudflare** — it never passes
+through the API — so there is a real progress bar: 30 MB on the works'
+connection is a minute in which nothing else on screen changes.
+
+**Replace, don't overwrite.** A revision keeps its predecessor: the cylinder on
+the shelf was engraved from one particular version, and a store that overwrites
+cannot say which. The new file becomes v2 and **Show replaced** brings the old
+one back into view. Nothing is superseded unless you replace it explicitly —
+a design legitimately carries a front and a back panel.
+
+**The trash button offers two different things**, because they are two different
+decisions and the office should see both before choosing.
+
+**Remove it from this design** is filing: the file leaves the screen and stays
+in the bucket, and **Put back** returns it. If something replaced it meanwhile
+it comes back as history, because a design cannot have two current files
+claiming to be the same artwork.
+
+**Delete the file for good** erases it from storage. It takes two presses, and
+the second one warns you how many cylinders this design has — if they were
+engraved from that file, nothing will be able to show what they were cut from.
+That is a warning rather than a refusal: nothing records which file a cylinder
+was cut from, so the works owner is the one who can answer it.
+
+Either way **the record stays**. A deleted file keeps its card under _Show
+replaced_, reading _"File erased by Sudeep Hase on 06-09-2026"_, with nothing to
+open. The design should be able to say what was there and who removed it; a file
+that simply vanishes leaves the office asking a question the system cannot
+answer.
+
+Every **Open** and **Save** fetches a fresh link that expires in five minutes.
+A URL that ends up in a chat message stops working, rather than standing as a
+permanent public link to a customer's unreleased packaging.
+
+Reading is open to anyone signed in — the floor works to the file the job
+prints. The buttons that change anything need the cylinders module.
+
 ### Rates — `/rates`
 
 Today's raw material prices, grouped by Films / Ink / Adhesive / Solvents.
@@ -984,6 +1344,7 @@ The browser recomputes the same figures the server does, using **the same code**
 | Customer job editor   | Composite GSM, pouches per kg                              |
 | Quotation form line   | Total pouches and weight, cylinder size and cost, margin   |
 | Quotation form totals | Material and cylinder subtotals, GST, grand total, advance |
+| Receive material      | What a delivery converts to in the stocked unit            |
 | Rates screen          | The change % a typed rate would produce                    |
 
 **The server always recalculates on save and its value wins.** The browser
@@ -999,7 +1360,8 @@ documented in [the API README](../api/README.md#calculations).
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Button`              | primary / secondary / ghost / danger, with a loading state                                                                                                        |
 | `Field`               | Label, hint and error in one consistent block                                                                                                                     |
-| `Input`, `Textarea`   | 44px tall, 15px text                                                                                                                                              |
+| `Input`, `Textarea`   | 44px tall; 15px text on a mouse, 16px on touch so iOS does not zoom on focus                                                                                      |
+| `NumberInput`         | Digits only, and a lone `0` is replaced rather than prefixed — see below                                                                                          |
 | `Select`              | Native select with a **drawn chevron** — `appearance: none` removes the browser's arrow, and without one of ours the control is indistinguishable from a text box |
 | `Combobox`            | Suggestions you can pick **or type past**. Replaces `<datalist>`, whose arrow and popup the browser draws and cannot be styled                                    |
 | `Modal`               | Escape closes, background scroll locks, focus moves inside and Tab is trapped, backdrop click closes                                                              |
@@ -1035,12 +1397,44 @@ frozen mid-rotation reads as a broken image.
 
 ---
 
+### Numbers are typed into `NumberInput`, never a plain box
+
+Two problems the office hits daily, and neither is solved by `type="number"`.
+
+**A stray letter must not erase the figure.** `type="number"` reports an empty
+string for anything it cannot parse, so `12abc` arrives as `""` and what was
+typed is gone. It also brings spinner arrows that nudge a quantity when the page
+is scrolled with the cursor over the box. So the type stays `text` with a
+numeric keypad, and a keystroke that would not make a number is **refused rather
+than stripped** — nothing happening reads as "that key does not belong here",
+where a character vanishing as it is typed reads as a broken keyboard.
+
+**A default of `0` must not become a prefix.** A field showing `0` is one
+somebody types into, and typing 210 leaves `0210` — a different number that
+looks like a fault. The contents are selected on focus, so the first keystroke
+replaces a lone zero. A real figure is selected too, which is what everybody
+expects of a form field they have tabbed into.
+
+Rows of fields are **top-aligned, not bottom-aligned.** With `items-end` a hint
+under one field makes that column taller and floats its input above the rest of
+the row — which is exactly what happened to Rate on the purchase order form.
+Every label in these rows is one line, so aligning the tops aligns the inputs; a
+trailing icon button gets a label-height spacer so it lands level with them.
+
 ## Conventions
 
 **Mobile-first.** Every screen starts at 375px. Tables become **cards** below
 `md` rather than scrolling sideways — a squeezed table is unusable on a phone.
-Inputs are 16px so iOS never zoom-jumps on focus, and the layout respects safe
-areas.
+The layout respects safe areas.
+
+Controls are **15px on a mouse and 16px on a touch device**, because iOS zooms
+the page when focusing anything under 16px and the shop floor is on tablets.
+That rule lives outside `@layer` in `styles/index.css`, deliberately: it was in
+the base layer for months and did nothing, because Tailwind's utilities layer
+beats base whatever the specificity — so the `text-[15px]` on every control won
+and inputs measured 15px on the tablet too. It is scoped to `pointer: coarse`
+rather than to a width, since it is touch that zooms and a narrow desktop window
+should keep the size the design was drawn at.
 
 **Design tokens, not hex values.** Tailwind v4 is configured in CSS via `@theme`
 in `styles/index.css` — there is no `tailwind.config.js`. The palette came from
@@ -1052,6 +1446,16 @@ fetched when someone opens it.
 **Adding a feature**
 
 1. Put the request/response contract in `packages/shared`.
-2. Create `features/<feature>/api/` with a query-key factory and hooks.
-3. Build pages under `features/<feature>/pages/`, components alongside.
-4. Register the route in `app/router.tsx` and the nav item in `AppShell`.
+2. Add the module key to `APP_MODULES` in `packages/shared/src/constants/modules.ts`
+   — the same list feeds the user editor's tick boxes, `RequireModule` and the
+   nav, so a feature added anywhere else is unreachable and invisible.
+3. Create `features/<feature>/api/` with a query-key factory and hooks.
+4. Build pages under `features/<feature>/pages/`, components alongside.
+5. Register the route in `app/router.tsx` and the nav item in `AppShell`.
+
+A mutation that changes something **another feature reads** invalidates that
+feature's keys too. Receiving a purchase delivery creates stock, so
+`useReceivePurchaseLine` clears `inventoryKeys.all` as well as its own — an
+inventory screen open in another tab would otherwise go on showing the figure
+from before the lorry arrived, and stock is the one thing this app must not show
+stale.

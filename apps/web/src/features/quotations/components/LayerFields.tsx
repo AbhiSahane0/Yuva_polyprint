@@ -13,7 +13,7 @@ import {
   resolveFilm,
   type CreateQuotationFormValues,
 } from '@yuva/shared';
-import { Field, Input, Select } from '@/components/ui/Field';
+import { Field, Select, NumberInput } from '@/components/ui/Field';
 import { cn } from '@/lib/utils';
 
 /**
@@ -254,9 +254,8 @@ export function LayerFields({
                   htmlFor={`items.${itemIndex}.layers.${index}.micron`}
                   error={errors?.[index]?.micron?.message}
                 >
-                  <Input
+                  <NumberInput
                     id={`items.${itemIndex}.layers.${index}.micron`}
-                    inputMode="decimal"
                     invalid={Boolean(errors?.[index]?.micron)}
                     {...register(`items.${itemIndex}.layers.${index}.micron`, {
                       onChange: (event) => changeMicron(index, event.target.value),
@@ -282,9 +281,8 @@ export function LayerFields({
                     htmlFor={`items.${itemIndex}.layers.${index}.rateOverride`}
                     error={errors?.[index]?.rateOverride?.message}
                   >
-                    <Input
+                    <NumberInput
                       id={`items.${itemIndex}.layers.${index}.rateOverride`}
-                      inputMode="decimal"
                       placeholder="Rs. / kg"
                       invalid={Boolean(errors?.[index]?.rateOverride)}
                       {...register(`items.${itemIndex}.layers.${index}.rateOverride`)}

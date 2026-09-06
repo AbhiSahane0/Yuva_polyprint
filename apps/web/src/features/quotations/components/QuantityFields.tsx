@@ -6,7 +6,7 @@ import {
   type CreateQuotationFormValues,
   type PricingBasis,
 } from '@yuva/shared';
-import { Field, Input } from '@/components/ui/Field';
+import { Field, NumberInput } from '@/components/ui/Field';
 import { cn } from '@/lib/utils';
 
 /**
@@ -181,7 +181,7 @@ export function QuantityFields({
                   hint={perPouch ? 'pouches' : 'kg'}
                   error={errors?.[index]?.[quantityField]?.message}
                 >
-                  <Input
+                  <NumberInput
                     /*
                      * Keyed on the field, so switching the unit remounts the
                      * box instead of reusing it.
@@ -198,7 +198,6 @@ export function QuantityFields({
                      */
                     key={quantityField}
                     id={`items.${itemIndex}.quantities.${index}.${quantityField}`}
-                    inputMode="decimal"
                     invalid={Boolean(errors?.[index]?.[quantityField])}
                     {...register(`items.${itemIndex}.quantities.${index}.${quantityField}`)}
                   />
@@ -212,10 +211,9 @@ export function QuantityFields({
                   hint={perPouch ? 'per pouch' : 'per kg'}
                   error={errors?.[index]?.[rateField]?.message}
                 >
-                  <Input
+                  <NumberInput
                     key={rateField}
                     id={`items.${itemIndex}.quantities.${index}.${rateField}`}
-                    inputMode="decimal"
                     invalid={Boolean(errors?.[index]?.[rateField])}
                     {...register(`items.${itemIndex}.quantities.${index}.${rateField}`)}
                   />

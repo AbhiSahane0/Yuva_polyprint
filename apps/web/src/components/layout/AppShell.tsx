@@ -8,6 +8,9 @@ import {
   LogOut,
   Menu,
   ShieldCheck,
+  Disc3,
+  Package,
+  Truck,
   Users,
   X,
 } from 'lucide-react';
@@ -39,11 +42,18 @@ const NAV: { group: string; items: NavItem[] }[] = [
   },
   {
     group: 'Materials',
-    items: [{ to: '/rates', label: 'Rates', icon: IndianRupee, module: 'rates' }],
+    items: [
+      { to: '/inventory', label: 'Inventory', icon: Package, module: 'inventory' },
+      { to: '/purchase', label: 'Purchase', icon: Truck, module: 'purchase' },
+      { to: '/rates', label: 'Rates', icon: IndianRupee, module: 'rates' },
+    ],
   },
   {
     group: 'Production',
-    items: [{ to: '/jobs', label: 'Jobs', icon: Boxes, module: 'jobs', disabled: true }],
+    items: [
+      { to: '/cylinders', label: 'Design & Cylinders', icon: Disc3, module: 'cylinders' },
+      { to: '/jobs', label: 'Jobs', icon: Boxes, module: 'jobs', disabled: true },
+    ],
   },
   {
     group: 'Administration',

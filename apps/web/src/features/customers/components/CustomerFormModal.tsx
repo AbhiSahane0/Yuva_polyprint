@@ -12,7 +12,7 @@ import {
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
-import { Field, FieldSection, Input, Textarea } from '@/components/ui/Field';
+import { Field, FieldSection, Input, Textarea, NumberInput } from '@/components/ui/Field';
 import { toast } from '@/lib/toast';
 import { ApiClientError } from '@/lib/api-client';
 import { GstinField } from '@/features/gstin/components/GstinField';
@@ -270,9 +270,8 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
                 hint="10 digits, starting 6-9"
                 error={errors.mobile?.message}
               >
-                <Input
+                <NumberInput
                   id="mobile"
-                  inputMode="numeric"
                   autoComplete="off"
                   placeholder="9876543210"
                   invalid={Boolean(errors.mobile)}
@@ -369,9 +368,8 @@ export function CustomerFormModal({ open, onClose, customer }: Props) {
                 hint="6 digits"
                 error={errors.pincode?.message}
               >
-                <Input
+                <NumberInput
                   id="pincode"
-                  inputMode="numeric"
                   autoComplete="off"
                   invalid={Boolean(errors.pincode)}
                   {...register('pincode')}

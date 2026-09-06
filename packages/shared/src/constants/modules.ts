@@ -6,7 +6,15 @@
  * that decide what to answer. Adding a module here and nowhere else leaves it
  * invisible and unreachable rather than silently open to everyone.
  */
-export const APP_MODULES = ['customers', 'quotations', 'rates', 'jobs'] as const;
+export const APP_MODULES = [
+  'customers',
+  'quotations',
+  'rates',
+  'inventory',
+  'purchase',
+  'cylinders',
+  'jobs',
+] as const;
 
 export type AppModule = (typeof APP_MODULES)[number];
 
@@ -14,6 +22,9 @@ export const MODULE_LABELS: Record<AppModule, string> = {
   customers: 'Customers',
   quotations: 'Quotations',
   rates: 'Rates',
+  inventory: 'Inventory',
+  purchase: 'Purchase & Suppliers',
+  cylinders: 'Design & Cylinders',
   jobs: 'Jobs',
 };
 

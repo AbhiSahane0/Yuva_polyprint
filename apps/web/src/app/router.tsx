@@ -16,6 +16,12 @@ const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'));
 const CustomersPage = lazy(() => import('@/features/customers/pages/CustomersPage'));
 const QuotationsPage = lazy(() => import('@/features/quotations/pages/QuotationsPage'));
 const RatesPage = lazy(() => import('@/features/rates/pages/RatesPage'));
+const InventoryPage = lazy(() => import('@/features/inventory/pages/InventoryPage'));
+const MaterialStockPage = lazy(() => import('@/features/inventory/pages/MaterialStockPage'));
+const PurchasePage = lazy(() => import('@/features/purchase/pages/PurchasePage'));
+const PurchaseOrderPage = lazy(() => import('@/features/purchase/pages/PurchaseOrderPage'));
+const CylindersPage = lazy(() => import('@/features/cylinders/pages/CylindersPage'));
+const DesignPage = lazy(() => import('@/features/cylinders/pages/DesignPage'));
 const QuotationFormPage = lazy(() => import('@/features/quotations/pages/QuotationFormPage'));
 const UsersPage = lazy(() => import('@/features/users/pages/UsersPage'));
 const MonitorPage = lazy(() => import('@/features/monitor/pages/MonitorPage'));
@@ -122,6 +128,54 @@ function AppRoutes() {
             element={
               <RequireModule module="rates">
                 <RatesPage />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="/inventory"
+            element={
+              <RequireModule module="inventory">
+                <InventoryPage />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="/inventory/:id"
+            element={
+              <RequireModule module="inventory">
+                <MaterialStockPage />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="/purchase"
+            element={
+              <RequireModule module="purchase">
+                <PurchasePage />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="/purchase/:id"
+            element={
+              <RequireModule module="purchase">
+                <PurchaseOrderPage />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="/cylinders"
+            element={
+              <RequireModule module="cylinders">
+                <CylindersPage />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="/cylinders/:id"
+            element={
+              <RequireModule module="cylinders">
+                <DesignPage />
               </RequireModule>
             }
           />
