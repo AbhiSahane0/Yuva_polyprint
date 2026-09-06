@@ -661,6 +661,17 @@ Four rules worth repeating here:
    `packages/shared/src/constants/modules.ts`. One list feeds the user editor's
    tick boxes, the sidebar and the API guards, so a module added anywhere else
    is unreachable and invisible — `requireModule` will not compile without it.
+
+   Not every API module needs one. `artwork` has its own folder, routes and
+   service but no key: it is guarded by `cylinders`, because design files are
+   part of the design register and a separate tick box would only be one more
+   thing to forget. Give a module its own key when somebody could reasonably be
+   trusted with it and not with its neighbour.
+
+   A module can also require **two** keys. Deleting a design needs `cylinders`
+   and `customers`, because the screen belongs to one and the record being
+   destroyed belongs to the other.
+
 4. Build the API module in `apps/api/src/modules/<module>/` and register its
    router in `apps/api/src/routes/index.ts`.
 5. Build the web feature in `apps/web/src/features/<feature>/`, register its
@@ -698,6 +709,15 @@ Four rules worth repeating here:
   warm — and the web service sleeps after 15 minutes idle, so Chromium relaunches
   too. Two idle systems waking on the same click. Every screen that waits shows a
   spinner; do not mistake it for a hang.
+- **R2 has no versioning, so "Delete for good" is final.** Nothing in the
+  bucket is recoverable once erased — there is no undelete to fall back on, by
+  design, since the point of the action is that the file stops existing. The
+  row survives to say it was there and who erased it; the bytes do not.
+- **An R2 bucket's CORS policy names origins explicitly**, so a browser upload
+  that works locally fails in production until the deployed origin is added.
+  The failure is a preflight the browser blocks, which surfaces as a status of
+  `0` and no readable error — the upload code turns that into a message naming
+  CORS, because nothing else would.
 - **The letterhead artwork is 762 KB of PNG**, which becomes ~1 MB of base64 in
   the HTML and ~670 KB of the finished 787 KB PDF. Resampling the header and
   footer to around 800px wide would take the PDF to roughly 200 KB with no code
