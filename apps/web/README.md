@@ -1150,6 +1150,28 @@ be asked about months later, and a rejection nobody explained teaches nothing.
 A retired cylinder refuses everything but re-engraving: it has been scrapped or
 gone back to the customer, and it is not there to be mounted.
 
+#### Deleting a design
+
+**Delete** in the header removes the design, its cylinders, their history and
+its files. It leads with what would actually go, counted from the database:
+
+> **Deleted with it** — Cylinders 8 · Cylinder history 16 · Design files 1
+> **Kept** — Ashoka, untouched · No quotations use this design
+
+**The customer is stated, not left to be inferred**, because that is the thing
+the office actually worries about. Quotations are stated too: one that used the
+design keeps its own copy of the name, the geometry and every rate, so the
+document still reads exactly as it was sent.
+
+It takes two presses, and the second warns that nothing comes back. **Material
+issued against the design refuses it outright** — a quotation holds its own
+copy, but a stock movement holds only the link, so deleting would leave the
+ledger unable to say what that material was issued for.
+
+The button only appears for someone who has **both** Design & Cylinders and
+Customers. The screen is the cylinder register's, but the record being destroyed
+is a job.
+
 #### Design files
 
 Above the cylinders, because the artwork is what a design **is** — the cylinders

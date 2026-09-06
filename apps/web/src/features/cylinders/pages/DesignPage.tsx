@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, History } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, History, Trash2 } from 'lucide-react';
 import {
   CYLINDER_EVENT_LABELS,
   CYLINDER_STATUS_LABELS,
@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { ArtworkPanel } from '@/features/artwork/components/ArtworkPanel';
 import { canAccess, useAuthStore } from '@/features/auth/auth-store';
 import { useDesign } from '../api/cylinder-api';
+import { DeleteDesignModal } from '../components/DeleteDesignModal';
 import { RecordEventModal } from '../components/RecordEventModal';
 
 const STATUS_TONE: Record<CylinderStatus | 'NONE', 'neutral' | 'success' | 'warning' | 'brand'> = {
@@ -37,9 +38,17 @@ function formatDate(iso: string): string {
 export default function DesignPage() {
   const { id } = useParams<{ id: string }>();
   const { data: design, isPending, isError, error, refetch } = useDesign(id ?? null);
+  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const canEdit = canAccess(user, 'cylinders');
+  /*
+   * Deleting destroys a job, which the customers module owns — the same rule
+   * the API applies. Someone trusted with the cylinder register is not
+   * automatically trusted to delete a customer's design record.
+   */
+  const canDelete = canEdit && canAccess(user, 'customers');
   const [recording, setRecording] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   /** Null shows the whole design's history; an id narrows it to one cylinder. */
   const [focused, setFocused] = useState<string | null>(null);
 
@@ -94,6 +103,16 @@ export default function DesignPage() {
               <Button onClick={() => setRecording(true)}>
                 <History className="size-4" />
                 Record an event
+              </Button>
+            ) : null}
+            {canDelete ? (
+              <Button
+                variant="ghost"
+                onClick={() => setDeleting(true)}
+                title="Delete this design, its cylinders and its files"
+              >
+                <Trash2 className="size-4" />
+                Delete
               </Button>
             ) : null}
           </div>
@@ -264,6 +283,14 @@ export default function DesignPage() {
           </div>
         </section>
       )}
+
+      <DeleteDesignModal
+        open={deleting}
+        onClose={() => setDeleting(false)}
+        jobId={design.jobId}
+        jobName={design.jobName}
+        onDeleted={() => navigate('/cylinders', { replace: true })}
+      />
 
       <RecordEventModal
         cylinders={design.cylinders}

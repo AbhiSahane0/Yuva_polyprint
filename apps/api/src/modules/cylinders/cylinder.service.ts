@@ -7,6 +7,8 @@ import {
   statusAfter,
   type Cylinder,
   type CylinderEvent,
+  type DesignDeleted,
+  type DesignDeletion,
   type DesignDetail,
   type DesignList,
   type DesignSummary,
@@ -17,6 +19,7 @@ import {
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../../lib/prisma.js';
+import { eraseAllForJob } from '../artwork/artwork.service.js';
 import { ApiError } from '../../utils/api-error.js';
 
 /**
@@ -439,4 +442,117 @@ export async function listOut(): Promise<Cylinder[]> {
     orderBy: { updatedAt: 'desc' },
   });
   return rows.map(toCylinder).filter((cylinder) => isOutOfStore(cylinder.status));
+}
+
+/**
+ * What deleting one design would cost, before anybody is asked to confirm it.
+ *
+ * Read separately rather than folded into the design itself: it counts across
+ * three other tables, and every page view would pay for a question almost
+ * nobody asks.
+ */
+export async function describeDeletion(jobId: string): Promise<DesignDeletion> {
+  const job = await prisma.job.findUnique({
+    where: { id: jobId },
+    select: {
+      id: true,
+      jobName: true,
+      jobCode: true,
+      customer: { select: { companyName: true, brandName: true } },
+      _count: {
+        select: {
+          cylinders: true,
+          quotationItems: true,
+          stockMovements: true,
+          /* Rows whose object is still there. A deleted one erases nothing. */
+          artwork: { where: { storageKey: { not: null } } },
+        },
+      },
+    },
+  });
+  if (!job) throw ApiError.notFound('Design not found');
+
+  const [cylinderEvents, quotationRows] = await Promise.all([
+    prisma.cylinderEvent.count({ where: { cylinder: { jobId } } }),
+    prisma.quotationItem.findMany({
+      where: { jobId },
+      select: { quotation: { select: { number: true } } },
+    }),
+  ]);
+
+  /*
+   * Material issued against this design is the one thing that cannot survive
+   * the job going. A quotation carries its own copy of everything it was
+   * priced from, so the document still reads; a stock movement carries only
+   * the link, so "what were these 200 kg issued for" would have no answer.
+   */
+  const movements = job._count.stockMovements;
+  const blockedReason =
+    movements > 0
+      ? `${movements} stock movement${movements === 1 ? ' names' : 's name'} this design. ` +
+        'Deleting it would leave the stock ledger unable to say what that material was issued for.'
+      : null;
+
+  return {
+    jobId: job.id,
+    jobName: job.jobName,
+    jobCode: job.jobCode,
+    customerName:
+      job.customer === null
+        ? null
+        : job.customer.brandName !== 'NA' && job.customer.brandName.trim() !== ''
+          ? job.customer.brandName
+          : job.customer.companyName,
+    cylinders: job._count.cylinders,
+    cylinderEvents,
+    artworkFiles: job._count.artwork,
+    quotationLines: job._count.quotationItems,
+    quotationNumbers: [...new Set(quotationRows.map((row) => row.quotation.number))].sort(
+      (a, b) => a - b,
+    ),
+    stockMovements: job._count.stockMovements,
+    canDelete: blockedReason === null,
+    blockedReason,
+  };
+}
+
+/**
+ * Deletes a design: the job, its cylinders and their history, and its files.
+ *
+ * **The customer stays.** So does every quotation the design was priced on —
+ * a quotation snapshots the name, the geometry and every rate it was costed
+ * against, precisely so a document keeps saying what it said. Only the live
+ * link goes, which the schema has always allowed for.
+ *
+ * The files are erased from R2 first, outside the transaction. Their rows
+ * cascade with the job, so an object not erased before then is one nothing
+ * will ever point at again — a customer's artwork left in a bucket with no
+ * record it is there. A failure at that step aborts the whole deletion, which
+ * is recoverable; the reverse is not.
+ *
+ * The cylinders are deleted explicitly rather than by cascade. Their foreign
+ * key is Restricted on purpose — a job with cylinders against it must not
+ * vanish by accident — and stepping around that deliberately, in one place
+ * that had to ask first, is different from loosening it everywhere.
+ */
+export async function deleteDesign(jobId: string): Promise<DesignDeleted> {
+  const impact = await describeDeletion(jobId);
+  if (!impact.canDelete) throw ApiError.conflict(impact.blockedReason as string);
+
+  const artworkFiles = await eraseAllForJob(jobId);
+
+  await prisma.$transaction(async (tx) => {
+    /* Events cascade with their cylinder; the cylinders do not cascade. */
+    await tx.cylinder.deleteMany({ where: { jobId } });
+    /* Artwork rows cascade here, and quotation lines are set null. */
+    await tx.job.delete({ where: { id: jobId } });
+  });
+
+  return {
+    jobId,
+    jobName: impact.jobName,
+    cylinders: impact.cylinders,
+    artworkFiles,
+    quotationLinesUnlinked: impact.quotationLines,
+  };
 }

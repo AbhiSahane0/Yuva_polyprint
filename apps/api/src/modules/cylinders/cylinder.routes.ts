@@ -48,4 +48,29 @@ router.patch(
   asyncHandler(controller.update),
 );
 
+/*
+ * Deleting a design.
+ *
+ * Both guards, and deliberately. The screen belongs to the cylinders module,
+ * but the thing being destroyed is a job — which the customers module owns,
+ * and which is what `/jobs` is gated on. Somebody trusted with the cylinder
+ * register is not automatically somebody trusted to delete a customer's design
+ * record, and the two questions should not be answered by one tick box.
+ */
+router.get(
+  '/:id/deletion',
+  requireModule('cylinders'),
+  requireModule('customers'),
+  validate({ params: idParamSchema }),
+  asyncHandler(controller.deletionImpact),
+);
+
+router.delete(
+  '/:id',
+  requireModule('cylinders'),
+  requireModule('customers'),
+  validate({ params: idParamSchema }),
+  asyncHandler(controller.deleteDesign),
+);
+
 export default router;

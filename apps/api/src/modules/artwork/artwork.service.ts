@@ -396,3 +396,31 @@ export async function restore(id: string): Promise<Artwork> {
   });
   return toArtwork(updated);
 }
+
+/**
+ * Erases every file a design holds, for a design that is being deleted.
+ *
+ * Called by the cylinder register rather than duplicated there: R2 is this
+ * module's business, and a second place that knows how to erase objects is a
+ * second place that can forget to.
+ *
+ * Strict about failures on purpose. The rows are about to disappear with the
+ * job, so an object left behind here is one nothing will ever point at again —
+ * a customer's artwork sitting in a bucket with no record that it is there.
+ * Better to refuse the whole deletion and let it be retried.
+ */
+export async function eraseAllForJob(jobId: string): Promise<number> {
+  const rows = await prisma.jobArtwork.findMany({
+    where: { jobId, storageKey: { not: null } },
+    select: { storageKey: true },
+  });
+
+  if (rows.length === 0) return 0;
+  if (!isStorageConfigured()) throw storageUnavailable();
+
+  for (const row of rows) {
+    await deleteObjectOrThrow(row.storageKey as string);
+  }
+
+  return rows.length;
+}

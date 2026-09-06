@@ -44,3 +44,12 @@ export async function update(req: Request, res: Response) {
     await cylinderService.updateCylinder(req.params.id as string, req.body as UpdateCylinderInput),
   );
 }
+
+/** What deleting this design would destroy — read before the confirmation. */
+export async function deletionImpact(req: Request, res: Response) {
+  ok(res, await cylinderService.describeDeletion(req.params.id as string));
+}
+
+export async function deleteDesign(req: Request, res: Response) {
+  ok(res, await cylinderService.deleteDesign(req.params.id as string));
+}

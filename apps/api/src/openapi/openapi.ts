@@ -423,6 +423,20 @@ export function buildOpenApiDocument(serverUrl: string) {
           responses: { 200: ok('Cylinders out of the store.'), ...AUTH_FAILURES },
         },
       },
+      '/api/cylinders/{id}/deletion': {
+        get: {
+          tags: ['Cylinders'],
+          summary: 'What deleting this design would destroy',
+          description:
+            'Read before the confirmation is offered, so the office decides against counts ' +
+            'rather than against "are you sure?". Says what goes (cylinders, their history, ' +
+            'the files) and what stays (the customer, and any quotation, which carries its own ' +
+            'copy of everything it was priced from). `canDelete` is false with a reason when ' +
+            'material has been issued against the design.',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The impact, counted.'), ...COMMON },
+        },
+      },
       '/api/cylinders/{id}': {
         get: {
           tags: ['Cylinders'],
@@ -430,6 +444,23 @@ export function buildOpenApiDocument(serverUrl: string) {
           description: 'The id is the **job** id, because a design is a job.',
           parameters: [ID_PARAM],
           responses: { 200: ok('The design in full.'), ...COMMON },
+        },
+        delete: {
+          tags: ['Cylinders'],
+          summary: 'Delete a design, its cylinders and its files',
+          description:
+            '**The customer stays**, and so does every quotation the design was priced on — a ' +
+            'quotation snapshots the name, the geometry and every rate it was costed against, ' +
+            'so the document keeps saying what it said. Only the live link goes.\n\n' +
+            'Refused, 409, when material has been issued against the design: a quotation holds ' +
+            'its own copy, but a stock movement holds only the link, so "what were these 200 kg ' +
+            'issued for" would have no answer.\n\nFiles are erased from R2 before the rows ' +
+            'cascade away — an object missed at that point is one nothing will ever point at ' +
+            'again. A failure there aborts the deletion, which is recoverable; the reverse is ' +
+            'not.\n\nNeeds **both** the cylinders and the customers module: the screen belongs ' +
+            'to one, the record being destroyed belongs to the other.',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('What the deletion did.'), ...COMMON },
         },
         patch: {
           tags: ['Cylinders'],

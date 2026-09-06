@@ -82,3 +82,51 @@ export interface DesignList {
   items: DesignSummary[];
   totals: CylinderTotals;
 }
+
+/**
+ * What deleting one design would destroy, and what it would leave behind.
+ *
+ * Fetched before the confirmation is offered rather than described in general
+ * terms. "This will delete 8 cylinders and erase 1 file, and 2 quotations will
+ * keep their own copy" is a decision somebody can make; "are you sure?" is not.
+ */
+export interface DesignDeletion {
+  jobId: string;
+  jobName: string;
+  jobCode: string;
+  customerName: string | null;
+
+  /** Destroyed with the design. */
+  cylinders: number;
+  cylinderEvents: number;
+  /** Files whose objects are erased from storage. */
+  artworkFiles: number;
+
+  /**
+   * Kept. A quotation snapshots the design it was priced from — name, geometry
+   * and every rate — so the document still reads correctly; only the live link
+   * to this design goes.
+   */
+  quotationLines: number;
+  quotationNumbers: number[];
+
+  /**
+   * Material issued against this design. Not nullable in practice: a movement
+   * naming a job that no longer exists is a hole in the ledger, so this is what
+   * refuses the deletion.
+   */
+  stockMovements: number;
+
+  canDelete: boolean;
+  /** Why not, in words the office can act on. Null when it can. */
+  blockedReason: string | null;
+}
+
+/** What a completed deletion actually did. */
+export interface DesignDeleted {
+  jobId: string;
+  jobName: string;
+  cylinders: number;
+  artworkFiles: number;
+  quotationLinesUnlinked: number;
+}

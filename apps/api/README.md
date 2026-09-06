@@ -192,7 +192,8 @@ guard is visible in that diff; a guard forgotten three files away is not.
 /cylinders   authenticate — whether a design already has a set is what stops a
              second one being ordered, and the quotation screens ask the same
              question. Registering or moving one needs
-             requireModule('cylinders').
+             requireModule('cylinders'); DELETING a design needs customers as
+             well, because the record it destroys is a job.
 /artwork     authenticate — the floor works to the file a job prints, and gating
              that on the cylinders module hides it from exactly the people who
              need it. Uploading, refiling and removing need
@@ -407,6 +408,8 @@ undo.
 | POST   | `/cylinders`              | Register a set against a design                              |
 | POST   | `/cylinders/events`       | Record what happened to one or more cylinders                |
 | PATCH  | `/cylinders/:id`          | Correct a cylinder — not its status, not its number          |
+| GET    | `/cylinders/:id/deletion` | What deleting this design would destroy, counted             |
+| DELETE | `/cylinders/:id`          | Delete a design, its cylinders and its files                 |
 
 Query on `GET /cylinders`: `q` (design, customer or cylinder number), `status`,
 `customerId`, `attentionOnly`.
@@ -426,6 +429,49 @@ those live, largest first, because the biggest sets cost most to lose.
 
 Totals are counted over every cylinder rather than over the rows returned, so a
 filter cannot move the damaged figure.
+
+#### Deleting a design
+
+`DELETE /cylinders/:id` removes the job, its cylinders, their whole history and
+its files. **The customer stays.** So does every quotation the design was priced
+on: a quotation snapshots the name, the geometry and every rate it was costed
+against, precisely so a sent document keeps saying what it said — only the live
+link goes, which `quotation_items.job_id` has always been nullable for.
+
+|                            | Deleting a design               |
+| -------------------------- | ------------------------------- |
+| Cylinders and their events | destroyed                       |
+| Design files               | erased from R2                  |
+| The customer               | untouched                       |
+| Quotations                 | kept — they hold their own copy |
+| Stock movements            | **refuses the deletion**        |
+
+**Material issued against the design refuses it, 409.** A quotation carries its
+own copy of everything, so the document survives. A stock movement carries only
+the link, so "what were these 200 kg issued for" would have no answer — and a
+ledger that cannot answer that is the one thing the inventory module exists to
+prevent.
+
+`GET /cylinders/:id/deletion` returns that impact **counted**, and the dialog is
+built from it. "8 cylinders, 16 events and 1 file" is a decision somebody can
+make; "are you sure?" is not.
+
+Two details in the order of operations:
+
+- **Files are erased before the rows cascade away.** Their rows go with the job,
+  so an object not erased by then is one nothing will ever point at again — a
+  customer's artwork in a bucket with no record it is there. A failure at that
+  step aborts the whole deletion, which is recoverable; the reverse is not.
+- **Cylinders are deleted explicitly, not by cascade.** Their foreign key is
+  `Restrict` on purpose — a job with cylinders against it must not vanish by
+  accident. Stepping around that deliberately, in one place that had to ask
+  first, is a different thing from loosening it everywhere.
+
+It needs **both** `requireModule('cylinders')` and `requireModule('customers')`.
+The screen belongs to the cylinder register, but the record being destroyed is a
+job, which is what `/jobs` is gated on. Somebody trusted with the cylinder
+register is not automatically somebody trusted to delete a customer's design,
+and one tick box should not answer both questions.
 
 A design is on the register once it has **either** a cylinder set **or** a file.
 Artwork comes first in the real order of work — the file is drawn and sent to

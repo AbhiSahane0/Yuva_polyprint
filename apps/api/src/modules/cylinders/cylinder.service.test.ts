@@ -71,12 +71,55 @@ describe('the cylinder register', () => {
     for (const forbidden of [
       'customer.create',
       'customer.update',
+      'customer.delete',
       'job.create',
       'job.update',
-      'job.delete',
+      'job.upsert',
     ]) {
       expect(CODE).not.toContain(forbidden);
     }
+  });
+
+  it('deletes a job only from deleteDesign, and never a customer', () => {
+    /*
+     * `job.delete` was on the forbidden list above until the register grew a
+     * way to delete a design, which is a job. It came off deliberately: the
+     * rule that list protects is that the design's identity has exactly one
+     * home, and removing that home does not give it a second one.
+     *
+     * What still has to hold is that it happens in one place, on purpose,
+     * after asking — and that the customer is not taken with it, which is the
+     * thing the office actually worries about.
+     */
+    const deletes = CODE.match(/job\.delete/g) ?? [];
+    expect(deletes).toHaveLength(1);
+
+    const block = CODE.slice(CODE.indexOf('export async function deleteDesign'));
+    /* It refuses before it destroys. */
+    expect(block.indexOf('impact.canDelete')).toBeLessThan(block.indexOf('job.delete'));
+    /* Files leave the bucket before their rows cascade away. */
+    expect(block.indexOf('eraseAllForJob')).toBeLessThan(block.indexOf('job.delete'));
+    /* Cylinders go with it; their key is Restricted, so it must be explicit. */
+    expect(block).toContain('tx.cylinder.deleteMany');
+    /* And nothing here touches the customer. */
+    expect(block).not.toContain('customer');
+  });
+
+  it('needs the customers module as well to delete a design', () => {
+    /*
+     * The screen belongs to the cylinders module, but the record being
+     * destroyed is a job — which `/jobs` is gated on customers for. Somebody
+     * trusted with the cylinder register is not automatically somebody trusted
+     * to delete a customer's design, and one tick box should not answer both.
+     */
+    const routes = readFileSync(
+      fileURLToPath(new URL('./cylinder.routes.ts', import.meta.url)),
+      'utf8',
+    );
+    const block = routes.slice(routes.indexOf("router.delete(\n  '/:id'"));
+    const deleteRoute = block.slice(0, block.indexOf(');'));
+    expect(deleteRoute).toContain("requireModule('cylinders')");
+    expect(deleteRoute).toContain("requireModule('customers')");
   });
 
   it('refuses to mount a retired cylinder', () => {

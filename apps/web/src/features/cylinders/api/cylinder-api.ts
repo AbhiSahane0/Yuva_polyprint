@@ -3,6 +3,8 @@ import type {
   Cylinder,
   CylinderEvent,
   CylinderStatus,
+  DesignDeleted,
+  DesignDeletion,
   DesignDetail,
   DesignList,
   DesignSummary,
@@ -23,6 +25,7 @@ export const cylinderKeys = {
   all: ['cylinders'] as const,
   list: (params: DesignListParams) => [...cylinderKeys.all, 'list', params] as const,
   design: (id: string) => [...cylinderKeys.all, 'design', id] as const,
+  deletion: (id: string) => [...cylinderKeys.all, 'deletion', id] as const,
   unregistered: () => [...cylinderKeys.all, 'unregistered'] as const,
 };
 
@@ -80,5 +83,39 @@ export function useUpdateCylinder(id: string) {
     mutationFn: (input: UpdateCylinderInput) =>
       request<Cylinder>({ url: `/cylinders/${id}`, method: 'PATCH', data: input }),
     onSuccess: invalidate,
+  });
+}
+
+/**
+ * What deleting this design would destroy.
+ *
+ * Fetched when the dialog opens rather than with the design: it counts across
+ * three other tables, and every page view would pay for a question almost
+ * nobody asks. Never cached — a quotation raised in another tab changes the
+ * answer, and a stale one here is a stale one on the only screen that matters.
+ */
+export function useDesignDeletion(jobId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: cylinderKeys.deletion(jobId ?? ''),
+    queryFn: () => request<DesignDeletion>({ url: `/cylinders/${jobId}/deletion`, method: 'GET' }),
+    enabled: enabled && Boolean(jobId),
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
+export function useDeleteDesign() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: string) =>
+      request<DesignDeleted>({ url: `/cylinders/${jobId}`, method: 'DELETE' }),
+    onSuccess: () => {
+      /*
+       * The artwork cache too: its files went with the design, and a stale
+       * entry would show a panel for a design that is no longer there.
+       */
+      void queryClient.invalidateQueries({ queryKey: cylinderKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['artwork'] });
+    },
   });
 }
