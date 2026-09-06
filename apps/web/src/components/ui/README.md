@@ -8,6 +8,23 @@ Rules: no business logic, no data fetching, no feature imports. Style with the
 design tokens in `src/styles/index.css` (`bg-brand-600`, `text-ink-500`, …)
 rather than raw hex values.
 
+## `Combobox` options can carry a key
+
+Pass plain strings when the text _is_ the identity, and `ComboboxOption`
+(`{ key, label, description? }`) when it is not. `onPick(label, key)` hands both
+back.
+
+The second form exists because two of this works' designs share a name **and** a
+job code — the source spreadsheet reuses codes across genuinely different jobs.
+Keyed on what is written, the picker would answer with the first match for both,
+and a cylinder set would be registered against the wrong job with nothing on
+screen to show it. `description` is the second line that lets a person tell such
+a pair apart.
+
+It takes either a react-hook-form `registration` **or** a plain `onChange`, not
+both: `register` owns the input through a ref, so also setting `value` would
+give one field two owners.
+
 ## Anything numeric uses `NumberInput`
 
 Not `Input`, and not `type="number"`. Two reasons, and both are behaviour the

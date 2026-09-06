@@ -16,11 +16,36 @@ import { cn } from '@/lib/utils';
  * suggestion writes through `onPick` so validation and dirty-tracking behave
  * exactly as they do when the value is typed.
  */
+/**
+ * An option whose text is not its identity.
+ *
+ * Needed wherever two rows can read the same. Two of this works' designs share
+ * both a name and a job code — the source spreadsheet reuses codes — so a list
+ * keyed on what is written would quietly pick the wrong one. Plain strings are
+ * still accepted, and are their own key.
+ */
+export interface ComboboxOption {
+  key: string;
+  label: string;
+  /** A second line, when the label alone does not explain the row. */
+  description?: string;
+}
+
 interface ComboboxProps {
   id: string;
-  options: readonly string[];
-  registration: UseFormRegisterReturn;
-  onPick: (value: string) => void;
+  options: readonly string[] | readonly ComboboxOption[];
+  /**
+   * React Hook Form mode: the input stays uncontrolled and `register` owns it.
+   *
+   * Omit it for a plain controlled field and pass `onChange` instead — the
+   * input is then driven by `value`. The two are exclusive: setting `value` on
+   * a registered input makes it controlled and fights the form library.
+   */
+  registration?: UseFormRegisterReturn;
+  /** Required when there is no `registration`. */
+  onChange?: (value: string) => void;
+  /** The picked option's key, which is its label for a plain string list. */
+  onPick: (value: string, key: string) => void;
   /** Current field value, used to filter and to mark the active option. */
   value: string;
   placeholder?: string;
@@ -46,6 +71,7 @@ export function Combobox({
   id,
   options,
   registration,
+  onChange,
   onPick,
   value,
   placeholder,
@@ -58,14 +84,19 @@ export function Combobox({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const listId = useId();
 
+  /* One shape inside, whichever the caller passed. */
+  const items: ComboboxOption[] = options.map((option) =>
+    typeof option === 'string' ? { key: option, label: option } : option,
+  );
+
   // Typing narrows the list; an exact match shows everything again so the user
   // can still see the alternatives.
   const query = value.trim().toLowerCase();
-  const exact = options.some((option) => option.toLowerCase() === query);
+  const exact = items.some((item) => item.label.toLowerCase() === query);
   const filtered =
     !filterLocally || query === '' || exact
-      ? options
-      : options.filter((o) => o.toLowerCase().includes(query));
+      ? items
+      : items.filter((item) => item.label.toLowerCase().includes(query));
 
   useEffect(() => {
     if (!open) return;
@@ -76,8 +107,8 @@ export function Combobox({
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, [open]);
 
-  function choose(option: string) {
-    onPick(option);
+  function choose(item: ComboboxOption) {
+    onPick(item.label, item.key);
     setOpen(false);
     setHighlighted(-1);
   }
@@ -126,10 +157,17 @@ export function Combobox({
         autoComplete="off"
         placeholder={placeholder}
         aria-invalid={invalid || undefined}
+        /*
+         * Only when the form library is not holding it. `register` writes
+         * through a ref, and adding `value` here would make React the owner of
+         * a field that already has one.
+         */
+        {...(registration ? {} : { value })}
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
         onChange={(event) => {
-          void registration.onChange(event);
+          if (registration) void registration.onChange(event);
+          else onChange?.(event.target.value);
           setOpen(true);
           setHighlighted(-1);
         }}
@@ -157,10 +195,11 @@ export function Combobox({
           role="listbox"
           className="border-ink-200 absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-[var(--radius-md)] border bg-white py-1 shadow-[var(--shadow-elevated)]"
         >
-          {filtered.map((option, index) => {
-            const selected = option.toLowerCase() === query;
+          {filtered.map((item, index) => {
+            const selected = item.label.toLowerCase() === query;
+            const description = item.description ?? describe?.(item.label);
             return (
-              <li key={option}>
+              <li key={item.key}>
                 <button
                   type="button"
                   role="option"
@@ -169,7 +208,7 @@ export function Combobox({
                   // before a click ever lands.
                   onMouseDown={(event) => {
                     event.preventDefault();
-                    choose(option);
+                    choose(item);
                   }}
                   onMouseEnter={() => setHighlighted(index)}
                   className={cn(
@@ -178,15 +217,16 @@ export function Combobox({
                     selected && 'font-semibold',
                   )}
                 >
-                  {option}
+                  {item.label}
                   {/*
                     Why this option is in the list, when its own text does not
                     say. A company found by its brand looks like a mistake
-                    without it.
+                    without it, and two designs with the same name are only
+                    told apart by it.
                   */}
-                  {describe?.(option) ? (
+                  {description ? (
                     <span className="text-ink-400 mt-0.5 block text-xs font-normal">
-                      {describe(option)}
+                      {description}
                     </span>
                   ) : null}
                 </button>

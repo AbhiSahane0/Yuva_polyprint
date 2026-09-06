@@ -1109,6 +1109,13 @@ of work. **Register a set** offers the same jobs as its worklist, largest first
 
 The **Files** column counts what is attached, current and replaced.
 
+**Register a set** finds its design by typing rather than by scrolling fifty
+rows of a dropdown. It searches the name, the customer and the job code, and
+each suggestion carries the customer and code on a second line — two designs on
+this works' books share a name _and_ a code, and that line is the only thing
+that tells them apart. Editing the box after choosing drops the choice, so it
+can never read one design while the form holds another.
+
 Numbers collapse to a range where they run on: `CYL-3301 – 3304`, which is how
 the office says it aloud. And a set registered short of what the job expects
 says so — **"4 of 8 registered"** in amber — because two cylinders unaccounted

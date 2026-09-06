@@ -10,6 +10,7 @@ import {
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, NumberInput, Select } from '@/components/ui/Field';
+import { Combobox, type ComboboxOption } from '@/components/ui/Combobox';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 import { useRegisterCylinders, useUnregisteredDesigns } from '../api/cylinder-api';
@@ -47,6 +48,8 @@ export function RegisterSetModal({ open, onClose }: { open: boolean; onClose: ()
   const register = useRegisterCylinders();
 
   const [jobId, setJobId] = useState('');
+  /* What is typed in the design box, which is not the same as what is chosen. */
+  const [designQuery, setDesignQuery] = useState('');
   const [ownership, setOwnership] = useState<CylinderOwnership>('YUVA_OWNED');
   const [location, setLocation] = useState('Cylinder Store A-1');
   const [engraver, setEngraver] = useState('');
@@ -65,6 +68,7 @@ export function RegisterSetModal({ open, onClose }: { open: boolean; onClose: ()
     if (!open) return;
     setError(null);
     setJobId('');
+    setDesignQuery('');
     setOwnership('YUVA_OWNED');
     setLocation('Cylinder Store A-1');
     setEngraver('');
@@ -79,6 +83,21 @@ export function RegisterSetModal({ open, onClose }: { open: boolean; onClose: ()
    * the usual separations. The count is already recorded on 382 jobs — asking
    * for it again would be asking a question the system can answer.
    */
+  /*
+   * Keyed by job id, not by what the row reads. Two of this works' designs
+   * share a name *and* a job code — the source spreadsheet reuses codes — so a
+   * list keyed on its own text would quietly register a set against the wrong
+   * one. The customer and the code are the second line, which is what tells a
+   * pair of same-named designs apart on screen.
+   */
+  const designOptions: ComboboxOption[] = (designs ?? []).map((row) => ({
+    key: row.jobId,
+    label: row.jobName,
+    description: [row.customerName ?? 'No customer', row.jobCode]
+      .filter((part) => part && part !== 'NA')
+      .join(' · '),
+  }));
+
   function chooseDesign(nextJobId: string) {
     setJobId(nextJobId);
     const chosen = (designs ?? []).find((row) => row.jobId === nextJobId);
@@ -154,18 +173,34 @@ export function RegisterSetModal({ open, onClose }: { open: boolean; onClose: ()
           hint={
             design
               ? `${design.customerName ?? 'No customer'} · the job expects ${design.expectedCylinders ?? '?'} cylinders`
-              : 'Designs whose job records a cylinder count but has no set yet'
+              : designQuery.trim() !== ''
+                ? 'Pick one from the list — a set has to belong to a design already on record'
+                : 'Type to search designs whose job records a cylinder count but has no set yet'
           }
         >
-          <Select id="jobId" value={jobId} onChange={(event) => chooseDesign(event.target.value)}>
-            <option value="">— Choose a design —</option>
-            {(designs ?? []).map((row) => (
-              <option key={row.jobId} value={row.jobId}>
-                {row.jobName}
-                {row.customerName ? ` — ${row.customerName}` : ''}
-              </option>
-            ))}
-          </Select>
+          <Combobox
+            id="jobId"
+            options={designOptions}
+            value={designQuery}
+            placeholder="Type a design, customer or job code…"
+            invalid={Boolean(error) && jobId === ''}
+            onChange={(next) => {
+              setDesignQuery(next);
+              /*
+               * Typing after a choice clears it. The alternative is a box
+               * reading one design while the form holds another, which is the
+               * kind of disagreement nobody notices until the set is
+               * registered against the wrong job.
+               */
+              if (jobId !== '') chooseDesign('');
+            }}
+            onPick={(label, key) => {
+              setDesignQuery(label);
+              chooseDesign(key);
+            }}
+            /* The list is small and already filtered to designs without a set. */
+            filterLocally
+          />
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
