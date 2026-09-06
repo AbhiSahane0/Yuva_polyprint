@@ -1001,12 +1001,12 @@ export default function QuotationFormPage() {
                 </Field>
               </div>
               <div className="sm:col-span-3">
-                <Field label="Mobile" htmlFor="mobile">
+                <Field label="Mobile" htmlFor="mobile" error={formState.errors.mobile?.message}>
                   <Input id="mobile" inputMode="tel" {...register('mobile')} />
                 </Field>
               </div>
               <div className="sm:col-span-5">
-                <Field label="Email" htmlFor="email">
+                <Field label="Email" htmlFor="email" error={formState.errors.email?.message}>
                   <Input id="email" type="email" {...register('email')} />
                 </Field>
               </div>

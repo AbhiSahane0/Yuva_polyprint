@@ -259,10 +259,18 @@ const createQuotationBaseSchema = z.object({
   addressLine1: z.string().trim().max(200).default(''),
   addressLine2: z.string().trim().max(200).default(''),
   addressLine3: z.string().trim().max(200).default(''),
-  mobile: z.string().trim().max(40).default(''),
+  mobile: z
+    .string()
+    .trim()
+    .min(1, 'Enter Valid Mobile Number')
+    .regex(/^\d{10}$/),
   /** GSTIN. Upper-cased, because it is printed and read back over the phone. */
   gstNumber: z.string().trim().toUpperCase().max(20).default(''),
-  email: z.string().trim().max(160).default(''),
+  email: z
+    .string()
+    .trim()
+    .min(1, 'Enter Valid Email')
+    .regex(/.*?@?[^@]*\.+.*/),
 
   /**
    * Which quantity the printed quotation is for, counting from 1.
