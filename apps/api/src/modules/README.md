@@ -14,6 +14,7 @@ One folder per business module. Built so far:
 | `inventory`  | Stock as a ledger — batches, movements, and what is running out  |
 | `purchase`   | Suppliers and orders; receiving is where buying becomes stock    |
 | `cylinders`  | The design register — engraved sets, where they are, what state  |
+| `artwork`    | Design files in R2 — signed uploads, revisions, signed reads     |
 | `gstin`      | Verifying a customer's GST registration                          |
 | `monitor`    | Sign-in history, for administrators                              |
 | `settings`   | Editable costing defaults                                        |

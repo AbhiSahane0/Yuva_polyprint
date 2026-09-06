@@ -93,12 +93,15 @@ function toEvent(row: EventRow): CylinderEvent {
   };
 }
 
-type JobRow = Prisma.JobGetPayload<{
-  include: {
-    customer: { select: { id: true; companyName: true; brandName: true } };
-    cylinders: { include: typeof CYLINDER_INCLUDE };
-  };
-}>;
+const DESIGN_INCLUDE = {
+  customer: { select: { id: true, companyName: true, brandName: true } },
+  cylinders: { include: CYLINDER_INCLUDE, orderBy: [{ position: 'asc' }, { code: 'asc' }] },
+  /* Counted, not fetched: the list shows how many files there are, not which. */
+  _count: { select: { artwork: { where: { status: { in: ['ACTIVE', 'SUPERSEDED'] } } } } },
+} satisfies Prisma.JobInclude;
+
+/* Derived from the include above, so the two cannot drift apart. */
+type JobRow = Prisma.JobGetPayload<{ include: typeof DESIGN_INCLUDE }>;
 
 /**
  * A design row: the job, plus what its cylinders add up to.
@@ -143,24 +146,32 @@ function toDesign(row: JobRow): DesignSummary {
       cylinders.reduce((sum, cylinder) => sum + (cylinder.cost ?? 0), 0),
       2,
     ),
+    artworkCount: row._count.artwork,
     lastEventAt: lastEvent ?? null,
   };
 }
 
-const DESIGN_INCLUDE = {
-  customer: { select: { id: true, companyName: true, brandName: true } },
-  cylinders: { include: CYLINDER_INCLUDE, orderBy: [{ position: 'asc' }, { code: 'asc' }] },
-} satisfies Prisma.JobInclude;
-
 /**
- * Designs that have a cylinder set, and the totals across all of them.
+ * Designs on the register, and the totals across all of them.
  *
- * Only jobs with cylinders registered. There are 420 jobs and 382 record a
- * cylinder *count*, but a count is not a set — listing all of them would fill
- * the register with rows nobody can act on and bury the ones that exist.
+ * A design is here once it has something on it: a cylinder set, or a file. Not
+ * every job — there are 420, and 382 record a cylinder *count*, but a count is
+ * not a set and listing them all would bury the rows somebody can act on.
+ *
+ * Artwork counts because it comes first in the real order of work: the file is
+ * drawn and sent to the engraver, and the cylinders come back weeks later. A
+ * design whose artwork is loaded but whose set is not cut yet is precisely the
+ * one the office is waiting on.
  */
 export async function listDesigns(query: ListCylindersQuery): Promise<DesignList> {
-  const filters: Prisma.JobWhereInput[] = [{ cylinders: { some: {} } }];
+  const filters: Prisma.JobWhereInput[] = [
+    {
+      OR: [
+        { cylinders: { some: {} } },
+        { artwork: { some: { status: { in: ['ACTIVE', 'SUPERSEDED'] } } } },
+      ],
+    },
+  ];
   if (query.customerId) filters.push({ customerId: query.customerId });
   if (query.status) filters.push({ cylinders: { some: { status: query.status } } });
   if (query.q) {

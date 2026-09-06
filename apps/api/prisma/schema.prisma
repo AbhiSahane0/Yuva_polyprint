@@ -201,6 +201,8 @@ model Job {
   /// The engraved set this design prints from. A job is the design — see the
   /// Cylinder model.
   cylinders      Cylinder[]
+  /// The files it prints from. See the JobArtwork model.
+  artwork        JobArtwork[]
 
   sourceRow Int @map("source_row")
 
@@ -382,8 +384,8 @@ model QuotationItem {
   pouchTypeNote String @default("") @map("pouch_type_note")
 
   // ---- The design --------------------------------------------------------
-  widthMm      Decimal      @map("width_mm") @db.Decimal(10, 2)
-  heightMm     Decimal      @map("height_mm") @db.Decimal(10, 2)
+  widthMm  Decimal @map("width_mm") @db.Decimal(10, 2)
+  heightMm Decimal @map("height_mm") @db.Decimal(10, 2)
 
   /// A gazette pouch gussets at the sides and the base so it stands. The three
   /// depths below are film the flat sheet has to carry, so they enlarge both
@@ -398,8 +400,8 @@ model QuotationItem {
   /// The flat film one pouch is cut from — the pouch plus its gussets. Equal to
   /// width and height on an ordinary bag; larger on a gazette. Stored because
   /// it is what the printed document and the machine both work from.
-  filmWidthMm  Decimal @map("film_width_mm") @db.Decimal(10, 2)
-  filmHeightMm Decimal @map("film_height_mm") @db.Decimal(10, 2)
+  filmWidthMm  Decimal      @map("film_width_mm") @db.Decimal(10, 2)
+  filmHeightMm Decimal      @map("film_height_mm") @db.Decimal(10, 2)
   /// Derived from the pouch style; stored so a saved line keeps the basis it
   /// was priced on even if the style is edited later.
   pricingBasis PricingBasis @default(PER_KG) @map("pricing_basis")
@@ -745,7 +747,6 @@ model QuotationEmail {
   @@map("quotation_emails")
 }
 
-
 /// Where a batch sits, and what a movement did.
 ///
 /// A ledger rather than a stock figure that gets edited: every change to a
@@ -799,7 +800,6 @@ model StockBatch {
 
   /**
    * What the delivery note said, before conversion.
-   *
    * Film is bought by the tonne and stocked by the kilogram. `initialQuantity`
    * holds the kilograms because that is what everything downstream measures in;
    * these two hold the 2 and the TON, so the batch can still be checked against
@@ -811,7 +811,6 @@ model StockBatch {
 
   /**
    * What is left, in the material's own unit.
-   *
    * Cached from the ledger and written in the same transaction as every
    * movement, so the two cannot drift. Kept rather than summed on read because
    * every screen wants it and a sum per batch per page is a lot of arithmetic
@@ -821,7 +820,6 @@ model StockBatch {
 
   /**
    * Rupees per unit actually paid for this delivery.
-   *
    * Null when nobody recorded it, in which case the material's current rate
    * stands in for valuation. Stored per batch because that is what the stock is
    * worth — today's rate values what it would cost to replace, which is a
@@ -833,7 +831,7 @@ model StockBatch {
   reference String @default("")
   notes     String @default("")
 
-  movements StockMovement[]
+  movements       StockMovement[]
   /// The delivery this batch came from, when it came from an order rather than
   /// being received by hand.
   purchaseReceipt PurchaseReceipt?
@@ -867,7 +865,6 @@ model StockMovement {
 
   /**
    * Signed, in the material's unit: positive added, negative taken away.
-   *
    * Zero on a TRANSFER, which moves stock without changing how much there is.
    */
   quantity Decimal @db.Decimal(14, 3)
@@ -901,7 +898,6 @@ model StockMovement {
   @@map("stock_movements")
 }
 
-
 /// Where a purchase order is in its life.
 ///
 /// Three of these are decisions somebody makes — the order was placed, it is on
@@ -930,14 +926,14 @@ enum PurchaseOrderStatus {
 model Supplier {
   id String @id @default(cuid())
 
-  name          String  @unique
-  contactPerson String  @default("NA") @map("contact_person")
-  mobile        String  @default("NA")
-  email         String  @default("NA")
-  address       String  @default("NA")
+  name          String @unique
+  contactPerson String @default("NA") @map("contact_person")
+  mobile        String @default("NA")
+  email         String @default("NA")
+  address       String @default("NA")
   /// GSTIN. 'NA' where unknown, matching customers.
-  gstNumber     String  @default("NA") @map("gst_number")
-  notes         String  @default("")
+  gstNumber     String @default("NA") @map("gst_number")
+  notes         String @default("")
 
   /// Retired suppliers stay for the sake of old orders but leave the form.
   isActive Boolean @default(true) @map("is_active")
@@ -967,7 +963,7 @@ model PurchaseOrder {
 
   status PurchaseOrderStatus @default(ORDERED)
 
-  orderedOn DateTime  @map("ordered_on") @db.Date
+  orderedOn  DateTime  @map("ordered_on") @db.Date
   /// When it was promised. Null when the supplier would not say; a line with no
   /// expected date can never be late, which is honest — nothing was promised.
   expectedOn DateTime? @map("expected_on") @db.Date
@@ -1011,7 +1007,6 @@ model PurchaseOrderLine {
 
   /**
    * Closed short, with what happened written down.
-   *
    * A supplier who sends 380 of 400 and will not send the rest leaves a line
    * that is neither open nor complete. Without this it stays on the pending
    * list forever and the office learns to ignore that list.
@@ -1057,7 +1052,6 @@ model PurchaseReceipt {
 
   /**
    * The stock this delivery became.
-   *
    * Null when everything was rejected, which is the one case a delivery creates
    * no stock. Nullable rather than absent so the receipt still records that a
    * lorry came and what was wrong with it.
@@ -1074,7 +1068,6 @@ model PurchaseReceipt {
   @@index([lineId])
   @@map("purchase_receipts")
 }
-
 
 /// Who paid for a cylinder, and therefore who it belongs to.
 ///
@@ -1155,7 +1148,7 @@ model Cylinder {
 
   /// Which separation it carries — Cyan, White, a spot colour. Free text,
   /// because a spot colour is named by whatever the customer calls it.
-  colour String @default("NA")
+  colour   String @default("NA")
   /// Print station order, where the works records it.
   position Int?
 
@@ -1208,7 +1201,6 @@ model CylinderEvent {
 
   /**
    * What it was for — a job number, a works order, a delivery note.
-   *
    * Free text on purpose. The wireframe shows "#1024", which is a production
    * order, and there is no production module yet; a foreign key to something
    * that does not exist would be worse than a string somebody can read.
@@ -1226,4 +1218,83 @@ model CylinderEvent {
 
   @@index([cylinderId, occurredOn])
   @@map("cylinder_events")
+}
+
+/// What a design file is.
+enum ArtworkKind {
+  /// The file the cylinders are engraved from.
+  ARTWORK
+  /// A colour proof, or a print that was approved.
+  PROOF
+  /// A photo of the pouch, an older sample, a customer's sketch.
+  REFERENCE
+  OTHER
+}
+
+/// Where a design file is in its life.
+enum ArtworkStatus {
+  /// A signed upload that has not been confirmed. See the JobArtwork model.
+  PENDING
+  ACTIVE
+  /// Replaced by a later revision, and kept.
+  SUPERSEDED
+  /// Taken off the design screen. The object stays in the bucket.
+  REMOVED
+}
+
+/// A design file, held in Cloudflare R2 with only its description here.
+///
+/// **A design is a job**, as it is for cylinders, so artwork hangs off the job
+/// and the customer is reached through it. Filing artwork against a customer
+/// would put four designs' files in one drawer with nothing to tell them apart.
+///
+/// Files are never replaced in place. The cylinder on the shelf was engraved
+/// from one version of one file, and a store that overwrites cannot say which,
+/// so a revision supersedes its predecessor and both stay.
+///
+/// PENDING is the first state because the browser puts the bytes into R2
+/// itself — the API signs a URL and never touches the file. The row is written
+/// before the upload, so an object that arrives already belongs to something
+/// and nobody can confirm a key this server did not issue.
+model JobArtwork {
+  id String @id @default(cuid())
+
+  jobId String @map("job_id")
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  kind   ArtworkKind   @default(ARTWORK)
+  status ArtworkStatus @default(PENDING)
+
+  /// The object key in the bucket. Unique: two rows pointing at one object
+  /// means removing either loses the other's file.
+  storageKey String @unique @map("storage_key")
+
+  /// What the designer called it. Kept for display and for the download name;
+  /// the key is a sanitised form of it and is not shown.
+  filename    String
+  contentType String @map("content_type")
+  /// What R2 reports the object to be, read back at confirmation rather than
+  /// taken from the browser, which is free to claim anything.
+  sizeBytes   Int    @default(0) @map("size_bytes")
+
+  /// Which revision this is. A replacement carries its predecessor's plus one.
+  version Int @default(1)
+
+  /// The file this one replaced, and the one that replaced it. Restricted, so
+  /// the chain cannot be broken from the middle.
+  replacesId String?     @unique @map("replaces_id")
+  replaces   JobArtwork? @relation("ArtworkRevisions", fields: [replacesId], references: [id], onDelete: Restrict)
+  replacedBy JobArtwork? @relation("ArtworkRevisions")
+
+  notes String @default("")
+
+  uploadedBy String    @map("uploaded_by")
+  /// When the object was confirmed present. Null while PENDING.
+  uploadedAt DateTime? @map("uploaded_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([jobId, status])
+  @@map("job_artwork")
 }

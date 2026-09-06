@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Paperclip, Plus, Search, X } from 'lucide-react';
 import {
   CYLINDER_STATUS_LABELS,
   formatNumber,
@@ -16,7 +16,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { useDebounce } from '@/hooks/useDebounce';
 import { cn } from '@/lib/utils';
-import { useDesigns } from '../api/cylinder-api';
+import { useDesigns, useUnregisteredDesigns } from '../api/cylinder-api';
 import { RegisterSetModal } from '../components/RegisterSetModal';
 
 const STATUS_TONE: Record<CylinderStatus | 'NONE', 'neutral' | 'success' | 'warning' | 'brand'> = {
@@ -60,6 +60,7 @@ export default function CylindersPage() {
   const [search, setSearch] = useState('');
   const [attentionOnly, setAttentionOnly] = useState(false);
   const [registering, setRegistering] = useState(false);
+  const [showWaiting, setShowWaiting] = useState(false);
 
   const debounced = useDebounce(search, 300);
   const params = useMemo(
@@ -73,6 +74,13 @@ export default function CylindersPage() {
   const { data, isPending, isError, error, refetch } = useDesigns(params);
   const designs = data?.items ?? [];
   const totals = data?.totals;
+
+  /*
+   * Designs the job says need a set, with none registered. They are here so
+   * artwork can be loaded before the cylinders exist — which is the real order
+   * of work: the file goes to the engraver and the set comes back weeks later.
+   */
+  const { data: waiting } = useUnregisteredDesigns(true);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
@@ -92,7 +100,11 @@ export default function CylindersPage() {
 
       {totals ? (
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Summary label="Designs with a set" value={formatNumber(totals.designs)} />
+          {/*
+           * Not "designs with a set" any more: a design is on the register once
+           * it has artwork, which is before its cylinders are cut.
+           */}
+          <Summary label="Designs on record" value={formatNumber(totals.designs)} />
           <Summary label="Cylinders" value={formatNumber(totals.cylinders)} />
           <Summary label="Out of the store" value={formatNumber(totals.inUse)} />
           {/*
@@ -171,6 +183,7 @@ export default function CylindersPage() {
                   <th className="px-4 py-3 font-semibold">Customer</th>
                   <th className="px-4 py-3 font-semibold">Cylinders</th>
                   <th className="px-4 py-3 text-right font-semibold">Colours</th>
+                  <th className="px-4 py-3 text-right font-semibold">Files</th>
                   <th className="px-4 py-3 font-semibold">Where</th>
                   <th className="px-4 py-3 font-semibold">Owner</th>
                   <th className="px-4 py-3 text-right font-semibold">Cost</th>
@@ -209,6 +222,57 @@ export default function CylindersPage() {
         </section>
       )}
 
+      {(waiting?.length ?? 0) > 0 ? (
+        <section className="border-ink-200 mt-6 overflow-hidden rounded-[var(--radius-lg)] border bg-white">
+          <button
+            type="button"
+            onClick={() => setShowWaiting((open) => !open)}
+            className="hover:bg-ink-25 flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left"
+          >
+            {showWaiting ? (
+              <ChevronDown className="text-ink-400 size-4" />
+            ) : (
+              <ChevronRight className="text-ink-400 size-4" />
+            )}
+            <span className="text-ink-800 text-sm font-semibold">Designs without a set</span>
+            <Badge tone="neutral">{waiting?.length ?? 0}</Badge>
+            <span className="text-ink-500 ml-auto hidden text-xs sm:inline">
+              Open one to attach its artwork before the cylinders are cut
+            </span>
+          </button>
+
+          {showWaiting ? (
+            <ul className="divide-ink-100 border-ink-100 divide-y border-t">
+              {(waiting ?? []).map((design) => (
+                <li key={design.jobId}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/cylinders/${design.jobId}`)}
+                    className="hover:bg-ink-25 flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-ink-900 truncate text-sm font-medium">{design.jobName}</p>
+                      <p className="text-ink-500 mt-0.5 truncate text-xs">
+                        {design.customerName ?? 'No customer'} · {design.jobCode}
+                      </p>
+                    </div>
+                    {design.artworkCount > 0 ? (
+                      <span className="text-ink-500 inline-flex items-center gap-1 text-xs">
+                        <Paperclip className="size-3.5" />
+                        {design.artworkCount}
+                      </span>
+                    ) : null}
+                    <span className="text-ink-500 text-xs whitespace-nowrap">
+                      needs {formatNumber(design.expectedCylinders ?? 0)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
+
       <RegisterSetModal open={registering} onClose={() => setRegistering(false)} />
     </div>
   );
@@ -245,6 +309,16 @@ function DesignRow({ design, onOpen }: { design: DesignSummary; onOpen: (to: str
         ) : null}
       </td>
       <td className="text-ink-600 px-4 py-3 text-right tabular-nums">{design.cylinderCount}</td>
+      <td className="px-4 py-3 text-right tabular-nums">
+        {design.artworkCount > 0 ? (
+          <span className="text-ink-600 inline-flex items-center gap-1">
+            <Paperclip className="size-3.5" />
+            {design.artworkCount}
+          </span>
+        ) : (
+          <span className="text-ink-300">—</span>
+        )}
+      </td>
       <td className="text-ink-500 px-4 py-3 text-xs">
         {design.locations.length > 0 ? design.locations.join(', ') : '—'}
       </td>

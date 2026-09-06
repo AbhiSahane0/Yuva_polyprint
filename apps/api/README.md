@@ -193,6 +193,10 @@ guard is visible in that diff; a guard forgotten three files away is not.
              second one being ordered, and the quotation screens ask the same
              question. Registering or moving one needs
              requireModule('cylinders').
+/artwork     authenticate — the floor works to the file a job prints, and gating
+             that on the cylinders module hides it from exactly the people who
+             need it. Uploading, refiling and removing need
+             requireModule('cylinders'), which is where designs are owned.
 /users       authenticate + requireAdmin
 ```
 
@@ -422,6 +426,112 @@ those live, largest first, because the biggest sets cost most to lose.
 
 Totals are counted over every cylinder rather than over the rows returned, so a
 filter cannot move the damaged figure.
+
+A design is on the register once it has **either** a cylinder set **or** a file.
+Artwork comes first in the real order of work — the file is drawn and sent to
+the engraver, and the set comes back weeks later — so a design with artwork and
+no cylinders is precisely the one the office is waiting on. Jobs with neither
+stay in `/cylinders/unregistered`.
+
+### Artwork
+
+| Method | Path                   | Notes                                              |
+| ------ | ---------------------- | -------------------------------------------------- |
+| GET    | `/artwork/job/:jobId`  | The files on one design. **`:jobId` is a job id**  |
+| GET    | `/artwork/:id/link`    | A signed URL to view or download one file          |
+| POST   | `/artwork/uploads`     | Sign an upload, and book the row it will belong to |
+| POST   | `/artwork/:id/confirm` | Confirm the file reached storage                   |
+| PATCH  | `/artwork/:id`         | Refile it — its kind and its note                  |
+| POST   | `/artwork/:id/restore` | Put a removed file back                            |
+| DELETE | `/artwork/:id`         | Take a file off the design screen                  |
+
+Query on the list: `includeArchived`. Off by default, so the screen shows what
+is current and the history is a click away.
+
+**No endpoint here returns bytes.** See below.
+
+### Design files live in Cloudflare R2
+
+**The bytes never pass through this API.** An upload is a presigned URL the
+browser PUTs to Cloudflare itself; a download is the same in reverse. A 40 MB
+artwork proxied through one Render instance would hold that process for the
+length of the upload, and the works' connection is not fast. Signing takes about
+a millisecond.
+
+That shapes the flow into three steps:
+
+1. `POST /artwork/uploads` writes a **PENDING** row and signs a URL for its key.
+2. The browser PUTs the file straight to R2.
+3. `POST /artwork/:id/confirm` asks R2 what actually arrived and, if it did,
+   makes the row **ACTIVE** with the size **R2** reports.
+
+The row before the object is the order that matters. Signing a key with no row
+would let anyone who could reach step 3 attach an arbitrary key — or another
+customer's artwork — to a design; and an upload that fails leaves a row that can
+be seen and ages out, rather than an object belonging to nothing.
+
+A file is checked twice on the way in: the browser refuses an oversized or
+unaccepted file before sending it, and the server refuses it again. **The
+extension decides the type, not the browser** — Chrome sends a `.cdr` as
+`application/octet-stream` and an `.ai` as `application/pdf`, because an
+Illustrator file _is_ a PDF. SVG is deliberately not accepted: it is a document
+that can carry script.
+
+**Nothing confirmed is ever deleted.** A cylinder on the shelf was engraved from
+one of these files, and a register naming a file that has gone is worth less
+than no register. Removing on screen is a status and the object stays in the
+bucket; a revision **supersedes** its predecessor and both stay. Only a PENDING
+row whose upload never completed is deleted outright, since nothing arrived to
+keep. Nothing is superseded unless the upload names `replacesId` — a design
+legitimately carries a front and a back panel.
+
+Superseding happens at **confirmation**, not when the URL is signed: replacing
+the current file before the new one is actually in the bucket would leave the
+design with no artwork and an upload that may never finish.
+
+The bucket stays **private**. Every read is a signed URL that expires in five
+minutes, so a link that ends up in a chat message stops working rather than
+standing as a permanent public link to a customer's unreleased packaging.
+Thumbnails come signed with the list rather than one request per file — signing
+costs an HMAC and no network call — which is why the browser refetches the list
+inside that window.
+
+One thing measured rather than assumed: a presigned URL signs only `host`
+(`X-Amz-SignedHeaders=host`), so the `Content-Type` the browser sends with its
+PUT is accepted whatever it is. The header is still sent, so the object is
+_stored_ as the right type for anyone reading the bucket — but nothing depends
+on it, because every download overrides the served type from the record.
+
+#### Configuration
+
+Four keys, and it is all four or none — three out of four boots happily and then
+fails on the first upload with a signing error nobody can trace back to a
+missing line in `.env`, so that is refused at boot instead. Without any of them
+the app runs normally and only the artwork panel reports itself unavailable.
+
+| Key                    | Where it comes from                                             |
+| ---------------------- | --------------------------------------------------------------- |
+| `R2_ACCOUNT_ID`        | Cloudflare dashboard → R2 → "Account ID"                        |
+| `R2_BUCKET`            | The bucket you created                                          |
+| `R2_ACCESS_KEY_ID`     | R2 → Manage API Tokens → **Object Read & Write** on that bucket |
+| `R2_SECRET_ACCESS_KEY` | Shown once, when the token is created                           |
+| `R2_ENDPOINT`          | Optional — only for a jurisdiction-specific (`.eu.`) bucket     |
+
+The bucket also needs a **CORS rule**, or the browser's upload fails at the
+preflight with an error nobody can read. In R2 → the bucket → Settings → CORS
+Policy:
+
+```json
+[
+  {
+    "AllowedOrigins": ["http://localhost:5173", "https://<your app>"],
+    "AllowedMethods": ["PUT", "GET"],
+    "AllowedHeaders": ["content-type"],
+    "ExposeHeaders": ["etag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
 
 ### Settings
 
@@ -1208,6 +1318,7 @@ Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 | `purchase_order_lines`      | One material on an order, in the unit it was ordered in.                                                                                                    |
 | `purchase_receipts`         | One delivery against a line. Accepted stock names the batch it became; rejected stock names nothing.                                                        |
 | `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.                                                                           |
+| `job_artwork`               | A design file, held in R2 with only its description here. Never overwritten: a revision supersedes and both stay.                                           |
 | `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.                                                                               |
 | `app_settings`              | Editable rates and costing defaults.                                                                                                                        |
 | `users`                     | Accounts, their password hash and which modules each may reach.                                                                                             |
@@ -1220,11 +1331,12 @@ Two deliberate choices:
 the source spreadsheet for genuinely different jobs. A surrogate `id` is the key
 until the client confirms the correct codes.
 
-**Nothing cascades except quotation lines.** Deleting a customer sets
+**Nothing cascades except quotation lines and artwork.** Deleting a customer sets
 `customer_id` to null on their jobs and quotations rather than destroying
 production history or a sent quotation. A line's plies and quantities do cascade
 with the line, and a quantity also cascades with its tier — they describe it and
-have no meaning apart from it.
+have no meaning apart from it. A job's artwork cascades with the job for the
+same reason: a design file with no design is a file nobody can identify.
 
 **A ply keeps its own copy of what it was costed against.** The material link is
 there for reporting, but the name, density and rate are snapshotted onto the row:

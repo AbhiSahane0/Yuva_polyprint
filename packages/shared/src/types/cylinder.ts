@@ -60,6 +60,8 @@ export interface DesignSummary {
   ownership: CylinderOwnership | 'MIXED' | null;
   /** What the set cost to engrave, where costs were recorded. */
   totalCost: number;
+  /** Files on the design, current and superseded. Removed ones do not count. */
+  artworkCount: number;
   lastEventAt: string | null;
 }
 

@@ -180,6 +180,7 @@ apps/api/
     ├── lib/
     │   ├── prisma.ts         PrismaClient singleton + pg driver adapter
     │   ├── password.ts       scrypt hashing and constant-time verification
+    │   ├── storage.ts        Cloudflare R2 — signs URLs, never moves bytes
     │   └── logger.ts         pino instance with credential redaction
     ├── middleware/
     │   ├── authenticate.ts   session lookup + requireAdmin / requireModule
@@ -398,7 +399,8 @@ The script refuses to run if an active administrator already exists.
 
 **Access is two tiers and no more.** An administrator sees everything and manages
 users; everyone else sees only the sections ticked for them — Customers,
-Quotations, Rates, Inventory, Purchase, Design & Cylinders, Jobs. The sidebar
+Quotations, Rates, Inventory, Purchase, Design & Cylinders (which carries its
+artwork), Jobs. The sidebar
 hides the rest, and the API refuses it independently, because hiding a link is
 not access control.
 
@@ -483,10 +485,18 @@ keeps its default of `/api` in every environment, exactly as in development.
    | `RESEND_API_KEY` | Optional. Enables emailing a quotation; without it every other screen still works                                                                                                               |
    | `MAIL_FROM`      | The sender, e.g. `Yuva Polyprint <quotations@yourdomain.com>`. **Decides whether customers can be emailed at all** — see [Sending quotations](./apps/api/README.md#sending-quotations-by-email) |
    | `GSTIN_API_KEY`  | Optional. Enables the **Verify** button on a GST number; the offline format and check-digit validation works without it                                                                         |
+   | `R2_*`           | Optional as a **set** of four — see [Design files live in Cloudflare R2](./apps/api/README.md#design-files-live-in-cloudflare-r2). Enables uploading artwork against a design                   |
 
-   Those three are optional. Leave them unset and the app runs normally, with
-   only "send quotation" and "verify GSTIN" reporting themselves unavailable.
-   `GSTIN_API_BASE_URL` is fixed in `render.yaml` and needs no prompt.
+   Those are optional. Leave them unset and the app runs normally, with only
+   "send quotation", "verify GSTIN" and the artwork panel reporting themselves
+   unavailable. `GSTIN_API_BASE_URL` is fixed in `render.yaml` and needs no
+   prompt.
+
+   The R2 keys are all four or none: three out of four boots happily and then
+   fails on the first upload with a signing error nobody can trace back to a
+   missing variable, so that is refused at boot instead. The bucket also needs a
+   CORS rule naming the Vercel origin, or uploads fail at the preflight — the
+   API README has the policy to paste in.
 
 4. Wait for the first build. It is slow — the image is ~1.8GB, mostly Chromium.
 5. Confirm `https://<service>.onrender.com/health/ready` returns

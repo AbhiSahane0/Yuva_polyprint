@@ -50,6 +50,7 @@ src/
 │   ├── inventory/         stock, batches, the movement ledger
 │   ├── purchase/          suppliers, orders, receiving into stock
 │   ├── cylinders/         the design register and cylinder history
+│   ├── artwork/           design files: upload to R2, versions, previews
 │   ├── gstin/             GSTIN field and lookup, shared by two screens
 │   ├── monitor/           sign-in log (admins only)
 │   └── rates/             daily material rates
@@ -1098,10 +1099,15 @@ cylinders, each identifiable — so "where is the cyan one for Krishna Dairy" ha
 an answer. That question is what stops a set being re-engraved because nobody
 could find the old one.
 
-Only designs with cylinders registered are listed. 382 jobs record a cylinder
-_count_, but a count is not a set; listing all of them would bury the ones that
-exist. **Register a set** offers exactly those 382 as its worklist, largest
-first — the biggest sets cost most to lose.
+A design appears once it has **something on it**: a cylinder set, or a file.
+Not all 420 jobs — 382 record a cylinder _count_, and a count is not a set, so
+listing them all would bury the rows somebody can act on. Those live under
+**Designs without a set**, a collapsible list at the foot of the screen; open
+one to attach its artwork before the cylinders are cut, which is the real order
+of work. **Register a set** offers the same jobs as its worklist, largest first
+— the biggest sets cost most to lose.
+
+The **Files** column counts what is attached, current and replaced.
 
 Numbers collapse to a range where they run on: `CYL-3301 – 3304`, which is how
 the office says it aloud. And a set registered short of what the job expects
@@ -1143,6 +1149,38 @@ be asked about months later, and a rejection nobody explained teaches nothing.
 
 A retired cylinder refuses everything but re-engraving: it has been scrapped or
 gone back to the customer, and it is not there to be mounted.
+
+#### Design files
+
+Above the cylinders, because the artwork is what a design **is** — the cylinders
+are how it gets printed, and somebody opening a design is usually here to look
+at the file.
+
+Drag artwork onto the panel or use **Add file**. PDF, JPG, PNG, TIFF, AI, EPS,
+CDR and ZIP, up to 50 MB. Images get a thumbnail; everything else gets its
+format on a tile, because a broken image icon is worse than no image.
+
+**The file goes straight from the browser to Cloudflare** — it never passes
+through the API — so there is a real progress bar: 30 MB on the works'
+connection is a minute in which nothing else on screen changes.
+
+**Replace, don't overwrite.** A revision keeps its predecessor: the cylinder on
+the shelf was engraved from one particular version, and a store that overwrites
+cannot say which. The new file becomes v2 and **Show replaced** brings the old
+one back into view. Nothing is superseded unless you replace it explicitly —
+a design legitimately carries a front and a back panel.
+
+**Remove is filing, not deletion.** The file leaves the screen and stays in the
+bucket, and **Put back** returns it. If something replaced it meanwhile it comes
+back as history, because a design cannot have two current files claiming to be
+the same artwork.
+
+Every **Open** and **Save** fetches a fresh link that expires in five minutes.
+A URL that ends up in a chat message stops working, rather than standing as a
+permanent public link to a customer's unreleased packaging.
+
+Reading is open to anyone signed in — the floor works to the file the job
+prints. The buttons that change anything need the cylinders module.
 
 ### Rates — `/rates`
 

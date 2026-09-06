@@ -36,6 +36,12 @@ erDiagram
     integer position
     CylinderStatus status
   }
+  job_artwork {
+    text id PK
+    text job_id FK
+    ArtworkStatus status
+    text replaces_id FK
+  }
   jobs {
     text id PK
     text job_code
@@ -167,6 +173,8 @@ erDiagram
   stock_batches ||--o{ purchase_receipts : "batch_id"
   jobs ||--|{ cylinders : "job_id"
   cylinders ||--|{ cylinder_events : "cylinder_id"
+  jobs ||--|{ job_artwork : "job_id"
+  job_artwork ||--o{ job_artwork : "replaces_id"
 ```
 
 ## Tables
@@ -175,11 +183,12 @@ erDiagram
 | --- | ---: | ---: | --- |
 | `app_settings` | 3 | 0 | Editable rates: cylinder rate, GST %, advance %. |
 | `customers` | 17 | 71 | Companies that order from Yuva Polyprint. |
-| `cylinder_events` | 11 | 19 |  |
+| `cylinder_events` | 11 | 0 |  |
 | `cylinders` | 16 | 4 |  |
+| `job_artwork` | 15 | 0 |  |
 | `jobs` | 55 | 420 | Products and their full engineering specification. |
 | `login_events` | 7 | 35 |  |
-| `material_rates` | 6 | 202 |  |
+| `material_rates` | 6 | 219 |  |
 | `materials` | 10 | 17 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
@@ -227,11 +236,15 @@ erDiagram
 | `purchase_receipts.batch_id` | `stock_batches.id` | SET NULL |  |
 | `cylinders.job_id` | `jobs.id` | RESTRICT |  |
 | `cylinder_events.cylinder_id` | `cylinders.id` | CASCADE |  |
+| `job_artwork.job_id` | `jobs.id` | CASCADE |  |
+| `job_artwork.replaces_id` | `job_artwork.id` | RESTRICT |  |
 
 ## Enums
 
 | Type | Values |
 | --- | --- |
+| `ArtworkKind` | `ARTWORK`, `PROOF`, `REFERENCE`, `OTHER` |
+| `ArtworkStatus` | `PENDING`, `ACTIVE`, `SUPERSEDED`, `REMOVED` |
 | `CustomerSource` | `SHEET`, `BRAND_INFERRED` |
 | `CylinderEventKind` | `ENGRAVED`, `ALLOCATED`, `IN_USE`, `RETURNED`, `DAMAGED`, `REWORKED`, `TRANSFERRED`, `RETIRED` |
 | `CylinderOwnership` | `CUSTOMER_OWNED`, `YUVA_OWNED` |
@@ -311,6 +324,26 @@ erDiagram
 | `engraver` | `text` |  |  |
 | `engraved_on` | `date` | ✓ |  |
 | `notes` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+
+### `job_artwork`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `job_id` | `text` |  | FK → `jobs.id` |
+| `kind` | `ArtworkKind` (enum) |  |  |
+| `status` | `ArtworkStatus` (enum) |  |  |
+| `storage_key` | `text` |  | unique |
+| `filename` | `text` |  |  |
+| `content_type` | `text` |  |  |
+| `size_bytes` | `integer` |  |  |
+| `version` | `integer` |  |  |
+| `replaces_id` | `text` | ✓ | FK → `job_artwork.id` |
+| `notes` | `text` |  |  |
+| `uploaded_by` | `text` |  |  |
+| `uploaded_at` | `timestamp` | ✓ |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
 

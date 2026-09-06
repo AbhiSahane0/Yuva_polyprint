@@ -8,9 +8,12 @@ import {
   listCustomersQuerySchema,
   adjustStockSchema,
   closePurchaseLineSchema,
+  listArtworkQuerySchema,
   listCylindersQuerySchema,
   recordCylinderEventSchema,
   registerCylindersSchema,
+  requestArtworkUploadSchema,
+  updateArtworkSchema,
   updateCylinderSchema,
   createPurchaseOrderSchema,
   issueStockSchema,
@@ -223,6 +226,14 @@ export function buildOpenApiDocument(serverUrl: string) {
           'follows the events, like stock quantity follows movements.',
       },
       {
+        name: 'Artwork',
+        description:
+          'The files a design prints from. The bytes never pass through this API: an upload is ' +
+          'a signed URL the browser PUTs to Cloudflare R2 itself, and every read is a signed URL ' +
+          'that expires in minutes. Nothing confirmed is deleted — a cylinder was engraved from ' +
+          'it, so a revision supersedes and both stay.',
+      },
+      {
         name: 'Purchase',
         description:
           'Suppliers and orders. Receiving a delivery is where buying becomes holding: the ' +
@@ -429,6 +440,96 @@ export function buildOpenApiDocument(serverUrl: string) {
           parameters: [ID_PARAM],
           requestBody: body(updateCylinderSchema),
           responses: { 200: ok('The cylinder.'), ...COMMON },
+        },
+      },
+      '/api/artwork/job/{jobId}': {
+        get: {
+          tags: ['Artwork'],
+          summary: 'The files on one design',
+          description:
+            'The id is the **job** id, because a design is a job. Superseded and removed files ' +
+            'are behind `includeArchived`. Thumbnail URLs come signed with this response rather ' +
+            'than one request per file, and expire with it — refetch inside five minutes.',
+          parameters: [
+            {
+              name: 'jobId',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+              description: 'The job (design) id.',
+            },
+            ...query(listArtworkQuerySchema),
+          ],
+          responses: { 200: ok('The files, newest first.'), ...COMMON },
+        },
+      },
+      '/api/artwork/uploads': {
+        post: {
+          tags: ['Artwork'],
+          summary: 'Sign an upload',
+          description:
+            'Books a PENDING row and returns a presigned PUT. The browser sends the file to the ' +
+            'returned URL with exactly the headers given — the signature covers Content-Type — ' +
+            'then calls confirm. Naming `replacesId` makes this a revision of that file rather ' +
+            'than a second one; nothing is superseded unless somebody says so, because a design ' +
+            'legitimately carries a front and a back panel.',
+          requestBody: body(requestArtworkUploadSchema),
+          responses: { 201: ok('The row, the URL and its headers.'), ...COMMON },
+        },
+      },
+      '/api/artwork/{id}/confirm': {
+        post: {
+          tags: ['Artwork'],
+          summary: 'Confirm the file reached storage',
+          description:
+            'Asks R2 what actually arrived and stores the size **it** reports. A browser saying ' +
+            'the PUT succeeded is not evidence. Calling this twice is not an error.',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The file, now current.'), ...COMMON },
+        },
+      },
+      '/api/artwork/{id}/link': {
+        get: {
+          tags: ['Artwork'],
+          summary: 'A signed URL to view or download one file',
+          description:
+            'Minted per request and short-lived, so a link that ends up in a chat message stops ' +
+            'working rather than standing as a public link to a customer’s unreleased packaging. ' +
+            '`?download=1` saves the file; without it a PDF or image opens in a tab.',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The URL and its life in seconds.'), ...COMMON },
+        },
+      },
+      '/api/artwork/{id}': {
+        patch: {
+          tags: ['Artwork'],
+          summary: 'Refile a document',
+          description: 'Its kind and its note. The file itself never changes.',
+          parameters: [ID_PARAM],
+          requestBody: body(updateArtworkSchema),
+          responses: { 200: ok('The file.'), ...COMMON },
+        },
+        delete: {
+          tags: ['Artwork'],
+          summary: 'Take a file off the design screen',
+          description:
+            'Marks it REMOVED and leaves the object in the bucket — removing is a filing ' +
+            'decision, and the cylinders engraved from it are still on the shelf. Only an ' +
+            'upload that never completed is deleted outright.',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The file, removed.'), ...COMMON },
+        },
+      },
+      '/api/artwork/{id}/restore': {
+        post: {
+          tags: ['Artwork'],
+          summary: 'Put a removed file back',
+          description:
+            'Current again, unless something replaced it while it was off the screen — then it ' +
+            'is history, because a design cannot have two current files claiming to be the same ' +
+            'artwork.',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The file.'), ...COMMON },
         },
       },
       '/api/cylinders/events': {

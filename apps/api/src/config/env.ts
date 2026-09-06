@@ -67,6 +67,27 @@ const envSchema = z.object({
    */
   GSTIN_API_BASE_URL: z.string().url().default('https://gstinapi.in'),
 
+  /*
+   * Cloudflare R2, where design artwork is stored.
+   *
+   * Optional as a set: with none of it configured the app runs normally and
+   * only the artwork panel reports itself unavailable, so a developer without
+   * a bucket is not blocked from the rest of the design screen. Configured
+   * half-way is a different thing and is refused below — a bucket name with no
+   * key would otherwise fail at the first upload, hours later, with a signing
+   * error nobody could trace back to a missing line in `.env`.
+   */
+  R2_ACCOUNT_ID: optional(z.string().min(1)),
+  R2_ACCESS_KEY_ID: optional(z.string().min(1)),
+  R2_SECRET_ACCESS_KEY: optional(z.string().min(1)),
+  R2_BUCKET: optional(z.string().min(1)),
+  /*
+   * Overrides the endpoint derived from the account id. Needed only for a
+   * jurisdiction-specific bucket (`.eu.` or `.fedramp.`), which is signed
+   * against a different host.
+   */
+  R2_ENDPOINT: optional(z.string().url()),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   RATE_LIMIT_WINDOW_MS: z.coerce
@@ -77,7 +98,26 @@ const envSchema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
 });
 
-const parsed = envSchema.safeParse(process.env);
+const R2_KEYS = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET'] as const;
+
+/**
+ * R2 is all four settings or none of them.
+ *
+ * Three out of four boots happily and then fails on the first upload with a
+ * signature error, which reads as a bug in this app rather than as a line
+ * missing from `.env`. Refusing at boot names the missing key instead.
+ */
+const r2Schema = envSchema.superRefine((value, ctx) => {
+  const missing = R2_KEYS.filter((key) => value[key] === undefined);
+  if (missing.length === 0 || missing.length === R2_KEYS.length) return;
+  ctx.addIssue({
+    code: 'custom',
+    path: ['R2_BUCKET'],
+    message: `Cloudflare R2 needs all of ${R2_KEYS.join(', ')} or none. Missing: ${missing.join(', ')}`,
+  });
+});
+
+const parsed = r2Schema.safeParse(process.env);
 
 if (!parsed.success) {
   const details = parsed.error.issues

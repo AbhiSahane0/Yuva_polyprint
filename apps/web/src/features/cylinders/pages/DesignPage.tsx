@@ -14,6 +14,8 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { cn } from '@/lib/utils';
+import { ArtworkPanel } from '@/features/artwork/components/ArtworkPanel';
+import { canAccess, useAuthStore } from '@/features/auth/auth-store';
 import { useDesign } from '../api/cylinder-api';
 import { RecordEventModal } from '../components/RecordEventModal';
 
@@ -35,6 +37,8 @@ function formatDate(iso: string): string {
 export default function DesignPage() {
   const { id } = useParams<{ id: string }>();
   const { data: design, isPending, isError, error, refetch } = useDesign(id ?? null);
+  const user = useAuthStore((state) => state.user);
+  const canEdit = canAccess(user, 'cylinders');
   const [recording, setRecording] = useState(false);
   /** Null shows the whole design's history; an id narrows it to one cylinder. */
   const [focused, setFocused] = useState<string | null>(null);
@@ -122,6 +126,15 @@ export default function DesignPage() {
           label="Stored in"
           value={design.locations.length > 0 ? design.locations.join(', ') : '—'}
         />
+      </div>
+
+      {/*
+       * Above the cylinders, because the artwork is what a design *is* — the
+       * cylinders are how it gets printed. Someone opening a design is
+       * usually here to look at the file.
+       */}
+      <div className="mt-8">
+        <ArtworkPanel jobId={design.jobId} canEdit={canEdit} />
       </div>
 
       <h2 className="text-ink-900 mt-8 mb-3 text-base font-semibold">Cylinders</h2>

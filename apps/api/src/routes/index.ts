@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import artworkRoutes from '../modules/artwork/artwork.routes.js';
 import authRoutes from '../modules/auth/auth.routes.js';
 import customerRoutes from '../modules/customers/customer.routes.js';
 import cylinderRoutes from '../modules/cylinders/cylinder.routes.js';
@@ -73,6 +74,18 @@ router.use('/purchase', authenticate, purchaseRoutes);
  * Registering or moving one needs requireModule('cylinders').
  */
 router.use('/cylinders', authenticate, cylinderRoutes);
+
+/*
+ * Design artwork. Readable by anyone signed in — the floor works to the file
+ * the job prints, and hiding it behind the cylinders module would hide it from
+ * exactly the people who need it. Every write needs requireModule('cylinders'),
+ * applied in the module's own routes.
+ *
+ * No endpoint here returns bytes: uploads and downloads are signed Cloudflare
+ * URLs the browser uses directly, so a 40 MB artwork never occupies this
+ * process.
+ */
+router.use('/artwork', authenticate, artworkRoutes);
 
 router.use('/settings', authenticate, settingsRoutes);
 

@@ -3,6 +3,20 @@
 //   npm run schema:docs -w @yuva/api
 // Paste the whole file into https://dbdiagram.io/d to explore it.
 
+Enum ArtworkKind {
+  ARTWORK
+  PROOF
+  REFERENCE
+  OTHER
+}
+
+Enum ArtworkStatus {
+  PENDING
+  ACTIVE
+  SUPERSEDED
+  REMOVED
+}
+
 Enum CustomerSource {
   SHEET
   BRAND_INFERRED
@@ -133,7 +147,7 @@ Table cylinder_events {
   entered_by text [not null]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '19 row(s) at time of generation'
+  Note: '0 row(s) at time of generation'
 }
 
 Table cylinders {
@@ -155,6 +169,26 @@ Table cylinders {
   updated_at timestamp [not null]
 
   Note: '4 row(s) at time of generation'
+}
+
+Table job_artwork {
+  id text [pk]
+  job_id text [not null]
+  kind ArtworkKind [not null, default: `'ARTWORK'::"ArtworkKind"`]
+  status ArtworkStatus [not null, default: `'PENDING'::"ArtworkStatus"`]
+  storage_key text [unique, not null]
+  filename text [not null]
+  content_type text [not null]
+  size_bytes integer [not null, default: `0`]
+  version integer [not null, default: `1`]
+  replaces_id text [unique]
+  notes text [not null, default: `''`]
+  uploaded_by text [not null]
+  uploaded_at timestamp
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+
+  Note: '0 row(s) at time of generation'
 }
 
 Table jobs {
@@ -237,7 +271,7 @@ Table material_rates {
   entered_by text [not null, default: `'Office'`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '202 row(s) at time of generation'
+  Note: '219 row(s) at time of generation'
 }
 
 Table materials {
@@ -541,3 +575,5 @@ Ref: purchase_receipts.order_id > purchase_orders.id [delete: cascade]
 Ref: purchase_receipts.batch_id > stock_batches.id [delete: set null]
 Ref: cylinders.job_id > jobs.id [delete: restrict]
 Ref: cylinder_events.cylinder_id > cylinders.id [delete: cascade]
+Ref: job_artwork.job_id > jobs.id [delete: cascade]
+Ref: job_artwork.replaces_id > job_artwork.id [delete: restrict]
