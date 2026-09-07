@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PROCESS_COLOURS,
+  SPECIAL_COLOUR_GUIDES,
   batchSolidsFor,
   costRate,
   inkGsmOf,
@@ -494,5 +496,50 @@ describe('a colour nobody has priced', () => {
 
   it('passes a fully priced set', () => {
     expect(unpricedColours(JOB.colours)).toEqual([]);
+  });
+});
+
+describe('process colours and special ones', () => {
+  it('names the four every press carries, and nothing else', () => {
+    /*
+     * The list is fixed because it is: no works chooses whether to stock cyan.
+     * A white base coat, a Pantone, a metallic are one customer's brand, and
+     * become the works' business only once a tin has been bought — so they are
+     * rows in the rate catalogue, not entries here.
+     */
+    expect(PROCESS_COLOURS).toEqual(['Cyan', 'Magenta', 'Yellow', 'Black']);
+  });
+
+  it('offers starting points for a colour nobody has entered before', () => {
+    /*
+     * Somebody entering their first spot colour has no idea whether 0.25 or
+     * 2.5 is the right order of magnitude, and the tin does not say grams per
+     * square metre. Suggestions on a form, never a stored figure.
+     */
+    const white = SPECIAL_COLOUR_GUIDES.find((guide) => guide.label.includes('white'))!;
+    expect(white.laydownGsm).toBe(1.8);
+    expect(white.solidsPercent).toBe(40);
+    for (const guide of SPECIAL_COLOUR_GUIDES) {
+      expect(guide.laydownGsm).toBeGreaterThan(0);
+      expect(guide.solidsPercent).toBeGreaterThan(0);
+      expect(guide.solidsPercent).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it('prices a heavy special colour far above a process one', () => {
+    // The whole reason colours are costed one by one rather than as "ink".
+    const withWhite = costRate({
+      ...input(),
+      job: {
+        ...JOB,
+        colours: [
+          ...JOB.colours,
+          { name: 'Opaque White', laydownGsm: 1.8, solidsPercent: 40, ratePerKg: 200 },
+        ],
+      },
+    })!;
+    const base = costRate(input())!;
+    /* One extra colour, and it more than doubles the ink on the job. */
+    expect(withWhite.inkCost).toBeGreaterThan(base.inkCost * 2);
   });
 });

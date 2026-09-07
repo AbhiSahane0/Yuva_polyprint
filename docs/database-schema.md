@@ -197,7 +197,7 @@ erDiagram
 | `jobs` | 55 | 418 | Products and their full engineering specification. |
 | `login_events` | 7 | 36 |  |
 | `material_rates` | 6 | 236 |  |
-| `materials` | 12 | 21 |  |
+| `materials` | 13 | 17 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
 | `purchase_receipts` | 11 | 1 |  |
@@ -257,6 +257,7 @@ erDiagram
 | `CylinderEventKind` | `ENGRAVED`, `ALLOCATED`, `IN_USE`, `RETURNED`, `DAMAGED`, `REWORKED`, `TRANSFERRED`, `RETIRED` |
 | `CylinderOwnership` | `CUSTOMER_OWNED`, `YUVA_OWNED` |
 | `CylinderStatus` | `IN_STORE`, `ALLOCATED`, `IN_USE`, `DAMAGED`, `NEEDS_REWORK`, `RETIRED` |
+| `InkKind` | `PROCESS`, `SPECIAL` |
 | `JobCustomerSource` | `EXPLICIT`, `INFERRED`, `NONE` |
 | `JobKind` | `ROLL`, `POUCH` |
 | `MachineKind` | `PRINTING`, `LAMINATION`, `SLITTING`, `POUCHING` |
@@ -487,6 +488,7 @@ erDiagram
 | `reorder_level` | `decimal(14,3)` | ✓ |  |
 | `laydown_gsm` | `decimal(6,3)` | ✓ |  |
 | `solids_percent` | `decimal(6,3)` | ✓ |  |
+| `ink_kind` | `InkKind` (enum) | ✓ |  |
 
 ### `purchase_order_lines`
 

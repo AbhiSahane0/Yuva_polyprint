@@ -1249,9 +1249,32 @@ The panel prints the figures it used, with a link to change them.
 They are picked rather than counted, because what they **are** changes the
 price: a white base coat lays 1.8 g/m² at 40% solids against a process colour's
 0.13 at 19.5%, so two jobs with six cylinders each can differ by a third on ink.
-A colour with no rate is marked, and choosing it stops the panel rather than
+
+**Two groups, because they are two different things.**
+
+_Process_ is cyan, magenta, yellow and black — on every press, on every job, and
+not a decision anybody makes. _Special_ is one customer's brand: a Pantone, a
+metallic, an opaque white. Those become the works' business only once a tin has
+been bought, so the group starts empty and **Add a special colour** fills it
+from here — the office should not have to leave a half-priced quotation to go
+and create a material.
+
+That dialog writes a real ink row with a real rate, which the Rates screen then
+owns like any other price. It offers rough starting points (an opaque base coat
+is about 1.8 gsm at 40% solids; a strong spot colour nearer 0.25 at 23%) because
+somebody entering their first spot colour has no idea whether 0.25 or 2.5 is the
+right order of magnitude, and the tin does not say grams per square metre. It
+also shows what the solids mean in money: _"at 23% solids the works buys 4.3 kg
+of liquid for every kilogram that stays on the film"_.
+
+A colour with no rate is marked `!`, and choosing it stops the panel rather than
 costing it at nothing — a job printing white at a rate of zero quotes at a
 twelfth of its real ink and looks entirely normal on the page.
+
+**Under a kilogram it declines to answer.** A press is set for an hour whichever
+quantity follows it, so twenty pouches carry a whole job's setup and price at
+thousands of rupees a kilogram — arithmetically right, and not a number anybody
+should be shown beside a heading that rounds to "0 kg".
 
 **ⓘ beside each rate shows the working** — the laminate ply by ply, the ink wet
 and dry, the adhesive batch, every machine's minutes, and the chain from

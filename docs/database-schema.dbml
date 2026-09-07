@@ -48,6 +48,11 @@ Enum CylinderStatus {
   RETIRED
 }
 
+Enum InkKind {
+  PROCESS
+  SPECIAL
+}
+
 Enum JobCustomerSource {
   EXPLICIT
   INFERRED
@@ -327,8 +332,9 @@ Table materials {
   reorder_level decimal(14,3)
   laydown_gsm decimal(6,3)
   solids_percent decimal(6,3)
+  ink_kind InkKind
 
-  Note: '21 row(s) at time of generation'
+  Note: '17 row(s) at time of generation'
 }
 
 Table purchase_order_lines {

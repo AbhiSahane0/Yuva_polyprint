@@ -681,3 +681,23 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
     marginOnRatePercent,
   };
 }
+
+/**
+ * The four colours every press carries.
+ *
+ * Fixed because they are: a rotogravure job may use any of them and no works
+ * chooses whether to stock cyan. Everything else — a white base coat, a
+ * brand's Pantone, a metallic — is that job's own decision and is added as the
+ * works buys it, which is why special colours are rows rather than a list here.
+ */
+export const PROCESS_COLOURS = ['Cyan', 'Magenta', 'Yellow', 'Black'] as const;
+
+/**
+ * Rough laydowns and solids, for a colour somebody is entering for the first
+ * time. Suggestions on a form, never a stored figure: the tin says what it is.
+ */
+export const SPECIAL_COLOUR_GUIDES = [
+  { label: 'Opaque base coat (white)', laydownGsm: 1.8, solidsPercent: 40 },
+  { label: 'Strong spot colour', laydownGsm: 0.25, solidsPercent: 23 },
+  { label: 'Light spot colour', laydownGsm: 0.15, solidsPercent: 20 },
+] as const;

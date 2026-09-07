@@ -28,6 +28,8 @@ export const createMaterialSchema = z.object({
   solidsPercent: z.coerce.number().positive().max(100).nullable().optional(),
   /** Dry g/m² this colour lays. A white base coat is an order heavier. */
   laydownGsm: z.coerce.number().min(0).max(50).nullable().optional(),
+  /** Process or special, for inks. Null on anything that is not an ink. */
+  inkKind: z.enum(['PROCESS', 'SPECIAL']).nullable().optional(),
   isActive: z.boolean().default(true),
   sortOrder: z.coerce.number().int().min(0).default(0),
 });

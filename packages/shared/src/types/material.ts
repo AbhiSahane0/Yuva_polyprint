@@ -14,6 +14,11 @@ export interface Material {
   solidsPercent: number | null;
   /** For inks: dry g/m² this colour lays. White runs far heavier than a process colour. */
   laydownGsm: number | null;
+  /**
+   * Process or special, for inks. Null on anything that is not an ink, and
+   * treated as special — a colour nobody has called one of the four is one.
+   */
+  inkKind: 'PROCESS' | 'SPECIAL' | null;
   isActive: boolean;
   sortOrder: number;
 

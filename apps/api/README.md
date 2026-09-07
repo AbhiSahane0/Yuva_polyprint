@@ -661,7 +661,11 @@ naive costing goes wrong by a factor:
   laydown against the purchase rate understates ink three to five times over.
 - **Each colour is its own material.** A white base coat lays 1.8 g/m² at 40%
   solids; a process colour lays 0.13 at 19.5%. One "ink GSM" cannot price a job
-  that uses both.
+  that uses both. `materials.ink_kind` separates the four every press carries
+  from a customer's own — stored rather than inferred from the name, because
+  "Ink — Cyan" and "Cyan (Sun Chemical)" are the same colour and a rule reading
+  names would disagree. Special colours are created from the quotation screen
+  as they come up, with their rate, and are ordinary ink rows afterwards.
 - **Adhesive is a diluted batch.** `100:146:15` is adhesive : ethyl acetate :
   hardener, 35% solid, and each component is priced separately. It is spread
   over the **substrate** GSM, not the whole laminate — it does not stick to

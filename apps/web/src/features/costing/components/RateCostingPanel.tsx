@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Calculator, Info, Wand2 } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Calculator, Info, Plus, Wand2 } from 'lucide-react';
 import {
   costRate,
   unpricedColours,
@@ -17,6 +17,16 @@ import { useSettings } from '@/features/quotations/api/quotation-api';
 import { cn } from '@/lib/utils';
 import { useCostingMasterData } from '../api/costing-api';
 import { CostingBreakdownModal } from './CostingBreakdownModal';
+import { SpecialColourModal } from './SpecialColourModal';
+
+/**
+ * Below this, a rate says more about the setup than about the film.
+ *
+ * A press is set for an hour whichever quantity follows it, so a fraction of a
+ * kilogram carries the whole of that hour and prices at thousands of rupees a
+ * kilogram. True, and useless.
+ */
+const MIN_COSTABLE_KG = 1;
 
 export interface RateCostingLine {
   /** The plies, in order. The first is the one that gets printed. */
@@ -63,6 +73,7 @@ export function RateCostingPanel({
   const { data: master } = useCostingMasterData();
 
   const [shown, setShown] = useState<CostingBreakdown | null>(null);
+  const [adding, setAdding] = useState(false);
 
   /*
    * The colours are picked here rather than taken from the cylinder count
@@ -76,10 +87,28 @@ export function RateCostingPanel({
     [materials],
   );
 
+  /*
+   * Two groups, because they are two different things. Cyan, magenta, yellow
+   * and black are on every press and every job may use them. Everything after
+   * that is one customer's brand and only becomes the works' business once a
+   * tin has been bought — which is why the second group can be added to from
+   * here rather than being a list somebody guessed in advance.
+   */
+  const process = inks.filter((ink) => ink.inkKind === 'PROCESS');
+  const special = inks.filter((ink) => ink.inkKind !== 'PROCESS');
+
   const [chosen, setChosen] = useState<string[] | null>(null);
-  const colourNames = chosen ?? inks.slice(0, Math.max(1, line.colourCount)).map((i) => i.name);
+  const colourNames =
+    chosen ?? [...process, ...special].slice(0, Math.max(1, line.colourCount)).map((i) => i.name);
   /* A stable dependency: the array is rebuilt every render, its contents are not. */
   const colourKey = colourNames.join('|');
+
+  const toggle = (name: string) =>
+    setChosen(
+      colourNames.includes(name)
+        ? colourNames.filter((chosenName) => chosenName !== name)
+        : [...colourNames, name],
+    );
 
   const rate = (name: string): number =>
     materials.find((material) => material.name === name)?.currentRate ?? 0;
@@ -174,11 +203,23 @@ export function RateCostingPanel({
    * whether it runs 500 kg or 5,000, so the rate falls with the order — which
    * is the whole reason a quotation carries tiers.
    */
+  /*
+   * One rate per quantity, not one rate. Setting a press takes the same hour
+   * whether it runs 500 kg or 5,000, so the rate falls with the order — which
+   * is the whole reason a quotation carries tiers.
+   *
+   * Anything under a kilogram is skipped rather than costed. A quotation for
+   * 20 pouches is a fraction of a kilogram carrying a whole job's setup, and
+   * it priced at Rs 13,504 a kilogram beside a heading that rounded to "0 kg"
+   * — arithmetically right, and not a number anybody should be shown.
+   */
   const results = useMemo(
     () =>
       input
         ? line.quantitiesKg.map((qty) =>
-            qty > 0 ? costRate({ ...input, job: { ...input.job, orderQtyKg: qty } }) : null,
+            qty >= MIN_COSTABLE_KG
+              ? costRate({ ...input, job: { ...input.job, orderQtyKg: qty } })
+              : null,
           )
         : [],
     [input, line.quantitiesKg],
@@ -237,52 +278,34 @@ export function RateCostingPanel({
                 colour&apos;s 0.13
               </span>
             </legend>
-            <div className="flex flex-wrap gap-1.5">
-              {inks.map((ink) => {
-                const on = colourNames.includes(ink.name);
-                return (
-                  <label
-                    key={ink.id}
-                    className={cn(
-                      'inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs',
-                      on
-                        ? 'border-brand-500 bg-brand-600 text-white'
-                        : 'border-ink-200 text-ink-600 bg-white hover:bg-ink-50',
-                    )}
+            <div className="space-y-2">
+              <ColourGroup label="Process" inks={process} chosen={colourNames} onToggle={toggle} />
+              <ColourGroup
+                label="Special"
+                inks={special}
+                chosen={colourNames}
+                onToggle={toggle}
+                empty="None yet — a Pantone, a metallic, an opaque white"
+                action={
+                  <button
+                    type="button"
+                    onClick={() => setAdding(true)}
+                    className="border-brand-300 text-brand-700 hover:bg-brand-50 inline-flex cursor-pointer items-center gap-1 rounded-full border border-dashed px-3 py-1.5 text-xs font-medium"
                   >
-                    <input
-                      type="checkbox"
-                      className="sr-only"
-                      checked={on}
-                      onChange={() =>
-                        setChosen(
-                          on
-                            ? colourNames.filter((name) => name !== ink.name)
-                            : [...colourNames, ink.name],
-                        )
-                      }
-                    />
-                    {ink.name.replace(/^Ink\s*[—-]\s*/, '')}
-                    <span className={on ? 'text-white/70' : 'text-ink-400'}>
-                      {formatNumber(ink.laydownGsm ?? 0, 2)}
-                    </span>
-                    {/* Visible before it is chosen, not only after it refuses. */}
-                    {!(ink.currentRate && ink.currentRate > 0) ? (
-                      <span
-                        title="No rate on the Rates screen"
-                        className={on ? 'text-white' : 'text-warning-600'}
-                      >
-                        !
-                      </span>
-                    ) : null}
-                  </label>
-                );
-              })}
+                    <Plus className="size-3.5" />
+                    Add a special colour
+                  </button>
+                }
+              />
             </div>
+
             <p className="text-ink-500 mt-2 text-xs">
-              {colourNames.length} of {line.colourCount} cylinders ·{' '}
-              {settings.defaultWastagePercent}% wastage · {settings.defaultMarginPercent}% margin ·{' '}
-              {settings.defaultTrimMm} mm trim · adhesive {settings.defaultAdhesiveRatio} —{' '}
+              {colourNames.length} colour{colourNames.length === 1 ? '' : 's'}
+              {colourNames.length !== line.colourCount
+                ? ` — the line charges for ${line.colourCount} cylinder${line.colourCount === 1 ? '' : 's'}`
+                : ''}{' '}
+              · {settings.defaultWastagePercent}% wastage · {settings.defaultMarginPercent}% margin
+              · {settings.defaultTrimMm} mm trim · adhesive {settings.defaultAdhesiveRatio} —{' '}
               <a href="/costing" className="text-brand-600 underline">
                 change on Costing
               </a>
@@ -297,7 +320,7 @@ export function RateCostingPanel({
                   className="border-ink-200 rounded-[var(--radius-md)] border bg-white p-3"
                 >
                   <p className="text-ink-500 text-xs">
-                    {formatNumber(line.quantitiesKg[index] ?? 0, 0)} kg
+                    {formatNumber(line.quantitiesKg[index] ?? 0, 1)} kg
                   </p>
                   <p className="text-ink-900 mt-0.5 flex items-center gap-1.5 text-lg font-bold tabular-nums">
                     {formatRs(result.ratePerKg, 2)}
@@ -305,7 +328,7 @@ export function RateCostingPanel({
                       type="button"
                       onClick={() => setShown(result)}
                       title="How this rate was worked out"
-                      aria-label={`How the rate for ${formatNumber(line.quantitiesKg[index] ?? 0, 0)} kg was worked out`}
+                      aria-label={`How the rate for ${formatNumber(line.quantitiesKg[index] ?? 0, 1)} kg was worked out`}
                       className="text-ink-400 hover:text-brand-600 cursor-pointer"
                     >
                       <Info className="size-4" />
@@ -333,9 +356,76 @@ export function RateCostingPanel({
         </>
       )}
 
+      <SpecialColourModal
+        open={adding}
+        onClose={() => setAdding(false)}
+        onCreated={(name) => setChosen([...colourNames, name])}
+      />
+
       <CostingBreakdownModal breakdown={shown} onClose={() => setShown(null)} />
     </section>
   );
 }
 
 export type { AppSettings };
+
+/**
+ * One group of colour chips.
+ *
+ * An unpriced colour is marked before it is chosen rather than only after the
+ * panel refuses it, so the office sees the gap while deciding rather than
+ * being stopped by it afterwards.
+ */
+function ColourGroup({
+  label,
+  inks,
+  chosen,
+  onToggle,
+  empty,
+  action,
+}: {
+  label: string;
+  inks: Material[];
+  chosen: string[];
+  onToggle: (name: string) => void;
+  empty?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-ink-400 w-16 shrink-0 text-xs font-semibold tracking-wide uppercase">
+        {label}
+      </span>
+      {inks.length === 0 && empty ? <span className="text-ink-400 text-xs">{empty}</span> : null}
+      {inks.map((ink) => {
+        const on = chosen.includes(ink.name);
+        const priced = Boolean(ink.currentRate && ink.currentRate > 0);
+        return (
+          <label
+            key={ink.id}
+            title={priced ? undefined : 'No rate on the Rates screen'}
+            className={cn(
+              'inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs',
+              on
+                ? 'border-brand-500 bg-brand-600 text-white'
+                : 'border-ink-200 text-ink-600 bg-white hover:bg-ink-50',
+            )}
+          >
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={on}
+              onChange={() => onToggle(ink.name)}
+            />
+            {ink.name.replace(/^Ink\s*[—-]\s*/, '')}
+            <span className={on ? 'text-white/70' : 'text-ink-400'}>
+              {formatNumber(ink.laydownGsm ?? 0, 2)}
+            </span>
+            {!priced ? <span className={on ? 'text-white' : 'text-warning-600'}>!</span> : null}
+          </label>
+        );
+      })}
+      {action}
+    </div>
+  );
+}

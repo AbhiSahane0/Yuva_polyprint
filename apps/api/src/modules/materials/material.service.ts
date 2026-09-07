@@ -167,6 +167,7 @@ export async function listMaterials(options: {
       density: toNumber(material.density),
       solidsPercent: toNumber(material.solidsPercent),
       laydownGsm: toNumber(material.laydownGsm),
+      inkKind: material.inkKind,
       isActive: material.isActive,
       sortOrder: material.sortOrder,
       currentRate,
@@ -283,6 +284,7 @@ export async function createMaterial(input: CreateMaterialInput): Promise<Materi
       density: input.density ?? null,
       solidsPercent: input.solidsPercent ?? null,
       laydownGsm: input.laydownGsm ?? null,
+      inkKind: input.inkKind ?? null,
     },
     select: { id: true },
   });

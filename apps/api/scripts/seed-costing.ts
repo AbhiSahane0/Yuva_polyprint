@@ -66,37 +66,19 @@ const LABOUR: { role: string; process: MachineKind; monthlySalary: number; sortO
 ];
 
 /**
- * Ink solids and laydown, from the works' Costing sheet.
+ * Solids and laydown for the four process colours, from the works' Costing
+ * sheet.
  *
- * White is an opaque base coat and lays an order of magnitude heavier than a
- * process colour, which is why one "ink GSM" cannot price a job using both.
+ * Only those four. A white base coat, a brand's Pantone, a metallic — those are
+ * a job's own decision and belong to the works only once somebody has bought a
+ * tin, so they are added from the quotation screen as they come up rather than
+ * seeded here as a guess at what this works prints.
  */
-const INKS: { match: string; solidsPercent: number; laydownGsm: number }[] = [
+const PROCESS_INKS: { match: string; solidsPercent: number; laydownGsm: number }[] = [
   { match: 'black', solidsPercent: 23, laydownGsm: 0.15 },
   { match: 'cyan', solidsPercent: 19.5, laydownGsm: 0.14 },
   { match: 'magenta', solidsPercent: 19.5, laydownGsm: 0.13 },
   { match: 'yellow', solidsPercent: 19.5, laydownGsm: 0.13 },
-  { match: 'white', solidsPercent: 40, laydownGsm: 1.8 },
-  { match: 'red', solidsPercent: 23, laydownGsm: 0.25 },
-  { match: 'violet', solidsPercent: 22.1, laydownGsm: 0.25 },
-  { match: 'green', solidsPercent: 21.8, laydownGsm: 0.18 },
-];
-
-/**
- * Colours the works prints but the rate catalogue did not carry.
- *
- * Created without a rate on purpose. The whole point of costing ink per colour
- * is that a white base coat lays 1.8 g/m² against a process colour's 0.13 —
- * so a job that prints white and cannot say so is costed at a twelfth of its
- * real ink. Inventing a price would be worse than the gap: the screens refuse
- * to quote a colour that has no rate, which is a question somebody answers
- * once on the Rates screen.
- */
-const MISSING_COLOURS = [
-  { name: 'Ink — White', solidsPercent: 40, laydownGsm: 1.8 },
-  { name: 'Ink — Red', solidsPercent: 23, laydownGsm: 0.25 },
-  { name: 'Ink — Violet', solidsPercent: 22.1, laydownGsm: 0.25 },
-  { name: 'Ink — Green', solidsPercent: 21.8, laydownGsm: 0.18 },
 ];
 
 async function main() {
@@ -123,16 +105,20 @@ async function main() {
     added += 1;
   }
 
-  /* Ink solids, onto whichever ink materials this database already holds. */
+  /* The four process colours, onto whichever ink rows this database holds. */
   let inked = 0;
   const inks = await prisma.material.findMany({ where: { category: 'INK' } });
   for (const ink of inks) {
-    if (ink.solidsPercent !== null && ink.laydownGsm !== null) continue;
-    const match = INKS.find((known) => ink.name.toLowerCase().includes(known.match));
+    const match = PROCESS_INKS.find((known) => ink.name.toLowerCase().includes(known.match));
     if (!match) continue;
     await prisma.material.update({
       where: { id: ink.id },
-      data: { solidsPercent: match.solidsPercent, laydownGsm: match.laydownGsm },
+      data: {
+        /* Never overwrites a figure the office has corrected. */
+        solidsPercent: ink.solidsPercent ?? match.solidsPercent,
+        laydownGsm: ink.laydownGsm ?? match.laydownGsm,
+        inkKind: 'PROCESS',
+      },
     });
     inked += 1;
   }
@@ -146,28 +132,8 @@ async function main() {
     inked += 1;
   }
 
-  /* The colours the sheet prices but the catalogue never held. */
-  let colours = 0;
-  const lastInk = await prisma.material.findFirst({
-    where: { category: 'INK' },
-    orderBy: { sortOrder: 'desc' },
-    select: { sortOrder: true },
-  });
-  let order = (lastInk?.sortOrder ?? 0) + 1;
-  for (const colour of MISSING_COLOURS) {
-    const existing = await prisma.material.findUnique({ where: { name: colour.name } });
-    if (existing) continue;
-    await prisma.material.create({
-      data: { ...colour, category: 'INK', unit: 'KG', sortOrder: order++ },
-    });
-    colours += 1;
-  }
-
   console.log(`costing master data: ${added} added, ${skipped} already there`);
-  if (colours > 0) {
-    console.log(`colours added WITHOUT a rate: ${colours} — price them on the Rates screen`);
-  }
-  console.log(`materials given solids/laydown: ${inked}`);
+  console.log(`process colours given solids/laydown: ${inked}`);
   console.log('\nEvery figure is from a 2022 sheet. Check them on the Costing screen.');
 }
 

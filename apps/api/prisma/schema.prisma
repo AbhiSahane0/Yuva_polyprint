@@ -564,6 +564,17 @@ model Material {
   laydownGsm Decimal? @map("laydown_gsm") @db.Decimal(6, 3)
 
   /**
+   * Process or special, for inks. Null on anything that is not an ink.
+   * Cyan, magenta, yellow and black are the four every press carries and every
+   * job may use. Everything else is a job's own decision — a white base coat,
+   * a brand's Pantone, a metallic — and belongs to the works only once
+   * somebody has bought a tin of it. The distinction is stored rather than
+   * inferred from the name, because "Ink — Cyan" and "Cyan (Sun Chemical)" are
+   * the same colour and a rule that reads names would disagree.
+   */
+  inkKind InkKind? @map("ink_kind")
+
+  /**
    * Stock at or below this reads as low. Null means nobody has set one, which
    * is not the same as zero — a material with no level never raises an alarm,
    * where a level of 0 would mean "only shout when we have run out".
@@ -1413,4 +1424,10 @@ model CostingLabour {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("costing_labour")
+}
+
+/// Whether an ink is one of the four every press carries, or a job's own.
+enum InkKind {
+  PROCESS
+  SPECIAL
 }
