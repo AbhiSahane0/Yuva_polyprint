@@ -165,6 +165,8 @@ export async function listMaterials(options: {
       category: material.category,
       unit: material.unit,
       density: toNumber(material.density),
+      solidsPercent: toNumber(material.solidsPercent),
+      laydownGsm: toNumber(material.laydownGsm),
       isActive: material.isActive,
       sortOrder: material.sortOrder,
       currentRate,
@@ -276,7 +278,12 @@ export async function createMaterial(input: CreateMaterialInput): Promise<Materi
   if (clash) throw ApiError.conflict(`A material named "${input.name}" already exists`);
 
   const created = await prisma.material.create({
-    data: { ...input, density: input.density ?? null },
+    data: {
+      ...input,
+      density: input.density ?? null,
+      solidsPercent: input.solidsPercent ?? null,
+      laydownGsm: input.laydownGsm ?? null,
+    },
     select: { id: true },
   });
 

@@ -378,6 +378,39 @@ export const settingsSchema = z.object({
   defaultMetpetMaterial: z.string().trim().max(80),
   defaultInkMaterial: z.string().trim().max(80),
   defaultAdhesiveMaterial: z.string().trim().max(80),
+
+  /**
+   * Rate costing — the works' own overheads.
+   *
+   * These build a rate up from every expense rather than starting from one
+   * somebody remembers. Machines and wages are rows of their own; what is left
+   * is a handful of figures that belong to the works rather than to any job.
+   */
+  workingDaysPerMonth: z.coerce.number().min(1).max(31),
+  hoursPerDay: z.coerce.number().min(1).max(24),
+  transportPerKg: z.coerce.number().min(0).max(10_000),
+  packingPerKg: z.coerce.number().min(0).max(10_000),
+  /** Sundries the works does not itemise, charged once on the job. */
+  otherPerJob: z.coerce.number().min(0).max(1_000_000),
+  emiPerMonth: z.coerce.number().min(0).max(10_000_000),
+  /** Machine hours a month the EMI is spread over. */
+  emiHoursPerMonth: z.coerce.number().min(1).max(744),
+  pouchMakingPerKg: z.coerce.number().min(0).max(10_000),
+  /** What the sixth, seventh and eighth printing stations each add, per kg. */
+  stationSurcharge6: z.coerce.number().min(0).max(10_000),
+  stationSurcharge7: z.coerce.number().min(0).max(10_000),
+  stationSurcharge8: z.coerce.number().min(0).max(10_000),
+  defaultWastagePercent: z.coerce.number().min(0).max(100),
+  defaultMarginPercent: z.coerce.number().min(0).max(100),
+  /**
+   * What the margin is taken on. Their sheet uses the material cost alone,
+   * which recovers labour and power at cost and earns nothing on them.
+   */
+  marginBasis: z.enum(['TOTAL_COST', 'MATERIAL_ONLY']),
+  /** Ink to solvent at the press, and how the solvent splits. */
+  inkSolventParts: z.coerce.number().min(0).max(1000),
+  ethylAcetatePercent: z.coerce.number().min(0).max(100),
+  defaultAdhesiveRatio: z.string().trim().max(20),
 });
 
 export type AppSettings = z.infer<typeof settingsSchema>;
@@ -396,6 +429,25 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultMetpetMaterial: 'MET PET 12µm',
   defaultInkMaterial: 'Ink — Black',
   defaultAdhesiveMaterial: 'Adhesive — PU',
+
+  /* Rate costing. Taken from the works' own sheets; edit on the Costing screen. */
+  workingDaysPerMonth: 26,
+  hoursPerDay: 8,
+  transportPerKg: 10,
+  packingPerKg: 5,
+  otherPerJob: 250,
+  emiPerMonth: 4166.66,
+  emiHoursPerMonth: 24,
+  pouchMakingPerKg: 15,
+  stationSurcharge6: 5.5,
+  stationSurcharge7: 7.5,
+  stationSurcharge8: 9,
+  defaultWastagePercent: 8,
+  defaultMarginPercent: 9,
+  marginBasis: 'TOTAL_COST',
+  inkSolventParts: 80,
+  ethylAcetatePercent: 50,
+  defaultAdhesiveRatio: '100:146:15',
 };
 
 /*

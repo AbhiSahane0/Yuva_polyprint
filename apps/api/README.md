@@ -194,6 +194,10 @@ guard is visible in that diff; a guard forgotten three files away is not.
              question. Registering or moving one needs
              requireModule('cylinders'); DELETING a design needs customers as
              well, because the record it destroys is a job.
+/costing     authenticate — the quotation wizard costs every line against the
+             machines and wages, so gating the read would break pricing for
+             somebody who has quotations but not rates. Changing one needs
+             requireModule('rates').
 /artwork     authenticate — the floor works to the file a job prints, and gating
              that on the cylinders module hides it from exactly the people who
              need it. Uploading, refiling and removing need
@@ -611,6 +615,77 @@ Policy:
   }
 ]
 ```
+
+### Costing
+
+| Method | Path                           | Notes                              |
+| ------ | ------------------------------ | ---------------------------------- |
+| GET    | `/costing`                     | Machines and wages, in one request |
+| POST   | `/costing/machines`            | Add a machine                      |
+| PATCH  | `/costing/machines/:id`        | Correct one                        |
+| POST   | `/costing/machines/:id/retire` | Retire or restore it               |
+| POST   | `/costing/labour`              | Add a role                         |
+| PATCH  | `/costing/labour/:id`          | Correct one                        |
+| POST   | `/costing/labour/:id/retire`   | Retire or restore it               |
+
+Readable by anyone signed in, because the quotation wizard costs every line
+against it. Writing needs `requireModule('rates')` — a machine speed or a wage
+moves the price of every quotation raised afterwards, which is the same
+authority a rate change carries. Retire rather than delete, for the same reason
+a retired material stays: quotations were costed against it.
+
+### Building a rate from what it costs to make
+
+`packages/shared/src/lib/rate-costing.ts`. Nothing on the server computes it —
+the wizard, the API and the PDF all call the same function, so they cannot
+disagree about a price.
+
+It is the works' own method, from the spreadsheets they cost by. Kilograms
+become running metres, metres become machine minutes, minutes become rupees:
+
+```
+order 500 kg + 8% wastage      →  540 kg consumed
+each ply's share of the GSM    →  its kilograms
+kg ÷ GSM ÷ web width           →  running metres
+metres ÷ machine speed         →  minutes, + setup
+minutes × (HP × rate)          →  electricity
+minutes × (salary ÷ days ÷ hours ÷ 60)  →  wages
+```
+
+Ink and adhesive are the parts worth understanding, because they are where a
+naive costing goes wrong by a factor:
+
+- **Ink is bought wet.** A colour lays 0.15 g/m² of pigment from a tin that is
+  23% solids, so `100 ÷ solids` kilograms are purchased for every one that
+  stays on the film, and solvent is added on top at the press ratio. Costing a
+  laydown against the purchase rate understates ink three to five times over.
+- **Each colour is its own material.** A white base coat lays 1.8 g/m² at 40%
+  solids; a process colour lays 0.13 at 19.5%. One "ink GSM" cannot price a job
+  that uses both.
+- **Adhesive is a diluted batch.** `100:146:15` is adhesive : ethyl acetate :
+  hardener, 35% solid, and each component is priced separately. It is spread
+  over the **substrate** GSM, not the whole laminate — it does not stick to
+  itself or to the ink.
+
+**Two sheets, reconciled.** The client's own workbook answered the same job
+twice, Rs 263.40 and Rs 228.22 a kilogram. This takes the Estimation frame —
+which divides by the quantity **ordered**, because the wastage is already
+inside the cost and dividing by the consumed weight would charge for it and
+then hand it back — with the Costing sheet's per-colour ink and batch adhesive.
+
+**Five corrections are deliberate**, each pinned by a test:
+
+| Their sheet                                                                        | Here                                                                   |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Ink held at a flat 1.8 GSM while the colours used sum to 0.55                      | The colours decide it — the structure's figure sets the pouch weight   |
+| Batch ratio lookup was `SUMIFS` over one cell, so it always returned the first row | The chosen ratio is used                                               |
+| An empty Met PET row booked a second lamination pass                               | A zero-micron ply is not a ply                                         |
+| Power charged on run time; wages on run + setup                                    | Both charged on both — the machine is switched on                      |
+| Margin taken on materials alone                                                    | On the whole cost by default; `marginBasis` restores the old behaviour |
+
+Master data lives in `costing_machines`, `costing_labour`, and the `costing_*`
+keys in settings. `npm run seed:costing -w @yuva/api` loads the works' own 2022
+figures — **check them before quoting on them**.
 
 ### Settings
 
@@ -1398,6 +1473,8 @@ Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 | `purchase_receipts`         | One delivery against a line. Accepted stock names the batch it became; rejected stock names nothing.                                                        |
 | `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.                                                                           |
 | `job_artwork`               | A design file, held in R2 with only its description here. A revision supersedes rather than overwrites; erasing the file keeps the row that describes it.   |
+| `costing_machines`          | A machine and what a minute of it costs — load, tariff, speed, setup. Retired, never deleted: quotations were costed against it.                            |
+| `costing_labour`            | A wage, and which machine's minutes it is paid for. Monthly; the working month in settings turns it into a rate per minute.                                 |
 | `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.                                                                               |
 | `app_settings`              | Editable rates and costing defaults.                                                                                                                        |
 | `users`                     | Accounts, their password hash and which modules each may reach.                                                                                             |

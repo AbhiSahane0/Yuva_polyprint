@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Yuva Polyprint ERP — REST API",
+  "description": "Yuva Polyprint ERP \u2014 REST API",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/server.ts",
@@ -23,7 +23,8 @@
     "schema:docs": "tsx scripts/generate-schema-docs.ts",
     "seed:materials": "tsx scripts/seed-materials.ts",
     "db:copy-to-remote": "bash scripts/migrate-data-to-remote.sh",
-    "seed:admin": "tsx scripts/seed-admin.ts"
+    "seed:admin": "tsx scripts/seed-admin.ts",
+    "seed:costing": "tsx scripts/seed-costing.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",

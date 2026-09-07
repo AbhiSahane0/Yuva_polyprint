@@ -20,6 +20,14 @@ export const createMaterialSchema = z.object({
    * specified by weight already.
    */
   density: z.coerce.number().positive().max(10).nullable().optional(),
+  /**
+   * Ink and adhesive only. Without the solids share a laydown costed against
+   * the purchase rate understates the ink three to five times over, because
+   * most of what is bought evaporates.
+   */
+  solidsPercent: z.coerce.number().positive().max(100).nullable().optional(),
+  /** Dry g/m² this colour lays. A white base coat is an order heavier. */
+  laydownGsm: z.coerce.number().min(0).max(50).nullable().optional(),
   isActive: z.boolean().default(true),
   sortOrder: z.coerce.number().int().min(0).default(0),
 });

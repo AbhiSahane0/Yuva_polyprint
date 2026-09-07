@@ -51,6 +51,7 @@ src/
 │   ├── purchase/          suppliers, orders, receiving into stock
 │   ├── cylinders/         the design register and cylinder history
 │   ├── artwork/           design files: upload to R2, versions, previews
+│   ├── costing/           machines, wages, and the rate a job is costed at
 │   ├── gstin/             GSTIN field and lookup, shared by two screens
 │   ├── monitor/           sign-in log (admins only)
 │   └── rates/             daily material rates
@@ -1225,6 +1226,49 @@ permanent public link to a customer's unreleased packaging.
 
 Reading is open to anyone signed in — the floor works to the file the job
 prints. The buttons that change anything need the cylinders module.
+
+#### What it costs to make
+
+At the **foot** of each job, below the cylinders. It used to sit in the middle,
+which asked the office to name a price before the job had finished describing
+itself — and a costed rate cannot be answered until it has: the structure
+decides the weight, the weight decides the running metres, and the metres decide
+how long every machine is occupied. Everything above the panel is a question
+about the job; everything below it is the answer.
+
+It prices **each quantity separately**, because setting a press takes the same
+hour whether it runs 500 kg or 5,000 — which is the whole reason a quotation
+carries tiers, and the reason a bigger order genuinely costs less a kilogram.
+
+The colours are picked here rather than counted, because what they **are**
+changes the price: a white base coat lays 1.8 g/m² at 40% solids against a
+process colour's 0.13 at 19.5%, so two jobs with six cylinders each can differ
+by a third on ink.
+
+**ⓘ beside each rate shows the working** — the laminate ply by ply, the ink wet
+and dry, the adhesive batch, every machine's minutes, and the chain from
+material cost to the rate. A rate nobody can explain is a rate nobody can defend
+across a table, and the office is asked "why is it 251?" by customers holding
+three other quotations.
+
+**It suggests; it does not impose.** The rate boxes work exactly as they always
+did and **Use this rate** writes the figure in, because the works knows things
+this does not — what the customer paid last year, and who else is quoting. On a
+line sold by the piece it converts using the quotation's own pieces-per-kilogram
+so the figure shown is the figure the document carries.
+
+### Costing — `/costing`
+
+What the works costs to run: the machines, the wages, and the overheads every
+quoted rate is built from. A machine speed or a wage that is three years stale
+here makes every quotation raised afterwards wrong by the same amount, and
+nobody would see it — which is why it is a screen and not a constant.
+
+Machines show their **running cost per hour** (load × tariff) and wages show
+their **cost per minute**, because that is what the costing actually uses. A
+monthly salary is not a figure anyone can check a rate against.
+
+Retire rather than delete, as rates do: quotations were costed against it.
 
 ### Rates — `/rates`
 

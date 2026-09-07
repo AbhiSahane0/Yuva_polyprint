@@ -19,6 +19,12 @@ erDiagram
     text key PK
     text value
   }
+  costing_labour {
+    text id PK
+  }
+  costing_machines {
+    text id PK
+  }
   customers {
     text id PK
     text company_name
@@ -182,14 +188,16 @@ erDiagram
 | Table | Columns | Rows | Purpose |
 | --- | ---: | ---: | --- |
 | `app_settings` | 3 | 0 | Editable rates: cylinder rate, GST %, advance %. |
+| `costing_labour` | 8 | 7 |  |
+| `costing_machines` | 11 | 3 |  |
 | `customers` | 17 | 71 | Companies that order from Yuva Polyprint. |
-| `cylinder_events` | 11 | 8 |  |
-| `cylinders` | 16 | 12 |  |
-| `job_artwork` | 17 | 2 |  |
-| `jobs` | 55 | 420 | Products and their full engineering specification. |
-| `login_events` | 7 | 35 |  |
-| `material_rates` | 6 | 219 |  |
-| `materials` | 10 | 17 |  |
+| `cylinder_events` | 11 | 0 |  |
+| `cylinders` | 16 | 0 |  |
+| `job_artwork` | 17 | 0 |  |
+| `jobs` | 55 | 418 | Products and their full engineering specification. |
+| `login_events` | 7 | 36 |  |
+| `material_rates` | 6 | 236 |  |
+| `materials` | 12 | 17 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
 | `purchase_receipts` | 11 | 1 |  |
@@ -203,7 +211,7 @@ erDiagram
 | `stock_batches` | 14 | 0 |  |
 | `stock_movements` | 13 | 5 |  |
 | `suppliers` | 11 | 1 |  |
-| `users` | 10 | 2 |  |
+| `users` | 10 | 3 |  |
 
 ## Relationships
 
@@ -251,6 +259,7 @@ erDiagram
 | `CylinderStatus` | `IN_STORE`, `ALLOCATED`, `IN_USE`, `DAMAGED`, `NEEDS_REWORK`, `RETIRED` |
 | `JobCustomerSource` | `EXPLICIT`, `INFERRED`, `NONE` |
 | `JobKind` | `ROLL`, `POUCH` |
+| `MachineKind` | `PRINTING`, `LAMINATION`, `SLITTING`, `POUCHING` |
 | `MaterialCategory` | `FILM`, `INK`, `ADHESIVE`, `SOLVENT`, `CONSUMABLE` |
 | `PouchType` | `STANDUP`, `STANDUP_ZIPPER`, `ZIPPER`, `SPOUT`, `CENTRE_SEAL`, `THREE_SIDE_SEAL`, `OTHER` |
 | `PricingBasis` | `PER_KG`, `PER_POUCH` |
@@ -266,6 +275,35 @@ erDiagram
 | --- | --- | :-: | --- |
 | `key` | `text` |  | PK |
 | `value` | `text` |  |  |
+| `updated_at` | `timestamp` |  |  |
+
+### `costing_labour`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `role` | `text` |  | unique |
+| `process` | `MachineKind` (enum) |  |  |
+| `monthly_salary` | `decimal(12,2)` |  |  |
+| `is_active` | `boolean` |  |  |
+| `sort_order` | `integer` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+
+### `costing_machines`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `name` | `text` |  | unique |
+| `kind` | `MachineKind` (enum) |  |  |
+| `horsepower` | `decimal(10,2)` |  |  |
+| `power_rate_per_hp_hour` | `decimal(10,2)` |  |  |
+| `speed_m_per_min` | `decimal(10,2)` |  |  |
+| `setup_minutes` | `integer` |  |  |
+| `is_active` | `boolean` |  |  |
+| `sort_order` | `integer` |  |  |
+| `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
 
 ### `customers`
@@ -446,6 +484,8 @@ erDiagram
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
 | `reorder_level` | `decimal(14,3)` | ✓ |  |
+| `laydown_gsm` | `decimal(6,3)` | ✓ |  |
+| `solids_percent` | `decimal(6,3)` | ✓ |  |
 
 ### `purchase_order_lines`
 

@@ -7,6 +7,13 @@ export interface Material {
   category: MaterialCategory;
   unit: string;
   density: number | null;
+  /**
+   * For inks and adhesives: what share of the tin stays on the film. The rest
+   * evaporates, so several kilograms are bought for every one laid down.
+   */
+  solidsPercent: number | null;
+  /** For inks: dry g/m² this colour lays. White runs far heavier than a process colour. */
+  laydownGsm: number | null;
   isActive: boolean;
   sortOrder: number;
 

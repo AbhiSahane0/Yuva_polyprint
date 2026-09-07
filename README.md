@@ -198,6 +198,7 @@ apps/api/
     ├── types/
     │   └── express.d.ts      augments Express.Request with `user`
     ├── modules/              ← business modules live here (see its README)
+    ├── scripts/              one-off and seeding scripts (seed:costing, …)
     └── generated/            Prisma client output — git-ignored, never edited
 ```
 
@@ -399,8 +400,8 @@ The script refuses to run if an active administrator already exists.
 
 **Access is two tiers and no more.** An administrator sees everything and manages
 users; everyone else sees only the sections ticked for them — Customers,
-Quotations, Rates, Inventory, Purchase, Design & Cylinders (which carries its
-artwork), Jobs. The sidebar
+Quotations, Rates (which carries Costing), Inventory, Purchase, Design &
+Cylinders (which carries its artwork), Jobs. The sidebar
 hides the rest, and the API refuses it independently, because hiding a link is
 not access control.
 

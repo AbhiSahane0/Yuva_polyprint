@@ -17,6 +17,7 @@ import {
   type QuotationSummary,
   MAX_PAGE_SIZE,
   type ItemGeometry,
+  type Material,
   type MaterialCostResult,
   PET_MICRON_PER_LAYER,
   JOB_KINDS,
@@ -31,6 +32,7 @@ import {
   overriddenRate,
   plyRatePerKg,
   resolveSelectedQuantity,
+  round,
   suggestRepeatHeight,
   suggestRepeatWidth,
   computeTier,
@@ -83,6 +85,10 @@ import {
 } from '../lib/step-save';
 import { QuotationPreview } from '../components/QuotationPreview';
 import { SendQuotationModal } from '../components/SendQuotationModal';
+import {
+  RateCostingPanel,
+  type RateCostingLine,
+} from '@/features/costing/components/RateCostingPanel';
 import { LayerFields } from '../components/LayerFields';
 import { QuantityFields, type QuantityResult } from '../components/QuantityFields';
 import { StepIndicator, type Step } from '../components/StepIndicator';
@@ -1063,6 +1069,7 @@ export default function QuotationFormPage() {
                 register={register}
                 setValue={setValue}
                 films={films}
+                materials={materials ?? []}
                 jobs={chosenCustomer?.jobs ?? []}
                 item={watched.items?.[index] as Partial<ItemValues> | undefined}
                 cost={costed[index]}
@@ -1191,6 +1198,7 @@ function JobCard({
   register,
   setValue,
   films,
+  materials,
   jobs,
   item,
   cost,
@@ -1205,6 +1213,8 @@ function JobCard({
   register: UseFormRegister<CreateQuotationFormValues>;
   setValue: UseFormSetValue<CreateQuotationFormValues>;
   films: Film[];
+  /** The full rate catalogue — the costing panel needs inks and solvents too. */
+  materials: Material[];
   /** The chosen customer's saved jobs. Empty for a new company. */
   jobs: CustomerJob[];
   item: Partial<ItemValues> | undefined;
@@ -1244,6 +1254,62 @@ function JobCard({
    */
   const filmWidthMm = cost?.geometry.filmWidthMm ?? 0;
   const filmHeightMm = cost?.geometry.filmHeightMm ?? 0;
+
+  /*
+   * The line, as the costing engine needs to see it.
+   *
+   * Every figure is read from what has already been costed rather than
+   * recomputed here, so the suggested rate and the geometry above it cannot
+   * disagree — the film width is the pouch plus its gussets, and the
+   * quantities are in kilograms whichever way the line is being priced.
+   */
+  const costingLine: RateCostingLine = useMemo(
+    () => ({
+      layers: (item?.layers ?? [])
+        .map((layer) => {
+          const film = films.find((candidate) => candidate.id === layer?.materialId);
+          return {
+            name: film?.name ?? 'Ply',
+            micron: num(layer?.micron),
+            density: film?.density ?? 0,
+            ratePerKg: num(layer?.rateOverride) || film?.currentRate || 0,
+          };
+        })
+        .filter((layer) => layer.micron > 0 && layer.density > 0),
+      filmWidthMm,
+      filmHeightMm,
+      ups: Math.max(1, num(item?.repeatWidth) || 1),
+      /* One cylinder per colour, which is what the line is charged for. */
+      colourCount: Math.max(1, num(item?.cylinderCount) || 1),
+      makesPouches: jobKind !== 'ROLL',
+      quantitiesKg: (cost?.quantities ?? []).map((quantity) => quantity?.quantityKg ?? 0),
+      /* The document's own count, so the suggestion and the line agree. */
+      piecesPerKg: cost?.geometry.pouchesPerKg ?? 0,
+    }),
+    [item, films, filmWidthMm, filmHeightMm, jobKind, cost],
+  );
+
+  /**
+   * Writes a suggested rate into the row it was worked out for.
+   *
+   * Per pouch when that is how the line is sold, because the office should not
+   * have to divide by the pieces in a kilogram to use a figure this screen
+   * already knows.
+   */
+  const onUseRate = (position: number, ratePerKg: number) => {
+    const perKg = round(ratePerKg, 2);
+    if (basis === 'PER_POUCH') {
+      const pieces = cost?.geometry.pouchesPerKg ?? 0;
+      if (pieces <= 0) return;
+      setNumber(
+        setValue,
+        `items.${index}.quantities.${position}.ratePerPouch`,
+        round(perKg / pieces, 4),
+      );
+      return;
+    }
+    setNumber(setValue, `items.${index}.quantities.${position}.ratePerKg`, perKg);
+  };
 
   /**
    * Fill the repeats in as the size is typed, until the office says otherwise.
@@ -1630,29 +1696,6 @@ function JobCard({
           />
         </div>
 
-        <div className="col-span-2 sm:col-span-12">
-          <QuantityFields
-            control={control}
-            register={register}
-            itemIndex={index}
-            pricingBasis={basis}
-            showsPouches={jobKind !== 'ROLL'}
-            onBasisChange={
-              jobKind === 'ROLL'
-                ? undefined
-                : (next) =>
-                    setValue(`items.${index}.pricingBasis`, next as ItemValues['pricingBasis'], {
-                      shouldDirty: true,
-                      shouldValidate: true,
-                    })
-            }
-            results={cost?.quantities ?? []}
-            errors={errors?.quantities as never}
-            selectedQuantity={selectedQuantity}
-            onSelectQuantity={onSelectQuantity}
-          />
-        </div>
-
         {fromSavedJob ? (
           <div className="col-span-2 sm:col-span-12">
             <p className="border-ink-200 text-ink-500 rounded-[var(--radius-md)] border border-dashed px-3 py-2.5 text-sm">
@@ -1773,6 +1816,43 @@ function JobCard({
             </div>
           </div>
         )}
+
+        {/*
+          The rate lives at the FOOT of the job, not in the middle of it.
+          
+          It used to sit above the cylinders, which asked the office to name a
+          price before the job had finished describing itself — and a costed
+          rate cannot be answered until it has: the structure decides the
+          weight, the weight decides the running metres, and the metres decide
+          how long every machine is occupied. Everything above this line is a
+          question about the job; everything below it is the answer.
+        */}
+        <div className="col-span-2 sm:col-span-12">
+          <RateCostingPanel line={costingLine} materials={materials} onUseRate={onUseRate} />
+        </div>
+
+        <div className="col-span-2 sm:col-span-12">
+          <QuantityFields
+            control={control}
+            register={register}
+            itemIndex={index}
+            pricingBasis={basis}
+            showsPouches={jobKind !== 'ROLL'}
+            onBasisChange={
+              jobKind === 'ROLL'
+                ? undefined
+                : (next) =>
+                    setValue(`items.${index}.pricingBasis`, next as ItemValues['pricingBasis'], {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+            }
+            results={cost?.quantities ?? []}
+            errors={errors?.quantities as never}
+            selectedQuantity={selectedQuantity}
+            onSelectQuantity={onSelectQuantity}
+          />
+        </div>
       </div>
     </section>
   );

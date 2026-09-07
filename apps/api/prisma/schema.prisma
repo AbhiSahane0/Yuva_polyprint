@@ -548,6 +548,22 @@ model Material {
   density Decimal? @db.Decimal(6, 4)
 
   /**
+   * What share of the tin is pigment or resin, for inks and adhesives.
+   * The rest evaporates, so the works buys several kilograms of liquid for
+   * every kilogram that stays on the film. Costing a laydown against the
+   * purchase rate without this understates ink by three to five times. Null
+   * for films, which are what they weigh.
+   */
+  solidsPercent Decimal? @map("solids_percent") @db.Decimal(6, 3)
+
+  /**
+   * Dry ink this colour lays down, g/m². White is an opaque base coat and runs
+   * an order of magnitude heavier than a process colour — 1.8 against 0.15 —
+   * so one figure for "ink" cannot price a job that uses both.
+   */
+  laydownGsm Decimal? @map("laydown_gsm") @db.Decimal(6, 3)
+
+  /**
    * Stock at or below this reads as low. Null means nobody has set one, which
    * is not the same as zero — a material with no level never raises an alarm,
    * where a level of 0 would mean "only shout when we have run out".
@@ -1318,4 +1334,72 @@ model JobArtwork {
 
   @@index([jobId, status])
   @@map("job_artwork")
+}
+
+/// A machine, or a stage that behaves like one.
+enum MachineKind {
+  PRINTING
+  LAMINATION
+  SLITTING
+  POUCHING
+}
+
+/// A machine on the floor, and what a minute of it costs.
+///
+/// Costing master data: this is what the works IS, not what a job is. A rate
+/// is built by turning kilograms into running metres, metres into minutes at
+/// the machine's speed, and minutes into rupees.
+model CostingMachine {
+  id String @id @default(cuid())
+
+  name String      @unique
+  kind MachineKind
+
+  /// Connected load. Power is costed as horsepower × a rate per hour.
+  horsepower Decimal @db.Decimal(10, 2)
+
+  /**
+   * Rupees per horsepower-hour.
+   * Per machine rather than one figure for the works, because that is what the
+   * client's sheets do: printing is costed at the electricity tariff itself
+   * (Rs 9) while lamination and slitting carry Rs 35 and Rs 60, which are
+   * plainly loaded with more than power. One rate for all three would silently
+   * reprice two machines.
+   */
+  powerRatePerHpHour Decimal @map("power_rate_per_hp_hour") @db.Decimal(10, 2)
+
+  /// Metres a minute.
+  speedMPerMin Decimal @map("speed_m_per_min") @db.Decimal(10, 2)
+  /// Setting and cleaning, before a metre is run.
+  setupMinutes Int     @default(0) @map("setup_minutes")
+
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("costing_machines")
+}
+
+/// A wage, and which machine's minutes it is paid for.
+///
+/// Salaries are monthly; the working month in settings turns them into a rate
+/// per minute. Somebody is paid for the setup time as well as the run time,
+/// which is why the setup minutes live on the machine.
+model CostingLabour {
+  id String @id @default(cuid())
+
+  role    String      @unique
+  process MachineKind
+
+  monthlySalary Decimal @map("monthly_salary") @db.Decimal(12, 2)
+
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("costing_labour")
 }
