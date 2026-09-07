@@ -33,6 +33,7 @@ const toMachine = (row: Prisma.CostingMachineGetPayload<Record<string, never>>):
   powerRatePerHpHour: toNumber(row.powerRatePerHpHour),
   speedMPerMin: toNumber(row.speedMPerMin),
   setupMinutes: row.setupMinutes,
+  setupPowerFactor: toNumber(row.setupPowerFactor),
   isActive: row.isActive,
   sortOrder: row.sortOrder,
 });

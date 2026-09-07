@@ -27,6 +27,7 @@ const BLANK = {
   powerRatePerHpHour: '',
   speedMPerMin: '',
   setupMinutes: '',
+  setupPowerFactor: '1',
 };
 
 export function MachineModal({ open, machine, onClose }: Props) {
@@ -46,6 +47,7 @@ export function MachineModal({ open, machine, onClose }: Props) {
             powerRatePerHpHour: String(machine.powerRatePerHpHour),
             speedMPerMin: String(machine.speedMPerMin),
             setupMinutes: String(machine.setupMinutes),
+            setupPowerFactor: String(machine.setupPowerFactor),
           }
         : BLANK,
     );
@@ -174,6 +176,20 @@ export function MachineModal({ open, machine, onClose }: Props) {
             value={form.setupMinutes}
             invalid={Boolean(errors.setupMinutes)}
             onChange={(event) => set('setupMinutes', event.target.value)}
+          />
+        </Field>
+
+        <Field
+          label="Load while setting up"
+          htmlFor="m-setuppower"
+          hint="0 to 1 — a press being threaded is not running at full load"
+          error={errors.setupPowerFactor}
+        >
+          <NumberInput
+            id="m-setuppower"
+            value={form.setupPowerFactor}
+            invalid={Boolean(errors.setupPowerFactor)}
+            onChange={(event) => set('setupPowerFactor', event.target.value)}
           />
         </Field>
       </div>

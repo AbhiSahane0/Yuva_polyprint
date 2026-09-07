@@ -22,6 +22,11 @@ export const machineSchema = z.object({
     .positive('A machine that runs at 0 never finishes the job')
     .max(10_000),
   setupMinutes: z.coerce.number().int().min(0).max(1440),
+  /**
+   * 0 charges nothing for setup power, as the client's sheet does; 1 charges
+   * the full connected load. Neither is right for a press being threaded.
+   */
+  setupPowerFactor: z.coerce.number().min(0).max(1).default(1),
   isActive: z.boolean().default(true),
   sortOrder: z.coerce.number().int().min(0).max(999).default(0),
 });

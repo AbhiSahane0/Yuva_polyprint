@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Calculator, Info, Wand2 } from 'lucide-react';
 import {
-  ADHESIVE_BATCHES,
   costRate,
+  unpricedColours,
   formatNumber,
   formatRs,
   type AppSettings,
@@ -13,8 +13,8 @@ import {
   type Material,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
-import { Field, NumberInput, Select } from '@/components/ui/Field';
 import { useSettings } from '@/features/quotations/api/quotation-api';
+import { cn } from '@/lib/utils';
 import { useCostingMasterData } from '../api/costing-api';
 import { CostingBreakdownModal } from './CostingBreakdownModal';
 
@@ -62,10 +62,6 @@ export function RateCostingPanel({
   const { data: settings } = useSettings();
   const { data: master } = useCostingMasterData();
 
-  const [wastage, setWastage] = useState<string>('');
-  const [margin, setMargin] = useState<string>('');
-  const [ratio, setRatio] = useState<string>('');
-  const [trim, setTrim] = useState<string>('15');
   const [shown, setShown] = useState<CostingBreakdown | null>(null);
 
   /*
@@ -88,6 +84,26 @@ export function RateCostingPanel({
   const rate = (name: string): number =>
     materials.find((material) => material.name === name)?.currentRate ?? 0;
 
+  /*
+   * Colours chosen but not priced.
+   *
+   * A colour with no rate costs nothing, and nothing is a plausible-looking
+   * number: a job printing white would quote at a twelfth of its real ink and
+   * read perfectly normal. The same rule the unpriced film gauge follows —
+   * refuse, and say which.
+   */
+  const unpriced = unpricedColours(
+    colourNames
+      .map((name) => inks.find((candidate) => candidate.name === name))
+      .filter((ink): ink is Material => Boolean(ink))
+      .map((ink) => ({
+        name: ink.name,
+        laydownGsm: ink.laydownGsm ?? 0,
+        solidsPercent: ink.solidsPercent ?? 100,
+        ratePerKg: ink.currentRate ?? 0,
+      })),
+  );
+
   const input: CostingInput | null = useMemo(() => {
     if (!settings || !master) return null;
     if (line.layers.length === 0) return null;
@@ -107,16 +123,16 @@ export function RateCostingPanel({
     return {
       job: {
         orderQtyKg: 0, // set per quantity below
-        wastagePercent: Number(wastage) || settings.defaultWastagePercent,
+        wastagePercent: settings.defaultWastagePercent,
         filmWidthMm: line.filmWidthMm,
         filmHeightMm: line.filmHeightMm,
         ups: line.ups,
-        trimMm: Number(trim) || 0,
+        trimMm: settings.defaultTrimMm,
         layers: line.layers,
         colours,
         adhesive: {
           gsm: settings.adhesiveGsm,
-          ratio: ratio || settings.defaultAdhesiveRatio,
+          ratio: settings.defaultAdhesiveRatio,
           adhesiveRatePerKg: rate(settings.defaultAdhesiveMaterial),
           ethylAcetateRatePerKg: rate('Ethyl Acetate'),
           hardenerRatePerKg: rate('Hardener'),
@@ -147,11 +163,11 @@ export function RateCostingPanel({
           settings.stationSurcharge7,
           settings.stationSurcharge8,
         ],
-        marginPercent: Number(margin) || settings.defaultMarginPercent,
+        marginPercent: settings.defaultMarginPercent,
         marginBasis: settings.marginBasis,
       },
     };
-  }, [settings, master, line, colourKey, wastage, margin, ratio, trim, materials, inks]);
+  }, [settings, master, line, colourKey, materials, inks]);
 
   /*
    * One rate per quantity, not one rate. Setting a press takes the same hour
@@ -186,7 +202,9 @@ export function RateCostingPanel({
           ? 'No ink has a laydown or solids figure yet. Set them on the Rates screen.'
           : line.quantitiesKg.every((quantity) => quantity <= 0)
             ? 'Enter a quantity below and the rate works itself out.'
-            : null;
+            : unpriced.length > 0
+              ? `${unpriced.join(', ')} ${unpriced.length === 1 ? 'has' : 'have'} no rate yet. Price ${unpriced.length === 1 ? 'it' : 'them'} on the Rates screen — costing a colour at nothing would quietly understate the job.`
+              : null;
 
   return (
     <section className="border-brand-200 bg-brand-50/30 rounded-[var(--radius-lg)] border p-4">
@@ -204,65 +222,72 @@ export function RateCostingPanel({
         <p className="text-ink-500 text-sm">{unusable}</p>
       ) : (
         <>
-          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <Field label="Colours" htmlFor="cost-colours" hint={`${colourNames.length} chosen`}>
-              <Select
-                id="cost-colours"
-                multiple
-                size={Math.min(5, Math.max(3, inks.length))}
-                value={colourNames}
-                onChange={(event) =>
-                  setChosen(Array.from(event.target.selectedOptions, (option) => option.value))
-                }
-              >
-                {inks.map((ink) => (
-                  <option key={ink.id} value={ink.name}>
-                    {ink.name} · {formatNumber(ink.laydownGsm ?? 0, 2)} gsm
-                  </option>
-                ))}
-              </Select>
-            </Field>
-
-            <Field label="Wastage %" htmlFor="cost-wastage" hint="film spoiled setting up">
-              <NumberInput
-                id="cost-wastage"
-                value={wastage}
-                placeholder={String(settings.defaultWastagePercent)}
-                onChange={(event) => setWastage(event.target.value)}
-              />
-            </Field>
-
-            <Field label="Margin %" htmlFor="cost-margin" hint="added to cost">
-              <NumberInput
-                id="cost-margin"
-                value={margin}
-                placeholder={String(settings.defaultMarginPercent)}
-                onChange={(event) => setMargin(event.target.value)}
-              />
-            </Field>
-
-            <Field label="Trim" htmlFor="cost-trim" hint="mm added to the web width">
-              <NumberInput
-                id="cost-trim"
-                value={trim}
-                onChange={(event) => setTrim(event.target.value)}
-              />
-            </Field>
-
-            <Field label="Adhesive batch" htmlFor="cost-ratio" hint="adhesive : EA : hardener">
-              <Select
-                id="cost-ratio"
-                value={ratio || settings.defaultAdhesiveRatio}
-                onChange={(event) => setRatio(event.target.value)}
-              >
-                {ADHESIVE_BATCHES.map((batch) => (
-                  <option key={batch.ratio} value={batch.ratio}>
-                    {batch.ratio} — {batch.solidsPercent}% solid
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
+          {/*
+            Colours are the only thing here that belongs to the JOB. Wastage,
+            margin, trim and the adhesive batch are what the works is, so they
+            live on the Costing screen — repeating them on every job card
+            invited four different answers to the same question, and the panel
+            they cluttered is the one place the office looks for a price.
+          */}
+          <fieldset className="mb-4">
+            <legend className="text-ink-700 mb-2 text-sm font-medium">
+              Colours it prints
+              <span className="text-ink-400 ml-2 text-xs font-normal">
+                what they are changes the price — a white base coat lays 1.8 gsm against a process
+                colour&apos;s 0.13
+              </span>
+            </legend>
+            <div className="flex flex-wrap gap-1.5">
+              {inks.map((ink) => {
+                const on = colourNames.includes(ink.name);
+                return (
+                  <label
+                    key={ink.id}
+                    className={cn(
+                      'inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs',
+                      on
+                        ? 'border-brand-500 bg-brand-600 text-white'
+                        : 'border-ink-200 text-ink-600 bg-white hover:bg-ink-50',
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={on}
+                      onChange={() =>
+                        setChosen(
+                          on
+                            ? colourNames.filter((name) => name !== ink.name)
+                            : [...colourNames, ink.name],
+                        )
+                      }
+                    />
+                    {ink.name.replace(/^Ink\s*[—-]\s*/, '')}
+                    <span className={on ? 'text-white/70' : 'text-ink-400'}>
+                      {formatNumber(ink.laydownGsm ?? 0, 2)}
+                    </span>
+                    {/* Visible before it is chosen, not only after it refuses. */}
+                    {!(ink.currentRate && ink.currentRate > 0) ? (
+                      <span
+                        title="No rate on the Rates screen"
+                        className={on ? 'text-white' : 'text-warning-600'}
+                      >
+                        !
+                      </span>
+                    ) : null}
+                  </label>
+                );
+              })}
+            </div>
+            <p className="text-ink-500 mt-2 text-xs">
+              {colourNames.length} of {line.colourCount} cylinders ·{' '}
+              {settings.defaultWastagePercent}% wastage · {settings.defaultMarginPercent}% margin ·{' '}
+              {settings.defaultTrimMm} mm trim · adhesive {settings.defaultAdhesiveRatio} —{' '}
+              <a href="/costing" className="text-brand-600 underline">
+                change on Costing
+              </a>
+            </p>
+          </fieldset>
 
           <div className="grid gap-2 sm:grid-cols-3">
             {results.map((result, index) =>

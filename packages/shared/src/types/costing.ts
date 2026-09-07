@@ -8,6 +8,7 @@ export interface Machine {
   powerRatePerHpHour: number;
   speedMPerMin: number;
   setupMinutes: number;
+  setupPowerFactor: number;
   isActive: boolean;
   sortOrder: number;
 }

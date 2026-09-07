@@ -5,6 +5,7 @@ import {
   inkGsmOf,
   parseAdhesiveRatio,
   salaryPerMinute,
+  unpricedColours,
   type CostingInput,
 } from './rate-costing.js';
 
@@ -415,5 +416,83 @@ describe('the rate that is shown is the rate that is applied', () => {
       (JOB.filmWidthMm * JOB.filmHeightMm * result.totalGsm) / 1_000_000,
       3,
     );
+  });
+});
+
+describe('how much power a machine draws while it is being set', () => {
+  const printing = (factor: number | undefined) =>
+    costRate({
+      ...input(),
+      machines: MASTER.machines.map((machine) =>
+        machine.kind === 'PRINTING' ? { ...machine, setupPowerFactor: factor } : machine,
+      ),
+    })!.processes.find((process) => process.kind === 'PRINTING')!;
+
+  it('reproduces the sheet at 0, and the full load at 1', () => {
+    /*
+     * Their sheet charges nothing for setup power and this app charged
+     * everything — which on their own job is the difference between Rs 920 and
+     * Rs 1,514 for one press, two thirds more. A press being threaded and
+     * having its cylinders cleaned is neither, and nothing in this code can
+     * know which, so the works sets it.
+     */
+    const perMinute = (66 * 9) / 60;
+    const none = printing(0);
+    expect(none.electricityCost).toBeCloseTo(perMinute * none.runMinutes, 1);
+
+    /*
+     * And on the sheet's own structure it is the sheet's own figure. It has to
+     * be measured there rather than here: with ink at 0.55 GSM the laminate is
+     * lighter, a kilogram carries more PET, and the press runs a minute longer
+     * — Rs 929.51 rather than Rs 920.24. Right, and not the sheet's number.
+     */
+    const asSheet = costRate({
+      ...sheetStructure(),
+      machines: MASTER.machines.map((machine) =>
+        machine.kind === 'PRINTING' ? { ...machine, setupPowerFactor: 0 } : machine,
+      ),
+    })!.processes.find((process) => process.kind === 'PRINTING')!;
+    expect(asSheet.electricityCost).toBeCloseTo(920.24, 0); // Estimation!K32
+
+    const full = printing(1);
+    expect(full.electricityCost).toBeCloseTo(perMinute * (full.runMinutes + full.setupMinutes), 1);
+  });
+
+  it('scales between the two', () => {
+    const half = printing(0.5);
+    expect(half.electricityCost).toBeCloseTo(
+      (printing(0).electricityCost + printing(1).electricityCost) / 2,
+      1,
+    );
+  });
+
+  it('charges the full load when nobody has said otherwise', () => {
+    /* The default has to be what the app did before the field existed. */
+    expect(printing(undefined).electricityCost).toBeCloseTo(printing(1).electricityCost, 2);
+  });
+
+  it('still pays the operator for every setup minute', () => {
+    // Somebody is standing there whatever the machine is drawing.
+    expect(printing(0).labourCost).toBeCloseTo(printing(1).labourCost, 2);
+  });
+});
+
+describe('a colour nobody has priced', () => {
+  it('is named rather than costed at nothing', () => {
+    /*
+     * The failure this prevents is silent: white lays 1.8 g/m² against a
+     * process colour's 0.13, so a job printing it at a rate of zero quotes at
+     * roughly a twelfth of its real ink and looks entirely normal on the page.
+     */
+    expect(
+      unpricedColours([
+        { name: 'Black', laydownGsm: 0.15, solidsPercent: 23, ratePerKg: 202 },
+        { name: 'White', laydownGsm: 1.8, solidsPercent: 40, ratePerKg: 0 },
+      ]),
+    ).toEqual(['White']);
+  });
+
+  it('passes a fully priced set', () => {
+    expect(unpricedColours(JOB.colours)).toEqual([]);
   });
 });

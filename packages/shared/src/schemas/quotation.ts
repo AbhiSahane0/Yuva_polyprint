@@ -400,6 +400,8 @@ export const settingsSchema = z.object({
   stationSurcharge6: z.coerce.number().min(0).max(10_000),
   stationSurcharge7: z.coerce.number().min(0).max(10_000),
   stationSurcharge8: z.coerce.number().min(0).max(10_000),
+  /** Edge trim added to the web width, millimetres. */
+  defaultTrimMm: z.coerce.number().min(0).max(500),
   defaultWastagePercent: z.coerce.number().min(0).max(100),
   defaultMarginPercent: z.coerce.number().min(0).max(100),
   /**
@@ -442,6 +444,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   stationSurcharge6: 5.5,
   stationSurcharge7: 7.5,
   stationSurcharge8: 9,
+  defaultTrimMm: 15,
   defaultWastagePercent: 8,
   defaultMarginPercent: 9,
   marginBasis: 'TOTAL_COST',

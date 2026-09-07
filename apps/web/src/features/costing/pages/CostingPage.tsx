@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Cog, Plus, RotateCcw, Users2 } from 'lucide-react';
 import {
+  ADHESIVE_BATCHES,
   MACHINE_KINDS,
   MACHINE_KIND_LABELS,
   formatNumber,
@@ -109,6 +110,7 @@ export default function CostingPage() {
                     <th className="px-4 py-3 text-right font-semibold">Rs / HP-hour</th>
                     <th className="px-4 py-3 text-right font-semibold">Speed</th>
                     <th className="px-4 py-3 text-right font-semibold">Setup</th>
+                    <th className="px-4 py-3 text-right font-semibold">Load while setting</th>
                     <th className="px-4 py-3 text-right font-semibold">Running cost</th>
                     <th className="px-4 py-3" />
                   </tr>
@@ -142,6 +144,13 @@ export default function CostingPage() {
                       </td>
                       <td className="text-ink-600 px-4 py-3 text-right tabular-nums">
                         {row.setupMinutes} min
+                      </td>
+                      {/*
+                        Their sheet charges nothing here and this app charged
+                        everything; a press being threaded is neither.
+                      */}
+                      <td className="text-ink-600 px-4 py-3 text-right tabular-nums">
+                        {formatNumber(row.setupPowerFactor * 100, 0)}%
                       </td>
                       {/* The figure the office can sanity-check against a bill. */}
                       <td className="text-ink-900 px-4 py-3 text-right font-medium tabular-nums">
@@ -311,6 +320,7 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
     ['stationSurcharge6', '6th station, Rs/kg', 'A job past five colours'],
     ['stationSurcharge7', '7th station, Rs/kg', ''],
     ['stationSurcharge8', '8th station, Rs/kg', ''],
+    ['defaultTrimMm', 'Trim, mm', 'Added to the web width'],
     ['defaultWastagePercent', 'Wastage %', 'Film spoiled setting up and running'],
     ['defaultMarginPercent', 'Margin %', 'Added to cost, not taken off the rate'],
     ['inkSolventParts', 'Solvent per 100 of ink', 'How the press thins it'],
@@ -337,6 +347,25 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
               />
             </Field>
           ))}
+
+          <Field
+            label="Adhesive batch"
+            htmlFor="defaultAdhesiveRatio"
+            hint="adhesive : ethyl acetate : hardener"
+          >
+            <Select
+              id="defaultAdhesiveRatio"
+              value={draft.defaultAdhesiveRatio}
+              onChange={(event) => set('defaultAdhesiveRatio', event.target.value)}
+              disabled={!canEdit}
+            >
+              {ADHESIVE_BATCHES.map((batch) => (
+                <option key={batch.ratio} value={batch.ratio}>
+                  {batch.ratio} — {batch.solidsPercent}% solid
+                </option>
+              ))}
+            </Select>
+          </Field>
 
           <Field
             label="Margin is taken on"

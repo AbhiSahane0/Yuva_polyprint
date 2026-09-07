@@ -1240,10 +1240,18 @@ It prices **each quantity separately**, because setting a press takes the same
 hour whether it runs 500 kg or 5,000 — which is the whole reason a quotation
 carries tiers, and the reason a bigger order genuinely costs less a kilogram.
 
-The colours are picked here rather than counted, because what they **are**
-changes the price: a white base coat lays 1.8 g/m² at 40% solids against a
-process colour's 0.13 at 19.5%, so two jobs with six cylinders each can differ
-by a third on ink.
+**Colours are the only thing on the panel that belongs to the job.** Wastage,
+margin, trim and the adhesive batch are what the works _is_, so they live on the
+Costing screen — repeated on every job card they invited four different answers
+to the same question, and cluttered the one place the office looks for a price.
+The panel prints the figures it used, with a link to change them.
+
+They are picked rather than counted, because what they **are** changes the
+price: a white base coat lays 1.8 g/m² at 40% solids against a process colour's
+0.13 at 19.5%, so two jobs with six cylinders each can differ by a third on ink.
+A colour with no rate is marked, and choosing it stops the panel rather than
+costing it at nothing — a job printing white at a rate of zero quotes at a
+twelfth of its real ink and looks entirely normal on the page.
 
 **ⓘ beside each rate shows the working** — the laminate ply by ply, the ink wet
 and dry, the adhesive batch, every machine's minutes, and the chain from
@@ -1267,6 +1275,12 @@ nobody would see it — which is why it is a screen and not a constant.
 Machines show their **running cost per hour** (load × tariff) and wages show
 their **cost per minute**, because that is what the costing actually uses. A
 monthly salary is not a figure anyone can check a rate against.
+
+**Load while setting** is the share of a machine's connected load it draws
+while being threaded and cleaned. The client's sheet charges nothing for it,
+which cannot be right — the press is switched on — and charging the full load
+adds two thirds to the printing electricity, which is not right either. Nothing
+in the app can know, so the works sets it; 100% is the default.
 
 Retire rather than delete, as rates do: quotations were costed against it.
 

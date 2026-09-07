@@ -60,6 +60,17 @@ export interface CostingMachine {
   speedMPerMin: number;
   /** Setting and cleaning, before a metre is run. */
   setupMinutes: number;
+  /**
+   * Share of the connected load drawn while being set, 0-1.
+   *
+   * Their sheet charges nothing for setup power, which cannot be right — the
+   * press is switched on. Charging the full load is not right either: a press
+   * being threaded and having its cylinders cleaned is not running at 66 HP,
+   * and assuming it does adds two thirds to the printing electricity. Neither
+   * figure is knowable from here, so the works sets it; 1 keeps the old
+   * behaviour for anybody who has not.
+   */
+  setupPowerFactor?: number;
 }
 
 export interface CostingLabour {
@@ -339,6 +350,18 @@ export function inkGsmOf(colours: CostingColour[]): number {
   return sum(colours.map((colour) => colour.laydownGsm));
 }
 
+/**
+ * Colours chosen but not priced.
+ *
+ * A colour with no rate costs nothing, and nothing looks like a plausible
+ * number: a job printing white would quote at a twelfth of its real ink and
+ * read perfectly normally on the page. The same rule an unpriced film gauge
+ * follows — refuse, and name which.
+ */
+export function unpricedColours(colours: CostingColour[]): string[] {
+  return colours.filter((colour) => !(colour.ratePerKg > 0)).map((colour) => colour.name);
+}
+
 /** Rupees a minute for one wage, given the works' month. */
 export function salaryPerMinute(
   monthlySalary: number,
@@ -511,11 +534,17 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
      * Setup is charged for power as well as for wages. Their sheet billed the
      * operator for the hour spent setting the press and billed nothing for the
      * press, which cannot be right — the machine is switched on.
+     *
+     * How MUCH it draws is a different question, and not one this code can
+     * answer: a press being threaded is not running at its connected load.
+     * `setupPowerFactor` is the works' answer to it.
      */
     const occupiedMinutes = runMinutes + machine.setupMinutes;
+    const setupFactor = machine.setupPowerFactor ?? 1;
+    const poweredMinutes = runMinutes + machine.setupMinutes * setupFactor;
 
     const electricityCost = round(
-      ((machine.horsepower * machine.powerRatePerHpHour) / 60) * occupiedMinutes,
+      ((machine.horsepower * machine.powerRatePerHpHour) / 60) * poweredMinutes,
       2,
     );
 

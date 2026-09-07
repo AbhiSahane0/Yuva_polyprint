@@ -117,7 +117,7 @@ Table app_settings {
   value text [not null]
   updated_at timestamp [not null]
 
-  Note: '0 row(s) at time of generation'
+  Note: '29 row(s) at time of generation'
 }
 
 Table costing_labour {
@@ -145,6 +145,7 @@ Table costing_machines {
   sort_order integer [not null, default: `0`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
+  setup_power_factor decimal(4,3) [not null, default: `1`]
 
   Note: '3 row(s) at time of generation'
 }
@@ -327,7 +328,7 @@ Table materials {
   laydown_gsm decimal(6,3)
   solids_percent decimal(6,3)
 
-  Note: '17 row(s) at time of generation'
+  Note: '21 row(s) at time of generation'
 }
 
 Table purchase_order_lines {

@@ -82,6 +82,23 @@ const INKS: { match: string; solidsPercent: number; laydownGsm: number }[] = [
   { match: 'green', solidsPercent: 21.8, laydownGsm: 0.18 },
 ];
 
+/**
+ * Colours the works prints but the rate catalogue did not carry.
+ *
+ * Created without a rate on purpose. The whole point of costing ink per colour
+ * is that a white base coat lays 1.8 g/m² against a process colour's 0.13 —
+ * so a job that prints white and cannot say so is costed at a twelfth of its
+ * real ink. Inventing a price would be worse than the gap: the screens refuse
+ * to quote a colour that has no rate, which is a question somebody answers
+ * once on the Rates screen.
+ */
+const MISSING_COLOURS = [
+  { name: 'Ink — White', solidsPercent: 40, laydownGsm: 1.8 },
+  { name: 'Ink — Red', solidsPercent: 23, laydownGsm: 0.25 },
+  { name: 'Ink — Violet', solidsPercent: 22.1, laydownGsm: 0.25 },
+  { name: 'Ink — Green', solidsPercent: 21.8, laydownGsm: 0.18 },
+];
+
 async function main() {
   let added = 0;
   let skipped = 0;
@@ -129,7 +146,27 @@ async function main() {
     inked += 1;
   }
 
+  /* The colours the sheet prices but the catalogue never held. */
+  let colours = 0;
+  const lastInk = await prisma.material.findFirst({
+    where: { category: 'INK' },
+    orderBy: { sortOrder: 'desc' },
+    select: { sortOrder: true },
+  });
+  let order = (lastInk?.sortOrder ?? 0) + 1;
+  for (const colour of MISSING_COLOURS) {
+    const existing = await prisma.material.findUnique({ where: { name: colour.name } });
+    if (existing) continue;
+    await prisma.material.create({
+      data: { ...colour, category: 'INK', unit: 'KG', sortOrder: order++ },
+    });
+    colours += 1;
+  }
+
   console.log(`costing master data: ${added} added, ${skipped} already there`);
+  if (colours > 0) {
+    console.log(`colours added WITHOUT a rate: ${colours} — price them on the Rates screen`);
+  }
   console.log(`materials given solids/laydown: ${inked}`);
   console.log('\nEvery figure is from a 2022 sheet. Check them on the Costing screen.');
 }
