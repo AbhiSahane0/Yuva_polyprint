@@ -819,26 +819,65 @@ export default function QuotationFormPage() {
    * — and the office's own work queue is ordered by that status. Sending is what
    * advances it, and that happens once the provider accepts the message.
    */
-  async function save(intent: 'CLOSE' | 'REVIEW') {
-    await handleSubmit(async (values) => {
-      const payload = {
-        ...values,
-        saveAsCustomer: customerMode === 'new',
-        brandName: values.brandName ?? '',
-        customerId: customerMode === 'existing' ? values.customerId : null,
-      } as CreateQuotationInput;
+  /**
+   * Where a refused field lives, so Save can take somebody to it.
+   *
+   * Saving used to do NOTHING when an earlier step was invalid — no toast, no
+   * scroll, no red field on the page in front of you. On this works' own data
+   * that happened the first time it was tried: a customer record carrying a
+   * mobile number the form will not accept blocks the save from two steps
+   * away, and the office clicks Save and watches nothing happen.
+   */
+  function stepOf(field: string): number {
+    const root = field.split('.')[0] ?? field;
+    const found = STEP_FIELDS.findIndex((fields) => (fields as string[]).includes(root));
+    return found === -1 ? step : found;
+  }
 
-      try {
-        const saved = isEdit
-          ? await updateQuotation.mutateAsync({ id: id!, input: payload })
-          : await createQuotation.mutateAsync(payload);
-        toast.success(`Quotation ${saved.number} saved`);
-        setPreviewId(saved.id);
-        setReviewing(intent === 'REVIEW' ? saved : null);
-      } catch (cause) {
-        toast.error(cause instanceof ApiClientError ? cause.message : 'Could not save.');
-      }
-    })();
+  async function save(intent: 'CLOSE' | 'REVIEW') {
+    await handleSubmit(
+      async (values) => {
+        const payload = {
+          ...values,
+          saveAsCustomer: customerMode === 'new',
+          brandName: values.brandName ?? '',
+          customerId: customerMode === 'existing' ? values.customerId : null,
+        } as CreateQuotationInput;
+
+        try {
+          const saved = isEdit
+            ? await updateQuotation.mutateAsync({ id: id!, input: payload })
+            : await createQuotation.mutateAsync(payload);
+          toast.success(`Quotation ${saved.number} saved`);
+          setPreviewId(saved.id);
+          setReviewing(intent === 'REVIEW' ? saved : null);
+        } catch (cause) {
+          toast.error(cause instanceof ApiClientError ? cause.message : 'Could not save.');
+        }
+      },
+      /*
+       * The half that was missing. `handleSubmit` swallows a failed validation
+       * silently, which is right for a form on one page and wrong for a wizard:
+       * the field it is objecting to may be two steps back and entirely off
+       * screen.
+       */
+      (invalid) => {
+        const first = Object.keys(invalid)[0];
+        if (first === undefined) return;
+
+        const target = stepOf(first);
+        const message =
+          (invalid as Record<string, { message?: string } | undefined>)[first]?.message ??
+          'Something on an earlier step needs fixing';
+
+        if (target !== step) {
+          setStep(target);
+          toast.error(`${message} — taken back to ${STEPS[target]?.label ?? 'that step'}`);
+          return;
+        }
+        toast.error(message);
+      },
+    )();
   }
 
   if (isEdit && loadingExisting) return <LoadingState label="Loading quotation…" />;

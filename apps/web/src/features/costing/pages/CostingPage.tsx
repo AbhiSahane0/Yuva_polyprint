@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { canAccess, useAuthStore } from '@/features/auth/auth-store';
 import { useSettings } from '@/features/quotations/api/quotation-api';
+import { useMaterials } from '@/features/rates/api/rate-api';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
@@ -288,6 +289,7 @@ export default function CostingPage() {
 /** The figures that belong to the works but are not a machine or a wage. */
 function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: boolean }) {
   const update = useUpdateSettings();
+  const { data: materials } = useMaterials();
   const [draft, setDraft] = useState(settings);
 
   useEffect(() => setDraft(settings), [settings]);
@@ -347,6 +349,57 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
               />
             </Field>
           ))}
+
+          {/*
+            Which rate prices each. They used to be hardcoded strings in the
+            costing — 'Ethyl Acetate' against a catalogue row called
+            "Solvent — Ethyl Acetate" — so every lookup missed and the solvent
+            cost nothing on every quotation. Naming them here makes a mismatch
+            visible instead of silent.
+          */}
+          {(
+            [
+              ['defaultAdhesiveMaterial', 'Adhesive', ['ADHESIVE']],
+              ['defaultHardenerMaterial', 'Hardener', ['ADHESIVE']],
+              ['defaultEthylAcetateMaterial', 'Ethyl acetate', ['SOLVENT']],
+              ['defaultTolueneMaterial', 'Toluene', ['SOLVENT']],
+            ] as [keyof AppSettings, string, string[]][]
+          ).map(([key, label, categories]) => {
+            const chosen = (materials ?? []).find((m) => m.name === draft[key]);
+            const priced = Boolean(chosen?.currentRate && chosen.currentRate > 0);
+            return (
+              <Field
+                key={key}
+                label={`${label} rate`}
+                htmlFor={key}
+                hint={
+                  !chosen
+                    ? 'Not on the rate list — the costing would use nothing'
+                    : priced
+                      ? `${formatRs(chosen.currentRate ?? 0)} / ${chosen.unit.toLowerCase()}`
+                      : 'On the list but never priced — the costing would use nothing'
+                }
+              >
+                <Select
+                  id={key}
+                  value={String(draft[key] ?? '')}
+                  onChange={(event) => set(key, event.target.value)}
+                  disabled={!canEdit}
+                  invalid={!priced}
+                >
+                  <option value="">— none —</option>
+                  {(materials ?? [])
+                    .filter((m) => categories.includes(m.category))
+                    .map((m) => (
+                      <option key={m.id} value={m.name}>
+                        {m.name}
+                        {m.currentRate ? ` · ${formatRs(m.currentRate)}` : ' · no rate'}
+                      </option>
+                    ))}
+                </Select>
+              </Field>
+            );
+          })}
 
           <Field
             label="Adhesive batch"

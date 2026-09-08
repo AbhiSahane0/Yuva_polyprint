@@ -411,6 +411,17 @@ export const settingsSchema = z.object({
   marginBasis: z.enum(['TOTAL_COST', 'MATERIAL_ONLY']),
   /** Ink to solvent at the press, and how the solvent splits. */
   inkSolventParts: z.coerce.number().min(0).max(1000),
+  /**
+   * Which rates price the solvents and the hardener.
+   *
+   * Names, like the film and adhesive defaults beside them — not hardcoded
+   * strings in the costing. They were hardcoded, and the catalogue calls its
+   * row "Solvent — Ethyl Acetate", so every lookup missed and the solvent cost
+   * nothing on every quotation.
+   */
+  defaultEthylAcetateMaterial: z.string().trim().max(80),
+  defaultTolueneMaterial: z.string().trim().max(80),
+  defaultHardenerMaterial: z.string().trim().max(80),
   ethylAcetatePercent: z.coerce.number().min(0).max(100),
   defaultAdhesiveRatio: z.string().trim().max(20),
 });
@@ -449,6 +460,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultMarginPercent: 9,
   marginBasis: 'TOTAL_COST',
   inkSolventParts: 80,
+  defaultEthylAcetateMaterial: 'Solvent — Ethyl Acetate',
+  defaultTolueneMaterial: 'Solvent — Toluene',
+  defaultHardenerMaterial: 'Adhesive — Hardener',
   ethylAcetatePercent: 50,
   defaultAdhesiveRatio: '100:146:15',
 };

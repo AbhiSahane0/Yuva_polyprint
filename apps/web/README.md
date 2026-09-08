@@ -1304,6 +1304,18 @@ this does not — what the customer paid last year, and who else is quoting. On 
 line sold by the piece it converts using the quotation's own pieces-per-kilogram
 so the figure shown is the figure the document carries.
 
+#### When Save does nothing
+
+It used to. `handleSubmit` swallows a failed validation silently, which is right
+for a form on one page and wrong for a wizard — the field it objects to may be
+two steps back and entirely off screen. On this works' own data it happened the
+first time it was tried: a customer record carrying a mobile number the form
+will not accept blocks the save from the Details step, and the office clicks
+Save and watches nothing happen.
+
+Save now names the field and takes you to it — _"Enter Valid Mobile Number —
+taken back to Details"_.
+
 ### Costing — `/costing`
 
 What the works costs to run: the machines, the wages, and the overheads every

@@ -134,15 +134,15 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
           gsm: settings.adhesiveGsm,
           ratio: settings.defaultAdhesiveRatio,
           adhesiveRatePerKg: rate(settings.defaultAdhesiveMaterial),
-          ethylAcetateRatePerKg: rate('Ethyl Acetate'),
-          hardenerRatePerKg: rate('Hardener'),
+          ethylAcetateRatePerKg: rate(settings.defaultEthylAcetateMaterial),
+          hardenerRatePerKg: rate(settings.defaultHardenerMaterial),
         },
         solvent: {
           inkParts: 100,
           solventParts: settings.inkSolventParts,
           ethylAcetatePercent: settings.ethylAcetatePercent,
-          ethylAcetateRatePerKg: rate('Ethyl Acetate'),
-          tolueneRatePerKg: rate('Toluene'),
+          ethylAcetateRatePerKg: rate(settings.defaultEthylAcetateMaterial),
+          tolueneRatePerKg: rate(settings.defaultTolueneMaterial),
         },
         makesPouches: line.makesPouches,
         piecesPerKgOverride: line.piecesPerKg,
@@ -196,6 +196,28 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
     [input, line.quantitiesKg],
   );
 
+  /*
+   * Anything else the costing needs a price for.
+   *
+   * These were hardcoded name lookups — 'Ethyl Acetate', 'Toluene',
+   * 'Hardener' — and the catalogue calls its row "Solvent — Ethyl Acetate", so
+   * every one missed and returned zero. Solvent is about a sixth of the ink
+   * cost and it was free on every quotation, silently. Now they are settings
+   * that name a material, and a missing price is named rather than costed at
+   * nothing.
+   */
+  const supporting = settings
+    ? [
+        ['Adhesive', settings.defaultAdhesiveMaterial],
+        ['Ethyl acetate', settings.defaultEthylAcetateMaterial],
+        ['Toluene', settings.defaultTolueneMaterial],
+        ['Hardener', settings.defaultHardenerMaterial],
+      ]
+    : [];
+  const unpricedSupporting = supporting
+    .filter(([, name]) => !(materials.find((m) => m.name === name)?.currentRate ?? 0))
+    .map(([label, name]) => `${label} (${name || 'not set'})`);
+
   const unusable =
     !settings || !master
       ? 'Loading the works’ figures…'
@@ -211,7 +233,9 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
                 : 'Enter a quantity below and the rate works itself out.'
               : unpriced.length > 0
                 ? `${unpriced.join(', ')} ${unpriced.length === 1 ? 'has' : 'have'} no rate yet. Price ${unpriced.length === 1 ? 'it' : 'them'} on the Rates screen — costing a colour at nothing would quietly understate the job.`
-                : null;
+                : unpricedSupporting.length > 0
+                  ? `No rate for ${unpricedSupporting.join(', ')}. Every one of these is real cost on the job, so the rate would come out low — price them on the Rates screen, or point at the right material on the Costing screen.`
+                  : null;
 
   return {
     settings,

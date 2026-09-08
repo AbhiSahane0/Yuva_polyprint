@@ -81,6 +81,19 @@ const PROCESS_INKS: { match: string; solidsPercent: number; laydownGsm: number }
   { match: 'yellow', solidsPercent: 19.5, laydownGsm: 0.13 },
 ];
 
+/**
+ * Materials the costing needs a price for but the catalogue did not carry.
+ *
+ * Created WITHOUT a rate. Solvent is about a sixth of the ink cost and the
+ * hardener a tenth of the adhesive batch, so inventing prices would be worse
+ * than the gap: the screens refuse to quote until these are priced, which is a
+ * question somebody answers once on the Rates screen from an actual invoice.
+ */
+const SUPPORTING = [
+  { name: 'Solvent — Toluene', category: 'SOLVENT' as const, unit: 'L' },
+  { name: 'Adhesive — Hardener', category: 'ADHESIVE' as const, unit: 'KG', solidsPercent: 75 },
+];
+
 async function main() {
   let added = 0;
   let skipped = 0;
@@ -132,7 +145,18 @@ async function main() {
     inked += 1;
   }
 
+  /* Solvent and hardener rows, so the costing has something to point at. */
+  let supporting = 0;
+  for (const material of SUPPORTING) {
+    if (await prisma.material.findUnique({ where: { name: material.name } })) continue;
+    await prisma.material.create({ data: { ...material, sortOrder: 90 + supporting } });
+    supporting += 1;
+  }
+
   console.log(`costing master data: ${added} added, ${skipped} already there`);
+  if (supporting > 0) {
+    console.log(`supporting materials added WITHOUT a rate: ${supporting} — price them on Rates`);
+  }
   console.log(`process colours given solids/laydown: ${inked}`);
   console.log('\nEvery figure is from a 2022 sheet. Check them on the Costing screen.');
 }
