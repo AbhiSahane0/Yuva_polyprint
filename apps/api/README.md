@@ -671,6 +671,26 @@ naive costing goes wrong by a factor:
   over the **substrate** GSM, not the whole laminate — it does not stick to
   itself or to the ink.
 
+**Gross and net.** The works' sheet has one margin concept — material cost
+times nine per cent — and no gross/net split at all. Its own labelled totals
+map onto both, so that is where they come from: **B** is the materials, and
+**A + C + D** plus the per-kilogram additions are everything else.
+
+|       | Subtracts                            | Reads                 |
+| ----- | ------------------------------------ | --------------------- |
+| Gross | Film, ink and solvent, adhesive      | What the trade quotes |
+| Net   | All of it, including the press setup | What the job earns    |
+
+Both are reported against the rate somebody **typed**, not the one that was
+suggested — a margin on a price nobody is offering is worse than no margin.
+
+Gross alone was actively misleading, and worst where it mattered. Materials
+cost the same per kilogram at any volume, so a short run at a higher rate shows
+the fattest margin on the page while earning least, because the same hour of
+setup is spread over a fraction of the film. On one real quotation: 1,000
+pouches read **71.9% gross** against 8,999 pouches' 37.3% — and net put both at
+**8%**.
+
 **Two sheets, reconciled.** The client's own workbook answered the same job
 twice, Rs 263.40 and Rs 228.22 a kilogram. This takes the Estimation frame —
 which divides by the quantity **ordered**, because the wastage is already

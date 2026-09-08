@@ -316,13 +316,63 @@ export interface CostingBreakdown {
   piecesPerKg: number;
   ratePerPiece: number;
 
-  /** Margin as a share of the selling rate, which is how a margin is read. */
-  marginOnRatePercent: number;
+  /* --- margin, both ways -------------------------------------------------
+   * The works' sheet has one margin concept — material cost times nine per
+   * cent — and no gross/net split at all. But its own labelled totals map onto
+   * both exactly: B is the materials, and A + C + D plus the per-kilogram
+   * additions are everything else. So these are its buckets, read the two ways
+   * an accountant reads them.
+   */
+
+  /** The sheet's B, per kilogram ORDERED. Film, ink and solvent, adhesive. */
+  materialCostPerKg: number;
+  /** Every bucket, per kilogram ordered — A + B + C + D and the per-kg extras. */
+  fullCostPerKg: number;
+
+  /**
+   * Margin over materials alone, at the suggested rate.
+   *
+   * The figure a printer quotes across a table, and the one that flatters a
+   * small order: materials cost the same per kilogram at any volume, so a
+   * higher rate on a short run looks like more profit when the setup it has to
+   * carry has not been counted.
+   */
+  grossMarginPercent: number;
+  /** Margin over everything, at the suggested rate. What the job actually earns. */
+  netMarginPercent: number;
 }
 
 // ---------------------------------------------------------------------------
 
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
+
+/**
+ * Margin as a share of the SELLING rate, which is how a margin is read.
+ *
+ * Not the mark-up on cost: nine per cent added to a cost is 8.26% of the price
+ * it produces, and quoting the first figure as a margin overstates every job.
+ */
+export function marginPercentOf(ratePerKg: number, costPerKg: number): number {
+  if (ratePerKg <= 0) return 0;
+  return round(((ratePerKg - costPerKg) / ratePerKg) * 100, 2);
+}
+
+/**
+ * Both margins at a rate somebody actually typed.
+ *
+ * The suggested rate is only a suggestion; what the office decides to charge is
+ * the number these have to be measured against, or the screen reports the
+ * margin on a price nobody is offering.
+ */
+export function marginsAt(
+  ratePerKg: number,
+  breakdown: Pick<CostingBreakdown, 'materialCostPerKg' | 'fullCostPerKg'>,
+): { grossPercent: number; netPercent: number } {
+  return {
+    grossPercent: marginPercentOf(ratePerKg, breakdown.materialCostPerKg),
+    netPercent: marginPercentOf(ratePerKg, breakdown.fullCostPerKg),
+  };
+}
 
 /** Splits '100:146:15' into its three parts. Null when it is not a ratio. */
 export function parseAdhesiveRatio(ratio: string): [number, number, number] | null {
@@ -633,8 +683,14 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
    * the gap between rate and `costBeforeMargin` as profit would report a
    * pouched job as half again as profitable as the same film on a reel.
    */
-  const marginPerKg = marginAmount / job.orderQtyKg;
-  const marginOnRatePercent = ratePerKg > 0 ? round((marginPerKg / ratePerKg) * 100, 2) : 0;
+  const materialCostPerKg = round(materialCost / job.orderQtyKg, 4);
+  const fullCostPerKg = round(
+    costBeforeMargin / job.orderQtyKg + stationSurchargePerKg + pouchMakingPerKg,
+    4,
+  );
+
+  const grossMarginPercent = marginPercentOf(ratePerKg, materialCostPerKg);
+  const netMarginPercent = marginPercentOf(ratePerKg, fullCostPerKg);
 
   return {
     totalGsm,
@@ -678,7 +734,11 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
     pieceWeightG,
     piecesPerKg,
     ratePerPiece,
-    marginOnRatePercent,
+
+    materialCostPerKg,
+    fullCostPerKg,
+    grossMarginPercent,
+    netMarginPercent,
   };
 }
 

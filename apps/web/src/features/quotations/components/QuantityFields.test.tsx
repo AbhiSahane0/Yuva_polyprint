@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { CreateQuotationFormValues, PricingBasis } from '@yuva/shared';
+import type { CostingBreakdown, CreateQuotationFormValues, PricingBasis } from '@yuva/shared';
 import { QuantityFields, type QuantityResult } from './QuantityFields';
 
 /**
@@ -136,11 +136,69 @@ describe('QuantityFields', () => {
     expect(screen.getByText('6.16 kg')).toBeTruthy();
     expect(screen.getByText('1,000 pouches')).toBeTruthy();
 
-    // And the margin says which two figures made it, and what it leaves out.
-    const margin = screen.getByText(/86\.9% margin/);
-    expect(margin.getAttribute('title')).toContain('Rs. 1,623.38');
-    expect(margin.getAttribute('title')).toContain('Rs. 213.23');
-    expect(margin.getAttribute('title')).toContain('cylinders and conversion are not included');
+    // The gross margin says which two figures made it, and what it leaves out.
+    const gross = screen.getByText(/86\.9% gross/);
+    expect(gross.getAttribute('title')).toContain('Rs. 1,623.38');
+    expect(gross.getAttribute('title')).toContain('Rs. 213.23');
+    expect(gross.getAttribute('title')).toContain('Film, ink and adhesive only');
+
+    /*
+     * And net is ABSENT rather than zero, because no costing was supplied.
+     * Showing 0% would read as a job that earns nothing, which is a different
+     * claim from "this line cannot be costed yet".
+     */
+    expect(screen.getByText('net —')).toBeTruthy();
+  });
+
+  it('reports gross and net side by side once the line can be costed', () => {
+    /*
+     * The pair exists because one figure was the flattering one. Margin over
+     * materials leaves out the wages, the power, the transport, the packing
+     * and the press setup — on a real quotation it read 41.9% where the job
+     * earned 8%.
+     */
+    const results: QuantityResult[] = [
+      {
+        quantityKg: 100,
+        ratePerKg: 400,
+        totalPouches: 2000,
+        totalAmount: 40000,
+        costPerPouch: 20,
+        marginPercent: 50,
+        materialCostPerKg: 200,
+      },
+    ];
+
+    /* Materials are half the rate; everything is 92% of it. */
+    const costing = { materialCostPerKg: 200, fullCostPerKg: 368 } as CostingBreakdown;
+
+    function Row() {
+      const { control, register } = useForm<CreateQuotationFormValues>({
+        defaultValues: {
+          items: [{ quantities: [{ quantityKg: 100, ratePerKg: 400 }] }],
+        } as CreateQuotationFormValues,
+      });
+      return (
+        <QuantityFields
+          control={control}
+          register={register}
+          itemIndex={0}
+          pricingBasis="PER_KG"
+          results={results}
+          costings={[costing]}
+        />
+      );
+    }
+
+    render(<Row />);
+
+    expect(screen.getByText('50.0% gross')).toBeTruthy();
+    expect(screen.getByText('8.0% net')).toBeTruthy();
+
+    // Net names the whole cost, so nobody has to guess what it left in.
+    const net = screen.getByText('8.0% net');
+    expect(net.getAttribute('title')).toContain('Rs. 368.00');
+    expect(net.getAttribute('title')).toContain('setup');
   });
 
   it('leaves the pouch count off a roll', () => {

@@ -6,6 +6,7 @@ import {
   costRate,
   inkGsmOf,
   parseAdhesiveRatio,
+  marginsAt,
   salaryPerMinute,
   unpricedColours,
   type CostingInput,
@@ -334,12 +335,12 @@ describe('margin', () => {
      * the identical film on a reel, purely because it was cut up.
      */
     const result = costRate(input())!;
-    expect(result.marginOnRatePercent).toBeGreaterThan(0);
-    expect(result.marginOnRatePercent).toBeLessThan(result.marginPercent);
+    expect(result.netMarginPercent).toBeGreaterThan(0);
+    expect(result.netMarginPercent).toBeLessThan(result.marginPercent);
 
     /* A roll and a pouch of the same film earn the same margin. */
     const roll = costRate({ ...input(), job: { ...JOB, makesPouches: false } })!;
-    expect(roll.marginOnRatePercent).toBeGreaterThan(result.marginOnRatePercent);
+    expect(roll.netMarginPercent).toBeGreaterThan(result.netMarginPercent);
     expect(result.marginAmount).toBeCloseTo(roll.marginAmount, 2);
   });
 });
@@ -541,5 +542,58 @@ describe('process colours and special ones', () => {
     const base = costRate(input())!;
     /* One extra colour, and it more than doubles the ink on the job. */
     expect(withWhite.inkCost).toBeGreaterThan(base.inkCost * 2);
+  });
+});
+
+describe('gross and net', () => {
+  const result = costRate(input())!;
+
+  it('reads both off the sheet’s own cost buckets', () => {
+    /*
+     * The works' sheet has one margin concept — material cost times nine per
+     * cent — and no gross/net split. Its labelled totals map onto both: B is
+     * the materials, and A + C + D plus the per-kilogram extras are the rest.
+     */
+    expect(result.materialCostPerKg).toBeCloseTo(result.materialCost / 500, 3);
+    expect(result.fullCostPerKg).toBeCloseTo(
+      result.costBeforeMargin / 500 + result.stationSurchargePerKg + result.pouchMakingPerKg,
+      3,
+    );
+    expect(result.fullCostPerKg).toBeGreaterThan(result.materialCostPerKg);
+  });
+
+  it('flatters a small order on gross and tells the truth on net', () => {
+    /*
+     * The trap this exists to close. Materials cost the same per kilogram at
+     * any volume, so a short run at a higher rate shows a FATTER gross margin
+     * than a long one — while actually earning less, because the same hour of
+     * setup is spread over a fraction of the film.
+     */
+    const small = costRate({ ...input(), job: { ...JOB, orderQtyKg: 25 } })!;
+    const large = costRate({ ...input(), job: { ...JOB, orderQtyKg: 2000 } })!;
+
+    expect(small.ratePerKg).toBeGreaterThan(large.ratePerKg);
+    /* Gross says the small order is the better one... */
+    expect(small.grossMarginPercent).toBeGreaterThan(large.grossMarginPercent);
+    /* ...and net, which counts the setup, says they earn the same mark-up. */
+    expect(small.netMarginPercent).toBeCloseTo(large.netMarginPercent, 0);
+    /* Gross is always the flattering one. */
+    expect(small.grossMarginPercent).toBeGreaterThan(small.netMarginPercent);
+  });
+
+  it('measures a rate somebody typed, not the one it suggested', () => {
+    // Quoting the margin on a price nobody is offering is worse than no margin.
+    const cheaper = marginsAt(result.ratePerKg * 0.9, result);
+    expect(cheaper.netPercent).toBeLessThan(result.netMarginPercent);
+    expect(cheaper.grossPercent).toBeLessThan(result.grossMarginPercent);
+
+    const atSuggested = marginsAt(result.ratePerKg, result);
+    expect(atSuggested.netPercent).toBeCloseTo(result.netMarginPercent, 2);
+    expect(atSuggested.grossPercent).toBeCloseTo(result.grossMarginPercent, 2);
+  });
+
+  it('reports a loss as a negative margin rather than hiding it', () => {
+    const below = marginsAt(result.fullCostPerKg * 0.8, result);
+    expect(below.netPercent).toBeLessThan(0);
   });
 });

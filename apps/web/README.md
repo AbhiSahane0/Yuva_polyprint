@@ -1282,6 +1282,22 @@ material cost to the rate. A rate nobody can explain is a rate nobody can defend
 across a table, and the office is asked "why is it 251?" by customers holding
 three other quotations.
 
+Each rate card, and **each quantity row below**, reports two margins —
+`37.3% gross · 8.0% net`. Gross subtracts materials; net subtracts everything,
+including the press setup. They are computed once and shared, so the panel and
+the rows cannot disagree about the same job.
+
+The pair exists because one figure was the flattering one, and most flattering
+exactly where it did most harm: materials cost the same per kilogram at any
+volume, so a short run at a higher rate showed the fattest margin on the
+screen while actually earning least. On a real quotation, 1,000 pouches read
+**71.9% gross** against 8,999 pouches' 37.3% — and net put both at **8%**.
+Someone reading the old row would have taken the small order believing it the
+best one there.
+
+Net is **absent, not zero**, when the line cannot be costed yet — a job that
+earns nothing and a job nobody has costed are different claims.
+
 **It suggests; it does not impose.** The rate boxes work exactly as they always
 did and **Use this rate** writes the figure in, because the works knows things
 this does not — what the customer paid last year, and who else is quoting. On a

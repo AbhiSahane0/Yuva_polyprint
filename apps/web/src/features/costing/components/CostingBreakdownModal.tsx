@@ -153,12 +153,19 @@ export function CostingBreakdownModal({
             ) : null}
             <Line label="Rate per kilogram" value={b.ratePerKg} decimals={2} strong />
           </dl>
+
+          {/* The two costs the two margins are measured against. */}
+          <dl className="divide-ink-100 mt-3 divide-y">
+            <Line label="Materials, per kg" value={b.materialCostPerKg} decimals={2} />
+            <Line label="Everything, per kg" value={b.fullCostPerKg} decimals={2} />
+          </dl>
           <Note>
             Divided by what was <strong>ordered</strong>, not by what was consumed — the wastage is
             already inside the cost, so dividing by the consumed weight would charge for it and then
             give it back. A piece weighs {formatNumber(b.pieceWeightG, 2)} g, so a kilogram is{' '}
             {formatNumber(b.piecesPerKg, 1)} of them at {formatRs(b.ratePerPiece, 2)} each. The
-            margin is {formatNumber(b.marginOnRatePercent, 2)}% of the rate.
+            margin is {formatNumber(b.grossMarginPercent, 1)}% of the rate over materials and{' '}
+            {formatNumber(b.netMarginPercent, 1)}% over everything.
           </Note>
         </Block>
       </div>

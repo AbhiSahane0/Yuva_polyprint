@@ -85,10 +85,8 @@ import {
 } from '../lib/step-save';
 import { QuotationPreview } from '../components/QuotationPreview';
 import { SendQuotationModal } from '../components/SendQuotationModal';
-import {
-  RateCostingPanel,
-  type RateCostingLine,
-} from '@/features/costing/components/RateCostingPanel';
+import { RateCostingPanel } from '@/features/costing/components/RateCostingPanel';
+import { useRateCosting, type RateCostingLine } from '@/features/costing/api/use-rate-costing';
 import { LayerFields } from '../components/LayerFields';
 import { QuantityFields, type QuantityResult } from '../components/QuantityFields';
 import { StepIndicator, type Step } from '../components/StepIndicator';
@@ -1289,6 +1287,13 @@ function JobCard({
     [item, films, filmWidthMm, filmHeightMm, jobKind, cost],
   );
 
+  /*
+   * Costed once, here, and handed to both the panel that suggests a rate and
+   * the rows that report what the typed one earns. Two computations would let
+   * the same screen disagree with itself about the same job.
+   */
+  const costing = useRateCosting(costingLine, materials);
+
   /**
    * Writes a suggested rate into the row it was worked out for.
    *
@@ -1828,7 +1833,7 @@ function JobCard({
           question about the job; everything below it is the answer.
         */}
         <div className="col-span-2 sm:col-span-12">
-          <RateCostingPanel line={costingLine} materials={materials} onUseRate={onUseRate} />
+          <RateCostingPanel costing={costing} line={costingLine} onUseRate={onUseRate} />
         </div>
 
         <div className="col-span-2 sm:col-span-12">
@@ -1848,6 +1853,7 @@ function JobCard({
                     })
             }
             results={cost?.quantities ?? []}
+            costings={costing.results}
             errors={errors?.quantities as never}
             selectedQuantity={selectedQuantity}
             onSelectQuantity={onSelectQuantity}
