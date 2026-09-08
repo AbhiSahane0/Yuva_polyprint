@@ -1304,6 +1304,19 @@ this does not — what the customer paid last year, and who else is quoting. On 
 line sold by the piece it converts using the quotation's own pieces-per-kilogram
 so the figure shown is the figure the document carries.
 
+#### A saved quotation keeps what it says
+
+Contact details are snapshotted onto the quotation, and the prefill from the
+customer record now runs only when somebody actually **picks** a company. It
+used to run whenever that record resolved — which, on opening a saved
+quotation, is a moment after the quotation itself. The customer's values then
+overwrote the quotation's own, so a mobile and an email typed onto quotation
+131 and saved correctly were gone the next time it was opened, replaced by two
+empty boxes and two validation errors. The record held the importer's `NA`.
+
+Picking a customer by hand still fills everything in, which is the point of the
+prefill. A quotation already written keeps what it says.
+
 #### When Save does nothing
 
 It used to. `handleSubmit` swallows a failed validation silently, which is right

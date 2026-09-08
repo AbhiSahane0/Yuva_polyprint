@@ -365,8 +365,30 @@ export default function QuotationFormPage() {
     };
   }, [chosenCustomer]);
 
+  /** Set when the office picks a company, as opposed to one merely loading. */
+  const pickedByHand = useRef(false);
+
+  /**
+   * Prefill from the customer record — and ONLY when their record is what the
+   * office is asking for.
+   *
+   * This effect runs whenever `chosenCustomer` resolves, which is not the same
+   * thing as somebody choosing a customer. Opening a saved quotation loads its
+   * customer a moment after the quotation itself, and this then overwrote the
+   * contact details the quotation had snapshotted with whatever the customer
+   * record holds. On a record where those are the importer's 'NA' that meant
+   * a mobile and an email typed onto quotation 131, saved correctly, and gone
+   * the next time it was opened — replaced by two empty boxes and two
+   * validation errors.
+   *
+   * Picking a customer by hand still fills everything in, which is the whole
+   * point of the prefill. A quotation already written keeps what it says.
+   */
   useEffect(() => {
     if (!chosenCustomer) return;
+    /* An existing quotation's own snapshot wins over the customer's record. */
+    if (isEdit && !pickedByHand.current) return;
+
     // 'NA' is the importer's placeholder; showing it as if it were an address
     // is worse than showing nothing.
     const real = (value: string | null | undefined) => (value && value !== 'NA' ? value : '');
@@ -391,7 +413,7 @@ export default function QuotationFormPage() {
       email: real(chosenCustomer.email),
       gstNumber: real(chosenCustomer.gstNumber),
     });
-  }, [chosenCustomer, setValue]);
+  }, [chosenCustomer, setValue, isEdit]);
 
   /* ------------------------------------------------------- editing a draft */
 
@@ -971,6 +993,8 @@ export default function QuotationFormPage() {
                           return brand && brand !== 'NA' ? brand : undefined;
                         }}
                         onPick={(name) => {
+                          /* A deliberate choice, so the prefill may run. */
+                          pickedByHand.current = true;
                           setValue('customerName', name, { shouldValidate: true });
                           // The name is what the office types; the link to the
                           // customer record follows from it.
