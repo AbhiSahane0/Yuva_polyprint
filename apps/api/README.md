@@ -717,20 +717,12 @@ pouches read **71.9% gross** against 8,999 pouches' 37.3% — and net put both a
 **8%**.
 
 **Two sheets, reconciled.** The client's own workbook answered the same job
-twice, Rs 263.40 and Rs 228.22 a kilogram. This takes the Estimation frame —
-which divides by the quantity **ordered**, because the wastage is already
-inside the cost and dividing by the consumed weight would charge for it and
-then hand it back — with the Costing sheet's per-colour ink and batch adhesive.
-
-**Five corrections are deliberate**, each pinned by a test:
-
-| Their sheet                                                                        | Here                                                                   |
-| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Ink held at a flat 1.8 GSM while the colours used sum to 0.55                      | The colours decide it — the structure's figure sets the pouch weight   |
-| Batch ratio lookup was `SUMIFS` over one cell, so it always returned the first row | The chosen ratio is used                                               |
-| An empty Met PET row booked a second lamination pass                               | A zero-micron ply is not a ply                                         |
-| Power charged on run time; wages on run + setup                                    | Both charged on both — the machine is switched on                      |
-| Margin taken on materials alone                                                    | On the whole cost by default; `marginBasis` restores the old behaviour |
+twice, Rs 263.40 and Rs 228.22 a kilogram. The **Estimation** frame is the one
+followed — it is the headline figure, and it divides by the quantity
+**ordered**, because the wastage is already inside the cost and dividing by the
+consumed weight would charge for it and then hand it back. The Costing sheet's
+per-colour ink and batch adhesive are computed alongside and shown in the
+breakdown, and `inkCostModel` / `adhesiveCostModel` switch to them.
 
 Master data lives in `costing_machines`, `costing_labour`, and the `costing_*`
 keys in settings. `npm run seed:costing -w @yuva/api` loads the works' own 2022

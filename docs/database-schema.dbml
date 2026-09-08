@@ -122,7 +122,7 @@ Table app_settings {
   value text [not null]
   updated_at timestamp [not null]
 
-  Note: '29 row(s) at time of generation'
+  Note: '36 row(s) at time of generation'
 }
 
 Table costing_labour {
@@ -150,7 +150,7 @@ Table costing_machines {
   sort_order integer [not null, default: `0`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
-  setup_power_factor decimal(4,3) [not null, default: `1`]
+  setup_power_factor decimal(4,3) [not null, default: `0`]
 
   Note: '3 row(s) at time of generation'
 }
@@ -293,7 +293,7 @@ Table jobs {
   customer_source JobCustomerSource [not null, default: `'NONE'::"JobCustomerSource"`]
   needs_customer boolean [not null, default: `false`]
 
-  Note: '418 row(s) at time of generation'
+  Note: '419 row(s) at time of generation'
 }
 
 Table login_events {
@@ -305,7 +305,7 @@ Table login_events {
   user_agent text
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '36 row(s) at time of generation'
+  Note: '37 row(s) at time of generation'
 }
 
 Table material_rates {
@@ -316,7 +316,7 @@ Table material_rates {
   entered_by text [not null, default: `'Office'`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '236 row(s) at time of generation'
+  Note: '255 row(s) at time of generation'
 }
 
 Table materials {
@@ -334,7 +334,7 @@ Table materials {
   solids_percent decimal(6,3)
   ink_kind InkKind
 
-  Note: '17 row(s) at time of generation'
+  Note: '19 row(s) at time of generation'
 }
 
 Table purchase_order_lines {
@@ -408,7 +408,7 @@ Table quotation_item_layers {
   rate_per_kg decimal(12,2)
   gsm decimal(10,3) [not null]
 
-  Note: '8 row(s) at time of generation'
+  Note: '10 row(s) at time of generation'
 }
 
 Table quotation_item_quantities {
@@ -426,7 +426,7 @@ Table quotation_item_quantities {
   material_cost decimal(14,2)
   margin_percent decimal(6,2)
 
-  Note: '6 row(s) at time of generation'
+  Note: '7 row(s) at time of generation'
 }
 
 Table quotation_items {
@@ -462,7 +462,7 @@ Table quotation_items {
   film_width_mm decimal(10,2) [not null]
   film_height_mm decimal(10,2) [not null]
 
-  Note: '4 row(s) at time of generation'
+  Note: '5 row(s) at time of generation'
 }
 
 Table quotation_tiers {
@@ -481,7 +481,7 @@ Table quotation_tiers {
   total_quantity_kg decimal(14,3) [not null]
   total_pouches decimal(14,2) [not null]
 
-  Note: '6 row(s) at time of generation'
+  Note: '7 row(s) at time of generation'
 }
 
 Table quotations {
@@ -514,7 +514,7 @@ Table quotations {
   won_tier_id text [unique]
   selected_quantity integer [not null, default: `1`]
 
-  Note: '4 row(s) at time of generation'
+  Note: '5 row(s) at time of generation'
 }
 
 Table sessions {
@@ -525,7 +525,7 @@ Table sessions {
   last_seen_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '16 row(s) at time of generation'
+  Note: '9 row(s) at time of generation'
 }
 
 Table stock_batches {

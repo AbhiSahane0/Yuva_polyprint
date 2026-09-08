@@ -68,7 +68,11 @@ const MASTER = {
     pouchMakingPerKg: 15,
     stationSurcharges: [5.5, 7.5, 9],
     marginPercent: 9,
-    marginBasis: 'TOTAL_COST' as const,
+    /* The works' own choices — see the parity block at the foot of this file. */
+    marginBasis: 'MATERIAL_ONLY' as const,
+    emiBasis: 'RUN_TIME' as const,
+    inkCostModel: 'PER_COLOUR' as const,
+    adhesiveCostModel: 'BATCH' as const,
   },
 };
 
@@ -256,21 +260,18 @@ describe('adhesive is a diluted batch', () => {
   });
 });
 
-describe('the corrections their sheets need', () => {
-  it('pays for the power a machine draws while it is being set up', () => {
+describe("the sheet's own rules", () => {
+  it("charges power for running time only, as the works' sheet does", () => {
     /*
-     * Their sheet billed the operator for the hour spent setting the press and
-     * billed nothing for the press. It is switched on.
+     * The sheet bills the operator for the hour spent setting the press and
+     * bills nothing for the press. Arguably it is switched on — but the office
+     * reconciles against that sheet, so this follows it, and the works can
+     * charge some or all of the setup load on the Costing screen.
      */
     const result = costRate(input())!;
     const printing = result.processes.find((p) => p.kind === 'PRINTING')!;
     const perMinute = (66 * 9) / 60;
-    expect(printing.electricityCost).toBeCloseTo(
-      perMinute * (printing.runMinutes + printing.setupMinutes),
-      1,
-    );
-    /* Which is more than the run-time-only figure the sheet reports. */
-    expect(printing.electricityCost).toBeGreaterThan(perMinute * printing.runMinutes);
+    expect(printing.electricityCost).toBeCloseTo(perMinute * printing.runMinutes, 1);
   });
 
   it('does not book a lamination pass for a ply that is not there', () => {
@@ -308,19 +309,19 @@ describe('the corrections their sheets need', () => {
 });
 
 describe('margin', () => {
-  it('is taken on the whole cost by default', () => {
+  it("is taken on materials alone, as the works' sheet does", () => {
     const result = costRate(input())!;
-    expect(result.marginAmount).toBeCloseTo(result.costBeforeMargin * 0.09, 1);
+    expect(result.marginAmount).toBeCloseTo(result.materialCost * 0.09, 1);
+    /* Which recovers the labour and the power at cost, earning nothing on it. */
+    expect(result.marginAmount).toBeLessThan(result.costBeforeMargin * 0.09);
   });
 
-  it('can be taken on materials alone, to reconcile with the old sheet', () => {
+  it('can be taken on the whole cost, when the works decides to', () => {
     const result = costRate({
       ...input(),
-      overheads: { ...MASTER.overheads, marginBasis: 'MATERIAL_ONLY' },
+      overheads: { ...MASTER.overheads, marginBasis: 'TOTAL_COST' },
     })!;
-    expect(result.marginAmount).toBeCloseTo(result.materialCost * 0.09, 1);
-    /* Which recovers the labour and the power at cost, earning nothing. */
-    expect(result.marginAmount).toBeLessThan(result.costBeforeMargin * 0.09);
+    expect(result.marginAmount).toBeCloseTo(result.costBeforeMargin * 0.09, 1);
   });
 
   it('reports the margin as a share of the rate, not as a mark-up on cost', () => {
@@ -469,9 +470,9 @@ describe('how much power a machine draws while it is being set', () => {
     );
   });
 
-  it('charges the full load when nobody has said otherwise', () => {
-    /* The default has to be what the app did before the field existed. */
-    expect(printing(undefined).electricityCost).toBeCloseTo(printing(1).electricityCost, 2);
+  it('charges nothing for setup when nobody has said otherwise', () => {
+    /* The default has to be what the works' sheet does, or nothing ties out. */
+    expect(printing(undefined).electricityCost).toBeCloseTo(printing(0).electricityCost, 2);
   });
 
   it('still pays the operator for every setup minute', () => {
@@ -575,8 +576,8 @@ describe('gross and net', () => {
     expect(small.ratePerKg).toBeGreaterThan(large.ratePerKg);
     /* Gross says the small order is the better one... */
     expect(small.grossMarginPercent).toBeGreaterThan(large.grossMarginPercent);
-    /* ...and net, which counts the setup, says they earn the same mark-up. */
-    expect(small.netMarginPercent).toBeCloseTo(large.netMarginPercent, 0);
+    /* ...and net, which counts the setup, says the opposite. */
+    expect(small.netMarginPercent).toBeLessThan(large.netMarginPercent);
     /* Gross is always the flattering one. */
     expect(small.grossMarginPercent).toBeGreaterThan(small.netMarginPercent);
   });
@@ -595,5 +596,98 @@ describe('gross and net', () => {
   it('reports a loss as a negative margin rather than hiding it', () => {
     const below = marginsAt(result.fullCostPerKg * 0.8, result);
     expect(below.netPercent).toBeLessThan(0);
+  });
+});
+
+/**
+ * The whole point, in one block: **the works' own workbook, reproduced.**
+ *
+ * "3. Anupriya.xlsx", Estimation sheet, 5 kg atta packaging, 23 March 2022.
+ * Every figure below is a cell in that sheet. The office costs against it and
+ * the client checks quotations against it, so where the workbook and this code
+ * disagreed the workbook won — including in the two places it argues with
+ * itself, where its headline figure decides.
+ *
+ * If this block ever fails, a quotation stopped agreeing with the document the
+ * client is holding.
+ */
+describe("the works' workbook, cell by cell", () => {
+  const SHEET: CostingInput = {
+    job: {
+      orderQtyKg: 500, // B8
+      wastagePercent: 8, // J5
+      filmWidthMm: 700, // F6
+      filmHeightMm: 600, // E6
+      ups: 1, // B9
+      trimMm: 15, // B10
+      layers: [
+        { name: 'Pet', micron: 12, density: 1.4, ratePerKg: 185 },
+        /* The sheet keeps this row on every job and leaves it empty. */
+        { name: 'Met Pet', micron: 0, density: 1.4, ratePerKg: 180 },
+        { name: 'W/O Poly', micron: 110, density: 0.94, ratePerKg: 163 },
+      ],
+      colours: JOB.colours,
+      flatInk: { ratePerKg: 800 }, // E37
+      adhesive: {
+        gsm: 3, // E13, picked by the sheet's own IF on ply thickness
+        ratio: '100:146:15', // D20
+        flatRatePerKg: 400, // E36
+        adhesiveRatePerKg: 165,
+        ethylAcetateRatePerKg: 125,
+        hardenerRatePerKg: 365,
+      },
+      solvent: JOB.solvent,
+      makesPouches: true,
+      inkGsmOverride: 1.8, // G14 — the structure's figure, not the colours'
+      adhesiveSplitRatio: '100:189:15', // what the sheet's lookup returns
+      stationCount: 7, // J19 — stations, not priced colours
+    },
+    machines: MASTER.machines.map((machine) => ({ ...machine, setupPowerFactor: 0 })),
+    labour: MASTER.labour,
+    overheads: { ...MASTER.overheads, inkCostModel: 'FLAT_GSM', adhesiveCostModel: 'FLAT_GSM' },
+  };
+
+  const r = costRate(SHEET)!;
+
+  it.each([
+    ['F32  PET cost', 13426.56, () => r.layers[0]!.cost],
+    ['F34  poly cost', 72810.14, () => r.layers[1]!.cost],
+    ['F37  ink cost', 6220.8, () => r.inkCost],
+    ['F36  adhesive cost', 5184, () => r.adhesiveCost],
+    ['F38  B material total', 97641.5, () => r.materialCost],
+    ['G51  A labour, transport, packing, EMI', 9820.12, () => r.overheadCost],
+    ['K37  D electricity', 1448.91, () => r.electricityCost],
+    ['G55  E profit margin', 8787.74, () => r.marginAmount],
+    ['G56  A+B+C+D+E', 117698.27, () => r.totalCost],
+    ['G57  1 kg cost', 235.4, () => r.baseRatePerKg],
+    ['G59+G60  stations 6 and 7', 13, () => r.stationSurchargePerKg],
+    ['G62  pouch making', 15, () => r.pouchMakingPerKg],
+    ['G63  CALCULATED FINAL COST', 263.4, () => r.ratePerKg],
+    ['G64  per pouch', 13.83, () => r.ratePerPiece],
+  ])('%s', (_cell, expected, actual) => {
+    /* Half a rupee, which is the sheet's own display rounding. */
+    expect(actual()).toBeCloseTo(expected, 0);
+  });
+
+  it('reaches the same structure the sheet does', () => {
+    expect(r.totalGsm).toBe(125); // G15
+    expect(r.consumedKg).toBe(540); // I6
+    expect(r.pieceWeightG).toBeCloseTo(52.5, 2); // J9
+    expect(r.piecesPerKg).toBeCloseTo(19.0476, 3); // J10
+  });
+
+  it('still shows what the detailed ink method would have said', () => {
+    /*
+     * The workbook prices ink twice and the two disagree by 2x: Estimation
+     * takes the laydown at one blended rate, Costing takes each colour wet
+     * with its solids and solvent. The headline figure uses Estimation, so
+     * that is the default — but the per-colour working is computed either way,
+     * because it is the more accurate of the two and the office will want it
+     * when they are ready.
+     */
+    expect(r.colours).toHaveLength(4);
+    const detailed = r.colours.reduce((total, colour) => total + colour.cost, 0);
+    expect(detailed).toBeCloseTo(3071.68, 0); // Costing!N20
+    expect(r.inkCost).toBeCloseTo(6220.8, 0); // and Estimation!F37 is what is used
   });
 });

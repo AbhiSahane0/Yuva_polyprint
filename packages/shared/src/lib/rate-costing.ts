@@ -67,8 +67,8 @@ export interface CostingMachine {
    * press is switched on. Charging the full load is not right either: a press
    * being threaded and having its cylinders cleaned is not running at 66 HP,
    * and assuming it does adds two thirds to the printing electricity. Neither
-   * figure is knowable from here, so the works sets it; 1 keeps the old
-   * behaviour for anybody who has not.
+   * figure is knowable from here, so the works sets it; 0 is the default
+   * because it is what their sheet does.
    */
   setupPowerFactor?: number;
 }
@@ -97,6 +97,14 @@ export interface CostingOverheads {
   emiPerMonth: number;
   /** Machine hours a month the EMI is spread over. */
   emiHoursPerMonth: number;
+  /**
+   * Which minutes the EMI is recovered over.
+   *
+   * The works' sheet uses running time alone. Charging the setup as well is
+   * arguably truer — the asset is tied up either way — but the office
+   * reconciles against the sheet, so RUN_TIME is what it does.
+   */
+  emiBasis: 'RUN_TIME' | 'OCCUPIED';
 
   /** Charged only when the line is made into pouches. */
   pouchMakingPerKg: number;
@@ -113,11 +121,28 @@ export interface CostingOverheads {
    * Their sheet applies it to the material cost alone, which leaves the labour,
    * the power, the transport and the packing recovered at cost and earning
    * nothing — on the job we were given, Rs 11,269 of effort for no return.
-   * `TOTAL_COST` is the default because that is almost certainly what was
-   * meant; `MATERIAL_ONLY` reproduces the sheet exactly, for anybody
-   * reconciling against it.
+   * `MATERIAL_ONLY` is the default because it is what the sheet does and the
+   * office reconciles against that sheet. `TOTAL_COST` earns on the effort as
+   * well, and is one setting away when they want it.
    */
   marginBasis: 'TOTAL_COST' | 'MATERIAL_ONLY';
+
+  /**
+   * How ink is costed. The workbook does it two ways and they disagree by 2x
+   * on the same job.
+   *
+   * `PER_COLOUR` is the Costing sheet: each colour's laydown grossed up by its
+   * solids to the wet weight actually bought, plus solvent at the press ratio.
+   * `FLAT_GSM` is the Estimation sheet: the structure's ink GSM times one
+   * blended rate, with no solids and no solvent — simpler, and what the
+   * workbook's headline 263.40 is built from.
+   */
+  inkCostModel: 'PER_COLOUR' | 'FLAT_GSM';
+  /**
+   * `BATCH` dilutes the adhesive and prices its three parts, as the Costing
+   * sheet does. `FLAT_GSM` is the Estimation sheet: GSM times one rate.
+   */
+  adhesiveCostModel: 'BATCH' | 'FLAT_GSM';
 }
 
 // ---------------------------------------------------------------------------
@@ -154,10 +179,17 @@ export type AdhesiveRatio = (typeof ADHESIVE_BATCHES)[number]['ratio'];
 export interface CostingAdhesive {
   /** Dry adhesive on the film, g/m². */
   gsm: number;
+  /** One blended rate, for `adhesiveCostModel: 'FLAT_GSM'`. */
+  flatRatePerKg?: number;
   ratio: string;
   adhesiveRatePerKg: number;
   ethylAcetateRatePerKg: number;
   hardenerRatePerKg: number;
+}
+
+/** One blended ink rate, for `inkCostModel: 'FLAT_GSM'`. */
+export interface CostingFlatInk {
+  ratePerKg: number;
 }
 
 export interface CostingSolvent {
@@ -186,11 +218,50 @@ export interface CostingJob {
 
   layers: CostingLayer[];
   colours: CostingColour[];
+  /** Used only when `inkCostModel` is FLAT_GSM. */
+  flatInk?: CostingFlatInk;
   adhesive: CostingAdhesive;
   solvent: CostingSolvent;
 
+  /**
+   * How the adhesive batch splits into its three parts.
+   *
+   * Separate from `adhesive.ratio`, which supplies the solids. The works'
+   * sheet takes the solids from the ratio the office picks and the SPLIT from
+   * a fixed row of the same table, so the two can differ — reproduced here
+   * rather than quietly tidied, because the office reconciles against that
+   * sheet. Null splits on the chosen ratio.
+   */
+  adhesiveSplitRatio?: string | null;
+
   /** A roll is not slit into pouches and carries no pouch-making charge. */
   makesPouches: boolean;
+
+  /**
+   * Printing stations the job occupies — one cylinder each.
+   *
+   * NOT the number of colours priced. The works' sheet counts seven stations
+   * on a job it prices four inks for, and the surcharge for the sixth and
+   * seventh is charged on the stations: a station is occupied, and paid for,
+   * whether or not its ink appears in the costing. Falls back to the colour
+   * count when the caller has nothing better.
+   */
+  stationCount?: number | null;
+
+  /**
+   * Ink GSM the STRUCTURE is weighed with, when it is stated rather than
+   * derived.
+   *
+   * The works' sheet holds this at a flat figure — 1.8 — while pricing the
+   * colours actually used, which on a four-colour job come to 0.55. Both
+   * numbers are in the workbook and they do not agree, and the flat one is
+   * what decides a pouch's weight there. Since the office costs against that
+   * sheet, this follows it: the laminate is weighed with the works' figure and
+   * the ink is priced colour by colour.
+   *
+   * Null derives it from the colours instead.
+   */
+  inkGsmOverride?: number | null;
 
   /**
    * Pieces in a kilogram, when the caller already has its own figure.
@@ -445,7 +516,14 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
   if (plies.length === 0) return null;
 
   const substrateGsm = round(sum(plies.map((layer) => layer.micron * layer.density)), 4);
-  const inkGsm = round(inkGsmOf(job.colours), 4);
+  /*
+   * The structure's ink weight. Stated by the works where they state it —
+   * see `inkGsmOverride`; the colours still price it.
+   */
+  const inkGsm =
+    job.inkGsmOverride !== null && job.inkGsmOverride !== undefined && job.inkGsmOverride >= 0
+      ? round(job.inkGsmOverride, 4)
+      : round(inkGsmOf(job.colours), 4);
   const adhesiveGsm = job.adhesive.gsm;
   const totalGsm = round(substrateGsm + inkGsm + adhesiveGsm, 4);
   if (totalGsm <= 0 || substrateGsm <= 0) return null;
@@ -520,7 +598,16 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
     };
   });
 
-  const inkCost = round(sum(colours.map((colour) => colour.cost)), 2);
+  /*
+   * Estimation prices the whole ink laydown at one blended rate — no solids,
+   * no solvent — and that is the model its headline figure is built from. The
+   * per-colour breakdown is still returned either way, so the office can see
+   * what the detailed method would have said.
+   */
+  const inkCost =
+    overheads.inkCostModel === 'FLAT_GSM'
+      ? round((inkGsm / totalGsm) * consumedKg * (job.flatInk?.ratePerKg ?? 0), 2)
+      : round(sum(colours.map((colour) => colour.cost)), 2);
 
   /* --- adhesive, as a diluted batch -------------------------------------
    * Against the SUBSTRATE weight rather than the whole laminate, because
@@ -535,18 +622,26 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
    * lookup was SUMIFS over a single cell, so it always returned the first row
    * whatever was picked — a job set to 100:146:15 was costed at 100:189:15.
    */
-  const parts = parseAdhesiveRatio(job.adhesive.ratio) ?? [100, 0, 0];
+  const parts = parseAdhesiveRatio(job.adhesiveSplitRatio || job.adhesive.ratio) ?? [100, 0, 0];
   const partsTotal = parts[0] + parts[1] + parts[2];
   const adhesiveKg = round((parts[0] / partsTotal) * batchKg, 4);
   const ethylAcetateKg = round((parts[1] / partsTotal) * batchKg, 4);
   const hardenerKg = round((parts[2] / partsTotal) * batchKg, 4);
 
-  const adhesiveCost = round(
-    adhesiveKg * job.adhesive.adhesiveRatePerKg +
-      ethylAcetateKg * job.adhesive.ethylAcetateRatePerKg +
-      hardenerKg * job.adhesive.hardenerRatePerKg,
-    2,
-  );
+  const adhesiveCost =
+    overheads.adhesiveCostModel === 'FLAT_GSM'
+      ? round(
+          (adhesiveGsm / totalGsm) *
+            consumedKg *
+            (job.adhesive.flatRatePerKg ?? job.adhesive.adhesiveRatePerKg),
+          2,
+        )
+      : round(
+          adhesiveKg * job.adhesive.adhesiveRatePerKg +
+            ethylAcetateKg * job.adhesive.ethylAcetateRatePerKg +
+            hardenerKg * job.adhesive.hardenerRatePerKg,
+          2,
+        );
 
   const adhesiveDetail: AdhesiveCost = {
     gsm: adhesiveGsm,
@@ -590,7 +685,7 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
      * `setupPowerFactor` is the works' answer to it.
      */
     const occupiedMinutes = runMinutes + machine.setupMinutes;
-    const setupFactor = machine.setupPowerFactor ?? 1;
+    const setupFactor = machine.setupPowerFactor ?? 0;
     const poweredMinutes = runMinutes + machine.setupMinutes * setupFactor;
 
     const electricityCost = round(
@@ -640,7 +735,11 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
 
   const emiPerMinute =
     overheads.emiHoursPerMonth > 0 ? overheads.emiPerMonth / (overheads.emiHoursPerMonth * 60) : 0;
-  const emiCost = round(emiPerMinute * totalMachineMinutes, 2);
+  const emiMinutes =
+    overheads.emiBasis === 'OCCUPIED'
+      ? totalMachineMinutes
+      : round(sum(processes.map((process) => process.runMinutes)), 2);
+  const emiCost = round(emiPerMinute * emiMinutes, 2);
 
   const overheadCost = round(labourCost + transportCost + packingCost + otherCost + emiCost, 2);
 
@@ -657,7 +756,11 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
    * A surcharge for each station past the fifth. `stationSurcharges[0]` is the
    * sixth, and a five-colour job pays none of them.
    */
-  const extraStations = Math.max(0, job.colours.length - 5);
+  const stations =
+    job.stationCount !== null && job.stationCount !== undefined && job.stationCount > 0
+      ? job.stationCount
+      : job.colours.length;
+  const extraStations = Math.max(0, stations - 5);
   const stationSurchargePerKg = round(sum(overheads.stationSurcharges.slice(0, extraStations)), 4);
 
   const pouchMakingPerKg = job.makesPouches ? overheads.pouchMakingPerKg : 0;

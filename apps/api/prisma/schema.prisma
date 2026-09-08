@@ -1389,11 +1389,11 @@ model CostingMachine {
    * The client's sheet charges nothing for setup power, which cannot be right
    * — the press is switched on. Charging the full load is not right either: a
    * press being threaded and having its cylinders cleaned is not running at
-   * 66 HP. Neither figure is knowable from here, so it is the works' to set,
-   * and 1 is the default because it is what this app did before the field
-   * existed.
+   * 66 HP. Neither figure is knowable from here, so it is the works' to set —
+   * and 0 is the default because it is what their sheet does, which is what a
+   * quoted rate has to tie out against.
    */
-  setupPowerFactor Decimal @default(1) @map("setup_power_factor") @db.Decimal(4, 3)
+  setupPowerFactor Decimal @default(0) @map("setup_power_factor") @db.Decimal(4, 3)
 
   isActive  Boolean @default(true) @map("is_active")
   sortOrder Int     @default(0) @map("sort_order")

@@ -24,10 +24,15 @@ export const machineSchema = z.object({
     .max(10_000),
   setupMinutes: z.coerce.number().int().min(0).max(1440),
   /**
-   * 0 charges nothing for setup power, as the client's sheet does; 1 charges
-   * the full connected load. Neither is right for a press being threaded.
+   * Share of the connected load drawn while being set, 0-1.
+   *
+   * 0 is the default because it is what the works' sheet does — it charges the
+   * operator for the setup hour and the machine for nothing. Arguably the
+   * press is switched on; equally, one being threaded is not running at its
+   * connected load. It is the works' figure to set, and the rate ties out
+   * against their own workbook at 0.
    */
-  setupPowerFactor: z.coerce.number().min(0).max(1).default(1),
+  setupPowerFactor: z.coerce.number().min(0).max(1).default(0),
   isActive: z.boolean().default(true),
   sortOrder: z.coerce.number().int().min(0).max(999).default(0),
 });

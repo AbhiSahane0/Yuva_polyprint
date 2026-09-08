@@ -396,6 +396,11 @@ export const settingsSchema = z.object({
   emiPerMonth: z.coerce.number().min(0).max(10_000_000),
   /** Machine hours a month the EMI is spread over. */
   emiHoursPerMonth: z.coerce.number().min(1).max(744),
+  /**
+   * Which minutes the EMI is recovered over. The works' sheet uses running
+   * time alone; charging the setup as well is truer but does not tie out.
+   */
+  emiBasis: z.enum(['RUN_TIME', 'OCCUPIED']),
   pouchMakingPerKg: z.coerce.number().min(0).max(10_000),
   /** What the sixth, seventh and eighth printing stations each add, per kg. */
   stationSurcharge6: z.coerce.number().min(0).max(10_000),
@@ -410,6 +415,16 @@ export const settingsSchema = z.object({
    * which recovers labour and power at cost and earns nothing on them.
    */
   marginBasis: z.enum(['TOTAL_COST', 'MATERIAL_ONLY']),
+  /**
+   * How ink and adhesive are costed. The works' workbook does each two ways
+   * and they disagree by 2x on ink, so both are here and the works chooses.
+   *
+   * FLAT_GSM is the Estimation sheet — GSM times one blended rate — and is
+   * what its headline figure is built from. PER_COLOUR and BATCH are the
+   * Costing sheet: wet weights, solids and solvent, priced part by part.
+   */
+  inkCostModel: z.enum(['PER_COLOUR', 'FLAT_GSM']),
+  adhesiveCostModel: z.enum(['BATCH', 'FLAT_GSM']),
   /** Ink to solvent at the press, and how the solvent splits. */
   inkSolventParts: z.coerce.number().min(0).max(1000),
   /**
@@ -425,6 +440,14 @@ export const settingsSchema = z.object({
   defaultHardenerMaterial: z.string().trim().max(80),
   ethylAcetatePercent: z.coerce.number().min(0).max(100),
   defaultAdhesiveRatio: z.string().trim().max(20),
+  /**
+   * How the adhesive batch splits into adhesive, ethyl acetate and hardener.
+   *
+   * The works' sheet takes the SOLIDS from the ratio the office picks and the
+   * SPLIT from a fixed row of the same table, so the two can differ. Set this
+   * to match `defaultAdhesiveRatio` to split on whatever is chosen.
+   */
+  adhesiveSplitRatio: z.string().trim().max(20),
 });
 
 export type AppSettings = z.infer<typeof settingsSchema>;
@@ -452,6 +475,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   otherPerJob: 250,
   emiPerMonth: 4166.66,
   emiHoursPerMonth: 24,
+  emiBasis: 'RUN_TIME',
   pouchMakingPerKg: 15,
   stationSurcharge6: 5.5,
   stationSurcharge7: 7.5,
@@ -459,13 +483,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultTrimMm: 15,
   defaultWastagePercent: 8,
   defaultMarginPercent: 9,
-  marginBasis: 'TOTAL_COST',
+  marginBasis: 'MATERIAL_ONLY',
+  inkCostModel: 'FLAT_GSM',
+  adhesiveCostModel: 'FLAT_GSM',
   inkSolventParts: 80,
   defaultEthylAcetateMaterial: 'Solvent — Ethyl Acetate',
   defaultTolueneMaterial: 'Solvent — Toluene',
   defaultHardenerMaterial: 'Adhesive — Hardener',
   ethylAcetatePercent: 50,
   defaultAdhesiveRatio: '100:146:15',
+  adhesiveSplitRatio: '100:189:15',
 };
 
 /*

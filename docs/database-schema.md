@@ -187,27 +187,27 @@ erDiagram
 
 | Table | Columns | Rows | Purpose |
 | --- | ---: | ---: | --- |
-| `app_settings` | 3 | 29 | Editable rates: cylinder rate, GST %, advance %. |
+| `app_settings` | 3 | 36 | Editable rates: cylinder rate, GST %, advance %. |
 | `costing_labour` | 8 | 7 |  |
 | `costing_machines` | 12 | 3 |  |
 | `customers` | 17 | 71 | Companies that order from Yuva Polyprint. |
 | `cylinder_events` | 11 | 0 |  |
 | `cylinders` | 16 | 0 |  |
 | `job_artwork` | 17 | 0 |  |
-| `jobs` | 55 | 418 | Products and their full engineering specification. |
-| `login_events` | 7 | 36 |  |
-| `material_rates` | 6 | 236 |  |
-| `materials` | 13 | 17 |  |
+| `jobs` | 55 | 419 | Products and their full engineering specification. |
+| `login_events` | 7 | 37 |  |
+| `material_rates` | 6 | 255 |  |
+| `materials` | 13 | 19 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
 | `purchase_receipts` | 11 | 1 |  |
 | `quotation_emails` | 10 | 1 |  |
-| `quotation_item_layers` | 9 | 8 |  |
-| `quotation_item_quantities` | 13 | 6 |  |
-| `quotation_items` | 31 | 4 | One priced line on a quotation. |
-| `quotation_tiers` | 14 | 6 |  |
-| `quotations` | 28 | 4 | Customer-facing quotations, with totals frozen at save. |
-| `sessions` | 6 | 16 |  |
+| `quotation_item_layers` | 9 | 10 |  |
+| `quotation_item_quantities` | 13 | 7 |  |
+| `quotation_items` | 31 | 5 | One priced line on a quotation. |
+| `quotation_tiers` | 14 | 7 |  |
+| `quotations` | 28 | 5 | Customer-facing quotations, with totals frozen at save. |
+| `sessions` | 6 | 9 |  |
 | `stock_batches` | 14 | 0 |  |
 | `stock_movements` | 13 | 5 |  |
 | `suppliers` | 11 | 1 |  |

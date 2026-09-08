@@ -420,23 +420,83 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
             </Select>
           </Field>
 
+          {/*
+            The three places the works' workbook does something one way and
+            an accountant might do it another. Each defaults to the workbook,
+            because that is the document a quotation is checked against.
+          */}
+          {(
+            [
+              [
+                'inkCostModel',
+                'Ink is costed',
+                [
+                  ['FLAT_GSM', 'By GSM \u00d7 one rate (workbook)'],
+                  ['PER_COLOUR', 'Per colour, wet, with solvent'],
+                ],
+                'Per colour is more accurate; the workbook uses the simpler one',
+              ],
+              [
+                'adhesiveCostModel',
+                'Adhesive is costed',
+                [
+                  ['FLAT_GSM', 'By GSM \u00d7 one rate (workbook)'],
+                  ['BATCH', 'As a diluted batch, part by part'],
+                ],
+                '',
+              ],
+              [
+                'emiBasis',
+                'EMI is spread over',
+                [
+                  ['RUN_TIME', 'Running time (workbook)'],
+                  ['OCCUPIED', 'Running and setup time'],
+                ],
+                'The machine is tied up during setup either way',
+              ],
+              [
+                'marginBasis',
+                'Margin is taken on',
+                [
+                  ['MATERIAL_ONLY', 'Materials only (workbook)'],
+                  ['TOTAL_COST', 'The whole cost'],
+                ],
+                'Materials only earns nothing on labour or power',
+              ],
+            ] as [keyof AppSettings, string, [string, string][], string][]
+          ).map(([key, label, options, hint]) => (
+            <Field key={key} label={label} htmlFor={key} hint={hint || undefined}>
+              <Select
+                id={key}
+                value={String(draft[key] ?? '')}
+                onChange={(event) => set(key, event.target.value)}
+                disabled={!canEdit}
+              >
+                {options.map(([value, text]) => (
+                  <option key={value} value={value}>
+                    {text}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ))}
+
           <Field
-            label="Margin is taken on"
-            htmlFor="marginBasis"
-            hint={
-              draft.marginBasis === 'MATERIAL_ONLY'
-                ? 'Labour and power are recovered at cost, earning nothing'
-                : 'Everything the job costs'
-            }
+            label="Adhesive split"
+            htmlFor="adhesiveSplitRatio"
+            hint="The workbook takes solids from the batch above and the split from this"
           >
             <Select
-              id="marginBasis"
-              value={draft.marginBasis}
-              onChange={(event) => set('marginBasis', event.target.value)}
+              id="adhesiveSplitRatio"
+              value={draft.adhesiveSplitRatio}
+              onChange={(event) => set('adhesiveSplitRatio', event.target.value)}
               disabled={!canEdit}
             >
-              <option value="TOTAL_COST">The whole cost</option>
-              <option value="MATERIAL_ONLY">Materials only</option>
+              {ADHESIVE_BATCHES.map((batch) => (
+                <option key={batch.ratio} value={batch.ratio}>
+                  {batch.ratio}
+                </option>
+              ))}
             </Select>
           </Field>
         </div>

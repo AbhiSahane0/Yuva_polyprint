@@ -130,8 +130,10 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
         trimMm: settings.defaultTrimMm,
         layers: line.layers,
         colours,
+        flatInk: { ratePerKg: rate(settings.defaultInkMaterial) },
         adhesive: {
           gsm: settings.adhesiveGsm,
+          flatRatePerKg: rate(settings.defaultAdhesiveMaterial),
           ratio: settings.defaultAdhesiveRatio,
           adhesiveRatePerKg: rate(settings.defaultAdhesiveMaterial),
           ethylAcetateRatePerKg: rate(settings.defaultEthylAcetateMaterial),
@@ -146,6 +148,11 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
         },
         makesPouches: line.makesPouches,
         piecesPerKgOverride: line.piecesPerKg,
+        /* The works weighs the laminate with its own ink figure. */
+        inkGsmOverride: settings.inkGsm,
+        /* One cylinder per station, which is what the line is charged for. */
+        stationCount: line.colourCount,
+        adhesiveSplitRatio: settings.adhesiveSplitRatio,
       },
       machines: master.machines,
       labour: master.labour,
@@ -157,6 +164,7 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
         otherPerJob: settings.otherPerJob,
         emiPerMonth: settings.emiPerMonth,
         emiHoursPerMonth: settings.emiHoursPerMonth,
+        emiBasis: settings.emiBasis,
         pouchMakingPerKg: settings.pouchMakingPerKg,
         stationSurcharges: [
           settings.stationSurcharge6,
@@ -165,6 +173,8 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
         ],
         marginPercent: settings.defaultMarginPercent,
         marginBasis: settings.marginBasis,
+        inkCostModel: settings.inkCostModel,
+        adhesiveCostModel: settings.adhesiveCostModel,
       },
     };
   }, [settings, master, line, colourKey, materials, inks]);

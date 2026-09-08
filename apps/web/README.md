@@ -1240,6 +1240,14 @@ It prices **each quantity separately**, because setting a press takes the same
 hour whether it runs 500 kg or 5,000 — which is the whole reason a quotation
 carries tiers, and the reason a bigger order genuinely costs less a kilogram.
 
+The figures come from the works' own workbook, reproduced rather than improved
+— every cell of "3. Anupriya.xlsx" ties out, down to Rs 263.40 a kilogram. The
+five places a fresh implementation would differ are **settings** on this
+screen, each defaulting to what the sheet does: how ink is costed, how adhesive
+is costed, what the margin is taken on, what the EMI is spread over, and how
+much load a machine draws while it is being set. Move any of them and the rate
+moves off the client's spreadsheet, deliberately.
+
 **Colours are the only thing on the panel that belongs to the job.** Wastage,
 margin, trim and the adhesive batch are what the works _is_, so they live on the
 Costing screen — repeated on every job card they invited four different answers
