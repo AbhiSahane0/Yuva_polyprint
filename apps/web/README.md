@@ -1331,18 +1331,24 @@ record, since an old quotation's snapshot legitimately differs — and **a blank
 never overwrites a stored value**. Clearing a field is done on the Customers
 screen, where the whole record is in front of you.
 
-#### A saved quotation keeps what it says
+#### A saved quotation keeps what it says, and only what it says
 
-Contact details are snapshotted onto the quotation, and the prefill from the
-customer record now runs only when somebody actually **picks** a company. It
-used to run whenever that record resolved — which, on opening a saved
-quotation, is a moment after the quotation itself. The customer's values then
-overwrote the quotation's own, so a mobile and an email typed onto quotation
-131 and saved correctly were gone the next time it was opened, replaced by two
-empty boxes and two validation errors. The record held the importer's `NA`.
+Contact details are snapshotted onto the quotation. Opening a saved one shows
+**the document first, and the customer's record for the gaps** — the same rule
+the send dialog uses.
 
-Picking a customer by hand still fills everything in, which is the point of the
-prefill. A quotation already written keeps what it says.
+Both halves were wrong at different times. The prefill used to run whenever the
+customer record resolved, which on an edit is a moment after the quotation
+itself, so the record's values overwrote the document's: a mobile and an email
+typed onto quotation 131 and saved correctly were gone the next time it was
+opened. Making the snapshot win outright then broke the opposite case —
+quotation 130 has every contact field blank while its customer carries a
+mobile, an email and an address, so it opened to six empty boxes and the office
+retyped what was already on record and concluded the write-back was broken.
+
+**A value typed onto a quotation is a decision; a blank is not.** Filling a gap
+also records what ended up on screen, so pressing Next straight afterwards
+sends nothing — the fill is not mistaken for an edit.
 
 #### When Save does nothing
 

@@ -77,6 +77,7 @@ import {
   baselineFromCustomer,
   changedCustomerFields,
   customerDetailsFromForm,
+  normalise,
   designFingerprint,
   fingerprintFromSavedJob,
   isSaveableDesign,
@@ -309,7 +310,7 @@ export default function QuotationFormPage() {
     },
   });
 
-  const { control, register, handleSubmit, setValue, trigger, formState, reset } = form;
+  const { control, register, handleSubmit, setValue, getValues, trigger, formState, reset } = form;
   const items = useFieldArray({ control, name: 'items' });
   const watched = useWatch({ control });
 
@@ -392,15 +393,39 @@ export default function QuotationFormPage() {
     const real = (value: string | null | undefined) => (value && value !== 'NA' ? value : '');
 
     /*
-     * On an existing quotation the document's own snapshot wins — except for
-     * the brand, which the quotation does not snapshot at all. Filling only
-     * the gap leaves the box populated without touching a single field the
-     * quotation has its own answer for.
+     * On an existing quotation the document's own snapshot wins **where it has
+     * one**, and the customer's record fills the gaps.
+     *
+     * A value typed onto a quotation was a decision about that document and
+     * must not be replaced by the company's general one. A blank is not a
+     * decision — it is a quotation written before anybody knew the number. The
+     * send dialog already works to this rule; the form did not, and made
+     * quotation 130 open with six empty boxes while its customer had a mobile,
+     * an email and an address on record. Retyping them there looked like the
+     * write-back was broken when it had worked the first time.
      */
     if (isEdit && !pickedByHand.current) {
-      const brand = real(chosenCustomer.brandName);
-      setValue('brandName', brand);
-      if (saved.current.shown) saved.current.shown.brandName = brand;
+      const gaps: [keyof CreateQuotationFormValues, keyof CustomerDetails, string][] = [
+        ['brandName', 'brandName', real(chosenCustomer.brandName)],
+        ['addressLine1', 'address', real(chosenCustomer.address)],
+        ['addressLine2', 'city', real(chosenCustomer.city)],
+        ['addressLine3', 'district', real(chosenCustomer.district)],
+        ['mobile', 'mobile', real(chosenCustomer.mobile)],
+        ['email', 'email', real(chosenCustomer.email)],
+        ['gstNumber', 'gstNumber', real(chosenCustomer.gstNumber)],
+      ];
+
+      for (const [field, baselineKey, value] of gaps) {
+        /* Only where the document has nothing of its own to say. */
+        if (normalise(getValues(field) as string) !== '') continue;
+        if (value === '') continue;
+        setValue(field, value);
+        /*
+         * And what is on screen is what the office is looking at, so a later
+         * Next does not read the fill as an edit and write it straight back.
+         */
+        if (saved.current.shown) saved.current.shown[baselineKey] = value;
+      }
       return;
     }
     setValue('customerName', chosenCustomer.companyName);
