@@ -696,6 +696,28 @@ naive costing goes wrong by a factor:
   over the **substrate** GSM, not the whole laminate — it does not stick to
   itself or to the ink.
 
+**Adhesive is worked out, not stated.** The sheet takes a heavier coat under a
+thick ply — `IF(ply > 40µ, 3, 2)` — and one coat per lamination, so a 12µ PET
+over a 110µ poly is 3 GSM across one join while a PET over a MET PET is 2. The
+three numbers are settings. The sheet writes the second term as "2 if there is
+a Met PET ply, else 1", which is a shortcut for its own three-ply structure;
+laminations are plies minus one, which agrees with it everywhere the sheet is
+used and is right on the structures it never had to handle.
+
+**Stations are not colours.** The surcharge for the sixth and seventh printing
+station is charged on the stations a job occupies — one cylinder each — not on
+how many inks are priced. The sheet counts seven stations on a job it prices
+four inks for.
+
+**Why the margin reads the same at every quantity.** Because the sheet's margin
+is nine per cent of the MATERIAL cost, and material scales exactly with the
+order — so material per kilogram, and the margin it produces, are identical at
+any volume. Only the setup and the sundries shrink, and on a film-heavy job
+they are a rounding error beside it: a three-fold order moved one real
+quotation by 38 paise a kilogram. It is the sheet's formula, not a fault. The
+tiers do separate under `marginBasis: TOTAL_COST`, where the margin follows a
+cost that does fall.
+
 **Gross and net.** The works' sheet has one margin concept — material cost
 times nine per cent — and no gross/net split at all. Its own labelled totals
 map onto both, so that is where they come from: **B** is the materials, and
