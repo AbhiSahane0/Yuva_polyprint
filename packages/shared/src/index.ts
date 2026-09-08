@@ -40,6 +40,7 @@ export * from './lib/rate-costing.js';
 export * from './lib/gstin.js';
 
 export * from './schemas/common.js';
+export * from './schemas/partial-update.js';
 export * from './schemas/customer.js';
 export * from './schemas/quotation.js';
 export * from './schemas/material.js';

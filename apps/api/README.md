@@ -210,6 +210,31 @@ app does not look broken. Anyone can type a URL or call the endpoint with curl,
 so the server is what actually says no — and it returns 403 whether or not the
 client bothered to hide the link.
 
+### A PATCH sends what it sends
+
+`schema.partial()` is not enough on its own, and getting this wrong turned
+every partial update into a full overwrite.
+
+Zod's `.partial()` makes a field optional; it does **not** remove its
+`.default()`, and a default fires precisely when a key is absent. So
+`PATCH /customers/:id` with `{ district: 'Nashik' }` parsed to that plus
+`brandName: 'NA'`, `address: 'NA'`, `city: 'NA'`, `mobile: 'NA'`,
+`email: 'NA'` — and the service spread it into `prisma.update`.
+
+It erased four real customer records. Three attempts to fix it in the quotation
+wizard failed because the wizard was innocent: it sent exactly the one field
+that had changed.
+
+**Seven of the eleven update schemas had it**, and the customer one was not the
+worst — a partial quotation update reset a SENT quotation to `DRAFT` and
+rewrote its terms; a partial material update un-retired the material.
+
+All of them now use `partialWithoutDefaults`, which unwraps one layer of
+`ZodDefault` before making the field optional. Validation of what IS sent is
+unchanged. A test sweeps every exported `update*Schema` and asserts an empty
+body parses to an empty object — testing the seven that were broken would not
+have stopped the eighth.
+
 ### Things the API refuses
 
 - Demoting or deactivating the **last active administrator**, so the system

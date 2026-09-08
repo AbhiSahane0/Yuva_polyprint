@@ -1304,6 +1304,25 @@ this does not — what the customer paid last year, and who else is quoting. On 
 line sold by the piece it converts using the quotation's own pieces-per-kilogram
 so the figure shown is the figure the document carries.
 
+#### Corrections go back to the customer
+
+Correcting an address, a mobile or a brand on a quotation updates the customer
+record as you press Next, so the next quotation starts from the right details
+rather than the same wrong ones.
+
+This was disabled for a long time because it **erased customer records** —
+correct a district, press Next, and the address, city, mobile and brand were
+all stored as `NA`. The cause was not in this screen: `updateCustomerSchema`
+was `createCustomerSchema.partial()`, and Zod's `.partial()` leaves `.default()`
+in place, so the server filled in every field the form had deliberately left
+out. See [the API README](../api/README.md#a-patch-sends-what-it-sends).
+
+Two rules keep it safe either way, and both are tested: a field is written only
+if it differs from **what the form was filled in with** — not merely from the
+record, since an old quotation's snapshot legitimately differs — and **a blank
+never overwrites a stored value**. Clearing a field is done on the Customers
+screen, where the whole record is in front of you.
+
 #### A saved quotation keeps what it says
 
 Contact details are snapshotted onto the quotation, and the prefill from the

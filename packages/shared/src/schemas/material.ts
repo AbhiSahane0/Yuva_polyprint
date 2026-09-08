@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { partialWithoutDefaults } from './partial-update.js';
 
 export const materialCategorySchema = z.enum(['FILM', 'INK', 'ADHESIVE', 'SOLVENT', 'CONSUMABLE']);
 export type MaterialCategory = z.infer<typeof materialCategorySchema>;
@@ -34,7 +35,7 @@ export const createMaterialSchema = z.object({
   sortOrder: z.coerce.number().int().min(0).default(0),
 });
 
-export const updateMaterialSchema = createMaterialSchema.partial();
+export const updateMaterialSchema = partialWithoutDefaults(createMaterialSchema);
 
 /** One line of the daily rate entry form. */
 export const rateEntrySchema = z.object({

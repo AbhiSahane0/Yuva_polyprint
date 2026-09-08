@@ -386,12 +386,23 @@ export default function QuotationFormPage() {
    */
   useEffect(() => {
     if (!chosenCustomer) return;
-    /* An existing quotation's own snapshot wins over the customer's record. */
-    if (isEdit && !pickedByHand.current) return;
 
     // 'NA' is the importer's placeholder; showing it as if it were an address
     // is worse than showing nothing.
     const real = (value: string | null | undefined) => (value && value !== 'NA' ? value : '');
+
+    /*
+     * On an existing quotation the document's own snapshot wins — except for
+     * the brand, which the quotation does not snapshot at all. Filling only
+     * the gap leaves the box populated without touching a single field the
+     * quotation has its own answer for.
+     */
+    if (isEdit && !pickedByHand.current) {
+      const brand = real(chosenCustomer.brandName);
+      setValue('brandName', brand);
+      if (saved.current.shown) saved.current.shown.brandName = brand;
+      return;
+    }
     setValue('customerName', chosenCustomer.companyName);
     setValue('brandName', real(chosenCustomer.brandName));
     setValue('addressLine1', real(chosenCustomer.address));
@@ -667,14 +678,13 @@ export default function QuotationFormPage() {
   /**
    * Pushes this quotation's corrections back onto the customer record.
    *
-   * NOT CALLED — see persistStep for why. Kept rather than deleted because the
-   * bug is in how the form reports its values, not in this logic, and throwing
-   * it away would mean rebuilding it once the cause is found.
-   *
    * Only what changed, and only for an existing customer — a new company has no
-   * record to correct until the quotation saves and creates one.
+   * record to correct until the quotation saves and creates one. The two rules
+   * that keep it safe are in `changedCustomerFields`: a field is written only
+   * if it differs from what the form was FILLED IN with, and a blank never
+   * overwrites a stored value.
    */
-  async function _persistCustomerDetails() {
+  async function persistCustomerDetails() {
     const id = customerId;
     const baseline = saved.current.customer;
     if (customerMode !== 'existing' || !id || !baseline) return;
@@ -774,26 +784,23 @@ export default function QuotationFormPage() {
   /** What each step writes on the way out. Steps not listed write nothing. */
   async function persistStep(leaving: number) {
     /*
-     * DISABLED — writing customer details back from this form erased them.
+     * Corrections made here go back to the customer, so the next quotation
+     * starts from the right details rather than the same wrong ones.
      *
-     * Observed four times against a real record: correct an existing
-     * customer's district here, press Next, and their address, city, mobile
-     * and brand were all stored as 'NA' while the district saved correctly.
-     * The form's own boxes held the right values throughout — checked in the
-     * DOM — so something between the form state and the request reported them
-     * as empty, and an empty string is stored as 'NA'.
+     * This was off for a long time because it ERASED customer records: correct
+     * a district, press Next, and the address, city, mobile and brand were all
+     * stored as 'NA'. Three attempts to fix it on this side failed, and they
+     * failed because nothing on this side was wrong — the form sent exactly the
+     * one field that had changed.
      *
-     * Three fixes were tried and none of them stopped it: comparing against
-     * what the form was populated with rather than the record, requiring
-     * react-hook-form to mark the field dirty, and refusing to let an empty
-     * value overwrite a stored one. The last of those should have made the
-     * damage impossible on its own, and did not, which says the fault is not
-     * where any of them looked.
-     *
-     * So it stays off until the cause is actually understood. Correcting a
-     * customer is done on the Customers screen, which has always worked.
-     * Saving designs is untouched — that half was verified and is correct.
+     * `updateCustomerSchema` was `createCustomerSchema.partial()`, and Zod's
+     * `.partial()` makes a field optional WITHOUT removing its `.default()`.
+     * A default fires precisely when a key is absent, so the server filled in
+     * every field the form had deliberately left out — with 'NA' — and the
+     * service spread that into `prisma.update`. See `partialWithoutDefaults`,
+     * which now covers all eleven update schemas; seven of them had it.
      */
+    if (leaving === 0 || leaving === 1) await persistCustomerDetails();
     if (leaving === 2) await persistDesigns();
   }
 

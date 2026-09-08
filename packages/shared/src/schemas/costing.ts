@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { partialWithoutDefaults } from './partial-update.js';
 import { MACHINE_KINDS } from '../lib/rate-costing.js';
 
 /**
@@ -32,7 +33,7 @@ export const machineSchema = z.object({
 });
 
 export type MachineInput = z.infer<typeof machineSchema>;
-export const updateMachineSchema = machineSchema.partial();
+export const updateMachineSchema = partialWithoutDefaults(machineSchema);
 export type UpdateMachineInput = z.infer<typeof updateMachineSchema>;
 
 export const labourSchema = z.object({
@@ -44,5 +45,5 @@ export const labourSchema = z.object({
 });
 
 export type LabourInput = z.infer<typeof labourSchema>;
-export const updateLabourSchema = labourSchema.partial();
+export const updateLabourSchema = partialWithoutDefaults(labourSchema);
 export type UpdateLabourInput = z.infer<typeof updateLabourSchema>;

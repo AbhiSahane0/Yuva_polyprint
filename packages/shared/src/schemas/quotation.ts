@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { partialWithoutDefaults } from './partial-update.js';
 import { JOB_KINDS, POUCH_TYPES, PRICING_BASES, pricingBasisFor } from '../constants/job.js';
 import { paginationQuerySchema } from './common.js';
 import { isMobile, normaliseMobile } from '../lib/phone.js';
@@ -317,7 +318,7 @@ export const createQuotationSchema = createQuotationBaseSchema
  * a partial update may legitimately omit `items` entirely, and when it does
  * carry them the item schema still validates each one.
  */
-export const updateQuotationSchema = createQuotationBaseSchema.partial();
+export const updateQuotationSchema = partialWithoutDefaults(createQuotationBaseSchema);
 
 /**
  * The columns the list can be ordered by.
