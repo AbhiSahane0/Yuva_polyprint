@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   PROCESS_COLOURS,
+  adhesiveGsmFor,
   SPECIAL_COLOUR_GUIDES,
   batchSolidsFor,
   costRate,
@@ -689,5 +690,79 @@ describe("the works' workbook, cell by cell", () => {
     const detailed = r.colours.reduce((total, colour) => total + colour.cost, 0);
     expect(detailed).toBeCloseTo(3071.68, 0); // Costing!N20
     expect(r.inkCost).toBeCloseTo(6220.8, 0); // and Estimation!F37 is what is used
+  });
+});
+
+describe('adhesive is worked out from the structure', () => {
+  const opts = { thinGsm: 2, thickGsm: 3, thickPlyMicron: 40 };
+
+  it('matches the sheet on the job the sheet costs', () => {
+    /*
+     * Estimation!E13/F13/G13: a heavier coat under a ply thicker than 40µ, one
+     * coat per lamination. PET over a 110µ poly is 3 gsm across one join.
+     */
+    expect(adhesiveGsmFor([{ micron: 12 }, { micron: 110 }], opts)).toBe(3);
+  });
+
+  it('takes the thin coat under a thin ply', () => {
+    // Quotation 132: PET 12µ over MET PET 12µ — one join, nothing thick.
+    expect(adhesiveGsmFor([{ micron: 12 }, { micron: 12 }], opts)).toBe(2);
+  });
+
+  it('counts a coat for every lamination, not for every ply', () => {
+    /*
+     * The sheet writes this as "2 if there is a Met PET ply, else 1", which is
+     * a shortcut for its own three-ply structure. Plies minus one agrees with
+     * it everywhere the sheet is actually used and is right elsewhere too.
+     */
+    expect(adhesiveGsmFor([{ micron: 12 }, { micron: 12 }, { micron: 110 }], opts)).toBe(6);
+  });
+
+  it('is nothing at all on a single ply', () => {
+    // An unlaminated film is not glued to anything.
+    expect(adhesiveGsmFor([{ micron: 12 }], opts)).toBe(0);
+    expect(adhesiveGsmFor([], opts)).toBe(0);
+  });
+});
+
+describe('why the margin is the same at every quantity', () => {
+  /**
+   * Asked twice, so it is written down: it is not a bug, it is the sheet's own
+   * formula. `G55 = G52 × E2` — nine per cent of the MATERIAL cost. Material
+   * scales exactly with the quantity, so material per kilogram is identical at
+   * any volume and so is the margin it produces. Only the setup and the
+   * sundries shrink, and on most jobs they are a rounding error beside the
+   * film.
+   */
+  const at = (qty: number) => costRate({ ...input(), job: { ...JOB, orderQtyKg: qty } })!;
+
+  it('holds the margin per kilogram exactly constant', () => {
+    const small = at(500);
+    const large = at(5000);
+    /* To four decimals; the residue is the margin being rounded to paise. */
+    expect(small.marginAmount / 500).toBeCloseTo(large.marginAmount / 5000, 4);
+    expect(small.materialCostPerKg).toBeCloseTo(large.materialCostPerKg, 4);
+  });
+
+  it('lets the rate fall only by what the fixed costs shed', () => {
+    /* Which on a film-heavy job is very little — and that is the real answer. */
+    const small = at(500);
+    const large = at(5000);
+    expect(large.ratePerKg).toBeLessThan(small.ratePerKg);
+    expect(small.ratePerKg - large.ratePerKg).toBeLessThan(small.ratePerKg * 0.1);
+  });
+
+  it('moves the moment the margin is taken on the whole cost instead', () => {
+    /*
+     * The other basis makes the margin follow the cost, which does fall with
+     * volume — so if the office wants the tiers to differ, that is the switch.
+     */
+    const whole = (qty: number) =>
+      costRate({
+        ...input(),
+        job: { ...JOB, orderQtyKg: qty },
+        overheads: { ...MASTER.overheads, marginBasis: 'TOTAL_COST' },
+      })!;
+    expect(whole(500).marginAmount / 500).toBeGreaterThan(whole(5000).marginAmount / 5000);
   });
 });

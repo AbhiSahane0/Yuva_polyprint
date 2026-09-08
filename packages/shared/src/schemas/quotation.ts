@@ -373,7 +373,15 @@ export const settingsSchema = z.object({
    * component against; the film itself is chosen per quotation line.
    */
   inkGsm: z.coerce.number().min(0).max(50),
+  /**
+   * Adhesive is worked out from the structure, not stated — the sheet takes a
+   * heavier coat under a thick ply and one coat per lamination. These three
+   * are its numbers; `adhesiveGsm` is no longer used for costing.
+   */
   adhesiveGsm: z.coerce.number().min(0).max(50),
+  adhesiveCoatThinGsm: z.coerce.number().min(0).max(50),
+  adhesiveCoatThickGsm: z.coerce.number().min(0).max(50),
+  adhesiveThickPlyMicron: z.coerce.number().min(0).max(1000),
   defaultPetMaterial: z.string().trim().max(80),
   /** The metallised ply of a 3-layer structure, costed on its own rate. */
   defaultMetpetMaterial: z.string().trim().max(80),
@@ -462,6 +470,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Averages of what the imported jobs actually record.
   inkGsm: 1.8,
   adhesiveGsm: 2.5,
+  adhesiveCoatThinGsm: 2,
+  adhesiveCoatThickGsm: 3,
+  adhesiveThickPlyMicron: 40,
   defaultPetMaterial: 'PET 12µm',
   defaultMetpetMaterial: 'MET PET 12µm',
   defaultInkMaterial: 'Ink — Black',

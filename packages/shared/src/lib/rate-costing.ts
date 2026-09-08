@@ -165,6 +165,30 @@ export interface CostingColour {
   ratePerKg: number;
 }
 
+/**
+ * Adhesive laid down, worked out from the structure — as the sheet does.
+ *
+ * `IF(ply > 40µ, 3, 2)` for the coat weight, times the number of laminations.
+ * The sheet writes that second term as "2 if there is a Met PET ply, else 1",
+ * which is a shortcut for its own three-ply structure and gives the wrong
+ * answer on any other; laminations are plies minus one, which agrees with it
+ * everywhere the sheet is actually used.
+ *
+ * A single ply is not laminated at all and carries no adhesive.
+ */
+export function adhesiveGsmFor(
+  plies: { micron: number }[],
+  options: { thinGsm: number; thickGsm: number; thickPlyMicron: number },
+): number {
+  const laminations = Math.max(0, plies.length - 1);
+  if (laminations === 0) return 0;
+
+  /* The coat is heavier under a thick ply. */
+  const thickest = Math.max(...plies.slice(1).map((ply) => ply.micron), 0);
+  const coat = thickest > options.thickPlyMicron ? options.thickGsm : options.thinGsm;
+  return round(coat * laminations, 4);
+}
+
 /** The five dilutions the works uses, and what each leaves behind. */
 export const ADHESIVE_BATCHES = [
   { ratio: '100:189:15', solidsPercent: 30 },

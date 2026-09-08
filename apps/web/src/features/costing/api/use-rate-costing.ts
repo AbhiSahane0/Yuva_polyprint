@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  adhesiveGsmFor,
   costRate,
   unpricedColours,
   type CostingBreakdown,
@@ -132,7 +133,12 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
         colours,
         flatInk: { ratePerKg: rate(settings.defaultInkMaterial) },
         adhesive: {
-          gsm: settings.adhesiveGsm,
+          /* Worked out from the structure, as the sheet does. */
+          gsm: adhesiveGsmFor(line.layers, {
+            thinGsm: settings.adhesiveCoatThinGsm,
+            thickGsm: settings.adhesiveCoatThickGsm,
+            thickPlyMicron: settings.adhesiveThickPlyMicron,
+          }),
           flatRatePerKg: rate(settings.defaultAdhesiveMaterial),
           ratio: settings.defaultAdhesiveRatio,
           adhesiveRatePerKg: rate(settings.defaultAdhesiveMaterial),
