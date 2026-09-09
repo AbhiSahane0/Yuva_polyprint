@@ -1980,6 +1980,23 @@ function JobCard({
             results={cost?.quantities ?? []}
             costings={costing.results}
             onShowWorking={setWorking}
+            onTakeRate={(position, ratePerKg) => {
+              /* A deliberate replacement, so it becomes this row's figure. */
+              const pieces = cost?.geometry.pouchesPerKg ?? 0;
+              const next =
+                basis === 'PER_POUCH'
+                  ? pieces > 0
+                    ? round(ratePerKg / pieces, 4)
+                    : null
+                  : round(ratePerKg, 2);
+              if (next === null) return;
+              autoFilled.current[position] = next;
+              setNumber(
+                setValue,
+                `items.${index}.quantities.${position}.${basis === 'PER_POUCH' ? 'ratePerPouch' : 'ratePerKg'}`,
+                next,
+              );
+            }}
             errors={errors?.quantities as never}
             selectedQuantity={selectedQuantity}
             onSelectQuantity={onSelectQuantity}

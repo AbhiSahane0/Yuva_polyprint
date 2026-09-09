@@ -170,7 +170,13 @@ describe('QuantityFields', () => {
     ];
 
     /* Materials are half the rate; everything is 92% of it. */
-    const costing = { materialCostPerKg: 200, fullCostPerKg: 368 } as CostingBreakdown;
+    const costing = {
+      materialCostPerKg: 200,
+      fullCostPerKg: 368,
+      /* Its own rate too, or the row cannot tell whether the typed one is stale. */
+      ratePerKg: 400,
+      ratePerPiece: 20,
+    } as CostingBreakdown;
 
     function Row() {
       const { control, register } = useForm<CreateQuotationFormValues>({
@@ -237,5 +243,96 @@ describe('QuantityFields', () => {
     expect(screen.getByText('100.00 kg')).toBeTruthy();
     // "0 pouches" reads as a count rather than as an absence.
     expect(screen.queryByText(/pouches$/)).toBeNull();
+  });
+});
+
+describe('a rate that no longer matches the job', () => {
+  /**
+   * Changing the film under a filled-in rate must not overwrite a price
+   * somebody decided on — and must not leave it there silently either. A rate
+   * worked out for a 60µ poly stayed in the box after the ply was corrected to
+   * 110µ, and the margin beside it went on measuring against a price that no
+   * longer described the job.
+   */
+  const priced = (typedPerKg: number, costedPerKg: number) => {
+    const results: QuantityResult[] = [
+      {
+        quantityKg: 100,
+        ratePerKg: typedPerKg,
+        totalPouches: 2000,
+        totalAmount: typedPerKg * 100,
+        costPerPouch: 0,
+        marginPercent: 50,
+        materialCostPerKg: 200,
+      },
+    ];
+    const costing = {
+      materialCostPerKg: 200,
+      fullCostPerKg: 300,
+      ratePerKg: costedPerKg,
+      ratePerPiece: costedPerKg / 20,
+    } as CostingBreakdown;
+
+    function Row() {
+      const { control, register } = useForm<CreateQuotationFormValues>({
+        defaultValues: {
+          items: [{ quantities: [{ quantityKg: 100, ratePerKg: typedPerKg }] }],
+        } as CreateQuotationFormValues,
+      });
+      return (
+        <QuantityFields
+          control={control}
+          register={register}
+          itemIndex={0}
+          pricingBasis="PER_KG"
+          results={results}
+          costings={[costing]}
+        />
+      );
+    }
+    render(<Row />);
+  };
+
+  it('says what it costs now when the two have drifted apart', () => {
+    priced(330.55, 291.95);
+    expect(screen.getByText(/Costs Rs\. 291\.95 a kg now/)).toBeTruthy();
+  });
+
+  it('stays quiet when they agree', () => {
+    // Rounding is not drift; a rupee in a hundred is the threshold.
+    priced(292.5, 291.95);
+    expect(screen.queryByText(/Costs Rs/)).toBeNull();
+  });
+
+  it('says nothing at all when the line is not costed', () => {
+    const results: QuantityResult[] = [
+      {
+        quantityKg: 100,
+        ratePerKg: 330,
+        totalPouches: 0,
+        totalAmount: 33000,
+        costPerPouch: 0,
+        marginPercent: null,
+        materialCostPerKg: null,
+      },
+    ];
+    function Row() {
+      const { control, register } = useForm<CreateQuotationFormValues>({
+        defaultValues: {
+          items: [{ quantities: [{ quantityKg: 100, ratePerKg: 330 }] }],
+        } as CreateQuotationFormValues,
+      });
+      return (
+        <QuantityFields
+          control={control}
+          register={register}
+          itemIndex={0}
+          pricingBasis="PER_KG"
+          results={results}
+        />
+      );
+    }
+    render(<Row />);
+    expect(screen.queryByText(/Costs Rs/)).toBeNull();
   });
 });

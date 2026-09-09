@@ -1297,6 +1297,13 @@ the job costs plus the works' margin. So it is in the box, with an **ⓘ** besid
 it for the working. A figure somebody types is never overwritten; the moment a
 rate is edited, that row is theirs.
 
+**A rate that no longer matches says so.** Changing the film under a filled-in
+rate does not overwrite it — that price may be one somebody decided on — but it
+does not sit there silently either: the row reads _"Costs Rs 291.95 a kg now —
+use it"_. A rate worked out for a 60µ poly stayed put after the ply was
+corrected to 110µ, and the margin beside it went on measuring against a price
+that no longer described the job.
+
 **The working downloads as a spreadsheet**, laid out like the works' own
 Estimation sheet — their headings, their row order, their spelling — with the
 formulas **live**, so a different wage or film rate can be tried in the copy
