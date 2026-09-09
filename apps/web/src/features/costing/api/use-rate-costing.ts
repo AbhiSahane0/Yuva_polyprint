@@ -86,12 +86,27 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
     materials.find((material) => material.name === name)?.currentRate ?? 0;
 
   /*
+   * Whether the colours chosen are actually costed.
+   *
+   * Under FLAT_GSM — the works' Estimation method, and the default — ink is
+   * the structure's stated GSM times one blended rate, and which colours are
+   * ticked does not enter the arithmetic anywhere. Under PER_COLOUR it is the
+   * Costing sheet's method and each colour is priced on its own laydown,
+   * solids and rate.
+   */
+  const perColourInk = settings?.inkCostModel === 'PER_COLOUR';
+
+  /*
    * Colours chosen but not priced.
    *
    * A colour with no rate costs nothing, and nothing is a plausible-looking
    * number: a job printing white would quote at a twelfth of its real ink and
    * read perfectly normal. The same rule the unpriced film gauge follows —
    * refuse, and say which.
+   *
+   * Only where the colours are costed, though. Blocking a quotation over an
+   * unpriced Gold that the flat method never reads is a refusal with no
+   * arithmetic behind it — the rate would be identical either way.
    */
   const unpriced = unpricedColours(
     colourNames
@@ -224,6 +239,12 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
    */
   const supporting = settings
     ? [
+        /*
+         * The blended ink, which the flat method costs the WHOLE laydown at.
+         * Unpriced, it is the largest of these gaps by some way and the one
+         * least likely to be noticed, because no colour is named as missing.
+         */
+        ...(perColourInk ? ([] as string[][]) : [['Ink', settings.defaultInkMaterial] as string[]]),
         ['Adhesive', settings.defaultAdhesiveMaterial],
         ['Ethyl acetate', settings.defaultEthylAcetateMaterial],
         ['Toluene', settings.defaultTolueneMaterial],
@@ -247,7 +268,7 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
               ? line.quantitiesKg.some((quantity) => quantity > 0)
                 ? 'That is under a kilogram of film. A whole job’s setup over a few grams is not a rate anybody can quote — check the quantity below.'
                 : 'Enter a quantity below and the rate works itself out.'
-              : unpriced.length > 0
+              : perColourInk && unpriced.length > 0
                 ? `${unpriced.join(', ')} ${unpriced.length === 1 ? 'has' : 'have'} no rate yet. Price ${unpriced.length === 1 ? 'it' : 'them'} on the Rates screen — costing a colour at nothing would quietly understate the job.`
                 : unpricedSupporting.length > 0
                   ? `No rate for ${unpricedSupporting.join(', ')}. Every one of these is real cost on the job, so the rate would come out low — price them on the Rates screen, or point at the right material on the Costing screen.`
@@ -258,6 +279,8 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
     master,
     /** The assembled inputs, for anything that needs to re-run or export it. */
     input,
+    /** Whether the colours chosen change the price. See `perColourInk`. */
+    perColourInk,
     process,
     special,
     colourNames,

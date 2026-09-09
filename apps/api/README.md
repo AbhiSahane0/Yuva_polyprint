@@ -759,6 +759,13 @@ consumed weight would charge for it and then hand it back. The Costing sheet's
 per-colour ink and batch adhesive are computed alongside and shown in the
 breakdown, and `inkCostModel` / `adhesiveCostModel` switch to them.
 
+`inkCostModel` decides more than a number: under `FLAT_GSM` the colours chosen
+are not read at all — the same 500 kg job costs Rs 233.76/kg on CMYK, on CMYK +
+Gold and on CMYK + White alike — so the quotation screen hides the colour picker
+and states the flat GSM and rate instead. Under `PER_COLOUR` those three come to
+Rs 236.89, 241.49 and 246.59, and the picker is back. What the flat method does
+charge for is stations past the fifth, from the line's own colour count.
+
 Master data lives in `costing_machines`, `costing_labour`, and the `costing_*`
 keys in settings. `npm run seed:costing -w @yuva/api` loads the works' own 2022
 figures — **check them before quoting on them**.

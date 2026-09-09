@@ -13,9 +13,11 @@ import { SpecialColourModal } from './SpecialColourModal';
  * running metres, and the metres decide how long every machine is occupied.
  * Asking for a rate before any of that is asking somebody to remember one.
  *
- * It **suggests**; it does not impose. The rate boxes stay exactly as they
- * were and Use writes the figure into them, because the works knows things
- * this does not — what the customer paid last year, and who else is quoting.
+ * What it shows depends on how the works costs ink. Under the Estimation
+ * method the whole laydown is one flat GSM at one blended rate, so there is
+ * nothing here to choose and the panel says what it used instead. Under the
+ * Costing method each colour is priced on its own laydown and solids, and the
+ * choice is the job's to make.
  */
 export function RateCostingPanel({
   costing,
@@ -27,13 +29,17 @@ export function RateCostingPanel({
 }) {
   const [adding, setAdding] = useState(false);
 
-  /*
-   * The colours are picked here rather than taken from the cylinder count
-   * alone, because what they ARE changes the price: a white base coat lays 1.8
-   * g/m² at 40% solids and a process colour lays 0.13 at 19.5%, so two jobs
-   * with six cylinders each can differ by a third on ink.
-   */
-  const { settings, process, special, colourNames, toggle, setChosen, unusable } = costing;
+  const {
+    settings,
+    input,
+    perColourInk,
+    process,
+    special,
+    colourNames,
+    toggle,
+    setChosen,
+    unusable,
+  } = costing;
 
   if (!settings) return null;
 
@@ -59,56 +65,92 @@ export function RateCostingPanel({
             live on the Costing screen — repeating them on every job card
             invited four different answers to the same question, and the panel
             they cluttered is the one place the office looks for a price.
-          */}
-          <fieldset className="mb-4">
-            <legend className="text-ink-700 mb-2 text-sm font-medium">
-              Colours it prints
-              <span className="text-ink-400 ml-2 text-xs font-normal">
-                what they are changes the price — a white base coat lays 1.8 gsm against a process
-                colour&apos;s 0.13
-              </span>
-            </legend>
-            <div className="space-y-2">
-              <ColourGroup label="Process" inks={process} chosen={colourNames} onToggle={toggle} />
-              <ColourGroup
-                label="Special"
-                inks={special}
-                chosen={colourNames}
-                onToggle={toggle}
-                empty="None yet — a Pantone, a metallic, an opaque white"
-                action={
-                  <button
-                    type="button"
-                    onClick={() => setAdding(true)}
-                    className="border-brand-300 text-brand-700 hover:bg-brand-50 inline-flex cursor-pointer items-center gap-1 rounded-full border border-dashed px-3 py-1.5 text-xs font-medium"
-                  >
-                    <Plus className="size-3.5" />
-                    Add a special colour
-                  </button>
-                }
-              />
-            </div>
 
-            <p className="text-ink-500 mt-2 text-xs">
-              {colourNames.length} colour{colourNames.length === 1 ? '' : 's'}
-              {colourNames.length !== line.colourCount
-                ? ` — the line charges for ${line.colourCount} cylinder${line.colourCount === 1 ? '' : 's'}`
-                : ''}{' '}
-              · {settings.defaultWastagePercent}% wastage · {settings.defaultMarginPercent}% margin
-              · {settings.defaultTrimMm} mm trim · adhesive {settings.defaultAdhesiveRatio} —{' '}
-              <a href="/costing" className="text-brand-600 underline">
-                change on Costing
-              </a>
+            And they only belong here at all when they are costed. The flat
+            method reads one GSM and one rate; offering a picker beside it
+            showed the office a control that moved nothing, and an unpriced
+            metallic ticked in it used to refuse the whole quotation.
+          */}
+          {perColourInk ? (
+            <fieldset className="mb-3">
+              <legend className="text-ink-700 mb-2 text-sm font-medium">
+                Colours it prints
+                <span className="text-ink-400 ml-2 text-xs font-normal">
+                  each is priced on its own laydown and solids
+                </span>
+              </legend>
+              <div className="space-y-2">
+                <ColourGroup
+                  label="Process"
+                  inks={process}
+                  chosen={colourNames}
+                  onToggle={toggle}
+                />
+                <ColourGroup
+                  label="Special"
+                  inks={special}
+                  chosen={colourNames}
+                  onToggle={toggle}
+                  empty="None yet — a Pantone, a metallic, an opaque white"
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => setAdding(true)}
+                      className="border-brand-300 text-brand-700 hover:bg-brand-50 inline-flex cursor-pointer items-center gap-1 rounded-full border border-dashed px-3 py-1.5 text-xs font-medium"
+                    >
+                      <Plus className="size-3.5" />
+                      Add a special colour
+                    </button>
+                  }
+                />
+              </div>
+            </fieldset>
+          ) : (
+            <p className="text-ink-600 mb-3 flex flex-wrap items-baseline gap-x-2 text-sm">
+              <span className="text-ink-400 w-16 shrink-0 text-xs font-semibold tracking-wide uppercase">
+                Ink
+              </span>
+              <span>
+                {formatNumber(settings.inkGsm, 2)} gsm at Rs{' '}
+                {formatNumber(input?.job.flatInk?.ratePerKg ?? 0, 2)}/kg
+                <span className="text-ink-400">
+                  {' '}
+                  — {settings.defaultInkMaterial || 'no ink chosen'}, whatever colours print
+                </span>
+              </span>
             </p>
-          </fieldset>
+          )}
+
+          <p className="text-ink-500 text-xs">
+            {perColourInk ? (
+              <>
+                {colourNames.length} colour{colourNames.length === 1 ? '' : 's'}
+                {colourNames.length !== line.colourCount
+                  ? ` — the line charges for ${line.colourCount} cylinder${line.colourCount === 1 ? '' : 's'}`
+                  : ''}{' '}
+                ·{' '}
+              </>
+            ) : (
+              <>
+                {line.colourCount} cylinder{line.colourCount === 1 ? '' : 's'} ·{' '}
+              </>
+            )}
+            {settings.defaultWastagePercent}% wastage · {settings.defaultMarginPercent}% margin ·{' '}
+            {settings.defaultTrimMm} mm trim · adhesive {settings.defaultAdhesiveRatio} —{' '}
+            <a href="/costing" className="text-brand-600 underline">
+              change on Costing
+            </a>
+          </p>
         </>
       )}
 
-      <SpecialColourModal
-        open={adding}
-        onClose={() => setAdding(false)}
-        onCreated={(name) => setChosen([...colourNames, name])}
-      />
+      {perColourInk ? (
+        <SpecialColourModal
+          open={adding}
+          onClose={() => setAdding(false)}
+          onCreated={(name) => setChosen([...colourNames, name])}
+        />
+      ) : null}
     </section>
   );
 }

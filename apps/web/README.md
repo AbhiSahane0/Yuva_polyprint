@@ -1254,9 +1254,30 @@ Costing screen — repeated on every job card they invited four different answer
 to the same question, and cluttered the one place the office looks for a price.
 The panel prints the figures it used, with a link to change them.
 
-They are picked rather than counted, because what they **are** changes the
-price: a white base coat lays 1.8 g/m² at 40% solids against a process colour's
-0.13 at 19.5%, so two jobs with six cylinders each can differ by a third on ink.
+— but only where they are costed, which under the works' own settings they are
+not.
+
+**The picker appears only when ink is costed per colour.** Ink has two methods
+and they disagree by 2× on the same job. `FLAT_GSM` is the Estimation sheet and
+the default: the structure's stated GSM — 1.8 — times one blended rate, with the
+colours nowhere in the arithmetic. Measured, not assumed: the same 500 kg job
+comes to Rs 233.76/kg on CMYK, on CMYK + Gold and on CMYK + White alike.
+`PER_COLOUR` is the Costing sheet, where each colour is grossed up by its own
+solids and carries its own solvent, and the same three come to Rs 236.89, 241.49
+and 246.59.
+
+So under the flat method the panel states what it used — _"1.80 gsm at Rs
+210.00/kg — Ink — Black, whatever colours print"_ — and offers nothing to tick.
+A picker that moved nothing, captioned "what they are changes the price", taught
+the office something false about their own quotations; and an unpriced metallic
+ticked in it used to refuse the whole quotation, a refusal with no arithmetic
+behind it. What the flat method _does_ charge for is **cylinders**, from the
+sixth station on, and that comes from the job's colour count rather than from
+anything on this panel.
+
+Switch ink to per colour on the Costing screen and the picker returns, along
+with the unpriced-colour guard, because then the choice genuinely decides the
+price.
 
 **Two groups, because they are two different things.**
 
@@ -1277,7 +1298,10 @@ of liquid for every kilogram that stays on the film"_.
 
 A colour with no rate is marked `!`, and choosing it stops the panel rather than
 costing it at nothing — a job printing white at a rate of zero quotes at a
-twelfth of its real ink and looks entirely normal on the page.
+twelfth of its real ink and looks entirely normal on the page. Under the flat
+method the same guard moves to the **blended ink material** instead, which is
+the one the whole laydown is priced at and the easiest of all of them to leave
+unpriced unnoticed, because no colour is named as missing.
 
 **Under a kilogram it declines to answer.** A press is set for an hour whichever
 quantity follows it, so twenty pouches carry a whole job's setup and price at
