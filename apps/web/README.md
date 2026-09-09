@@ -51,6 +51,7 @@ src/
 │   ├── purchase/          suppliers, orders, receiving into stock
 │   ├── cylinders/         the design register and cylinder history
 │   ├── artwork/           design files: upload to R2, versions, previews
+│   ├── costing/           machines, wages, and the rate a job is costed at
 │   ├── gstin/             GSTIN field and lookup, shared by two screens
 │   ├── monitor/           sign-in log (admins only)
 │   └── rates/             daily material rates
@@ -1225,6 +1226,171 @@ permanent public link to a customer's unreleased packaging.
 
 Reading is open to anyone signed in — the floor works to the file the job
 prints. The buttons that change anything need the cylinders module.
+
+#### What it costs to make
+
+Each quantity on a job is **costed**, and the rate arrives in the box already
+filled in. There is no panel for it any more — there was one, a card at the foot
+of the job showing the colours and the works' figures, and it is gone: what it
+displayed was either settings that live on the Costing screen or a colour picker
+that, under the works' own method, moved nothing at all.
+
+It prices **each quantity separately**, because setting a press takes the same
+hour whether it runs 500 kg or 5,000 — which is the whole reason a quotation
+carries tiers, and the reason a bigger order genuinely costs less a kilogram.
+
+The figures come from the works' own workbook, reproduced rather than improved
+— every cell of "3. Anupriya.xlsx" ties out, down to Rs 263.40 a kilogram. The
+five places a fresh implementation would differ are **settings** on the Costing
+screen, each defaulting to what the sheet does: how ink is costed, how adhesive
+is costed, what the margin is taken on, what the EMI is spread over, and how
+much load a machine draws while it is being set. Move any of them and the rate
+moves off the client's spreadsheet, deliberately.
+
+**Colours are taken, not chosen.** The process colours the catalogue holds, then
+any spot colours, up to the job's colour count. There was a picker for this and
+it was removed, because under `FLAT_GSM` — the Estimation method, and the
+default — ink is a flat GSM at one blended rate and the choice never reached the
+arithmetic: the same 500 kg job came to Rs 233.76/kg on CMYK, on CMYK + Gold and
+on CMYK + White alike. Under `PER_COLOUR` the list does decide the answer
+(Rs 236.89, 241.49, 246.59 for those three), and it is the catalogue's order
+that supplies it.
+
+What the flat method **does** charge for is cylinders, from the sixth station
+on, and that comes from the job's own colour count.
+
+**Under a kilogram it declines to answer.** A press is set for an hour whichever
+quantity follows it, so twenty pouches carry a whole job's setup and price at
+thousands of rupees a kilogram — arithmetically right, and not a number anybody
+should be shown beside a heading that rounds to "0 kg".
+
+**ⓘ beside each rate shows the working** — the laminate ply by ply, the ink wet
+and dry, the adhesive batch, every machine's minutes, and the chain from
+material cost to the rate. A rate nobody can explain is a rate nobody can defend
+across a table, and the office is asked "why is it 251?" by customers holding
+three other quotations.
+
+**The rate arrives filled in.** There is no button to press to accept a figure
+the system already worked out — there were three cards offering it, which read
+as something magical happening off to one side, and it is not magic: it is what
+the job costs plus the works' margin. So it is in the box, with an **ⓘ** beside
+it for the working.
+
+**The rate follows the costing.** Change the film, the colours or the quantity
+and the price changes with them — no notice to read, no button to press. A rate
+worked out for a 60µ poly sitting on a 110µ one is not a decision anybody made;
+it is a number nobody updated, and the margin beside it goes on measuring
+against a price that no longer describes the job.
+
+Typing still holds: the write happens only when the **computed** figure moves,
+so a rate keyed in by hand stays until something that changes the cost is
+touched. That is also what stops it looping, since writing the rate re-renders
+the job.
+
+**Nothing on screen says when the costing cannot be trusted.** The hook still
+works it out — an unpriced solvent, no machines on record, a film gauge with no
+density — and the panel used to print it. With the panel gone there is no
+reader: an unpriced Toluene does not stop the arithmetic, it quietly understates
+it, and the rate lands in the box looking exactly as confident as a good one.
+`useRateCosting` returns `unusable` for whoever wants to surface it next.
+
+**The working downloads as a spreadsheet**, laid out like the works' own
+Estimation sheet — their headings, their row order, their spelling — with the
+formulas **live**, so a different wage or film rate can be tried in the copy
+and the total moves. Verified by evaluating the generated file: the chain
+recalculates to Rs 263.40 a kilogram and Rs 13.83 a pouch, which are the
+workbook's own figures.
+
+Each quantity row reports two margins —
+`37.3% gross · 8.0% net`. Gross subtracts materials; net subtracts everything,
+including the press setup. They are computed once and shared, so the panel and
+the rows cannot disagree about the same job.
+
+The pair exists because one figure was the flattering one, and most flattering
+exactly where it did most harm: materials cost the same per kilogram at any
+volume, so a short run at a higher rate showed the fattest margin on the
+screen while actually earning least. On a real quotation, 1,000 pouches read
+**71.9% gross** against 8,999 pouches' 37.3% — and net put both at **8%**.
+Someone reading the old row would have taken the small order believing it the
+best one there.
+
+Net is **absent, not zero**, when the line cannot be costed yet — a job that
+earns nothing and a job nobody has costed are different claims.
+
+**It suggests; it does not impose.** The rate boxes work exactly as they always
+did and **Use this rate** writes the figure in, because the works knows things
+this does not — what the customer paid last year, and who else is quoting. On a
+line sold by the piece it converts using the quotation's own pieces-per-kilogram
+so the figure shown is the figure the document carries.
+
+#### Corrections go back to the customer
+
+Correcting an address, a mobile or a brand on a quotation updates the customer
+record as you press Next, so the next quotation starts from the right details
+rather than the same wrong ones.
+
+This was disabled for a long time because it **erased customer records** —
+correct a district, press Next, and the address, city, mobile and brand were
+all stored as `NA`. The cause was not in this screen: `updateCustomerSchema`
+was `createCustomerSchema.partial()`, and Zod's `.partial()` leaves `.default()`
+in place, so the server filled in every field the form had deliberately left
+out. See [the API README](../api/README.md#a-patch-sends-what-it-sends).
+
+Two rules keep it safe either way, and both are tested: a field is written only
+if it differs from **what the form was filled in with** — not merely from the
+record, since an old quotation's snapshot legitimately differs — and **a blank
+never overwrites a stored value**. Clearing a field is done on the Customers
+screen, where the whole record is in front of you.
+
+#### A saved quotation keeps what it says, and only what it says
+
+Contact details are snapshotted onto the quotation. Opening a saved one shows
+**the document first, and the customer's record for the gaps** — the same rule
+the send dialog uses.
+
+Both halves were wrong at different times. The prefill used to run whenever the
+customer record resolved, which on an edit is a moment after the quotation
+itself, so the record's values overwrote the document's: a mobile and an email
+typed onto quotation 131 and saved correctly were gone the next time it was
+opened. Making the snapshot win outright then broke the opposite case —
+quotation 130 has every contact field blank while its customer carries a
+mobile, an email and an address, so it opened to six empty boxes and the office
+retyped what was already on record and concluded the write-back was broken.
+
+**A value typed onto a quotation is a decision; a blank is not.** Filling a gap
+also records what ended up on screen, so pressing Next straight afterwards
+sends nothing — the fill is not mistaken for an edit.
+
+#### When Save does nothing
+
+It used to. `handleSubmit` swallows a failed validation silently, which is right
+for a form on one page and wrong for a wizard — the field it objects to may be
+two steps back and entirely off screen. On this works' own data it happened the
+first time it was tried: a customer record carrying a mobile number the form
+will not accept blocks the save from the Details step, and the office clicks
+Save and watches nothing happen.
+
+Save now names the field and takes you to it — _"Enter Valid Mobile Number —
+taken back to Details"_.
+
+### Costing — `/costing`
+
+What the works costs to run: the machines, the wages, and the overheads every
+quoted rate is built from. A machine speed or a wage that is three years stale
+here makes every quotation raised afterwards wrong by the same amount, and
+nobody would see it — which is why it is a screen and not a constant.
+
+Machines show their **running cost per hour** (load × tariff) and wages show
+their **cost per minute**, because that is what the costing actually uses. A
+monthly salary is not a figure anyone can check a rate against.
+
+**Load while setting** is the share of a machine's connected load it draws
+while being threaded and cleaned. The client's sheet charges nothing for it,
+which cannot be right — the press is switched on — and charging the full load
+adds two thirds to the printing electricity, which is not right either. Nothing
+in the app can know, so the works sets it; 100% is the default.
+
+Retire rather than delete, as rates do: quotations were costed against it.
 
 ### Rates — `/rates`
 

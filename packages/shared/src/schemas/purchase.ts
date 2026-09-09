@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { partialWithoutDefaults } from './partial-update.js';
 import { paginationQuerySchema } from './common.js';
 import { CHOOSABLE_STATUSES, PURCHASE_ORDER_STATUSES } from '../lib/purchase.js';
 
@@ -25,7 +26,7 @@ export const supplierSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
-export const updateSupplierSchema = supplierSchema.partial();
+export const updateSupplierSchema = partialWithoutDefaults(supplierSchema);
 
 export const listSuppliersQuerySchema = paginationQuerySchema.extend({
   q: z.string().trim().max(200).optional(),
