@@ -1290,7 +1290,21 @@ material cost to the rate. A rate nobody can explain is a rate nobody can defend
 across a table, and the office is asked "why is it 251?" by customers holding
 three other quotations.
 
-Each rate card, and **each quantity row below**, reports two margins —
+**The rate arrives filled in.** There is no button to press to accept a figure
+the system already worked out — there were three cards offering it, which read
+as something magical happening off to one side, and it is not magic: it is what
+the job costs plus the works' margin. So it is in the box, with an **ⓘ** beside
+it for the working. A figure somebody types is never overwritten; the moment a
+rate is edited, that row is theirs.
+
+**The working downloads as a spreadsheet**, laid out like the works' own
+Estimation sheet — their headings, their row order, their spelling — with the
+formulas **live**, so a different wage or film rate can be tried in the copy
+and the total moves. Verified by evaluating the generated file: the chain
+recalculates to Rs 263.40 a kilogram and Rs 13.83 a pouch, which are the
+workbook's own figures.
+
+Each quantity row reports two margins —
 `37.3% gross · 8.0% net`. Gross subtracts materials; net subtracts everything,
 including the press setup. They are computed once and shared, so the panel and
 the rows cannot disagree about the same job.

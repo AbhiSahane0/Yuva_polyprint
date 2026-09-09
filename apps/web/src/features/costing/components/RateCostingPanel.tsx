@@ -1,10 +1,8 @@
 import { useState, type ReactNode } from 'react';
-import { Calculator, Info, Plus, Wand2 } from 'lucide-react';
-import { formatNumber, formatRs, type CostingBreakdown, type Material } from '@yuva/shared';
-import { Button } from '@/components/ui/Button';
+import { Calculator, Plus } from 'lucide-react';
+import { formatNumber, type Material } from '@yuva/shared';
 import { cn } from '@/lib/utils';
 import type { RateCosting, RateCostingLine } from '../api/use-rate-costing';
-import { CostingBreakdownModal } from './CostingBreakdownModal';
 import { SpecialColourModal } from './SpecialColourModal';
 
 /**
@@ -22,15 +20,11 @@ import { SpecialColourModal } from './SpecialColourModal';
 export function RateCostingPanel({
   costing,
   line,
-  onUseRate,
 }: {
   /** Shared with the quantity rows below, so the two cannot disagree. */
   costing: RateCosting;
   line: RateCostingLine;
-  /** Writes a computed rate into the quantity row it belongs to. */
-  onUseRate: (index: number, ratePerKg: number) => void;
 }) {
-  const [shown, setShown] = useState<CostingBreakdown | null>(null);
   const [adding, setAdding] = useState(false);
 
   /*
@@ -39,7 +33,7 @@ export function RateCostingPanel({
    * g/m² at 40% solids and a process colour lays 0.13 at 19.5%, so two jobs
    * with six cylinders each can differ by a third on ink.
    */
-  const { settings, process, special, colourNames, toggle, setChosen, results, unusable } = costing;
+  const { settings, process, special, colourNames, toggle, setChosen, unusable } = costing;
 
   if (!settings) return null;
 
@@ -107,61 +101,6 @@ export function RateCostingPanel({
               </a>
             </p>
           </fieldset>
-
-          <div className="grid gap-2 sm:grid-cols-3">
-            {results.map((result, index) =>
-              result === null ? null : (
-                <div
-                  key={index}
-                  className="border-ink-200 rounded-[var(--radius-md)] border bg-white p-3"
-                >
-                  <p className="text-ink-500 text-xs">
-                    {formatNumber(line.quantitiesKg[index] ?? 0, 1)} kg
-                  </p>
-                  <p className="text-ink-900 mt-0.5 flex items-center gap-1.5 text-lg font-bold tabular-nums">
-                    {formatRs(result.ratePerKg, 2)}
-                    <button
-                      type="button"
-                      onClick={() => setShown(result)}
-                      title="How this rate was worked out"
-                      aria-label={`How the rate for ${formatNumber(line.quantitiesKg[index] ?? 0, 1)} kg was worked out`}
-                      className="text-ink-400 hover:text-brand-600 cursor-pointer"
-                    >
-                      <Info className="size-4" />
-                    </button>
-                  </p>
-                  <p className="text-ink-500 text-xs">
-                    per kg · {formatRs(result.ratePerPiece, 2)} a piece
-                  </p>
-                  {/*
-                    Both, because gross alone is the number that makes a short
-                    run look like the best job on the page.
-                  */}
-                  <p className="text-ink-500 mt-1 text-xs">
-                    <span title="Over materials — film, ink and adhesive">
-                      {formatNumber(result.grossMarginPercent, 1)}% gross
-                    </span>{' '}
-                    ·{' '}
-                    <span
-                      className="text-ink-700 font-medium"
-                      title="Over everything the job costs, including the setup"
-                    >
-                      {formatNumber(result.netMarginPercent, 1)}% net
-                    </span>
-                  </p>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="mt-2 w-full"
-                    onClick={() => onUseRate(index, result.ratePerKg)}
-                  >
-                    <Wand2 className="size-4" />
-                    Use this rate
-                  </Button>
-                </div>
-              ),
-            )}
-          </div>
         </>
       )}
 
@@ -170,8 +109,6 @@ export function RateCostingPanel({
         onClose={() => setAdding(false)}
         onCreated={(name) => setChosen([...colourNames, name])}
       />
-
-      <CostingBreakdownModal breakdown={shown} onClose={() => setShown(null)} />
     </section>
   );
 }

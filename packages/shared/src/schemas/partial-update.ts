@@ -28,8 +28,25 @@ import { z } from 'zod';
  *
  * Validation is untouched: a field that IS sent is checked exactly as before.
  */
-export function partialWithoutDefaults<T extends z.ZodObject<z.ZodRawShape>>(schema: T) {
-  const shape = schema.shape as Record<string, z.ZodTypeAny>;
+/** A field with its `.default()` peeled off, if it had one. */
+type WithoutDefault<T> = T extends z.ZodDefault<infer Inner> ? Inner : T;
+
+/**
+ * The shape `partialWithoutDefaults` produces.
+ *
+ * Spelled out rather than inferred, because building the object from a
+ * `Record<string, ZodTypeAny>` erases every field's type — and the callers are
+ * service functions handing the result to Prisma, which then sees `{}` for
+ * every column and refuses the update.
+ */
+export type PartialWithoutDefaults<Shape extends z.ZodRawShape> = {
+  [K in keyof Shape]: z.ZodOptional<WithoutDefault<Shape[K]>>;
+};
+
+export function partialWithoutDefaults<Shape extends z.ZodRawShape>(
+  schema: z.ZodObject<Shape>,
+): z.ZodObject<PartialWithoutDefaults<Shape>> {
+  const shape = schema.shape as unknown as Record<string, z.ZodTypeAny>;
   const next: Record<string, z.ZodTypeAny> = {};
 
   for (const [key, field] of Object.entries(shape)) {
@@ -39,5 +56,5 @@ export function partialWithoutDefaults<T extends z.ZodObject<z.ZodRawShape>>(sch
       def?.type === 'default' && def.innerType ? def.innerType.optional() : field.optional();
   }
 
-  return z.object(next);
+  return z.object(next) as z.ZodObject<PartialWithoutDefaults<Shape>>;
 }

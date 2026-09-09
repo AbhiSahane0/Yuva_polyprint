@@ -1,7 +1,18 @@
-import type { ReactNode } from 'react';
-import { MACHINE_KIND_LABELS, formatNumber, formatRs, type CostingBreakdown } from '@yuva/shared';
+import { useState, type ReactNode } from 'react';
+import { FileSpreadsheet } from 'lucide-react';
+import {
+  MACHINE_KIND_LABELS,
+  formatNumber,
+  formatRs,
+  type CostingBreakdown,
+  type CostingInput,
+} from '@yuva/shared';
 import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import { ApiClientError } from '@/lib/api-client';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
+import { downloadCostingWorkbook } from '../api/costing-api';
 
 /**
  * Every figure behind the rate, in the order it was worked out.
@@ -13,13 +24,53 @@ import { cn } from '@/lib/utils';
  */
 export function CostingBreakdownModal({
   breakdown,
+  costing,
+  quotationNumber,
+  customerName,
+  jobName,
   onClose,
 }: {
   breakdown: CostingBreakdown | null;
+  /** The inputs behind it, so the working can be downloaded as a spreadsheet. */
+  costing?: CostingInput | null;
+  quotationNumber?: number | null;
+  customerName?: string;
+  jobName?: string;
   onClose: () => void;
 }) {
+  const [saving, setSaving] = useState(false);
+
   if (!breakdown) return null;
   const b = breakdown;
+
+  /*
+   * The same working, in the layout the office already reads.
+   *
+   * They have costed on their own Estimation sheet for years and check
+   * quotations against it. A download in a different shape is one they have to
+   * learn before they can use it, so this is theirs — with live formulas, so a
+   * different wage or film rate can be tried in the copy.
+   */
+  async function download() {
+    if (!costing) return;
+    setSaving(true);
+    try {
+      await downloadCostingWorkbook({
+        quotationNumber: quotationNumber ?? null,
+        customerName: customerName ?? '',
+        jobName: jobName ?? '',
+        costing,
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof ApiClientError || error instanceof Error
+          ? error.message
+          : 'Could not build the spreadsheet',
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <Modal
@@ -28,6 +79,19 @@ export function CostingBreakdownModal({
       size="xl"
       title={`How ${formatRs(b.ratePerKg, 2)} a kilogram was worked out`}
       description={`${formatNumber(b.orderQtyKg, 0)} kg ordered · ${formatNumber(b.consumedKg, 0)} kg consumed after ${formatNumber(b.wastageKg, 0)} kg of wastage`}
+      footer={
+        costing ? (
+          <div className="flex justify-between gap-2">
+            <span className="text-ink-500 self-center text-xs">
+              Downloads in your own Estimation layout, with the formulas live
+            </span>
+            <Button variant="secondary" onClick={() => void download()} loading={saving}>
+              <FileSpreadsheet className="size-4" />
+              Download as Excel
+            </Button>
+          </div>
+        ) : undefined
+      }
     >
       <div className="space-y-5 text-sm">
         <Block title="The laminate">

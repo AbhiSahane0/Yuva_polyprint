@@ -8,6 +8,7 @@ import {
   type CreateQuotationFormValues,
   type PricingBasis,
 } from '@yuva/shared';
+import { Info } from 'lucide-react';
 import { Field, NumberInput } from '@/components/ui/Field';
 import { cn } from '@/lib/utils';
 
@@ -51,6 +52,7 @@ export function QuantityFields({
   showsPouches = true,
   results,
   costings,
+  onShowWorking,
   errors,
   selectedQuantity,
   onSelectQuantity,
@@ -65,6 +67,8 @@ export function QuantityFields({
    * disappears rather than reading zero.
    */
   costings?: (CostingBreakdown | null)[];
+  /** Opens the working behind one row's rate. */
+  onShowWorking?: ((index: number) => void) | undefined;
   /**
    * Absent on a roll, where the switch is not shown at all — a reel has no
    * pouches to count, so offering the choice would be offering a mistake.
@@ -214,19 +218,38 @@ export function QuantityFields({
               </div>
 
               <div className="col-span-1 sm:col-span-2">
-                <Field
-                  label={`Rate ${index + 1}`}
-                  htmlFor={`items.${itemIndex}.quantities.${index}.${rateField}`}
-                  hint={perPouch ? 'per pouch' : 'per kg'}
-                  error={errors?.[index]?.[rateField]?.message}
-                >
-                  <NumberInput
-                    key={rateField}
-                    id={`items.${itemIndex}.quantities.${index}.${rateField}`}
-                    invalid={Boolean(errors?.[index]?.[rateField])}
-                    {...register(`items.${itemIndex}.quantities.${index}.${rateField}`)}
-                  />
-                </Field>
+                <div className="relative">
+                  <Field
+                    label={`Rate ${index + 1}`}
+                    htmlFor={`items.${itemIndex}.quantities.${index}.${rateField}`}
+                    hint={perPouch ? 'per pouch' : 'per kg'}
+                    error={errors?.[index]?.[rateField]?.message}
+                  >
+                    <NumberInput
+                      key={rateField}
+                      id={`items.${itemIndex}.quantities.${index}.${rateField}`}
+                      invalid={Boolean(errors?.[index]?.[rateField])}
+                      {...register(`items.${itemIndex}.quantities.${index}.${rateField}`)}
+                    />
+                  </Field>
+                  {/*
+                    The working, beside the figure it produced. The rate arrives
+                    filled in — there is no reason to make somebody press a
+                    button to accept a number the system already worked out —
+                    and this is how they check where it came from.
+                  */}
+                  {costings?.[index] && onShowWorking ? (
+                    <button
+                      type="button"
+                      onClick={() => onShowWorking(index)}
+                      title="How this rate was worked out"
+                      aria-label={`How rate ${index + 1} was worked out`}
+                      className="text-ink-400 hover:text-brand-600 absolute top-0 right-0 cursor-pointer p-0.5"
+                    >
+                      <Info className="size-4" />
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               {/*

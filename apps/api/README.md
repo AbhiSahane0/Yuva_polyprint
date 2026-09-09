@@ -643,15 +643,16 @@ Policy:
 
 ### Costing
 
-| Method | Path                           | Notes                              |
-| ------ | ------------------------------ | ---------------------------------- |
-| GET    | `/costing`                     | Machines and wages, in one request |
-| POST   | `/costing/machines`            | Add a machine                      |
-| PATCH  | `/costing/machines/:id`        | Correct one                        |
-| POST   | `/costing/machines/:id/retire` | Retire or restore it               |
-| POST   | `/costing/labour`              | Add a role                         |
-| PATCH  | `/costing/labour/:id`          | Correct one                        |
-| POST   | `/costing/labour/:id/retire`   | Retire or restore it               |
+| Method | Path                           | Notes                                                  |
+| ------ | ------------------------------ | ------------------------------------------------------ |
+| GET    | `/costing`                     | Machines and wages, in one request                     |
+| POST   | `/costing/workbook`            | The costing as a spreadsheet, in the works' own layout |
+| POST   | `/costing/machines`            | Add a machine                                          |
+| PATCH  | `/costing/machines/:id`        | Correct one                                            |
+| POST   | `/costing/machines/:id/retire` | Retire or restore it                                   |
+| POST   | `/costing/labour`              | Add a role                                             |
+| PATCH  | `/costing/labour/:id`          | Correct one                                            |
+| POST   | `/costing/labour/:id/retire`   | Retire or restore it                                   |
 
 Readable by anyone signed in, because the quotation wizard costs every line
 against it. Writing needs `requireModule('rates')` — a machine speed or a wage
@@ -717,6 +718,18 @@ they are a rounding error beside it: a three-fold order moved one real
 quotation by 38 paise a kilogram. It is the sheet's formula, not a fault. The
 tiers do separate under `marginBasis: TOTAL_COST`, where the margin follows a
 cost that does fall.
+
+**It downloads as their own spreadsheet.** `POST /costing/workbook` returns an
+`.xlsx` laid out like the Estimation sheet — their headings, their row order,
+their spelling — with **live formulas**, so a works that wants to try a
+different wage or film rate does it in the copy and watches the total move.
+That is what they do today, and a download full of pasted numbers would not let
+them. Verified by evaluating the generated file: the chain recalculates to
+Rs 263.40 a kilogram and Rs 13.83 a pouch.
+
+The whole calculation travels in the body rather than a quotation id, because
+the panel is a calculator: it prices quantities the document may never carry,
+against colours nobody has committed to. What is on screen is what downloads.
 
 **Gross and net.** The works' sheet has one margin concept — material cost
 times nine per cent — and no gross/net split at all. Its own labelled totals

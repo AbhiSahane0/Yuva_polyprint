@@ -256,6 +256,8 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
   return {
     settings,
     master,
+    /** The assembled inputs, for anything that needs to re-run or export it. */
+    input,
     process,
     special,
     colourNames,

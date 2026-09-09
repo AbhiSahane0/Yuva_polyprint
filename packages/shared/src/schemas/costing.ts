@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { partialWithoutDefaults } from './partial-update.js';
-import { MACHINE_KINDS } from '../lib/rate-costing.js';
+import { MACHINE_KINDS, type CostingInput } from '../lib/rate-costing.js';
 
 /**
  * Costing master data — what the works is, rather than what a job is.
@@ -52,3 +52,26 @@ export const labourSchema = z.object({
 export type LabourInput = z.infer<typeof labourSchema>;
 export const updateLabourSchema = partialWithoutDefaults(labourSchema);
 export type UpdateLabourInput = z.infer<typeof updateLabourSchema>;
+
+/**
+ * A costing sent up to be written out as a spreadsheet.
+ *
+ * The whole calculation travels rather than a quotation id, because the panel
+ * is a calculator: it prices quantities the document may never carry, against
+ * colours nobody has committed to. What is on screen is what should download.
+ *
+ * Loosely typed on purpose — the engine's own types are the contract, and
+ * re-declaring forty fields in zod would be a second definition free to drift
+ * from the first. `costRate` returns null on anything it cannot cost, which is
+ * the validation that matters.
+ */
+export const costingWorkbookSchema = z.object({
+  quotationNumber: z.coerce.number().int().positive().nullable().optional(),
+  customerName: z.string().trim().max(200).default(''),
+  jobName: z.string().trim().max(200).default(''),
+  costing: z.custom<CostingInput>((value) => typeof value === 'object' && value !== null, {
+    message: 'The costing is missing',
+  }),
+});
+
+export type CostingWorkbookInput = z.infer<typeof costingWorkbookSchema>;

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  costingWorkbookSchema,
   idParamSchema,
   labourSchema,
   machineSchema,
@@ -23,6 +24,18 @@ const router = Router();
  * authority a rate change carries.
  */
 router.get('/', asyncHandler(controller.masterData));
+
+/*
+ * The costing as a spreadsheet. A POST because the whole calculation travels
+ * in the body: it is a calculator, and what is on screen is what downloads —
+ * quantities the quotation may never carry, colours nobody has committed to.
+ * Anyone who can see a rate can export the working behind it.
+ */
+router.post(
+  '/workbook',
+  validate({ body: costingWorkbookSchema }),
+  asyncHandler(controller.workbook),
+);
 
 router.post(
   '/machines',

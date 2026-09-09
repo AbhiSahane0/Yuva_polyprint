@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AppSettings,
+  CostingInput,
   Material,
   CostingMasterData,
   Labour,
@@ -10,7 +11,8 @@ import type {
   UpdateLabourInput,
   UpdateMachineInput,
 } from '@yuva/shared';
-import { request } from '@/lib/api-client';
+import { apiClient, request } from '@/lib/api-client';
+import { saveBlob } from '@/lib/download';
 
 export const costingKeys = {
   all: ['costing'] as const,
@@ -136,4 +138,22 @@ export function useCreateSpecialColour() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['materials'] }),
   });
+}
+
+/**
+ * Downloads the costing as a spreadsheet, laid out like the works' own sheet.
+ *
+ * Goes through the API rather than being built in the browser: the layout is
+ * long, the office wants live formulas in it, and a workbook writer in the
+ * page bundle would be shipped to every screen that never asks for one.
+ */
+export async function downloadCostingWorkbook(input: {
+  quotationNumber?: number | null;
+  customerName: string;
+  jobName: string;
+  costing: CostingInput;
+}): Promise<void> {
+  const response = await apiClient.post('/costing/workbook', input, { responseType: 'blob' });
+  const name = `Costing ${input.jobName || 'quotation'}`.replace(/[^\w -]+/g, '').slice(0, 60);
+  saveBlob(response.data as Blob, `${name}.xlsx`);
 }

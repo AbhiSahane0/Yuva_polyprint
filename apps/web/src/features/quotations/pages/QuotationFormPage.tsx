@@ -87,6 +87,7 @@ import {
 import { QuotationPreview } from '../components/QuotationPreview';
 import { SendQuotationModal } from '../components/SendQuotationModal';
 import { RateCostingPanel } from '@/features/costing/components/RateCostingPanel';
+import { CostingBreakdownModal } from '@/features/costing/components/CostingBreakdownModal';
 import { useRateCosting, type RateCostingLine } from '@/features/costing/api/use-rate-costing';
 import { LayerFields } from '../components/LayerFields';
 import { QuantityFields, type QuantityResult } from '../components/QuantityFields';
@@ -1163,6 +1164,8 @@ export default function QuotationFormPage() {
                 setValue={setValue}
                 films={films}
                 materials={materials ?? []}
+                customerName={watched.customerName ?? ''}
+                quotationNumber={existing?.number ?? null}
                 jobs={chosenCustomer?.jobs ?? []}
                 item={watched.items?.[index] as Partial<ItemValues> | undefined}
                 cost={costed[index]}
@@ -1292,6 +1295,8 @@ function JobCard({
   setValue,
   films,
   materials,
+  customerName,
+  quotationNumber,
   jobs,
   item,
   cost,
@@ -1308,6 +1313,9 @@ function JobCard({
   films: Film[];
   /** The full rate catalogue — the costing panel needs inks and solvents too. */
   materials: Material[];
+  /** Only for naming the downloaded costing sheet. */
+  customerName: string;
+  quotationNumber: number | null;
   /** The chosen customer's saved jobs. Empty for a new company. */
   jobs: CustomerJob[];
   item: Partial<ItemValues> | undefined;
@@ -1389,27 +1397,52 @@ function JobCard({
    */
   const costing = useRateCosting(costingLine, materials);
 
-  /**
-   * Writes a suggested rate into the row it was worked out for.
+  /** Which row's working is open, if any. */
+  const [working, setWorking] = useState<number | null>(null);
+
+  /*
+   * The rate arrives filled in.
    *
-   * Per pouch when that is how the line is sold, because the office should not
-   * have to divide by the pieces in a kilogram to use a figure this screen
-   * already knows.
+   * There used to be three cards offering it with a Use this rate button on
+   * each, which read as something magical happening off to one side. It is not
+   * magic — it is what the job costs plus the works' margin — so it belongs in
+   * the box, with the working one click away beside it.
+   *
+   * A figure somebody typed is never overwritten. The row is filled while it
+   * is empty or still holds the last figure this put there; the moment it is
+   * edited, that row is theirs.
    */
-  const onUseRate = (position: number, ratePerKg: number) => {
-    const perKg = round(ratePerKg, 2);
-    if (basis === 'PER_POUCH') {
+  const autoFilled = useRef<Record<number, number>>({});
+
+  useEffect(() => {
+    const quantities = item?.quantities ?? [];
+    costing.results.forEach((result, position) => {
+      if (!result) return;
+
+      const perKg = round(result.ratePerKg, 2);
       const pieces = cost?.geometry.pouchesPerKg ?? 0;
-      if (pieces <= 0) return;
+      const next = basis === 'PER_POUCH' ? (pieces > 0 ? round(perKg / pieces, 4) : null) : perKg;
+      if (next === null) return;
+
+      const current = num(
+        quantities[position]?.[basis === 'PER_POUCH' ? 'ratePerPouch' : 'ratePerKg'],
+      );
+      const ours = autoFilled.current[position];
+      const untouched = current === 0 || (ours !== undefined && Math.abs(current - ours) < 0.00005);
+      if (!untouched || current === next) return;
+
+      autoFilled.current[position] = next;
       setNumber(
         setValue,
-        `items.${index}.quantities.${position}.ratePerPouch`,
-        round(perKg / pieces, 4),
+        `items.${index}.quantities.${position}.${basis === 'PER_POUCH' ? 'ratePerPouch' : 'ratePerKg'}`,
+        next,
       );
-      return;
-    }
-    setNumber(setValue, `items.${index}.quantities.${position}.ratePerKg`, perKg);
-  };
+    });
+    /*
+     * Deliberately not depending on the quantities: this WRITES them, and
+     * watching what it writes would loop.
+     */
+  }, [costing.results, basis, cost?.geometry.pouchesPerKg, index, item?.quantities, setValue]);
 
   /**
    * Fill the repeats in as the size is typed, until the office says otherwise.
@@ -1796,15 +1829,12 @@ function JobCard({
           />
         </div>
 
-        {fromSavedJob ? (
-          <div className="col-span-2 sm:col-span-12">
-            <p className="border-ink-200 text-ink-500 rounded-[var(--radius-md)] border border-dashed px-3 py-2.5 text-sm">
-              Repeat of a saved design —{' '}
-              <strong className="text-ink-800">no cylinder charge</strong>. Cylinders for{' '}
-              {item?.jobName || 'this job'} are already in the works.
-            </p>
-          </div>
-        ) : (
+        {/*
+          A repeat shows no cylinder panel at all. It used to explain itself in
+          a dashed box above the costing — true, and one more line between the
+          office and the price.
+        */}
+        {fromSavedJob ? null : (
           <div className="col-span-2 sm:col-span-12">
             <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -1928,7 +1958,7 @@ function JobCard({
           question about the job; everything below it is the answer.
         */}
         <div className="col-span-2 sm:col-span-12">
-          <RateCostingPanel costing={costing} line={costingLine} onUseRate={onUseRate} />
+          <RateCostingPanel costing={costing} line={costingLine} />
         </div>
 
         <div className="col-span-2 sm:col-span-12">
@@ -1949,12 +1979,33 @@ function JobCard({
             }
             results={cost?.quantities ?? []}
             costings={costing.results}
+            onShowWorking={setWorking}
             errors={errors?.quantities as never}
             selectedQuantity={selectedQuantity}
             onSelectQuantity={onSelectQuantity}
           />
         </div>
       </div>
+
+      <CostingBreakdownModal
+        breakdown={working === null ? null : (costing.results[working] ?? null)}
+        /* Costed at the quantity whose working is open, not the first one. */
+        costing={
+          working === null || !costing.input
+            ? null
+            : {
+                ...costing.input,
+                job: {
+                  ...costing.input.job,
+                  orderQtyKg: costingLine.quantitiesKg[working] ?? 0,
+                },
+              }
+        }
+        quotationNumber={quotationNumber}
+        customerName={customerName}
+        jobName={item?.jobName ?? ''}
+        onClose={() => setWorking(null)}
+      />
     </section>
   );
 }
