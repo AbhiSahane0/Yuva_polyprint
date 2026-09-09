@@ -113,7 +113,7 @@ interface NumberInputProps extends Omit<InputProps, 'type' | 'onChange'> {
  * than being destroyed.
  */
 export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(function NumberInput(
-  { allowNegative = false, onChange, onFocus, className, ...props },
+  { allowNegative = false, invalid, onChange, onFocus, className, ...props },
   ref,
 ) {
   const pattern = allowNegative ? /^-?\d*\.?\d*$/ : /^\d*\.?\d*$/;
@@ -130,7 +130,7 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(functi
       type="text"
       inputMode={allowNegative ? 'text' : 'decimal'}
       autoComplete="off"
-      aria-invalid={props.invalid || undefined}
+      aria-invalid={invalid || undefined}
       onFocus={(event) => {
         // A lone zero is a placeholder somebody means to replace. Selecting it
         // means the first keystroke does that rather than appending to it.
@@ -147,7 +147,7 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(functi
       className={cn(
         CONTROL,
         'tabular-nums',
-        props.invalid ? 'border-danger-500' : 'border-ink-200',
+        invalid ? 'border-danger-500' : 'border-ink-200',
         className,
       )}
       {...props}

@@ -53,7 +53,6 @@ export function QuantityFields({
   results,
   costings,
   onShowWorking,
-  onTakeRate,
   errors,
   selectedQuantity,
   onSelectQuantity,
@@ -70,8 +69,6 @@ export function QuantityFields({
   costings?: (CostingBreakdown | null)[];
   /** Opens the working behind one row's rate. */
   onShowWorking?: ((index: number) => void) | undefined;
-  /** Replaces a row's rate with what the job now costs. */
-  onTakeRate?: ((index: number, rate: number) => void) | undefined;
   /**
    * Absent on a roll, where the switch is not shown at all — a reel has no
    * pouches to count, so offering the choice would be offering a mistake.
@@ -241,23 +238,6 @@ export function QuantityFields({
                     button to accept a number the system already worked out —
                     and this is how they check where it came from.
                   */}
-                  {/*
-                    What it costs NOW, when the box disagrees.
-                    
-                    A rate is filled in once and then belongs to whoever is
-                    looking at it — so changing the film underneath it must not
-                    overwrite a price somebody decided on. But it must not sit
-                    there silently either: a rate worked out for a 60µ poly
-                    stayed in the box after the ply was corrected to 110µ, and
-                    the margin beside it went on measuring against a price that
-                    no longer described the job.
-                  */}
-                  <Stale
-                    typedPerKg={result?.ratePerKg ?? 0}
-                    costing={costings?.[index] ?? null}
-                    perPouch={perPouch}
-                    onTake={onTakeRate ? (rate) => onTakeRate(index, rate) : undefined}
-                  />
                   {costings?.[index] && onShowWorking ? (
                     <button
                       type="button"
@@ -415,53 +395,5 @@ function Margins({
         </span>
       )}
     </span>
-  );
-}
-
-/**
- * Says what the job costs now, when the rate in the box no longer matches it.
- *
- * A filled-in rate belongs to whoever is looking at it — changing the film
- * underneath must not overwrite a price somebody decided on. But it must not
- * sit there silently either: a rate worked out for a 60µ poly stayed put after
- * the ply was corrected to 110µ, and the margin beside it went on measuring
- * against a price that no longer described the job.
- *
- * So: never overwrite, always say. One click takes the new figure.
- */
-function Stale({
-  typedPerKg,
-  costing,
-  perPouch,
-  onTake,
-}: {
-  typedPerKg: number;
-  costing: CostingBreakdown | null;
-  perPouch: boolean;
-  onTake?: ((ratePerKg: number) => void) | undefined;
-}) {
-  /* A breakdown with no rate of its own has nothing to compare against. */
-  if (!costing || typedPerKg <= 0 || !(costing.ratePerKg > 0)) return null;
-
-  /* A rupee in a hundred. Below that it is rounding, not a stale figure. */
-  const drift = Math.abs(typedPerKg - costing.ratePerKg) / costing.ratePerKg;
-  if (drift < 0.01) return null;
-
-  const shown = perPouch ? costing.ratePerPiece : costing.ratePerKg;
-
-  return (
-    <p className="text-warning-700 mt-1 text-xs">
-      Costs {formatRs(shown, 2)}
-      {perPouch ? ' a pouch' : ' a kg'} now
-      {onTake ? (
-        <button
-          type="button"
-          onClick={() => onTake(costing.ratePerKg)}
-          className="text-brand-600 ml-1.5 cursor-pointer underline"
-        >
-          use it
-        </button>
-      ) : null}
-    </p>
   );
 }

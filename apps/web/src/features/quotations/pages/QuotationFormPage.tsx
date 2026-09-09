@@ -1401,48 +1401,37 @@ function JobCard({
   const [working, setWorking] = useState<number | null>(null);
 
   /*
-   * The rate arrives filled in.
+   * The rate follows the costing.
    *
-   * There used to be three cards offering it with a Use this rate button on
-   * each, which read as something magical happening off to one side. It is not
-   * magic — it is what the job costs plus the works' margin — so it belongs in
-   * the box, with the working one click away beside it.
+   * Not a suggestion offered beside the box — the box itself. It is what the
+   * job costs plus the works' margin, so when the film, the colours or the
+   * quantity change, the price changes with them and nobody has to notice and
+   * accept it. A rate worked out for a 60µ poly sitting on a 110µ one is not a
+   * decision anybody made; it is a number nobody updated.
    *
-   * A figure somebody typed is never overwritten. The row is filled while it
-   * is empty or still holds the last figure this put there; the moment it is
-   * edited, that row is theirs.
+   * Typing still holds. The write only happens when the COMPUTED figure moves,
+   * so a rate keyed in by hand stays until something that changes the cost is
+   * touched — and that is also what stops this looping, since writing the rate
+   * re-renders the card.
    */
-  const autoFilled = useRef<Record<number, number>>({});
+  const lastComputed = useRef<Record<number, number>>({});
 
   useEffect(() => {
-    const quantities = item?.quantities ?? [];
+    const field = basis === 'PER_POUCH' ? 'ratePerPouch' : 'ratePerKg';
+    const pieces = cost?.geometry.pouchesPerKg ?? 0;
+
     costing.results.forEach((result, position) => {
       if (!result) return;
 
       const perKg = round(result.ratePerKg, 2);
-      const pieces = cost?.geometry.pouchesPerKg ?? 0;
       const next = basis === 'PER_POUCH' ? (pieces > 0 ? round(perKg / pieces, 4) : null) : perKg;
       if (next === null) return;
 
-      const current = num(
-        quantities[position]?.[basis === 'PER_POUCH' ? 'ratePerPouch' : 'ratePerKg'],
-      );
-      const ours = autoFilled.current[position];
-      const untouched = current === 0 || (ours !== undefined && Math.abs(current - ours) < 0.00005);
-      if (!untouched || current === next) return;
-
-      autoFilled.current[position] = next;
-      setNumber(
-        setValue,
-        `items.${index}.quantities.${position}.${basis === 'PER_POUCH' ? 'ratePerPouch' : 'ratePerKg'}`,
-        next,
-      );
+      if (lastComputed.current[position] === next) return;
+      lastComputed.current[position] = next;
+      setNumber(setValue, `items.${index}.quantities.${position}.${field}`, next);
     });
-    /*
-     * Deliberately not depending on the quantities: this WRITES them, and
-     * watching what it writes would loop.
-     */
-  }, [costing.results, basis, cost?.geometry.pouchesPerKg, index, item?.quantities, setValue]);
+  }, [costing.results, basis, cost?.geometry.pouchesPerKg, index, setValue]);
 
   /**
    * Fill the repeats in as the size is typed, until the office says otherwise.
@@ -1980,23 +1969,6 @@ function JobCard({
             results={cost?.quantities ?? []}
             costings={costing.results}
             onShowWorking={setWorking}
-            onTakeRate={(position, ratePerKg) => {
-              /* A deliberate replacement, so it becomes this row's figure. */
-              const pieces = cost?.geometry.pouchesPerKg ?? 0;
-              const next =
-                basis === 'PER_POUCH'
-                  ? pieces > 0
-                    ? round(ratePerKg / pieces, 4)
-                    : null
-                  : round(ratePerKg, 2);
-              if (next === null) return;
-              autoFilled.current[position] = next;
-              setNumber(
-                setValue,
-                `items.${index}.quantities.${position}.${basis === 'PER_POUCH' ? 'ratePerPouch' : 'ratePerKg'}`,
-                next,
-              );
-            }}
             errors={errors?.quantities as never}
             selectedQuantity={selectedQuantity}
             onSelectQuantity={onSelectQuantity}

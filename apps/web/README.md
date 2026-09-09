@@ -1294,15 +1294,18 @@ three other quotations.
 the system already worked out — there were three cards offering it, which read
 as something magical happening off to one side, and it is not magic: it is what
 the job costs plus the works' margin. So it is in the box, with an **ⓘ** beside
-it for the working. A figure somebody types is never overwritten; the moment a
-rate is edited, that row is theirs.
+it for the working.
 
-**A rate that no longer matches says so.** Changing the film under a filled-in
-rate does not overwrite it — that price may be one somebody decided on — but it
-does not sit there silently either: the row reads _"Costs Rs 291.95 a kg now —
-use it"_. A rate worked out for a 60µ poly stayed put after the ply was
-corrected to 110µ, and the margin beside it went on measuring against a price
-that no longer described the job.
+**The rate follows the costing.** Change the film, the colours or the quantity
+and the price changes with them — no notice to read, no button to press. A rate
+worked out for a 60µ poly sitting on a 110µ one is not a decision anybody made;
+it is a number nobody updated, and the margin beside it goes on measuring
+against a price that no longer describes the job.
+
+Typing still holds: the write happens only when the **computed** figure moves,
+so a rate keyed in by hand stays until something that changes the cost is
+touched. That is also what stops it looping, since writing the rate re-renders
+the card.
 
 **The working downloads as a spreadsheet**, laid out like the works' own
 Estimation sheet — their headings, their row order, their spelling — with the

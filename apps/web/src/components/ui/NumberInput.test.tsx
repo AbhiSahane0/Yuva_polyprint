@@ -94,3 +94,23 @@ describe('NumberInput', () => {
     expect(box().value).toBe('');
   });
 });
+
+describe('NumberInput and the DOM', () => {
+  it('keeps `invalid` out of the markup', () => {
+    /*
+     * It reads the prop for the border and for aria-invalid, and used to
+     * forward it as well — React then warned on every render of every number
+     * box on the quotation screen, which is most of them, and buried anything
+     * else in the console.
+     */
+    render(<NumberInput aria-label="rate" invalid={false} defaultValue="1" />);
+    const input = screen.getByLabelText('rate');
+    expect(input.hasAttribute('invalid')).toBe(false);
+    expect(input.getAttribute('aria-invalid')).toBeNull();
+  });
+
+  it('still marks a refused value for a screen reader', () => {
+    render(<NumberInput aria-label="rate" invalid defaultValue="1" />);
+    expect(screen.getByLabelText('rate').getAttribute('aria-invalid')).toBe('true');
+  });
+});
