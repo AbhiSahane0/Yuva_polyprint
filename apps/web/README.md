@@ -1229,12 +1229,11 @@ prints. The buttons that change anything need the cylinders module.
 
 #### What it costs to make
 
-At the **foot** of each job, below the cylinders. It used to sit in the middle,
-which asked the office to name a price before the job had finished describing
-itself — and a costed rate cannot be answered until it has: the structure
-decides the weight, the weight decides the running metres, and the metres decide
-how long every machine is occupied. Everything above the panel is a question
-about the job; everything below it is the answer.
+Each quantity on a job is **costed**, and the rate arrives in the box already
+filled in. There is no panel for it any more — there was one, a card at the foot
+of the job showing the colours and the works' figures, and it is gone: what it
+displayed was either settings that live on the Costing screen or a colour picker
+that, under the works' own method, moved nothing at all.
 
 It prices **each quantity separately**, because setting a press takes the same
 hour whether it runs 500 kg or 5,000 — which is the whole reason a quotation
@@ -1242,66 +1241,23 @@ carries tiers, and the reason a bigger order genuinely costs less a kilogram.
 
 The figures come from the works' own workbook, reproduced rather than improved
 — every cell of "3. Anupriya.xlsx" ties out, down to Rs 263.40 a kilogram. The
-five places a fresh implementation would differ are **settings** on this
+five places a fresh implementation would differ are **settings** on the Costing
 screen, each defaulting to what the sheet does: how ink is costed, how adhesive
 is costed, what the margin is taken on, what the EMI is spread over, and how
 much load a machine draws while it is being set. Move any of them and the rate
 moves off the client's spreadsheet, deliberately.
 
-**Colours are the only thing on the panel that belongs to the job.** Wastage,
-margin, trim and the adhesive batch are what the works _is_, so they live on the
-Costing screen — repeated on every job card they invited four different answers
-to the same question, and cluttered the one place the office looks for a price.
-The panel prints the figures it used, with a link to change them.
+**Colours are taken, not chosen.** The process colours the catalogue holds, then
+any spot colours, up to the job's colour count. There was a picker for this and
+it was removed, because under `FLAT_GSM` — the Estimation method, and the
+default — ink is a flat GSM at one blended rate and the choice never reached the
+arithmetic: the same 500 kg job came to Rs 233.76/kg on CMYK, on CMYK + Gold and
+on CMYK + White alike. Under `PER_COLOUR` the list does decide the answer
+(Rs 236.89, 241.49, 246.59 for those three), and it is the catalogue's order
+that supplies it.
 
-— but only where they are costed, which under the works' own settings they are
-not.
-
-**The picker appears only when ink is costed per colour.** Ink has two methods
-and they disagree by 2× on the same job. `FLAT_GSM` is the Estimation sheet and
-the default: the structure's stated GSM — 1.8 — times one blended rate, with the
-colours nowhere in the arithmetic. Measured, not assumed: the same 500 kg job
-comes to Rs 233.76/kg on CMYK, on CMYK + Gold and on CMYK + White alike.
-`PER_COLOUR` is the Costing sheet, where each colour is grossed up by its own
-solids and carries its own solvent, and the same three come to Rs 236.89, 241.49
-and 246.59.
-
-So under the flat method the panel states what it used — _"1.80 gsm at Rs
-210.00/kg — Ink — Black, whatever colours print"_ — and offers nothing to tick.
-A picker that moved nothing, captioned "what they are changes the price", taught
-the office something false about their own quotations; and an unpriced metallic
-ticked in it used to refuse the whole quotation, a refusal with no arithmetic
-behind it. What the flat method _does_ charge for is **cylinders**, from the
-sixth station on, and that comes from the job's colour count rather than from
-anything on this panel.
-
-Switch ink to per colour on the Costing screen and the picker returns, along
-with the unpriced-colour guard, because then the choice genuinely decides the
-price.
-
-**Two groups, because they are two different things.**
-
-_Process_ is cyan, magenta, yellow and black — on every press, on every job, and
-not a decision anybody makes. _Special_ is one customer's brand: a Pantone, a
-metallic, an opaque white. Those become the works' business only once a tin has
-been bought, so the group starts empty and **Add a special colour** fills it
-from here — the office should not have to leave a half-priced quotation to go
-and create a material.
-
-That dialog writes a real ink row with a real rate, which the Rates screen then
-owns like any other price. It offers rough starting points (an opaque base coat
-is about 1.8 gsm at 40% solids; a strong spot colour nearer 0.25 at 23%) because
-somebody entering their first spot colour has no idea whether 0.25 or 2.5 is the
-right order of magnitude, and the tin does not say grams per square metre. It
-also shows what the solids mean in money: _"at 23% solids the works buys 4.3 kg
-of liquid for every kilogram that stays on the film"_.
-
-A colour with no rate is marked `!`, and choosing it stops the panel rather than
-costing it at nothing — a job printing white at a rate of zero quotes at a
-twelfth of its real ink and looks entirely normal on the page. Under the flat
-method the same guard moves to the **blended ink material** instead, which is
-the one the whole laydown is priced at and the easiest of all of them to leave
-unpriced unnoticed, because no colour is named as missing.
+What the flat method **does** charge for is cylinders, from the sixth station
+on, and that comes from the job's own colour count.
 
 **Under a kilogram it declines to answer.** A press is set for an hour whichever
 quantity follows it, so twenty pouches carry a whole job's setup and price at
@@ -1329,7 +1285,14 @@ against a price that no longer describes the job.
 Typing still holds: the write happens only when the **computed** figure moves,
 so a rate keyed in by hand stays until something that changes the cost is
 touched. That is also what stops it looping, since writing the rate re-renders
-the card.
+the job.
+
+**Nothing on screen says when the costing cannot be trusted.** The hook still
+works it out — an unpriced solvent, no machines on record, a film gauge with no
+density — and the panel used to print it. With the panel gone there is no
+reader: an unpriced Toluene does not stop the arithmetic, it quietly understates
+it, and the rate lands in the box looking exactly as confident as a good one.
+`useRateCosting` returns `unusable` for whoever wants to surface it next.
 
 **The working downloads as a spreadsheet**, laid out like the works' own
 Estimation sheet — their headings, their row order, their spelling — with the

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   adhesiveGsmFor,
   costRate,
@@ -60,27 +60,28 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
   );
 
   /*
-   * Two groups, because they are two different things. Cyan, magenta, yellow
-   * and black are on every press and every job may use them. Everything after
-   * that is one customer's brand and only becomes the works' business once a
-   * tin has been bought — which is why the second group can be added to from
-   * here rather than being a list somebody guessed in advance.
+   * Which colours the job prints.
+   *
+   * Taken from the catalogue rather than chosen, because under the works' own
+   * settings the choice never mattered: ink is the Estimation sheet's flat GSM
+   * at one blended rate, and the same job came to Rs 233.76/kg on CMYK, on
+   * CMYK + Gold and on CMYK + White alike. There was a picker here for it, and
+   * it was removed — a control that moves nothing teaches the office something
+   * false about their own quotations.
+   *
+   * The process colours come first because every press carries them, and a
+   * job's own spot colours follow. The engine needs at least one to price the
+   * ink at all under PER_COLOUR, which is the method where this list does
+   * decide the answer.
    */
-  const process = inks.filter((ink) => ink.inkKind === 'PROCESS');
-  const special = inks.filter((ink) => ink.inkKind !== 'PROCESS');
-
-  const [chosen, setChosen] = useState<string[] | null>(null);
-  const colourNames =
-    chosen ?? [...process, ...special].slice(0, Math.max(1, line.colourCount)).map((i) => i.name);
+  const colourNames = [
+    ...inks.filter((ink) => ink.inkKind === 'PROCESS'),
+    ...inks.filter((ink) => ink.inkKind !== 'PROCESS'),
+  ]
+    .slice(0, Math.max(1, line.colourCount))
+    .map((ink) => ink.name);
   /* A stable dependency: the array is rebuilt every render, its contents are not. */
   const colourKey = colourNames.join('|');
-
-  const toggle = (name: string) =>
-    setChosen(
-      colourNames.includes(name)
-        ? colourNames.filter((chosenName) => chosenName !== name)
-        : [...colourNames, name],
-    );
 
   const rate = (name: string): number =>
     materials.find((material) => material.name === name)?.currentRate ?? 0;
@@ -279,14 +280,15 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
     master,
     /** The assembled inputs, for anything that needs to re-run or export it. */
     input,
-    /** Whether the colours chosen change the price. See `perColourInk`. */
-    perColourInk,
-    process,
-    special,
-    colourNames,
-    toggle,
-    setChosen,
     results,
+    /**
+     * Why the figures cannot be trusted, when they cannot.
+     *
+     * Nothing displays this since the costing panel was removed, and it is
+     * kept rather than deleted because it is the only thing that knows: an
+     * unpriced solvent does not stop the arithmetic, it quietly understates
+     * it. Somewhere ought to say so.
+     */
     unusable,
   } as const;
 }

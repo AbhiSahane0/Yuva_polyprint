@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AppSettings,
   CostingInput,
-  Material,
   CostingMasterData,
   Labour,
   LabourInput,
@@ -98,47 +97,6 @@ export function useUpdateSettings() {
 }
 
 export type { UpdateLabourInput, UpdateMachineInput };
-
-/**
- * Adds a special colour and prices it, in one step.
- *
- * It is an ink material like any other — this is not a separate kind of thing,
- * it is the rate catalogue gaining a row at the moment somebody needs it. The
- * rate goes on in the same call, because a colour without one costs nothing
- * and the panel refuses to quote it.
- */
-export function useCreateSpecialColour() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: {
-      name: string;
-      laydownGsm: number;
-      solidsPercent: number;
-      ratePerKg: number;
-    }) => {
-      const material = await request<Material>({
-        url: '/materials',
-        method: 'POST',
-        data: {
-          name: input.name,
-          category: 'INK',
-          unit: 'KG',
-          inkKind: 'SPECIAL',
-          laydownGsm: input.laydownGsm,
-          solidsPercent: input.solidsPercent,
-        },
-      });
-      /* The same endpoint the Rates screen uses, so the price has a history. */
-      await request({
-        url: '/materials/rates',
-        method: 'PUT',
-        data: { entries: [{ materialId: material.id, rate: input.ratePerKg }] },
-      });
-      return material;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['materials'] }),
-  });
-}
 
 /**
  * Downloads the costing as a spreadsheet, laid out like the works' own sheet.

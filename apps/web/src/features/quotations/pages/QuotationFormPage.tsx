@@ -86,7 +86,6 @@ import {
 } from '../lib/step-save';
 import { QuotationPreview } from '../components/QuotationPreview';
 import { SendQuotationModal } from '../components/SendQuotationModal';
-// import { RateCostingPanel } from '@/features/costing/components/RateCostingPanel';
 import { CostingBreakdownModal } from '@/features/costing/components/CostingBreakdownModal';
 import { useRateCosting, type RateCostingLine } from '@/features/costing/api/use-rate-costing';
 import { LayerFields } from '../components/LayerFields';
@@ -1938,7 +1937,7 @@ function JobCard({
 
         {/*
           The rate lives at the FOOT of the job, not in the middle of it.
-          
+
           It used to sit above the cylinders, which asked the office to name a
           price before the job had finished describing itself — and a costed
           rate cannot be answered until it has: the structure decides the
@@ -1946,10 +1945,6 @@ function JobCard({
           how long every machine is occupied. Everything above this line is a
           question about the job; everything below it is the answer.
         */}
-        {/* <div className="col-span-2 sm:col-span-12">
-          <RateCostingPanel costing={costing} line={costingLine} />
-        </div> */}
-
         <div className="col-span-2 sm:col-span-12">
           <QuantityFields
             control={control}

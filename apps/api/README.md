@@ -761,10 +761,12 @@ breakdown, and `inkCostModel` / `adhesiveCostModel` switch to them.
 
 `inkCostModel` decides more than a number: under `FLAT_GSM` the colours chosen
 are not read at all — the same 500 kg job costs Rs 233.76/kg on CMYK, on CMYK +
-Gold and on CMYK + White alike — so the quotation screen hides the colour picker
-and states the flat GSM and rate instead. Under `PER_COLOUR` those three come to
-Rs 236.89, 241.49 and 246.59, and the picker is back. What the flat method does
-charge for is stations past the fifth, from the line's own colour count.
+Gold and on CMYK + White alike. Under `PER_COLOUR` those three come to
+Rs 236.89, 241.49 and 246.59. The quotation screen used to let the office pick
+the colours; it no longer does, since under the works' own setting the picker
+moved nothing. They are taken from the catalogue in order, up to the job's
+colour count — which is also what the station surcharge is charged on, from the
+sixth station.
 
 Master data lives in `costing_machines`, `costing_labour`, and the `costing_*`
 keys in settings. `npm run seed:costing -w @yuva/api` loads the works' own 2022
