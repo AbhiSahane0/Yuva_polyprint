@@ -194,6 +194,10 @@ guard is visible in that diff; a guard forgotten three files away is not.
              question. Registering or moving one needs
              requireModule('cylinders'); DELETING a design needs customers as
              well, because the record it destroys is a job.
+/costing     authenticate — the quotation wizard costs every line against the
+             machines and wages, so gating the read would break pricing for
+             somebody who has quotations but not rates. Changing one needs
+             requireModule('rates').
 /artwork     authenticate — the floor works to the file a job prints, and gating
              that on the cylinders module hides it from exactly the people who
              need it. Uploading, refiling and removing need
@@ -205,6 +209,31 @@ guard is visible in that diff; a guard forgotten three files away is not.
 app does not look broken. Anyone can type a URL or call the endpoint with curl,
 so the server is what actually says no — and it returns 403 whether or not the
 client bothered to hide the link.
+
+### A PATCH sends what it sends
+
+`schema.partial()` is not enough on its own, and getting this wrong turned
+every partial update into a full overwrite.
+
+Zod's `.partial()` makes a field optional; it does **not** remove its
+`.default()`, and a default fires precisely when a key is absent. So
+`PATCH /customers/:id` with `{ district: 'Nashik' }` parsed to that plus
+`brandName: 'NA'`, `address: 'NA'`, `city: 'NA'`, `mobile: 'NA'`,
+`email: 'NA'` — and the service spread it into `prisma.update`.
+
+It erased four real customer records. Three attempts to fix it in the quotation
+wizard failed because the wizard was innocent: it sent exactly the one field
+that had changed.
+
+**Seven of the eleven update schemas had it**, and the customer one was not the
+worst — a partial quotation update reset a SENT quotation to `DRAFT` and
+rewrote its terms; a partial material update un-retired the material.
+
+All of them now use `partialWithoutDefaults`, which unwraps one layer of
+`ZodDefault` before making the field optional. Validation of what IS sent is
+unchanged. A test sweeps every exported `update*Schema` and asserts an empty
+body parses to an empty object — testing the seven that were broken would not
+have stopped the eighth.
 
 ### Things the API refuses
 
@@ -611,6 +640,135 @@ Policy:
   }
 ]
 ```
+
+### Costing
+
+| Method | Path                           | Notes                                                  |
+| ------ | ------------------------------ | ------------------------------------------------------ |
+| GET    | `/costing`                     | Machines and wages, in one request                     |
+| POST   | `/costing/workbook`            | The costing as a spreadsheet, in the works' own layout |
+| POST   | `/costing/machines`            | Add a machine                                          |
+| PATCH  | `/costing/machines/:id`        | Correct one                                            |
+| POST   | `/costing/machines/:id/retire` | Retire or restore it                                   |
+| POST   | `/costing/labour`              | Add a role                                             |
+| PATCH  | `/costing/labour/:id`          | Correct one                                            |
+| POST   | `/costing/labour/:id/retire`   | Retire or restore it                                   |
+
+Readable by anyone signed in, because the quotation wizard costs every line
+against it. Writing needs `requireModule('rates')` — a machine speed or a wage
+moves the price of every quotation raised afterwards, which is the same
+authority a rate change carries. Retire rather than delete, for the same reason
+a retired material stays: quotations were costed against it.
+
+### Building a rate from what it costs to make
+
+`packages/shared/src/lib/rate-costing.ts`. Nothing on the server computes it —
+the wizard, the API and the PDF all call the same function, so they cannot
+disagree about a price.
+
+It is the works' own method, from the spreadsheets they cost by. Kilograms
+become running metres, metres become machine minutes, minutes become rupees:
+
+```
+order 500 kg + 8% wastage      →  540 kg consumed
+each ply's share of the GSM    →  its kilograms
+kg ÷ GSM ÷ web width           →  running metres
+metres ÷ machine speed         →  minutes, + setup
+minutes × (HP × rate)          →  electricity
+minutes × (salary ÷ days ÷ hours ÷ 60)  →  wages
+```
+
+Ink and adhesive are the parts worth understanding, because they are where a
+naive costing goes wrong by a factor:
+
+- **Ink is bought wet.** A colour lays 0.15 g/m² of pigment from a tin that is
+  23% solids, so `100 ÷ solids` kilograms are purchased for every one that
+  stays on the film, and solvent is added on top at the press ratio. Costing a
+  laydown against the purchase rate understates ink three to five times over.
+- **Each colour is its own material.** A white base coat lays 1.8 g/m² at 40%
+  solids; a process colour lays 0.13 at 19.5%. One "ink GSM" cannot price a job
+  that uses both. `materials.ink_kind` separates the four every press carries
+  from a customer's own — stored rather than inferred from the name, because
+  "Ink — Cyan" and "Cyan (Sun Chemical)" are the same colour and a rule reading
+  names would disagree. Special colours are created from the quotation screen
+  as they come up, with their rate, and are ordinary ink rows afterwards.
+- **Adhesive is a diluted batch.** `100:146:15` is adhesive : ethyl acetate :
+  hardener, 35% solid, and each component is priced separately. It is spread
+  over the **substrate** GSM, not the whole laminate — it does not stick to
+  itself or to the ink.
+
+**Adhesive is worked out, not stated.** The sheet takes a heavier coat under a
+thick ply — `IF(ply > 40µ, 3, 2)` — and one coat per lamination, so a 12µ PET
+over a 110µ poly is 3 GSM across one join while a PET over a MET PET is 2. The
+three numbers are settings. The sheet writes the second term as "2 if there is
+a Met PET ply, else 1", which is a shortcut for its own three-ply structure;
+laminations are plies minus one, which agrees with it everywhere the sheet is
+used and is right on the structures it never had to handle.
+
+**Stations are not colours.** The surcharge for the sixth and seventh printing
+station is charged on the stations a job occupies — one cylinder each — not on
+how many inks are priced. The sheet counts seven stations on a job it prices
+four inks for.
+
+**Why the margin reads the same at every quantity.** Because the sheet's margin
+is nine per cent of the MATERIAL cost, and material scales exactly with the
+order — so material per kilogram, and the margin it produces, are identical at
+any volume. Only the setup and the sundries shrink, and on a film-heavy job
+they are a rounding error beside it: a three-fold order moved one real
+quotation by 38 paise a kilogram. It is the sheet's formula, not a fault. The
+tiers do separate under `marginBasis: TOTAL_COST`, where the margin follows a
+cost that does fall.
+
+**It downloads as their own spreadsheet.** `POST /costing/workbook` returns an
+`.xlsx` laid out like the Estimation sheet — their headings, their row order,
+their spelling — with **live formulas**, so a works that wants to try a
+different wage or film rate does it in the copy and watches the total move.
+That is what they do today, and a download full of pasted numbers would not let
+them. Verified by evaluating the generated file: the chain recalculates to
+Rs 263.40 a kilogram and Rs 13.83 a pouch.
+
+The whole calculation travels in the body rather than a quotation id, because
+the panel is a calculator: it prices quantities the document may never carry,
+against colours nobody has committed to. What is on screen is what downloads.
+
+**Gross and net.** The works' sheet has one margin concept — material cost
+times nine per cent — and no gross/net split at all. Its own labelled totals
+map onto both, so that is where they come from: **B** is the materials, and
+**A + C + D** plus the per-kilogram additions are everything else.
+
+|       | Subtracts                            | Reads                 |
+| ----- | ------------------------------------ | --------------------- |
+| Gross | Film, ink and solvent, adhesive      | What the trade quotes |
+| Net   | All of it, including the press setup | What the job earns    |
+
+Both are reported against the rate somebody **typed**, not the one that was
+suggested — a margin on a price nobody is offering is worse than no margin.
+
+Gross alone was actively misleading, and worst where it mattered. Materials
+cost the same per kilogram at any volume, so a short run at a higher rate shows
+the fattest margin on the page while earning least, because the same hour of
+setup is spread over a fraction of the film. On one real quotation: 1,000
+pouches read **71.9% gross** against 8,999 pouches' 37.3% — and net put both at
+**8%**.
+
+**Two sheets, reconciled.** The client's own workbook answered the same job
+twice, Rs 263.40 and Rs 228.22 a kilogram. The **Estimation** frame is the one
+followed — it is the headline figure, and it divides by the quantity
+**ordered**, because the wastage is already inside the cost and dividing by the
+consumed weight would charge for it and then hand it back. The Costing sheet's
+per-colour ink and batch adhesive are computed alongside and shown in the
+breakdown, and `inkCostModel` / `adhesiveCostModel` switch to them.
+
+`inkCostModel` decides more than a number: under `FLAT_GSM` the colours chosen
+are not read at all — the same 500 kg job costs Rs 233.76/kg on CMYK, on CMYK +
+Gold and on CMYK + White alike — so the quotation screen hides the colour picker
+and states the flat GSM and rate instead. Under `PER_COLOUR` those three come to
+Rs 236.89, 241.49 and 246.59, and the picker is back. What the flat method does
+charge for is stations past the fifth, from the line's own colour count.
+
+Master data lives in `costing_machines`, `costing_labour`, and the `costing_*`
+keys in settings. `npm run seed:costing -w @yuva/api` loads the works' own 2022
+figures — **check them before quoting on them**.
 
 ### Settings
 
@@ -1398,6 +1556,8 @@ Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 | `purchase_receipts`         | One delivery against a line. Accepted stock names the batch it became; rejected stock names nothing.                                                        |
 | `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.                                                                           |
 | `job_artwork`               | A design file, held in R2 with only its description here. A revision supersedes rather than overwrites; erasing the file keeps the row that describes it.   |
+| `costing_machines`          | A machine and what a minute of it costs — load, tariff, speed, setup. Retired, never deleted: quotations were costed against it.                            |
+| `costing_labour`            | A wage, and which machine's minutes it is paid for. Monthly; the working month in settings turns it into a rate per minute.                                 |
 | `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.                                                                               |
 | `app_settings`              | Editable rates and costing defaults.                                                                                                                        |
 | `users`                     | Accounts, their password hash and which modules each may reach.                                                                                             |

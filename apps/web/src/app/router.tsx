@@ -16,6 +16,7 @@ const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'));
 const CustomersPage = lazy(() => import('@/features/customers/pages/CustomersPage'));
 const QuotationsPage = lazy(() => import('@/features/quotations/pages/QuotationsPage'));
 const RatesPage = lazy(() => import('@/features/rates/pages/RatesPage'));
+const CostingPage = lazy(() => import('@/features/costing/pages/CostingPage'));
 const InventoryPage = lazy(() => import('@/features/inventory/pages/InventoryPage'));
 const MaterialStockPage = lazy(() => import('@/features/inventory/pages/MaterialStockPage'));
 const PurchasePage = lazy(() => import('@/features/purchase/pages/PurchasePage'));
@@ -128,6 +129,19 @@ function AppRoutes() {
             element={
               <RequireModule module="rates">
                 <RatesPage />
+              </RequireModule>
+            }
+          />
+          {/*
+            Costing master data is READ by the quotation wizard, so the guard
+            here is the same one rates carries: anyone who can see rates can see
+            what a machine minute costs. Changing it is guarded per endpoint.
+          */}
+          <Route
+            path="/costing"
+            element={
+              <RequireModule module="rates">
+                <CostingPage />
               </RequireModule>
             }
           />

@@ -13,6 +13,7 @@ import {
   Truck,
   Users,
   X,
+  Calculator,
 } from 'lucide-react';
 import type { AppModule } from '@yuva/shared';
 import { cn } from '@/lib/utils';
@@ -46,6 +47,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: '/inventory', label: 'Inventory', icon: Package, module: 'inventory' },
       { to: '/purchase', label: 'Purchase', icon: Truck, module: 'purchase' },
       { to: '/rates', label: 'Rates', icon: IndianRupee, module: 'rates' },
+      { to: '/costing', label: 'Costing', icon: Calculator, module: 'rates' },
     ],
   },
   {

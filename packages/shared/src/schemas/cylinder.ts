@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { partialWithoutDefaults } from './partial-update.js';
 import { paginationQuerySchema } from './common.js';
 import { CYLINDER_EVENT_KINDS, CYLINDER_OWNERSHIPS, CYLINDER_STATUSES } from '../lib/cylinders.js';
 
@@ -84,7 +85,9 @@ export const registerCylindersSchema = z.object({
     ),
 });
 
-export const updateCylinderSchema = cylinderInputSchema.partial().omit({ code: true });
+export const updateCylinderSchema = partialWithoutDefaults(cylinderInputSchema).omit({
+  code: true,
+});
 
 /**
  * Something that happened to a cylinder.

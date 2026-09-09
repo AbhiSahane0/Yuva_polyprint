@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import artworkRoutes from '../modules/artwork/artwork.routes.js';
 import authRoutes from '../modules/auth/auth.routes.js';
+import costingRoutes from '../modules/costing/costing.routes.js';
 import customerRoutes from '../modules/customers/customer.routes.js';
 import cylinderRoutes from '../modules/cylinders/cylinder.routes.js';
 import gstinRoutes from '../modules/gstin/gstin.routes.js';
@@ -86,6 +87,14 @@ router.use('/cylinders', authenticate, cylinderRoutes);
  * process.
  */
 router.use('/artwork', authenticate, artworkRoutes);
+
+/*
+ * Costing master data — the machines and the wages a rate is built from.
+ * Readable by anyone signed in, because the quotation wizard costs every line
+ * against it; changing it needs requireModule('rates'), since a machine speed
+ * or a wage moves the price of every quotation raised afterwards.
+ */
+router.use('/costing', authenticate, costingRoutes);
 
 router.use('/settings', authenticate, settingsRoutes);
 

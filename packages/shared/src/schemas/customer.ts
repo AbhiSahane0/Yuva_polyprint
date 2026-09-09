@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { partialWithoutDefaults } from './partial-update.js';
 import { paginationQuerySchema } from './common.js';
 
 /**
@@ -176,7 +177,7 @@ export const createCustomerSchema = z.object({
 });
 
 /** Every field is optional on update; only what is sent gets changed. */
-export const updateCustomerSchema = createCustomerSchema.partial();
+export const updateCustomerSchema = partialWithoutDefaults(createCustomerSchema);
 
 export const listCustomersQuerySchema = paginationQuerySchema.extend({
   /** Free-text search across company, contact, mobile, city, district. */
