@@ -86,7 +86,7 @@ import {
 } from '../lib/step-save';
 import { QuotationPreview } from '../components/QuotationPreview';
 import { SendQuotationModal } from '../components/SendQuotationModal';
-import { RateCostingPanel } from '@/features/costing/components/RateCostingPanel';
+// import { RateCostingPanel } from '@/features/costing/components/RateCostingPanel';
 import { CostingBreakdownModal } from '@/features/costing/components/CostingBreakdownModal';
 import { useRateCosting, type RateCostingLine } from '@/features/costing/api/use-rate-costing';
 import { LayerFields } from '../components/LayerFields';
@@ -1946,9 +1946,9 @@ function JobCard({
           how long every machine is occupied. Everything above this line is a
           question about the job; everything below it is the answer.
         */}
-        <div className="col-span-2 sm:col-span-12">
+        {/* <div className="col-span-2 sm:col-span-12">
           <RateCostingPanel costing={costing} line={costingLine} />
-        </div>
+        </div> */}
 
         <div className="col-span-2 sm:col-span-12">
           <QuantityFields
