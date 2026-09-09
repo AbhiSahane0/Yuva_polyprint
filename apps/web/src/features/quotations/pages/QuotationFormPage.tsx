@@ -17,9 +17,8 @@ import {
   type QuotationSummary,
   MAX_PAGE_SIZE,
   type ItemGeometry,
-  type Material,
   type MaterialCostResult,
-  PET_MICRON_PER_LAYER,
+  // PET_MICRON_PER_LAYER,
   JOB_KINDS,
   JOB_KIND_LABELS,
   POUCH_TYPES,
@@ -32,7 +31,6 @@ import {
   overriddenRate,
   plyRatePerKg,
   resolveSelectedQuantity,
-  round,
   suggestRepeatHeight,
   suggestRepeatWidth,
   computeTier,
@@ -77,7 +75,6 @@ import {
   baselineFromCustomer,
   changedCustomerFields,
   customerDetailsFromForm,
-  normalise,
   designFingerprint,
   fingerprintFromSavedJob,
   isSaveableDesign,
@@ -86,9 +83,6 @@ import {
 } from '../lib/step-save';
 import { QuotationPreview } from '../components/QuotationPreview';
 import { SendQuotationModal } from '../components/SendQuotationModal';
-import { RateCostingPanel } from '@/features/costing/components/RateCostingPanel';
-import { CostingBreakdownModal } from '@/features/costing/components/CostingBreakdownModal';
-import { useRateCosting, type RateCostingLine } from '@/features/costing/api/use-rate-costing';
 import { LayerFields } from '../components/LayerFields';
 import { QuantityFields, type QuantityResult } from '../components/QuantityFields';
 import { StepIndicator, type Step } from '../components/StepIndicator';
@@ -154,8 +148,8 @@ const BLANK_DESIGN = {
   gazetteLeft: 0,
   gazetteRight: 0,
   layers: [
-    { materialId: null, micron: PET_MICRON_PER_LAYER, rateOverride: '' },
-    { materialId: null, micron: 50, rateOverride: '' },
+    { materialId: null, micron: 0, rateOverride: '' },
+    { materialId: null, micron: 0, rateOverride: '' },
   ],
   repeatWidth: 1,
   repeatHeight: 1,
@@ -311,7 +305,7 @@ export default function QuotationFormPage() {
     },
   });
 
-  const { control, register, handleSubmit, setValue, getValues, trigger, formState, reset } = form;
+  const { control, register, handleSubmit, setValue, trigger, formState, reset } = form;
   const items = useFieldArray({ control, name: 'items' });
   const watched = useWatch({ control });
 
@@ -367,68 +361,11 @@ export default function QuotationFormPage() {
     };
   }, [chosenCustomer]);
 
-  /** Set when the office picks a company, as opposed to one merely loading. */
-  const pickedByHand = useRef(false);
-
-  /**
-   * Prefill from the customer record — and ONLY when their record is what the
-   * office is asking for.
-   *
-   * This effect runs whenever `chosenCustomer` resolves, which is not the same
-   * thing as somebody choosing a customer. Opening a saved quotation loads its
-   * customer a moment after the quotation itself, and this then overwrote the
-   * contact details the quotation had snapshotted with whatever the customer
-   * record holds. On a record where those are the importer's 'NA' that meant
-   * a mobile and an email typed onto quotation 131, saved correctly, and gone
-   * the next time it was opened — replaced by two empty boxes and two
-   * validation errors.
-   *
-   * Picking a customer by hand still fills everything in, which is the whole
-   * point of the prefill. A quotation already written keeps what it says.
-   */
   useEffect(() => {
     if (!chosenCustomer) return;
-
     // 'NA' is the importer's placeholder; showing it as if it were an address
     // is worse than showing nothing.
     const real = (value: string | null | undefined) => (value && value !== 'NA' ? value : '');
-
-    /*
-     * On an existing quotation the document's own snapshot wins **where it has
-     * one**, and the customer's record fills the gaps.
-     *
-     * A value typed onto a quotation was a decision about that document and
-     * must not be replaced by the company's general one. A blank is not a
-     * decision — it is a quotation written before anybody knew the number. The
-     * send dialog already works to this rule; the form did not, and made
-     * quotation 130 open with six empty boxes while its customer had a mobile,
-     * an email and an address on record. Retyping them there looked like the
-     * write-back was broken when it had worked the first time.
-     */
-    if (isEdit && !pickedByHand.current) {
-      const gaps: [keyof CreateQuotationFormValues, keyof CustomerDetails, string][] = [
-        ['brandName', 'brandName', real(chosenCustomer.brandName)],
-        ['addressLine1', 'address', real(chosenCustomer.address)],
-        ['addressLine2', 'city', real(chosenCustomer.city)],
-        ['addressLine3', 'district', real(chosenCustomer.district)],
-        ['mobile', 'mobile', real(chosenCustomer.mobile)],
-        ['email', 'email', real(chosenCustomer.email)],
-        ['gstNumber', 'gstNumber', real(chosenCustomer.gstNumber)],
-      ];
-
-      for (const [field, baselineKey, value] of gaps) {
-        /* Only where the document has nothing of its own to say. */
-        if (normalise(getValues(field) as string) !== '') continue;
-        if (value === '') continue;
-        setValue(field, value);
-        /*
-         * And what is on screen is what the office is looking at, so a later
-         * Next does not read the fill as an edit and write it straight back.
-         */
-        if (saved.current.shown) saved.current.shown[baselineKey] = value;
-      }
-      return;
-    }
     setValue('customerName', chosenCustomer.companyName);
     setValue('brandName', real(chosenCustomer.brandName));
     setValue('addressLine1', real(chosenCustomer.address));
@@ -450,7 +387,7 @@ export default function QuotationFormPage() {
       email: real(chosenCustomer.email),
       gstNumber: real(chosenCustomer.gstNumber),
     });
-  }, [chosenCustomer, setValue, isEdit]);
+  }, [chosenCustomer, setValue]);
 
   /* ------------------------------------------------------- editing a draft */
 
@@ -704,13 +641,14 @@ export default function QuotationFormPage() {
   /**
    * Pushes this quotation's corrections back onto the customer record.
    *
+   * NOT CALLED — see persistStep for why. Kept rather than deleted because the
+   * bug is in how the form reports its values, not in this logic, and throwing
+   * it away would mean rebuilding it once the cause is found.
+   *
    * Only what changed, and only for an existing customer — a new company has no
-   * record to correct until the quotation saves and creates one. The two rules
-   * that keep it safe are in `changedCustomerFields`: a field is written only
-   * if it differs from what the form was FILLED IN with, and a blank never
-   * overwrites a stored value.
+   * record to correct until the quotation saves and creates one.
    */
-  async function persistCustomerDetails() {
+  async function _persistCustomerDetails() {
     const id = customerId;
     const baseline = saved.current.customer;
     if (customerMode !== 'existing' || !id || !baseline) return;
@@ -810,23 +748,26 @@ export default function QuotationFormPage() {
   /** What each step writes on the way out. Steps not listed write nothing. */
   async function persistStep(leaving: number) {
     /*
-     * Corrections made here go back to the customer, so the next quotation
-     * starts from the right details rather than the same wrong ones.
+     * DISABLED — writing customer details back from this form erased them.
      *
-     * This was off for a long time because it ERASED customer records: correct
-     * a district, press Next, and the address, city, mobile and brand were all
-     * stored as 'NA'. Three attempts to fix it on this side failed, and they
-     * failed because nothing on this side was wrong — the form sent exactly the
-     * one field that had changed.
+     * Observed four times against a real record: correct an existing
+     * customer's district here, press Next, and their address, city, mobile
+     * and brand were all stored as 'NA' while the district saved correctly.
+     * The form's own boxes held the right values throughout — checked in the
+     * DOM — so something between the form state and the request reported them
+     * as empty, and an empty string is stored as 'NA'.
      *
-     * `updateCustomerSchema` was `createCustomerSchema.partial()`, and Zod's
-     * `.partial()` makes a field optional WITHOUT removing its `.default()`.
-     * A default fires precisely when a key is absent, so the server filled in
-     * every field the form had deliberately left out — with 'NA' — and the
-     * service spread that into `prisma.update`. See `partialWithoutDefaults`,
-     * which now covers all eleven update schemas; seven of them had it.
+     * Three fixes were tried and none of them stopped it: comparing against
+     * what the form was populated with rather than the record, requiring
+     * react-hook-form to mark the field dirty, and refusing to let an empty
+     * value overwrite a stored one. The last of those should have made the
+     * damage impossible on its own, and did not, which says the fault is not
+     * where any of them looked.
+     *
+     * So it stays off until the cause is actually understood. Correcting a
+     * customer is done on the Customers screen, which has always worked.
+     * Saving designs is untouched — that half was verified and is correct.
      */
-    if (leaving === 0 || leaving === 1) await persistCustomerDetails();
     if (leaving === 2) await persistDesigns();
   }
 
@@ -874,65 +815,26 @@ export default function QuotationFormPage() {
    * — and the office's own work queue is ordered by that status. Sending is what
    * advances it, and that happens once the provider accepts the message.
    */
-  /**
-   * Where a refused field lives, so Save can take somebody to it.
-   *
-   * Saving used to do NOTHING when an earlier step was invalid — no toast, no
-   * scroll, no red field on the page in front of you. On this works' own data
-   * that happened the first time it was tried: a customer record carrying a
-   * mobile number the form will not accept blocks the save from two steps
-   * away, and the office clicks Save and watches nothing happen.
-   */
-  function stepOf(field: string): number {
-    const root = field.split('.')[0] ?? field;
-    const found = STEP_FIELDS.findIndex((fields) => (fields as string[]).includes(root));
-    return found === -1 ? step : found;
-  }
-
   async function save(intent: 'CLOSE' | 'REVIEW') {
-    await handleSubmit(
-      async (values) => {
-        const payload = {
-          ...values,
-          saveAsCustomer: customerMode === 'new',
-          brandName: values.brandName ?? '',
-          customerId: customerMode === 'existing' ? values.customerId : null,
-        } as CreateQuotationInput;
+    await handleSubmit(async (values) => {
+      const payload = {
+        ...values,
+        saveAsCustomer: customerMode === 'new',
+        brandName: values.brandName ?? '',
+        customerId: customerMode === 'existing' ? values.customerId : null,
+      } as CreateQuotationInput;
 
-        try {
-          const saved = isEdit
-            ? await updateQuotation.mutateAsync({ id: id!, input: payload })
-            : await createQuotation.mutateAsync(payload);
-          toast.success(`Quotation ${saved.number} saved`);
-          setPreviewId(saved.id);
-          setReviewing(intent === 'REVIEW' ? saved : null);
-        } catch (cause) {
-          toast.error(cause instanceof ApiClientError ? cause.message : 'Could not save.');
-        }
-      },
-      /*
-       * The half that was missing. `handleSubmit` swallows a failed validation
-       * silently, which is right for a form on one page and wrong for a wizard:
-       * the field it is objecting to may be two steps back and entirely off
-       * screen.
-       */
-      (invalid) => {
-        const first = Object.keys(invalid)[0];
-        if (first === undefined) return;
-
-        const target = stepOf(first);
-        const message =
-          (invalid as Record<string, { message?: string } | undefined>)[first]?.message ??
-          'Something on an earlier step needs fixing';
-
-        if (target !== step) {
-          setStep(target);
-          toast.error(`${message} — taken back to ${STEPS[target]?.label ?? 'that step'}`);
-          return;
-        }
-        toast.error(message);
-      },
-    )();
+      try {
+        const saved = isEdit
+          ? await updateQuotation.mutateAsync({ id: id!, input: payload })
+          : await createQuotation.mutateAsync(payload);
+        toast.success(`Quotation ${saved.number} saved`);
+        setPreviewId(saved.id);
+        setReviewing(intent === 'REVIEW' ? saved : null);
+      } catch (cause) {
+        toast.error(cause instanceof ApiClientError ? cause.message : 'Could not save.');
+      }
+    })();
   }
 
   if (isEdit && loadingExisting) return <LoadingState label="Loading quotation…" />;
@@ -1026,8 +928,6 @@ export default function QuotationFormPage() {
                           return brand && brand !== 'NA' ? brand : undefined;
                         }}
                         onPick={(name) => {
-                          /* A deliberate choice, so the prefill may run. */
-                          pickedByHand.current = true;
                           setValue('customerName', name, { shouldValidate: true });
                           // The name is what the office types; the link to the
                           // customer record follows from it.
@@ -1163,9 +1063,6 @@ export default function QuotationFormPage() {
                 register={register}
                 setValue={setValue}
                 films={films}
-                materials={materials ?? []}
-                customerName={watched.customerName ?? ''}
-                quotationNumber={existing?.number ?? null}
                 jobs={chosenCustomer?.jobs ?? []}
                 item={watched.items?.[index] as Partial<ItemValues> | undefined}
                 cost={costed[index]}
@@ -1294,9 +1191,6 @@ function JobCard({
   register,
   setValue,
   films,
-  materials,
-  customerName,
-  quotationNumber,
   jobs,
   item,
   cost,
@@ -1311,11 +1205,6 @@ function JobCard({
   register: UseFormRegister<CreateQuotationFormValues>;
   setValue: UseFormSetValue<CreateQuotationFormValues>;
   films: Film[];
-  /** The full rate catalogue — the costing panel needs inks and solvents too. */
-  materials: Material[];
-  /** Only for naming the downloaded costing sheet. */
-  customerName: string;
-  quotationNumber: number | null;
   /** The chosen customer's saved jobs. Empty for a new company. */
   jobs: CustomerJob[];
   item: Partial<ItemValues> | undefined;
@@ -1355,83 +1244,6 @@ function JobCard({
    */
   const filmWidthMm = cost?.geometry.filmWidthMm ?? 0;
   const filmHeightMm = cost?.geometry.filmHeightMm ?? 0;
-
-  /*
-   * The line, as the costing engine needs to see it.
-   *
-   * Every figure is read from what has already been costed rather than
-   * recomputed here, so the suggested rate and the geometry above it cannot
-   * disagree — the film width is the pouch plus its gussets, and the
-   * quantities are in kilograms whichever way the line is being priced.
-   */
-  const costingLine: RateCostingLine = useMemo(
-    () => ({
-      layers: (item?.layers ?? [])
-        .map((layer) => {
-          const film = films.find((candidate) => candidate.id === layer?.materialId);
-          return {
-            name: film?.name ?? 'Ply',
-            micron: num(layer?.micron),
-            density: film?.density ?? 0,
-            ratePerKg: num(layer?.rateOverride) || film?.currentRate || 0,
-          };
-        })
-        .filter((layer) => layer.micron > 0 && layer.density > 0),
-      filmWidthMm,
-      filmHeightMm,
-      ups: Math.max(1, num(item?.repeatWidth) || 1),
-      /* One cylinder per colour, which is what the line is charged for. */
-      colourCount: Math.max(1, num(item?.cylinderCount) || 1),
-      makesPouches: jobKind !== 'ROLL',
-      quantitiesKg: (cost?.quantities ?? []).map((quantity) => quantity?.quantityKg ?? 0),
-      /* The document's own count, so the suggestion and the line agree. */
-      piecesPerKg: cost?.geometry.pouchesPerKg ?? 0,
-    }),
-    [item, films, filmWidthMm, filmHeightMm, jobKind, cost],
-  );
-
-  /*
-   * Costed once, here, and handed to both the panel that suggests a rate and
-   * the rows that report what the typed one earns. Two computations would let
-   * the same screen disagree with itself about the same job.
-   */
-  const costing = useRateCosting(costingLine, materials);
-
-  /** Which row's working is open, if any. */
-  const [working, setWorking] = useState<number | null>(null);
-
-  /*
-   * The rate follows the costing.
-   *
-   * Not a suggestion offered beside the box — the box itself. It is what the
-   * job costs plus the works' margin, so when the film, the colours or the
-   * quantity change, the price changes with them and nobody has to notice and
-   * accept it. A rate worked out for a 60µ poly sitting on a 110µ one is not a
-   * decision anybody made; it is a number nobody updated.
-   *
-   * Typing still holds. The write only happens when the COMPUTED figure moves,
-   * so a rate keyed in by hand stays until something that changes the cost is
-   * touched — and that is also what stops this looping, since writing the rate
-   * re-renders the card.
-   */
-  const lastComputed = useRef<Record<number, number>>({});
-
-  useEffect(() => {
-    const field = basis === 'PER_POUCH' ? 'ratePerPouch' : 'ratePerKg';
-    const pieces = cost?.geometry.pouchesPerKg ?? 0;
-
-    costing.results.forEach((result, position) => {
-      if (!result) return;
-
-      const perKg = round(result.ratePerKg, 2);
-      const next = basis === 'PER_POUCH' ? (pieces > 0 ? round(perKg / pieces, 4) : null) : perKg;
-      if (next === null) return;
-
-      if (lastComputed.current[position] === next) return;
-      lastComputed.current[position] = next;
-      setNumber(setValue, `items.${index}.quantities.${position}.${field}`, next);
-    });
-  }, [costing.results, basis, cost?.geometry.pouchesPerKg, index, setValue]);
 
   /**
    * Fill the repeats in as the size is typed, until the office says otherwise.
@@ -1818,12 +1630,38 @@ function JobCard({
           />
         </div>
 
-        {/*
-          A repeat shows no cylinder panel at all. It used to explain itself in
-          a dashed box above the costing — true, and one more line between the
-          office and the price.
-        */}
-        {fromSavedJob ? null : (
+        <div className="col-span-2 sm:col-span-12">
+          <QuantityFields
+            control={control}
+            register={register}
+            itemIndex={index}
+            pricingBasis={basis}
+            showsPouches={jobKind !== 'ROLL'}
+            onBasisChange={
+              jobKind === 'ROLL'
+                ? undefined
+                : (next) =>
+                    setValue(`items.${index}.pricingBasis`, next as ItemValues['pricingBasis'], {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+            }
+            results={cost?.quantities ?? []}
+            errors={errors?.quantities as never}
+            selectedQuantity={selectedQuantity}
+            onSelectQuantity={onSelectQuantity}
+          />
+        </div>
+
+        {fromSavedJob ? (
+          <div className="col-span-2 sm:col-span-12">
+            <p className="border-ink-200 text-ink-500 rounded-[var(--radius-md)] border border-dashed px-3 py-2.5 text-sm">
+              Repeat of a saved design —{' '}
+              <strong className="text-ink-800">no cylinder charge</strong>. Cylinders for{' '}
+              {item?.jobName || 'this job'} are already in the works.
+            </p>
+          </div>
+        ) : (
           <div className="col-span-2 sm:col-span-12">
             <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -1935,66 +1773,7 @@ function JobCard({
             </div>
           </div>
         )}
-
-        {/*
-          The rate lives at the FOOT of the job, not in the middle of it.
-          
-          It used to sit above the cylinders, which asked the office to name a
-          price before the job had finished describing itself — and a costed
-          rate cannot be answered until it has: the structure decides the
-          weight, the weight decides the running metres, and the metres decide
-          how long every machine is occupied. Everything above this line is a
-          question about the job; everything below it is the answer.
-        */}
-        <div className="col-span-2 sm:col-span-12">
-          <RateCostingPanel costing={costing} line={costingLine} />
-        </div>
-
-        <div className="col-span-2 sm:col-span-12">
-          <QuantityFields
-            control={control}
-            register={register}
-            itemIndex={index}
-            pricingBasis={basis}
-            showsPouches={jobKind !== 'ROLL'}
-            onBasisChange={
-              jobKind === 'ROLL'
-                ? undefined
-                : (next) =>
-                    setValue(`items.${index}.pricingBasis`, next as ItemValues['pricingBasis'], {
-                      shouldDirty: true,
-                      shouldValidate: true,
-                    })
-            }
-            results={cost?.quantities ?? []}
-            costings={costing.results}
-            onShowWorking={setWorking}
-            errors={errors?.quantities as never}
-            selectedQuantity={selectedQuantity}
-            onSelectQuantity={onSelectQuantity}
-          />
-        </div>
       </div>
-
-      <CostingBreakdownModal
-        breakdown={working === null ? null : (costing.results[working] ?? null)}
-        /* Costed at the quantity whose working is open, not the first one. */
-        costing={
-          working === null || !costing.input
-            ? null
-            : {
-                ...costing.input,
-                job: {
-                  ...costing.input.job,
-                  orderQtyKg: costingLine.quantitiesKg[working] ?? 0,
-                },
-              }
-        }
-        quotationNumber={quotationNumber}
-        customerName={customerName}
-        jobName={item?.jobName ?? ''}
-        onClose={() => setWorking(null)}
-      />
     </section>
   );
 }
