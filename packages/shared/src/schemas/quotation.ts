@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { partialWithoutDefaults } from './partial-update.js';
 import { JOB_KINDS, POUCH_TYPES, PRICING_BASES, pricingBasisFor } from '../constants/job.js';
 import { paginationQuerySchema } from './common.js';
 import { isMobile, normaliseMobile } from '../lib/phone.js';
@@ -264,14 +263,14 @@ const createQuotationBaseSchema = z.object({
     .string()
     .trim()
     .min(1, 'Enter Valid Mobile Number')
-    .regex(/^\d{10}$/, 'Enter Valid Mobile Number'),
+    .regex(/^\d{10}$/),
   /** GSTIN. Upper-cased, because it is printed and read back over the phone. */
   gstNumber: z.string().trim().toUpperCase().max(20).default(''),
   email: z
     .string()
     .trim()
     .min(1, 'Enter Valid Email')
-    .regex(/.*?@?[^@]*\.+.*/, 'Enter Valid Email'),
+    .regex(/.*?@?[^@]*\.+.*/),
 
   /**
    * Which quantity the printed quotation is for, counting from 1.
@@ -318,7 +317,7 @@ export const createQuotationSchema = createQuotationBaseSchema
  * a partial update may legitimately omit `items` entirely, and when it does
  * carry them the item schema still validates each one.
  */
-export const updateQuotationSchema = partialWithoutDefaults(createQuotationBaseSchema);
+export const updateQuotationSchema = createQuotationBaseSchema.partial();
 
 /**
  * The columns the list can be ordered by.
@@ -373,89 +372,12 @@ export const settingsSchema = z.object({
    * component against; the film itself is chosen per quotation line.
    */
   inkGsm: z.coerce.number().min(0).max(50),
-  /**
-   * Adhesive is worked out from the structure, not stated — the sheet takes a
-   * heavier coat under a thick ply and one coat per lamination. These three
-   * are its numbers; `adhesiveGsm` is no longer used for costing.
-   */
   adhesiveGsm: z.coerce.number().min(0).max(50),
-  adhesiveCoatThinGsm: z.coerce.number().min(0).max(50),
-  adhesiveCoatThickGsm: z.coerce.number().min(0).max(50),
-  adhesiveThickPlyMicron: z.coerce.number().min(0).max(1000),
   defaultPetMaterial: z.string().trim().max(80),
   /** The metallised ply of a 3-layer structure, costed on its own rate. */
   defaultMetpetMaterial: z.string().trim().max(80),
   defaultInkMaterial: z.string().trim().max(80),
   defaultAdhesiveMaterial: z.string().trim().max(80),
-
-  /**
-   * Rate costing — the works' own overheads.
-   *
-   * These build a rate up from every expense rather than starting from one
-   * somebody remembers. Machines and wages are rows of their own; what is left
-   * is a handful of figures that belong to the works rather than to any job.
-   */
-  workingDaysPerMonth: z.coerce.number().min(1).max(31),
-  hoursPerDay: z.coerce.number().min(1).max(24),
-  transportPerKg: z.coerce.number().min(0).max(10_000),
-  packingPerKg: z.coerce.number().min(0).max(10_000),
-  /** Sundries the works does not itemise, charged once on the job. */
-  otherPerJob: z.coerce.number().min(0).max(1_000_000),
-  emiPerMonth: z.coerce.number().min(0).max(10_000_000),
-  /** Machine hours a month the EMI is spread over. */
-  emiHoursPerMonth: z.coerce.number().min(1).max(744),
-  /**
-   * Which minutes the EMI is recovered over. The works' sheet uses running
-   * time alone; charging the setup as well is truer but does not tie out.
-   */
-  emiBasis: z.enum(['RUN_TIME', 'OCCUPIED']),
-  pouchMakingPerKg: z.coerce.number().min(0).max(10_000),
-  /** What the sixth, seventh and eighth printing stations each add, per kg. */
-  stationSurcharge6: z.coerce.number().min(0).max(10_000),
-  stationSurcharge7: z.coerce.number().min(0).max(10_000),
-  stationSurcharge8: z.coerce.number().min(0).max(10_000),
-  /** Edge trim added to the web width, millimetres. */
-  defaultTrimMm: z.coerce.number().min(0).max(500),
-  defaultWastagePercent: z.coerce.number().min(0).max(100),
-  defaultMarginPercent: z.coerce.number().min(0).max(100),
-  /**
-   * What the margin is taken on. Their sheet uses the material cost alone,
-   * which recovers labour and power at cost and earns nothing on them.
-   */
-  marginBasis: z.enum(['TOTAL_COST', 'MATERIAL_ONLY']),
-  /**
-   * How ink and adhesive are costed. The works' workbook does each two ways
-   * and they disagree by 2x on ink, so both are here and the works chooses.
-   *
-   * FLAT_GSM is the Estimation sheet — GSM times one blended rate — and is
-   * what its headline figure is built from. PER_COLOUR and BATCH are the
-   * Costing sheet: wet weights, solids and solvent, priced part by part.
-   */
-  inkCostModel: z.enum(['PER_COLOUR', 'FLAT_GSM']),
-  adhesiveCostModel: z.enum(['BATCH', 'FLAT_GSM']),
-  /** Ink to solvent at the press, and how the solvent splits. */
-  inkSolventParts: z.coerce.number().min(0).max(1000),
-  /**
-   * Which rates price the solvents and the hardener.
-   *
-   * Names, like the film and adhesive defaults beside them — not hardcoded
-   * strings in the costing. They were hardcoded, and the catalogue calls its
-   * row "Solvent — Ethyl Acetate", so every lookup missed and the solvent cost
-   * nothing on every quotation.
-   */
-  defaultEthylAcetateMaterial: z.string().trim().max(80),
-  defaultTolueneMaterial: z.string().trim().max(80),
-  defaultHardenerMaterial: z.string().trim().max(80),
-  ethylAcetatePercent: z.coerce.number().min(0).max(100),
-  defaultAdhesiveRatio: z.string().trim().max(20),
-  /**
-   * How the adhesive batch splits into adhesive, ethyl acetate and hardener.
-   *
-   * The works' sheet takes the SOLIDS from the ratio the office picks and the
-   * SPLIT from a fixed row of the same table, so the two can differ. Set this
-   * to match `defaultAdhesiveRatio` to split on whatever is chosen.
-   */
-  adhesiveSplitRatio: z.string().trim().max(20),
 });
 
 export type AppSettings = z.infer<typeof settingsSchema>;
@@ -470,40 +392,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Averages of what the imported jobs actually record.
   inkGsm: 1.8,
   adhesiveGsm: 2.5,
-  adhesiveCoatThinGsm: 2,
-  adhesiveCoatThickGsm: 3,
-  adhesiveThickPlyMicron: 40,
   defaultPetMaterial: 'PET 12µm',
   defaultMetpetMaterial: 'MET PET 12µm',
   defaultInkMaterial: 'Ink — Black',
   defaultAdhesiveMaterial: 'Adhesive — PU',
-
-  /* Rate costing. Taken from the works' own sheets; edit on the Costing screen. */
-  workingDaysPerMonth: 26,
-  hoursPerDay: 8,
-  transportPerKg: 10,
-  packingPerKg: 5,
-  otherPerJob: 250,
-  emiPerMonth: 4166.66,
-  emiHoursPerMonth: 24,
-  emiBasis: 'RUN_TIME',
-  pouchMakingPerKg: 15,
-  stationSurcharge6: 5.5,
-  stationSurcharge7: 7.5,
-  stationSurcharge8: 9,
-  defaultTrimMm: 15,
-  defaultWastagePercent: 8,
-  defaultMarginPercent: 9,
-  marginBasis: 'MATERIAL_ONLY',
-  inkCostModel: 'FLAT_GSM',
-  adhesiveCostModel: 'FLAT_GSM',
-  inkSolventParts: 80,
-  defaultEthylAcetateMaterial: 'Solvent — Ethyl Acetate',
-  defaultTolueneMaterial: 'Solvent — Toluene',
-  defaultHardenerMaterial: 'Adhesive — Hardener',
-  ethylAcetatePercent: 50,
-  defaultAdhesiveRatio: '100:146:15',
-  adhesiveSplitRatio: '100:189:15',
 };
 
 /*

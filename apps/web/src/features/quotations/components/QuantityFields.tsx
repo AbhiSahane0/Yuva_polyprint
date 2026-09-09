@@ -3,12 +3,9 @@ import { Layers3 } from 'lucide-react';
 import {
   formatNumber,
   formatRs,
-  marginsAt,
-  type CostingBreakdown,
   type CreateQuotationFormValues,
   type PricingBasis,
 } from '@yuva/shared';
-import { Info } from 'lucide-react';
 import { Field, NumberInput } from '@/components/ui/Field';
 import { cn } from '@/lib/utils';
 
@@ -51,8 +48,6 @@ export function QuantityFields({
   onBasisChange,
   showsPouches = true,
   results,
-  costings,
-  onShowWorking,
   errors,
   selectedQuantity,
   onSelectQuantity,
@@ -61,14 +56,6 @@ export function QuantityFields({
   register: UseFormRegister<CreateQuotationFormValues>;
   itemIndex: number;
   pricingBasis: PricingBasis;
-  /**
-   * What each quantity costs to MAKE — the full activity-based figure, one per
-   * row. Absent while the line is not costable, which is why the net margin
-   * disappears rather than reading zero.
-   */
-  costings?: (CostingBreakdown | null)[];
-  /** Opens the working behind one row's rate. */
-  onShowWorking?: ((index: number) => void) | undefined;
   /**
    * Absent on a roll, where the switch is not shown at all — a reel has no
    * pouches to count, so offering the choice would be offering a mistake.
@@ -218,38 +205,19 @@ export function QuantityFields({
               </div>
 
               <div className="col-span-1 sm:col-span-2">
-                <div className="relative">
-                  <Field
-                    label={`Rate ${index + 1}`}
-                    htmlFor={`items.${itemIndex}.quantities.${index}.${rateField}`}
-                    hint={perPouch ? 'per pouch' : 'per kg'}
-                    error={errors?.[index]?.[rateField]?.message}
-                  >
-                    <NumberInput
-                      key={rateField}
-                      id={`items.${itemIndex}.quantities.${index}.${rateField}`}
-                      invalid={Boolean(errors?.[index]?.[rateField])}
-                      {...register(`items.${itemIndex}.quantities.${index}.${rateField}`)}
-                    />
-                  </Field>
-                  {/*
-                    The working, beside the figure it produced. The rate arrives
-                    filled in — there is no reason to make somebody press a
-                    button to accept a number the system already worked out —
-                    and this is how they check where it came from.
-                  */}
-                  {costings?.[index] && onShowWorking ? (
-                    <button
-                      type="button"
-                      onClick={() => onShowWorking(index)}
-                      title="How this rate was worked out"
-                      aria-label={`How rate ${index + 1} was worked out`}
-                      className="text-ink-400 hover:text-brand-600 absolute top-0 right-0 cursor-pointer p-0.5"
-                    >
-                      <Info className="size-4" />
-                    </button>
-                  ) : null}
-                </div>
+                <Field
+                  label={`Rate ${index + 1}`}
+                  htmlFor={`items.${itemIndex}.quantities.${index}.${rateField}`}
+                  hint={perPouch ? 'per pouch' : 'per kg'}
+                  error={errors?.[index]?.[rateField]?.message}
+                >
+                  <NumberInput
+                    key={rateField}
+                    id={`items.${itemIndex}.quantities.${index}.${rateField}`}
+                    invalid={Boolean(errors?.[index]?.[rateField])}
+                    {...register(`items.${itemIndex}.quantities.${index}.${rateField}`)}
+                  />
+                </Field>
               </div>
 
               {/*
@@ -280,7 +248,15 @@ export function QuantityFields({
                           {formatNumber(result.totalPouches)} pouches
                         </span>
                       ) : null}
-                      {/* Gross and net — see the Margins component below. */}
+                      {/*
+                       * Margin on the selling rate, against the *material*
+                       * cost of a kilogram and nothing else — cylinders,
+                       * printing and wastage are not in it. Spelled out on
+                       * hover rather than on the row, because it is a question
+                       * asked once and a line of noise thereafter, and because
+                       * a figure this high on a per-pouch line surprises
+                       * people until they see which two numbers made it.
+                       */}
                       {result.marginPercent === null ? (
                         <span
                           className="text-ink-400"
@@ -289,11 +265,21 @@ export function QuantityFields({
                           margin —
                         </span>
                       ) : (
-                        <Margins
-                          ratePerKg={result.ratePerKg}
-                          materialCostPerKg={result.materialCostPerKg ?? 0}
-                          costing={costings?.[index] ?? null}
-                        />
+                        <span
+                          title={`(${formatRs(result.ratePerKg, 2)} per kg − ${formatRs(
+                            result.materialCostPerKg ?? 0,
+                            2,
+                          )} material per kg) ÷ ${formatRs(
+                            result.ratePerKg,
+                            2,
+                          )}. Material only — cylinders and conversion are not included.`}
+                          className={cn(
+                            'font-medium',
+                            result.marginPercent < 15 ? 'text-warning-600' : 'text-success-600',
+                          )}
+                        >
+                          {formatNumber(result.marginPercent, 1)}% margin
+                        </span>
                       )}
                     </>
                   ) : (
@@ -319,81 +305,5 @@ export function QuantityFields({
         })}
       </div>
     </div>
-  );
-}
-
-/**
- * Both margins on the rate that was actually typed.
- *
- * They used to be one figure, and it was the flattering one: margin over
- * MATERIALS, with the labour, the power, the transport, the packing and the
- * setup left out entirely. On a real quotation that read 41.9% where the job
- * earned 8%.
- *
- * Worse, it was most wrong where it mattered. Materials cost the same per
- * kilogram at any volume, so a short run at a higher rate showed the FATTEST
- * margin on the page — while actually earning least, because the same hour of
- * press setup was spread over a fraction of the film. Somebody reading that
- * row would take the small order thinking it the best one there.
- *
- * So: gross stays, because it is the figure the trade talks in, and net sits
- * beside it in the stronger type, because it is the one that is true. Net
- * needs the whole costing, so it is absent — not zero — when the line cannot
- * yet be costed.
- */
-function Margins({
-  ratePerKg,
-  materialCostPerKg,
-  costing,
-}: {
-  ratePerKg: number;
-  materialCostPerKg: number;
-  costing: CostingBreakdown | null;
-}) {
-  const both = costing ? marginsAt(ratePerKg, costing) : null;
-  const gross = both
-    ? both.grossPercent
-    : ratePerKg > 0
-      ? ((ratePerKg - materialCostPerKg) / ratePerKg) * 100
-      : 0;
-
-  return (
-    <span className="inline-flex items-baseline gap-1.5">
-      <span
-        className="text-ink-500"
-        title={`(${formatRs(ratePerKg, 2)} per kg − ${formatRs(
-          costing?.materialCostPerKg ?? materialCostPerKg,
-          2,
-        )} of material) ÷ ${formatRs(ratePerKg, 2)}. Film, ink and adhesive only.`}
-      >
-        {formatNumber(gross, 1)}% gross
-      </span>
-      <span className="text-ink-300">·</span>
-      {both === null ? (
-        <span
-          className="text-ink-400"
-          title="Net needs the full costing — choose a film for every ply, and a quantity of at least a kilogram."
-        >
-          net —
-        </span>
-      ) : (
-        <span
-          title={`(${formatRs(ratePerKg, 2)} per kg − ${formatRs(
-            costing!.fullCostPerKg,
-            2,
-          )} it costs to make) ÷ ${formatRs(ratePerKg, 2)}. Everything: film, ink, adhesive, wages, power, transport, packing and the setup.`}
-          className={cn(
-            'font-semibold',
-            both.netPercent < 5
-              ? 'text-danger-600'
-              : both.netPercent < 12
-                ? 'text-warning-600'
-                : 'text-success-600',
-          )}
-        >
-          {formatNumber(both.netPercent, 1)}% net
-        </span>
-      )}
-    </span>
   );
 }

@@ -9,7 +9,6 @@ import {
   isSaveableDesign,
   jobPayloadFromLine,
   normalise,
-  type CustomerDetails,
   type LineForJob,
 } from './step-save';
 
@@ -274,79 +273,5 @@ describe('a field nobody changed on this screen', () => {
     expect(customerDetailsFromForm({ customerName: 'X', addressLine2: 'Sangamner' })).toMatchObject(
       { companyName: 'X', city: 'Sangamner', district: '' },
     );
-  });
-});
-
-describe('a blank on the quotation is not a decision', () => {
-  /**
-   * The rule the form fills its boxes by on an existing quotation, stated here
-   * because it is what makes the write-back behave.
-   *
-   * A value typed onto a quotation was a decision about that document and must
-   * not be replaced by the company's general one. A blank is not a decision —
-   * it is a quotation written before anybody knew the number.
-   *
-   * Quotation 130 had every contact field blank while its customer carried a
-   * mobile, an email and an address. With the snapshot winning outright, the
-   * office opened it to six empty boxes, retyped what was already on record,
-   * and concluded the write-back was broken.
-   */
-  const record: CustomerDetails = {
-    companyName: 'Family And Quantity Check',
-    brandName: 'Test',
-    address: 'Samsherpur',
-    city: '',
-    district: '',
-    mobile: '8485071067',
-    email: 'cloudabhi123@gmail.com',
-    gstNumber: '',
-  };
-
-  /** The merge the form performs: the document first, the record for gaps. */
-  const fill = (snapshot: CustomerDetails, customer: CustomerDetails): CustomerDetails => {
-    const merged = { ...snapshot };
-    for (const key of Object.keys(snapshot) as (keyof CustomerDetails)[]) {
-      if (normalise(merged[key]) === '') merged[key] = customer[key];
-    }
-    return merged;
-  };
-
-  const blankSnapshot: CustomerDetails = {
-    companyName: 'Family And Quantity Check',
-    brandName: '',
-    address: '',
-    city: '',
-    district: '',
-    mobile: '',
-    email: '',
-    gstNumber: '',
-  };
-
-  it('fills what the quotation left blank', () => {
-    const shown = fill(blankSnapshot, record);
-    expect(shown.mobile).toBe('8485071067');
-    expect(shown.email).toBe('cloudabhi123@gmail.com');
-    expect(shown.address).toBe('Samsherpur');
-  });
-
-  it('keeps a correction the quotation actually carries', () => {
-    // An address typed onto one document is not overwritten by the company's.
-    const corrected = { ...blankSnapshot, address: 'Plot 14, MIDC' };
-    expect(fill(corrected, record).address).toBe('Plot 14, MIDC');
-  });
-
-  it('writes nothing back when only the gaps were filled', () => {
-    /*
-     * The half that stops the fill looking like an edit. `shown` records what
-     * ended up on screen, so a Next that changed nothing sends nothing.
-     */
-    const shown = fill(blankSnapshot, record);
-    expect(changedCustomerFields(record, shown, shown)).toBeNull();
-  });
-
-  it('still writes a real correction made on top of a filled gap', () => {
-    const shown = fill(blankSnapshot, record);
-    const edited = { ...shown, mobile: '9876500011' };
-    expect(changedCustomerFields(record, edited, shown)).toEqual({ mobile: '9876500011' });
   });
 });

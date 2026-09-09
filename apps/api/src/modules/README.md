@@ -16,7 +16,6 @@ One folder per business module. Built so far:
 | `purchase`   | Suppliers and orders; receiving is where buying becomes stock    |
 | `cylinders`  | The design register — engraved sets, where they are, what state  |
 | `artwork`    | Design files in R2 — signed uploads, revisions, signed reads     |
-| `costing`    | Machines and wages — the master data every quoted rate rests on  |
 | `gstin`      | Verifying a customer's GST registration                          |
 | `monitor`    | Sign-in history, for administrators                              |
 | `settings`   | Editable costing defaults                                        |
