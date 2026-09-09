@@ -724,3 +724,5 @@ Four rules worth repeating here:
   change — the asset loader reads dimensions from the file header, so the layout
   follows. Worth doing for the download and the email attachment; it will not
   move generation time much.
+
+  changes to make
