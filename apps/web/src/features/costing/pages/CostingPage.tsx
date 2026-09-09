@@ -356,10 +356,20 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
             "Solvent — Ethyl Acetate" — so every lookup missed and the solvent
             cost nothing on every quotation. Naming them here makes a mismatch
             visible instead of silent.
+
+            Ink and adhesive are named TWICE on purpose. The flat method costs
+            the whole laydown at one blended rate — the works' sheet uses
+            Rs 800/kg for ink and Rs 400/kg for adhesive, figures that already
+            carry the solvent and the dilution. The per-batch method buys the
+            same adhesive at Rs 165 and prices its thinner and hardener
+            separately. One row cannot hold both, and pointing the flat method
+            at a purchase rate understated ink by a quarter.
           */}
           {(
             [
-              ['defaultAdhesiveMaterial', 'Adhesive', ['ADHESIVE']],
+              ['defaultFlatInkMaterial', 'Ink — flat method', ['INK']],
+              ['defaultFlatAdhesiveMaterial', 'Adhesive — flat method', ['ADHESIVE']],
+              ['defaultAdhesiveMaterial', 'Adhesive — per-batch method', ['ADHESIVE']],
               ['defaultHardenerMaterial', 'Hardener', ['ADHESIVE']],
               ['defaultEthylAcetateMaterial', 'Ethyl acetate', ['SOLVENT']],
               ['defaultTolueneMaterial', 'Toluene', ['SOLVENT']],

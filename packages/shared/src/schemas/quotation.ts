@@ -389,6 +389,22 @@ export const settingsSchema = z.object({
   defaultAdhesiveMaterial: z.string().trim().max(80),
 
   /**
+   * What the FLAT method prices ink and adhesive at.
+   *
+   * Deliberately not the purchase rates above. The works' Estimation sheet
+   * costs the whole ink laydown at Rs 800/kg and the adhesive at Rs 400/kg —
+   * blended figures that already carry the solvent, the dilution and the
+   * losses. Its Costing sheet buys the same ink at Rs 202-235 and the same
+   * adhesive at Rs 165, and prices the solvent and hardener separately.
+   *
+   * Both are right, for their own method. Pointing the flat model at a
+   * purchase rate mixed the two and understated ink by a quarter — so each
+   * names its own material, and the two can be priced independently.
+   */
+  defaultFlatInkMaterial: z.string().trim().max(80),
+  defaultFlatAdhesiveMaterial: z.string().trim().max(80),
+
+  /**
    * Rate costing — the works' own overheads.
    *
    * These build a rate up from every expense rather than starting from one
@@ -477,6 +493,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultMetpetMaterial: 'MET PET 12µm',
   defaultInkMaterial: 'Ink — Black',
   defaultAdhesiveMaterial: 'Adhesive — PU',
+  defaultFlatInkMaterial: 'Ink — Blended (Estimation)',
+  defaultFlatAdhesiveMaterial: 'Adhesive — Blended (Estimation)',
 
   /* Rate costing. Taken from the works' own sheets; edit on the Costing screen. */
   workingDaysPerMonth: 26,

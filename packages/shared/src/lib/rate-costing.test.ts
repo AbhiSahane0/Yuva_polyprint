@@ -623,6 +623,43 @@ describe("the works' workbook, cell by cell", () => {
     expect(actual()).toBeCloseTo(expected, 0);
   });
 
+  /**
+   * The blended rate and the purchase rate are not alternatives.
+   *
+   * Estimation costs the whole laydown at Rs 800/kg — a figure that already
+   * carries the solvent, the dilution and the losses. Costing buys the same
+   * black at Rs 202 and prices the solvent beside it. Both are right for their
+   * own method, and the app pointed the flat model at the purchase rate: ink
+   * came out a quarter light on every quotation, and nothing said so, because
+   * Rs 202 is a perfectly plausible number for ink.
+   */
+  it('understates ink when the flat method is fed a purchase rate', () => {
+    const purchase = costRate({
+      ...SHEET,
+      job: { ...SHEET.job, flatInk: { ratePerKg: 202 } },
+    })!;
+
+    expect(r.inkCost).toBeCloseTo(6220.8, 0);
+    expect(purchase.inkCost).toBeCloseTo(1570.75, 0);
+    /*
+     * Rs 9.30 a kilogram of missing ink, and Rs 10.14 off the quoted rate —
+     * the margin is taken on material cost, so understating the ink
+     * understates the profit on it as well.
+     */
+    expect((r.inkCost - purchase.inkCost) / 500).toBeCloseTo(9.3, 1);
+    expect(r.ratePerKg - purchase.ratePerKg).toBeCloseTo(10.14, 1);
+  });
+
+  it('overstates adhesive when the flat method is fed a drum rate', () => {
+    const drum = costRate({
+      ...SHEET,
+      job: { ...SHEET.job, adhesive: { ...SHEET.job.adhesive, flatRatePerKg: 165 } },
+    })!;
+
+    expect(r.adhesiveCost).toBeCloseTo(5184, 0);
+    expect(drum.adhesiveCost).toBeCloseTo(2138.4, 0);
+  });
+
   it('reaches the same structure the sheet does', () => {
     expect(r.totalGsm).toBe(125); // G15
     expect(r.consumedKg).toBe(540); // I6

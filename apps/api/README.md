@@ -768,6 +768,23 @@ moved nothing. They are taken from the catalogue in order, up to the job's
 colour count — which is also what the station surcharge is charged on, from the
 sixth station.
 
+**The blended rate and the purchase rate are different numbers for the same
+drum.** Estimation costs the whole ink laydown at Rs 800/kg and the adhesive at
+Rs 400/kg — figures that already carry the solvent, the dilution and the losses.
+Costing buys the same black at Rs 202 and the same adhesive at Rs 165, and
+prices the thinner and hardener beside them. Both are right for their own
+method, so each names its own material: `defaultFlatInkMaterial` and
+`defaultFlatAdhesiveMaterial` for the flat method, `defaultAdhesiveMaterial`
+and the solvent settings for the batch. Pointing the flat method at a purchase
+rate, which is what it did, understated ink by a quarter — Rs 10.14 a kilogram
+off the quoted rate, and nothing said so, because Rs 202 is a perfectly
+plausible number for ink.
+
+`npm run seed:excel-rates -w @yuva/api` writes the workbook's own figures into
+the catalogue. Unlike `seed:costing` it DOES change rates already set — that is
+its purpose — but rates are append-only, so the previous figure stays on the
+Rates screen.
+
 Master data lives in `costing_machines`, `costing_labour`, and the `costing_*`
 keys in settings. `npm run seed:costing -w @yuva/api` loads the works' own 2022
 figures — **check them before quoting on them**.
