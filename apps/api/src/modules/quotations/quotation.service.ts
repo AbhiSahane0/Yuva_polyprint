@@ -356,6 +356,8 @@ function priceQuotation(
         cylinderCount: item.cylinderCount,
         transportCost: item.transportCost,
         chargeCylinders: item.chargeCylinders,
+        /* The engraver's mounting margin, from the Costing screen. */
+        mountingMm: costing.settings.cylinderMountingMm,
       },
       rates.cylinderRate,
     );

@@ -1418,6 +1418,23 @@ recorded rate and who keyed it in.
 Saving invalidates the quotation queries too, since their costing depends on
 these rates.
 
+#### The cylinder mounting margin
+
+A cylinder is wider than the film it carries, and the works pays for the whole
+face: `film width × lanes + mounting`. That mounting was a literal `+ 80` in the
+geometry — on a 700 mm job at seven stations, **Rs 8,400 of an Rs 81,900
+cylinder charge**, about 4% of the quotation, with nothing on any screen to show
+it or change it.
+
+It is **Cylinder mounting, mm** on the Costing screen now. Unlike everything
+else there, the client's workbook does not reach cylinders at all, so there is
+no sheet to reconcile it against — it is what their engraver charges for. The 80
+stays the default, read off their own jobs: `width × lanes + 80` is at or under
+the press's 800 mm face on 95% of them.
+
+It also feeds the suggested number of lanes, so a wider margin proposes fewer of
+them and the cylinder it suggests still fits the press.
+
 #### Add a material, and edit what its price is multiplied by
 
 **Add a material** on the header, and a slider button on each row for the

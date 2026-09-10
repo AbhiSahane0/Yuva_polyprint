@@ -432,6 +432,20 @@ export const settingsSchema = z.object({
   stationSurcharge8: z.coerce.number().min(0).max(10_000),
   /** Edge trim added to the web width, millimetres. */
   defaultTrimMm: z.coerce.number().min(0).max(500),
+  /**
+   * Millimetres of cylinder face beyond the printed web.
+   *
+   * The engraver's mounting margin: a cylinder is wider than the film it
+   * carries, and the whole face is what the works pays for. It multiplies
+   * straight into the cylinder charge — on a 700 mm job at seven stations it is
+   * Rs 8,400 of an Rs 81,900 charge — and was a literal `+ 80` in the geometry,
+   * with nothing on any screen to show it, let alone change it.
+   *
+   * The client's workbook does not reach cylinders at all, so unlike the rest
+   * of these there is no sheet to reconcile it against. It is what their
+   * engraver charges for, and it is theirs to set.
+   */
+  cylinderMountingMm: z.coerce.number().min(0).max(500),
   defaultWastagePercent: z.coerce.number().min(0).max(100),
   defaultMarginPercent: z.coerce.number().min(0).max(100),
   /**
@@ -510,6 +524,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   stationSurcharge7: 7.5,
   stationSurcharge8: 9,
   defaultTrimMm: 15,
+  /* Read off the works' own jobs: width × lanes + 80 fits their press on 95%. */
+  cylinderMountingMm: 80,
   defaultWastagePercent: 8,
   defaultMarginPercent: 9,
   marginBasis: 'MATERIAL_ONLY',

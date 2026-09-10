@@ -5,6 +5,7 @@ import {
   computeTier,
   computeTotals,
   structureGsm,
+  suggestRepeatWidth,
 } from './quotation-math.js';
 
 /**
@@ -113,6 +114,39 @@ describe('computeItemGeometry', () => {
     expect(g.cylinderCircumference).toBe(460);
     expect(g.costPerCylinder).toBe(8625);
     expect(g.totalCylinderCost).toBe(69000); // 8 cylinders
+  });
+
+  /**
+   * **The mounting margin is money, so it is the works' to set.**
+   *
+   * A cylinder is wider than the film it carries and the whole face is paid
+   * for. It was a literal `+ 80` here: on the Anupriya job — 700 mm at seven
+   * stations — that is Rs 8,400 of an Rs 81,900 cylinder charge, about 4% of
+   * the whole quotation, with nothing on any screen to show it.
+   */
+  describe('the cylinder mounting margin', () => {
+    it('defaults to the works’ own 80 mm', () => {
+      expect(computeItemGeometry(paneerBag, 2.5).cylinderWidth).toBe(750); // 670 + 80
+    });
+
+    it('takes the figure the Costing screen holds', () => {
+      expect(computeItemGeometry({ ...paneerBag, mountingMm: 120 }, 2.5).cylinderWidth).toBe(790);
+      expect(computeItemGeometry({ ...paneerBag, mountingMm: 0 }, 2.5).cylinderWidth).toBe(670);
+    });
+
+    it('carries into what a cylinder costs', () => {
+      const at80 = computeItemGeometry(paneerBag, 2.5).totalCylinderCost;
+      const at0 = computeItemGeometry({ ...paneerBag, mountingMm: 0 }, 2.5).totalCylinderCost;
+
+      /* 80 mm × 460 mm ÷ 100 × Rs 2.5 × 8 cylinders. */
+      expect(at80 - at0).toBe(7360);
+    });
+
+    it('suggests lanes that still fit the press once the margin is added', () => {
+      /* The face is 800: a wider margin leaves less of it for the web. */
+      expect(suggestRepeatWidth(240, 80)).toBe(3); // (800 − 80) ÷ 240
+      expect(suggestRepeatWidth(240, 320)).toBe(2); // (800 − 320) ÷ 240
+    });
   });
 
   it('adds transport to the cylinder total when it is charged', () => {

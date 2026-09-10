@@ -323,6 +323,7 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
     ['stationSurcharge7', '7th station, Rs/kg', ''],
     ['stationSurcharge8', '8th station, Rs/kg', ''],
     ['defaultTrimMm', 'Trim, mm', 'Added to the web width'],
+    ['cylinderMountingMm', 'Cylinder mounting, mm', 'Face beyond the web the engraver charges for'],
     ['defaultWastagePercent', 'Wastage %', 'Film spoiled setting up and running'],
     ['defaultMarginPercent', 'Margin %', 'Added to cost, not taken off the rate'],
     ['inkSolventParts', 'Solvent per 100 of ink', 'How the press thins it'],

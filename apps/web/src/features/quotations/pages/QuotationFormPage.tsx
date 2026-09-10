@@ -636,6 +636,8 @@ export default function QuotationFormPage() {
           cylinderCount: num(item?.cylinderCount),
           transportCost: num(item?.transportCost),
           chargeCylinders: item?.chargeCylinders !== false,
+          /* The engraver's mounting margin, from the Costing screen. */
+          mountingMm: settings?.cylinderMountingMm,
         },
         cylinderRate,
       );
@@ -1459,7 +1461,7 @@ function JobCard({
     if (repeatsTaken || !charged) return;
     if (filmWidthMm <= 0 || filmHeightMm <= 0) return;
 
-    const width = suggestRepeatWidth(filmWidthMm);
+    const width = suggestRepeatWidth(filmWidthMm, costing.settings?.cylinderMountingMm);
     const height = suggestRepeatHeight(filmHeightMm);
 
     /*

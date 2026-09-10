@@ -89,6 +89,8 @@ export interface QuotationItemInputs {
   repeatHeight: number;
   cylinderCount: number;
   transportCost?: number;
+  /** The engraver's mounting margin — see `DEFAULT_CYLINDER_MOUNTING_MM`. */
+  mountingMm?: number;
 }
 
 export interface QuotationItemComputed {
@@ -158,7 +160,10 @@ export function computeItem(
       : 0
     : input.ratePerKg;
 
-  const cylinderWidth = round(input.widthMm * input.repeatWidth + 80, 2);
+  const cylinderWidth = round(
+    input.widthMm * input.repeatWidth + (input.mountingMm ?? DEFAULT_CYLINDER_MOUNTING_MM),
+    2,
+  );
   const cylinderCircumference = round(input.heightMm * input.repeatHeight, 2);
   const costPerCylinder = round(((cylinderWidth * cylinderCircumference) / 100) * cylinderRate, 2);
   const totalCylinderCost = round(
@@ -222,6 +227,11 @@ export interface ItemGeometryInputs {
    * back to the micron proxy, which is what a ply with no density leaves.
    */
   gsm?: number;
+  /**
+   * Cylinder face beyond the web, in millimetres — the engraver's mounting
+   * margin. Set on the Costing screen; omitted falls back to the works' 80.
+   */
+  mountingMm?: number;
   /** The finished pouch, before any gusset is added. */
   widthMm: number;
   heightMm: number;
@@ -291,6 +301,16 @@ export const CYLINDER_CIRCUMFERENCE = { MIN: 310, MAX: 740, PREFERRED: 490 } as 
 export const MAX_CYLINDER_FACE_MM = 800;
 
 /**
+ * Millimetres of cylinder face beyond the printed web, when nothing says.
+ *
+ * The engraver's mounting margin. A fallback only: the works sets its own on
+ * the Costing screen, because it is what their engraver charges for and the
+ * client's workbook does not reach cylinders at all. 80 is what their own jobs
+ * show — `width × lanes + 80` is at or under the press's face on 95% of them.
+ */
+export const DEFAULT_CYLINDER_MOUNTING_MM = 80;
+
+/**
  * How many lanes of the design fit across the web.
  *
  * As many as the machine's face will take, which is what the works does on most
@@ -298,9 +318,14 @@ export const MAX_CYLINDER_FACE_MM = 800;
  * more passes. Never less than 1, so an unusually wide design is still quotable
  * rather than being quoted as zero lanes and priced at nothing.
  */
-export function suggestRepeatWidth(filmWidthMm: number): number {
+export function suggestRepeatWidth(
+  filmWidthMm: number,
+  mountingMm: number = DEFAULT_CYLINDER_MOUNTING_MM,
+): number {
   if (!Number.isFinite(filmWidthMm) || filmWidthMm <= 0) return 1;
-  return Math.max(1, Math.floor((MAX_CYLINDER_FACE_MM - 80) / filmWidthMm));
+  /* The same margin `cylinderWidth` adds, so the lanes it suggests fit. */
+  const usable = MAX_CYLINDER_FACE_MM - Math.max(0, mountingMm);
+  return Math.max(1, Math.floor(usable / filmWidthMm));
 }
 
 /**
@@ -385,7 +410,10 @@ export function computeItemGeometry(input: ItemGeometryInputs, cylinderRate: num
   const pouchesPerKg =
     (input.makesPouches ?? true) && gramsPerPouch > 0 ? round(1000 / gramsPerPouch, 2) : 0;
 
-  const cylinderWidth = round(filmWidthMm * input.repeatWidth + 80, 2);
+  const cylinderWidth = round(
+    filmWidthMm * input.repeatWidth + (input.mountingMm ?? DEFAULT_CYLINDER_MOUNTING_MM),
+    2,
+  );
   const cylinderCircumference = round(filmHeightMm * input.repeatHeight, 2);
   const costPerCylinder = round(((cylinderWidth * cylinderCircumference) / 100) * cylinderRate, 2);
 
