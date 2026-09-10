@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { computeItem, computeItemGeometry, computeTier, computeTotals } from './quotation-math.js';
+import {
+  computeItem,
+  computeItemGeometry,
+  computeTier,
+  computeTotals,
+  structureGsm,
+  suggestRepeatWidth,
+} from './quotation-math.js';
 
 /**
  * Locks the arithmetic to the client's real quotation #118. If a formula ever
@@ -109,6 +116,39 @@ describe('computeItemGeometry', () => {
     expect(g.totalCylinderCost).toBe(69000); // 8 cylinders
   });
 
+  /**
+   * **The mounting margin is money, so it is the works' to set.**
+   *
+   * A cylinder is wider than the film it carries and the whole face is paid
+   * for. It was a literal `+ 80` here: on the Anupriya job — 700 mm at seven
+   * stations — that is Rs 8,400 of an Rs 81,900 cylinder charge, about 4% of
+   * the whole quotation, with nothing on any screen to show it.
+   */
+  describe('the cylinder mounting margin', () => {
+    it('defaults to the works’ own 80 mm', () => {
+      expect(computeItemGeometry(paneerBag, 2.5).cylinderWidth).toBe(750); // 670 + 80
+    });
+
+    it('takes the figure the Costing screen holds', () => {
+      expect(computeItemGeometry({ ...paneerBag, mountingMm: 120 }, 2.5).cylinderWidth).toBe(790);
+      expect(computeItemGeometry({ ...paneerBag, mountingMm: 0 }, 2.5).cylinderWidth).toBe(670);
+    });
+
+    it('carries into what a cylinder costs', () => {
+      const at80 = computeItemGeometry(paneerBag, 2.5).totalCylinderCost;
+      const at0 = computeItemGeometry({ ...paneerBag, mountingMm: 0 }, 2.5).totalCylinderCost;
+
+      /* 80 mm × 460 mm ÷ 100 × Rs 2.5 × 8 cylinders. */
+      expect(at80 - at0).toBe(7360);
+    });
+
+    it('suggests lanes that still fit the press once the margin is added', () => {
+      /* The face is 800: a wider margin leaves less of it for the web. */
+      expect(suggestRepeatWidth(240, 80)).toBe(3); // (800 − 80) ÷ 240
+      expect(suggestRepeatWidth(240, 320)).toBe(2); // (800 − 320) ÷ 240
+    });
+  });
+
   it('adds transport to the cylinder total when it is charged', () => {
     expect(computeItemGeometry({ ...paneerBag, transportCost: 1500 }, 2.5).totalCylinderCost).toBe(
       70500,
@@ -129,6 +169,70 @@ describe('computeItemGeometry', () => {
 
     expect(g.totalCylinderCost).toBe(0);
     expect(g.costPerCylinder).toBe(8625);
+  });
+
+  /**
+   * **A pouch weighs what its film weighs, not what its thickness implies.**
+   *
+   * The proxy below stands a flat 1.1 in for the laminate's density. PET over
+   * white-opaque poly averages 0.985, so a pouch came out 9.1% heavy: the
+   * works' own sheet says 500 kg of the Anupriya job is 9,524 pouches and this
+   * quoted 8,730, which put Rs 15.09 on a document the sheet prices at
+   * Rs 13.83. PET over MET PET averages 1.400 and went the other way by 27%.
+   *
+   * Density is a property of the film, is on the rate list beside its price,
+   * and is what the client's own sheet uses — there is a whole table of them
+   * in it.
+   */
+  describe('weighing a pouch by its real density', () => {
+    /* The workbook's job: PET 12µ at 1.4 over W/O Poly 110µ at 0.94. */
+    const plies = [
+      { micron: 12, density: 1.4 },
+      { micron: 110, density: 0.94 },
+    ];
+    const coats = { inkGsm: 1.8, adhesiveGsm: 3 };
+
+    it('totals the plies at their own density, plus the coats', () => {
+      // Estimation!G15 — 16.8 + 103.4 + 1.8 + 3
+      expect(structureGsm(plies, coats)).toBe(125);
+    });
+
+    it('reaches the sheet’s own pouch weight and count', () => {
+      const g = computeItemGeometry(
+        { ...paneerBag, widthMm: 700, heightMm: 600, gsm: structureGsm(plies, coats) },
+        2.5,
+      );
+
+      // Estimation!J10 — 19.05 pouches to the kilogram, so J9's 52.5 g.
+      expect(g.pouchesPerKg).toBe(19.05);
+      /* One decimal: the count is rounded to a paisa-sized 2 dp before this. */
+      expect(1000 / g.pouchesPerKg).toBeCloseTo(52.5, 1);
+    });
+
+    it('falls back to the micron proxy when a ply has no density', () => {
+      expect(
+        structureGsm(
+          [
+            { micron: 12, density: 1.4 },
+            { micron: 110, density: null },
+          ],
+          coats,
+        ),
+      ).toBe(0);
+
+      /* Zero means "use the proxy", which is the pre-existing behaviour. */
+      const withoutDensity = computeItemGeometry({ ...paneerBag, gsm: 0 }, 2.5);
+      expect(withoutDensity.pouchesPerKg).toBe(39.86);
+    });
+
+    it('ignores a ply left at zero microns, as the sheet does', () => {
+      const withEmptyMetPet = [
+        { micron: 12, density: 1.4 },
+        { micron: 0, density: 1.4 },
+        { micron: 110, density: 0.94 },
+      ];
+      expect(structureGsm(withEmptyMetPet, coats)).toBe(125);
+    });
   });
 
   it('allows more waste on a three-ply structure than a two-ply one', () => {

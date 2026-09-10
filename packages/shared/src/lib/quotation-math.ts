@@ -27,9 +27,49 @@ export function totalMicron(layer: number, polyMicron: number): number {
   return layer === 2 ? 12 + polyMicron + 2 : 12 + 12 + polyMicron + 2;
 }
 
-/** Yield allowance: 3-layer film wastes more, hence the higher factor. */
+/**
+ * Yield allowance, for a structure whose plies have no density on record.
+ *
+ * A fallback, not the model. It stands in for the film's density with a flat
+ * 1.1, which is only right when the laminate happens to average that: PET over
+ * white-opaque poly averages 0.985, so a pouch came out 9.1% heavy and 500 kg
+ * was quoted as 8,730 pouches where the works' own sheet says 9,524. Foil is
+ * 2.71 and would go the other way, badly.
+ *
+ * `structureGsm` is the model. This is what is left when a ply has no density
+ * to work from, and a wrong weight is still better than a weightless one.
+ */
 export function layerFactor(layer: number): number {
   return layer === 2 ? 1.1 : 1.2;
+}
+
+/**
+ * What a square metre of the finished laminate weighs.
+ *
+ * Each ply at its own density, plus the ink and the adhesive it carries —
+ * exactly the column the works' sheet totals to reach its 125 GSM, and the
+ * same arithmetic the rate costing uses. Density is a property of the film and
+ * is edited on the Rates screen beside its price.
+ *
+ * Returns 0 when any ply has no density on record, so the caller falls back
+ * rather than quietly under-weighing the structure by a whole ply.
+ */
+export function structureGsm(
+  plies: { micron: number; density: number | null | undefined }[],
+  coats: { inkGsm: number; adhesiveGsm: number },
+): number {
+  if (plies.length === 0) return 0;
+
+  let substrate = 0;
+  for (const ply of plies) {
+    /* A ply left at zero microns is a ply the structure does not have. */
+    if (!(ply.micron > 0)) continue;
+    if (!(Number(ply.density) > 0)) return 0;
+    substrate += ply.micron * Number(ply.density);
+  }
+  if (substrate <= 0) return 0;
+
+  return round(substrate + Math.max(0, coats.inkGsm) + Math.max(0, coats.adhesiveGsm), 4);
 }
 
 export interface QuotationItemInputs {
@@ -49,6 +89,8 @@ export interface QuotationItemInputs {
   repeatHeight: number;
   cylinderCount: number;
   transportCost?: number;
+  /** The engraver's mounting margin — see `DEFAULT_CYLINDER_MOUNTING_MM`. */
+  mountingMm?: number;
 }
 
 export interface QuotationItemComputed {
@@ -118,7 +160,10 @@ export function computeItem(
       : 0
     : input.ratePerKg;
 
-  const cylinderWidth = round(input.widthMm * input.repeatWidth + 80, 2);
+  const cylinderWidth = round(
+    input.widthMm * input.repeatWidth + (input.mountingMm ?? DEFAULT_CYLINDER_MOUNTING_MM),
+    2,
+  );
   const cylinderCircumference = round(input.heightMm * input.repeatHeight, 2);
   const costPerCylinder = round(((cylinderWidth * cylinderCircumference) / 100) * cylinderRate, 2);
   const totalCylinderCost = round(
@@ -175,6 +220,18 @@ export interface ItemGeometryInputs {
   layerCount: number;
   /** Total structure thickness — see `totalMicronForLayers` in material-cost. */
   micron: number;
+  /**
+   * Grams per square metre of the finished laminate — see `structureGsm`.
+   *
+   * What decides the pouch's weight where it is known. Omitted or zero falls
+   * back to the micron proxy, which is what a ply with no density leaves.
+   */
+  gsm?: number;
+  /**
+   * Cylinder face beyond the web, in millimetres — the engraver's mounting
+   * margin. Set on the Costing screen; omitted falls back to the works' 80.
+   */
+  mountingMm?: number;
   /** The finished pouch, before any gusset is added. */
   widthMm: number;
   heightMm: number;
@@ -244,6 +301,16 @@ export const CYLINDER_CIRCUMFERENCE = { MIN: 310, MAX: 740, PREFERRED: 490 } as 
 export const MAX_CYLINDER_FACE_MM = 800;
 
 /**
+ * Millimetres of cylinder face beyond the printed web, when nothing says.
+ *
+ * The engraver's mounting margin. A fallback only: the works sets its own on
+ * the Costing screen, because it is what their engraver charges for and the
+ * client's workbook does not reach cylinders at all. 80 is what their own jobs
+ * show — `width × lanes + 80` is at or under the press's face on 95% of them.
+ */
+export const DEFAULT_CYLINDER_MOUNTING_MM = 80;
+
+/**
  * How many lanes of the design fit across the web.
  *
  * As many as the machine's face will take, which is what the works does on most
@@ -251,9 +318,14 @@ export const MAX_CYLINDER_FACE_MM = 800;
  * more passes. Never less than 1, so an unusually wide design is still quotable
  * rather than being quoted as zero lanes and priced at nothing.
  */
-export function suggestRepeatWidth(filmWidthMm: number): number {
+export function suggestRepeatWidth(
+  filmWidthMm: number,
+  mountingMm: number = DEFAULT_CYLINDER_MOUNTING_MM,
+): number {
   if (!Number.isFinite(filmWidthMm) || filmWidthMm <= 0) return 1;
-  return Math.max(1, Math.floor((MAX_CYLINDER_FACE_MM - 80) / filmWidthMm));
+  /* The same margin `cylinderWidth` adds, so the lanes it suggests fit. */
+  const usable = MAX_CYLINDER_FACE_MM - Math.max(0, mountingMm);
+  return Math.max(1, Math.floor(usable / filmWidthMm));
 }
 
 /**
@@ -325,11 +397,23 @@ export function computeItemGeometry(input: ItemGeometryInputs, cylinderRate: num
    * A roll is skipped: film on a reel is not pouches, and a confident figure
    * there would be worse than none.
    */
-  const areaTerm = ((filmWidthMm * filmHeightMm) / 100) * input.micron * factor;
+  /*
+   * Grams of film per pouch.
+   *
+   * From the structure's real GSM where the plies carry a density — the sheet's
+   * own arithmetic — and from the micron proxy where they do not.
+   */
+  const gramsPerPouch =
+    input.gsm && input.gsm > 0
+      ? (filmWidthMm * filmHeightMm * input.gsm) / 1_000_000
+      : ((filmWidthMm * filmHeightMm) / 100) * input.micron * factor * 0.0001;
   const pouchesPerKg =
-    (input.makesPouches ?? true) && areaTerm > 0 ? round(1000 / (areaTerm / 10000), 2) : 0;
+    (input.makesPouches ?? true) && gramsPerPouch > 0 ? round(1000 / gramsPerPouch, 2) : 0;
 
-  const cylinderWidth = round(filmWidthMm * input.repeatWidth + 80, 2);
+  const cylinderWidth = round(
+    filmWidthMm * input.repeatWidth + (input.mountingMm ?? DEFAULT_CYLINDER_MOUNTING_MM),
+    2,
+  );
   const cylinderCircumference = round(filmHeightMm * input.repeatHeight, 2);
   const costPerCylinder = round(((cylinderWidth * cylinderCircumference) / 100) * cylinderRate, 2);
 

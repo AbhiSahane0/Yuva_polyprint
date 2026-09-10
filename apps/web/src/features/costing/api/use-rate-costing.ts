@@ -147,7 +147,8 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
         trimMm: settings.defaultTrimMm,
         layers: line.layers,
         colours,
-        flatInk: { ratePerKg: rate(settings.defaultInkMaterial) },
+        /* The Estimation sheet's blended figure, not a purchase rate. */
+        flatInk: { ratePerKg: rate(settings.defaultFlatInkMaterial) },
         adhesive: {
           /* Worked out from the structure, as the sheet does. */
           gsm: adhesiveGsmFor(line.layers, {
@@ -155,7 +156,7 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
             thickGsm: settings.adhesiveCoatThickGsm,
             thickPlyMicron: settings.adhesiveThickPlyMicron,
           }),
-          flatRatePerKg: rate(settings.defaultAdhesiveMaterial),
+          flatRatePerKg: rate(settings.defaultFlatAdhesiveMaterial),
           ratio: settings.defaultAdhesiveRatio,
           adhesiveRatePerKg: rate(settings.defaultAdhesiveMaterial),
           ethylAcetateRatePerKg: rate(settings.defaultEthylAcetateMaterial),
@@ -241,15 +242,25 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
   const supporting = settings
     ? [
         /*
-         * The blended ink, which the flat method costs the WHOLE laydown at.
-         * Unpriced, it is the largest of these gaps by some way and the one
-         * least likely to be noticed, because no colour is named as missing.
+         * Whichever materials THIS method actually reads.
+         *
+         * The flat method prices the whole laydown at one blended rate and
+         * never touches the solvent rows; the per-colour method prices the
+         * solvent and hardener and never touches the blends. Naming all of
+         * them either way refused quotations over a rate that was not in the
+         * arithmetic.
          */
-        ...(perColourInk ? ([] as string[][]) : [['Ink', settings.defaultInkMaterial] as string[]]),
-        ['Adhesive', settings.defaultAdhesiveMaterial],
-        ['Ethyl acetate', settings.defaultEthylAcetateMaterial],
-        ['Toluene', settings.defaultTolueneMaterial],
-        ['Hardener', settings.defaultHardenerMaterial],
+        ...(perColourInk
+          ? ([
+              ['Adhesive', settings.defaultAdhesiveMaterial],
+              ['Ethyl acetate', settings.defaultEthylAcetateMaterial],
+              ['Toluene', settings.defaultTolueneMaterial],
+              ['Hardener', settings.defaultHardenerMaterial],
+            ] as string[][])
+          : ([
+              ['Ink', settings.defaultFlatInkMaterial],
+              ['Adhesive', settings.defaultFlatAdhesiveMaterial],
+            ] as string[][])),
       ]
     : [];
   const unpricedSupporting = supporting

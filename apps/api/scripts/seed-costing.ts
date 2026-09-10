@@ -5,9 +5,9 @@
  * theirs, but they are three years old and every one of them should be checked
  * on the Costing screen before a quotation goes out on them.
  *
- * Two figures are NOT from the sheet and are marked below: it has no lamination
- * operator at all, though the laminator runs for an hour and a half on the job
- * it costs. Somebody is paid to stand there.
+ * Every figure is from that sheet, including the wages it does NOT carry: it
+ * has no lamination operator at all, though the laminator runs for an hour and
+ * a half on the job it costs, and the works chose to follow the sheet.
  *
  * Idempotent: run it as often as you like. Existing rows are left exactly as
  * they are, so it can never overwrite a figure the office has corrected.
@@ -58,9 +58,15 @@ const LABOUR: { role: string; process: MachineKind; monthlySalary: number; sortO
   { role: 'Printing Operator', process: 'PRINTING', monthlySalary: 25000, sortOrder: 1 },
   { role: 'Printing Assistant', process: 'PRINTING', monthlySalary: 13000, sortOrder: 2 },
   { role: 'Printing Helper', process: 'PRINTING', monthlySalary: 8000, sortOrder: 3 },
-  /* Not in the sheet. The laminator runs 86 minutes on that job unattended. */
-  { role: 'Lamination Operator', process: 'LAMINATION', monthlySalary: 18000, sortOrder: 4 },
-  { role: 'Lamination Helper', process: 'LAMINATION', monthlySalary: 8000, sortOrder: 5 },
+  /*
+   * There is no lamination wage here, and that is the works' own decision.
+   *
+   * Their sheet has no line for one, though the laminator runs 86 minutes on
+   * the job it costs — somebody stands at that machine. Two roles were seeded
+   * for it at Rs 18,000 and Rs 8,000, which put the rate 48 paise a kilogram
+   * above the sheet, and on 10 September 2026 the works chose the sheet. Add
+   * them on the Costing screen if that is ever reconsidered.
+   */
   { role: 'Slitting Operator', process: 'SLITTING', monthlySalary: 12000, sortOrder: 6 },
   { role: 'Slitting Helper', process: 'SLITTING', monthlySalary: 8000, sortOrder: 7 },
 ];

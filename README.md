@@ -314,6 +314,8 @@ Workspace scripts worth knowing:
 | ---------------------------------------- | ----------------------------------------------------------- |
 | `npm run seed:admin -w @yuva/api`        | create the first administrator (refuses if one exists)      |
 | `npm run seed:materials -w @yuva/api`    | seed the material catalogue                                 |
+| `npm run seed:costing -w @yuva/api`      | machines, wages and ink figures for the rate costing        |
+| `npm run seed:excel-rates -w @yuva/api`  | bring rates and master data to the client's own workbook    |
 | `npm run schema:docs -w @yuva/api`       | regenerate `docs/database-schema.md` from the live database |
 | `npm run db:copy-to-remote -w @yuva/api` | copy local data up to Neon                                  |
 | `npm run import:legacy -w @yuva/api`     | import the legacy spreadsheet                               |

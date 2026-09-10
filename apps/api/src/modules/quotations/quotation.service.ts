@@ -13,6 +13,8 @@ import {
   type QuotationItemQuantity,
   type QuotationTier,
   computeItemGeometry,
+  structureGsm,
+  adhesiveGsmFor,
   computeTier,
   overriddenRate,
   plyRatePerKg,
@@ -328,6 +330,15 @@ function priceQuotation(
       {
         layerCount: layers.length,
         micron: totalMicronForLayers(layers),
+        /* Each ply at its own density, as the works' sheet weighs it. */
+        gsm: structureGsm(layers, {
+          inkGsm: costing.settings.inkGsm,
+          adhesiveGsm: adhesiveGsmFor(layers, {
+            thinGsm: costing.settings.adhesiveCoatThinGsm,
+            thickGsm: costing.settings.adhesiveCoatThickGsm,
+            thickPlyMicron: costing.settings.adhesiveThickPlyMicron,
+          }),
+        }),
         widthMm: item.widthMm,
         heightMm: item.heightMm,
         // Film on a reel is not pouches; the engine reports zero rather than a
@@ -345,6 +356,8 @@ function priceQuotation(
         cylinderCount: item.cylinderCount,
         transportCost: item.transportCost,
         chargeCylinders: item.chargeCylinders,
+        /* The engraver's mounting margin, from the Costing screen. */
+        mountingMm: costing.settings.cylinderMountingMm,
       },
       rates.cylinderRate,
     );

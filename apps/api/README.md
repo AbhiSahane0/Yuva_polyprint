@@ -768,6 +768,33 @@ moved nothing. They are taken from the catalogue in order, up to the job's
 colour count — which is also what the station surcharge is charged on, from the
 sixth station.
 
+**The blended rate and the purchase rate are different numbers for the same
+drum.** Estimation costs the whole ink laydown at Rs 800/kg and the adhesive at
+Rs 400/kg — figures that already carry the solvent, the dilution and the losses.
+Costing buys the same black at Rs 202 and the same adhesive at Rs 165, and
+prices the thinner and hardener beside them. Both are right for their own
+method, so each names its own material: `defaultFlatInkMaterial` and
+`defaultFlatAdhesiveMaterial` for the flat method, `defaultAdhesiveMaterial`
+and the solvent settings for the batch. Pointing the flat method at a purchase
+rate, which is what it did, understated ink by a quarter — Rs 10.14 a kilogram
+off the quoted rate, and nothing said so, because Rs 202 is a perfectly
+plausible number for ink.
+
+`npm run seed:excel-rates -w @yuva/api` writes the workbook's own figures into
+the catalogue. Unlike `seed:costing` it DOES change rates already set — that is
+its purpose — but rates are append-only, so the previous figure stays on the
+Rates screen.
+
+It also **retires the two lamination wages**. The sheet has no line for one,
+though the laminator runs 86 minutes on the job it costs — somebody stands at
+that machine, and the sheet does not pay them. Seeded at Rs 18,000 and Rs 8,000
+they put the rate 48 paise a kilogram over the sheet; on 10 September 2026 the
+works chose the sheet. Retired rather than deleted, so the Costing screen shows
+them greyed with a Restore beside them and the decision stays visible.
+
+With those off, the workbook reconciles **exactly** — Rs 263.40 a kilogram and
+Rs 13.83 a pouch, on local and on Neon alike.
+
 Master data lives in `costing_machines`, `costing_labour`, and the `costing_*`
 keys in settings. `npm run seed:costing -w @yuva/api` loads the works' own 2022
 figures — **check them before quoting on them**.
@@ -783,18 +810,26 @@ Stored as key/value rows so a new setting never needs a migration. Anything
 missing falls back to a documented default, so a fresh database works with no
 seeding step.
 
-| Setting                   | Default         | Meaning                                      |
-| ------------------------- | --------------- | -------------------------------------------- |
-| `quotationStartNumber`    | 119             | Continues the client's existing paper series |
-| `cylinderRate`            | 2.5             | Multiplier in the cylinder cost formula      |
-| `gstPercent`              | 18              | Applied to material and cylinder totals      |
-| `materialAdvancePercent`  | 70              | Advance taken on the material total          |
-| `cylinderAdvancePercent`  | 100             | Advance taken on the cylinder total          |
-| `inkGsm`                  | 1.8             | Ink laid down per m², for costing            |
-| `adhesiveGsm`             | 2.5             | Adhesive laid down per m², for costing       |
-| `defaultPetMaterial`      | `PET 12µm`      | Which material's rate prices the PET layer   |
-| `defaultInkMaterial`      | `Ink — Black`   | Which rate prices the ink                    |
-| `defaultAdhesiveMaterial` | `Adhesive — PU` | Which rate prices the adhesive               |
+| Setting                       | Default                           | Meaning                                                                                    |
+| ----------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------ |
+| `quotationStartNumber`        | 119                               | Continues the client's existing paper series                                               |
+| `cylinderRate`                | 2.5                               | Multiplier in the cylinder cost formula                                                    |
+| `gstPercent`                  | 18                                | Applied to material and cylinder totals                                                    |
+| `materialAdvancePercent`      | 70                                | Advance taken on the material total                                                        |
+| `cylinderAdvancePercent`      | 100                               | Advance taken on the cylinder total                                                        |
+| `inkGsm`                      | 1.8                               | Ink laid down per m², for costing                                                          |
+| `adhesiveGsm`                 | 2.5                               | Adhesive laid down per m², for costing                                                     |
+| `defaultPetMaterial`          | `PET 12µm`                        | Which material's rate prices the PET layer                                                 |
+| `defaultInkMaterial`          | `Ink — Black`                     | Which rate prices the ink                                                                  |
+| `defaultAdhesiveMaterial`     | `Adhesive — PU`                   | Which rate prices the adhesive, per batch                                                  |
+| `defaultFlatInkMaterial`      | `Ink — Blended (Estimation)`      | What the FLAT method prices the whole ink laydown at — a blended rate, Rs 800 on the sheet |
+| `defaultFlatAdhesiveMaterial` | `Adhesive — Blended (Estimation)` | The same for adhesive — Rs 400, the made-up batch rather than the drum                     |
+| `cylinderMountingMm`          | 80                                | Cylinder face beyond the web, which the engraver charges for                               |
+
+The two `Flat*` settings are deliberately not the purchase rates above them. See
+**Two sheets, reconciled** below: the same drum has one price on the invoice and
+another, blended, in the Estimation sheet, and mixing them understated ink by a
+quarter.
 
 ---
 
@@ -818,7 +853,8 @@ Every figure on a quotation traces back to these. Worth reading once.
 | **MET PET**        | Metallised PET — the same 12µ film with a thin aluminium coating. A barrier against moisture, oxygen and light, and what makes a pouch silver inside. Usually the middle ply of a three-ply laminate. |
 | **Poly**           | The inner sealing ply. Its grade is chosen per job; picking the film sets its thickness, density and rate together, because the film's name states its gauge.                                         |
 | **Adhesive**       | Bonds the plies. Adds 2µ and its own GSM.                                                                                                                                                             |
-| **Yield factor**   | A wastage allowance applied when working out pouches per kilogram.                                                                                                                                    |
+| **Structure GSM**  | Every ply at its own density, plus the ink and adhesive coats. What a pouch actually weighs, and what the client's own sheet totals to reach its 125.                                                 |
+| **Yield factor**   | A stand-in for density, used only when a ply's film has no density recorded. 1.1 for two plies, 1.2 for three or more.                                                                                |
 | **Pouches per kg** | How many pouches a kilogram of finished film yields. Falls as the film gets thicker.                                                                                                                  |
 | **Repeat**         | How many times the design wraps around the cylinder. Sets the engraved area, and so the cylinder's cost.                                                                                              |
 
@@ -855,17 +891,26 @@ what is stored and costed. Deriving it is a decision the form makes, so an
 import or a correction can still state a gauge the catalogue does not name — and
 so a film named without one (`PP Woven`, specified by GSM) stays quotable.
 
-The layer **count** still moves two things on its own:
+The layer **count** still moves the stated thickness:
 
 ```
 micron = every ply + 2µ adhesive          (flat, not per bond)
-yield factor: 2 plies 1.1, 3 or more 1.2
 ```
 
 The adhesive is a single 2µ whatever the ply count. A three-ply laminate is
 glued twice and ought to carry twice as much, but the client's spreadsheet adds
 one either way and every imported job matches it — changing it would move
 pouches-per-kg on every 3-layer line ever quoted.
+
+**A pouch's weight no longer comes from that thickness.** It comes from
+`structureGsm` — each ply at its own density, plus the ink and adhesive coats —
+which is the column the client's own workbook totals to reach its 125 GSM, and
+there is a table of densities in that workbook for the purpose. The **yield
+factor** below (2 plies 1.1, 3 or more 1.2) survives only as the fallback for a
+ply whose film has no density on record. It stood in for the density on every
+job until 10 September 2026: PET over white-opaque poly averages 0.985, so a
+pouch came out 9.1% heavy — 500 kg quoted as 8,730 pouches where the sheet says
+9,524 — and PET over MET PET averages 1.400 and went the other way by 27%.
 
 The same 420 × 260 pouch with a 45µ sealant, 250 kg ordered at ₹300/kg:
 
@@ -960,11 +1005,14 @@ PET 12 + Poly 45              micron = 59
 PET 12 + MET PET 12 + Poly 60 micron = 86
 ```
 
-**2. Yield factor** — more plies waste more:
+**2. Yield factor** — the fallback when a ply has no density recorded:
 
 ```
 2 plies: 1.1     3 or more: 1.2
 ```
+
+Where the films do carry a density — which is now editable on the Rates screen —
+the weight comes from `structureGsm` instead and this is not consulted.
 
 **Gazette pouches and rolls change what "width × height" means.**
 
@@ -1118,10 +1166,12 @@ Worked example, 5 Kg Paneer Bag, 670 × 460 mm, 60µ poly, 2 layer, 250 kg at
 
 ```
 micron            = 12 + 60 + 2 = 74
-pouches/kg        = 1000 ÷ (((670×460÷100) × 74 × 1.1) ÷ 10000) = 39.86
-totalPouches      = 39.86 × 250                                 = 9,965
+structure GSM     = 12×1.4 + 60×0.94 + 1.8 ink + 3 adhesive     = 78.0
+pouches/kg        = 1000 ÷ (670 × 460 × 78.0 ÷ 1,000,000)       = 41.60
+  (a film with no density falls back to 74µ × 1.1)              = 39.86
+totalPouches      = 41.60 × 250                                 = 10,400
 totalAmount       = 250 × 295                                   = ₹73,750
-cylinderWidth     = 670 × 1 + 80                                = 750
+cylinderWidth     = 670 × 1 + 80 mounting                       = 750
 circumference     = 460 × 1                                     = 460
 costPerCylinder   = (750 × 460 ÷ 100) × 2.5                     = ₹8,625
 totalCylinderCost = 8,625 × 4                                   = ₹34,500
@@ -1886,17 +1936,19 @@ Your `.env` stays pointed at Docker throughout.
 
 ## Scripts
 
-| Command                              | Does                                                 |
-| ------------------------------------ | ---------------------------------------------------- |
-| `npm run dev`                        | Watch mode on port 4000                              |
-| `npm run build` / `start`            | Compile to `dist/`, then run it                      |
-| `npm test`                           | Vitest, including the shell smoke tests              |
-| `npm run db:migrate`                 | Create and apply a migration                         |
-| `npm run db:studio`                  | Prisma Studio                                        |
-| `npm run seed:materials`             | Seed the 16 materials and opening rates. Idempotent. |
-| `npm run import:legacy -- --dry-run` | Parse the legacy sheet, write nothing                |
-| `npm run import:legacy [-- --fresh]` | Import it; `--fresh` replaces existing rows          |
-| `npm run schema:docs`                | Regenerate the database documentation                |
+| Command                              | Does                                                  |
+| ------------------------------------ | ----------------------------------------------------- |
+| `npm run dev`                        | Watch mode on port 4000                               |
+| `npm run build` / `start`            | Compile to `dist/`, then run it                       |
+| `npm test`                           | Vitest, including the shell smoke tests               |
+| `npm run db:migrate`                 | Create and apply a migration                          |
+| `npm run db:studio`                  | Prisma Studio                                         |
+| `npm run seed:materials`             | Seed the 16 materials and opening rates. Idempotent.  |
+| `npm run seed:costing`               | Machines, wages and ink figures. Never overwrites.    |
+| `npm run seed:excel-rates`           | The workbook's own rates. DOES overwrite — see above. |
+| `npm run import:legacy -- --dry-run` | Parse the legacy sheet, write nothing                 |
+| `npm run import:legacy [-- --fresh]` | Import it; `--fresh` replaces existing rows           |
+| `npm run schema:docs`                | Regenerate the database documentation                 |
 
 ### PDF rendering
 

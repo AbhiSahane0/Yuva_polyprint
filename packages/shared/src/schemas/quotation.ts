@@ -389,6 +389,22 @@ export const settingsSchema = z.object({
   defaultAdhesiveMaterial: z.string().trim().max(80),
 
   /**
+   * What the FLAT method prices ink and adhesive at.
+   *
+   * Deliberately not the purchase rates above. The works' Estimation sheet
+   * costs the whole ink laydown at Rs 800/kg and the adhesive at Rs 400/kg —
+   * blended figures that already carry the solvent, the dilution and the
+   * losses. Its Costing sheet buys the same ink at Rs 202-235 and the same
+   * adhesive at Rs 165, and prices the solvent and hardener separately.
+   *
+   * Both are right, for their own method. Pointing the flat model at a
+   * purchase rate mixed the two and understated ink by a quarter — so each
+   * names its own material, and the two can be priced independently.
+   */
+  defaultFlatInkMaterial: z.string().trim().max(80),
+  defaultFlatAdhesiveMaterial: z.string().trim().max(80),
+
+  /**
    * Rate costing — the works' own overheads.
    *
    * These build a rate up from every expense rather than starting from one
@@ -416,6 +432,20 @@ export const settingsSchema = z.object({
   stationSurcharge8: z.coerce.number().min(0).max(10_000),
   /** Edge trim added to the web width, millimetres. */
   defaultTrimMm: z.coerce.number().min(0).max(500),
+  /**
+   * Millimetres of cylinder face beyond the printed web.
+   *
+   * The engraver's mounting margin: a cylinder is wider than the film it
+   * carries, and the whole face is what the works pays for. It multiplies
+   * straight into the cylinder charge — on a 700 mm job at seven stations it is
+   * Rs 8,400 of an Rs 81,900 charge — and was a literal `+ 80` in the geometry,
+   * with nothing on any screen to show it, let alone change it.
+   *
+   * The client's workbook does not reach cylinders at all, so unlike the rest
+   * of these there is no sheet to reconcile it against. It is what their
+   * engraver charges for, and it is theirs to set.
+   */
+  cylinderMountingMm: z.coerce.number().min(0).max(500),
   defaultWastagePercent: z.coerce.number().min(0).max(100),
   defaultMarginPercent: z.coerce.number().min(0).max(100),
   /**
@@ -477,6 +507,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultMetpetMaterial: 'MET PET 12µm',
   defaultInkMaterial: 'Ink — Black',
   defaultAdhesiveMaterial: 'Adhesive — PU',
+  defaultFlatInkMaterial: 'Ink — Blended (Estimation)',
+  defaultFlatAdhesiveMaterial: 'Adhesive — Blended (Estimation)',
 
   /* Rate costing. Taken from the works' own sheets; edit on the Costing screen. */
   workingDaysPerMonth: 26,
@@ -492,6 +524,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   stationSurcharge7: 7.5,
   stationSurcharge8: 9,
   defaultTrimMm: 15,
+  /* Read off the works' own jobs: width × lanes + 80 fits their press on 95%. */
+  cylinderMountingMm: 80,
   defaultWastagePercent: 8,
   defaultMarginPercent: 9,
   marginBasis: 'MATERIAL_ONLY',

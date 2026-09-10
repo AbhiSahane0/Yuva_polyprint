@@ -1227,6 +1227,16 @@ permanent public link to a customer's unreleased packaging.
 Reading is open to anyone signed in — the floor works to the file the job
 prints. The buttons that change anything need the cylinders module.
 
+**A pouch weighs what its film weighs.** Each ply at its own density, plus the
+ink and the adhesive it carries — which is the column the client's own sheet
+totals to reach 125 GSM, and there is a whole density table in that workbook for
+the purpose. It used to stand a flat **1.1** in for the density instead: PET
+over white-opaque poly averages 0.985, so a pouch came out 9.1% heavy and 500 kg
+was quoted as 8,730 pouches where the sheet says 9,524 — Rs 15.09 a pouch on a
+document the sheet prices at Rs 13.83. PET over MET PET averages 1.400 and went
+the other way by 27%. A ply with no density on record still falls back to the
+old proxy, because a wrong weight beats a weightless one.
+
 #### What it costs to make
 
 Each quantity on a job is **costed**, and the rate arrives in the box already
@@ -1270,12 +1280,6 @@ material cost to the rate. A rate nobody can explain is a rate nobody can defend
 across a table, and the office is asked "why is it 251?" by customers holding
 three other quotations.
 
-**The rate arrives filled in.** There is no button to press to accept a figure
-the system already worked out — there were three cards offering it, which read
-as something magical happening off to one side, and it is not magic: it is what
-the job costs plus the works' margin. So it is in the box, with an **ⓘ** beside
-it for the working.
-
 **The rate follows the costing.** Change the film, the colours or the quantity
 and the price changes with them — no notice to read, no button to press. A rate
 worked out for a 60µ poly sitting on a 110µ one is not a decision anybody made;
@@ -1303,8 +1307,8 @@ workbook's own figures.
 
 Each quantity row reports two margins —
 `37.3% gross · 8.0% net`. Gross subtracts materials; net subtracts everything,
-including the press setup. They are computed once and shared, so the panel and
-the rows cannot disagree about the same job.
+including the press setup. They are computed once and shared, so the rate in
+the box and the margin beside it cannot disagree about the same job.
 
 The pair exists because one figure was the flattering one, and most flattering
 exactly where it did most harm: materials cost the same per kilogram at any
@@ -1317,11 +1321,16 @@ best one there.
 Net is **absent, not zero**, when the line cannot be costed yet — a job that
 earns nothing and a job nobody has costed are different claims.
 
-**It suggests; it does not impose.** The rate boxes work exactly as they always
-did and **Use this rate** writes the figure in, because the works knows things
-this does not — what the customer paid last year, and who else is quoting. On a
-line sold by the piece it converts using the quotation's own pieces-per-kilogram
-so the figure shown is the figure the document carries.
+**The rate arrives in the box.** There was a card offering it and a button to
+accept it; both are gone, because the office read them as something magical
+happening off to one side and it is not magic — it is what the job costs plus
+the works' margin. On a line sold by the piece it converts using the quotation's
+own pieces-per-kilogram, so the figure shown is the figure the document carries.
+
+A rate typed by hand still holds. The costed figure is written only when the
+**computed** number moves, so what the works knows and this does not — what the
+customer paid last year, who else is quoting — survives until something that
+genuinely changes the cost is touched.
 
 #### Corrections go back to the customer
 
@@ -1407,6 +1416,41 @@ recorded rate and who keyed it in.
 
 Saving invalidates the quotation queries too, since their costing depends on
 these rates.
+
+#### The cylinder mounting margin
+
+A cylinder is wider than the film it carries, and the works pays for the whole
+face: `film width × lanes + mounting`. That mounting was a literal `+ 80` in the
+geometry — on a 700 mm job at seven stations, **Rs 8,400 of an Rs 81,900
+cylinder charge**, about 4% of the quotation, with nothing on any screen to show
+it or change it.
+
+It is **Cylinder mounting, mm** on the Costing screen now. Unlike everything
+else there, the client's workbook does not reach cylinders at all, so there is
+no sheet to reconcile it against — it is what their engraver charges for. The 80
+stays the default, read off their own jobs: `width × lanes + 80` is at or under
+the press's 800 mm face on 95% of them.
+
+It also feeds the suggested number of lanes, so a wider margin proposes fewer of
+them and the cylinder it suggests still fits the press.
+
+#### Add a material, and edit what its price is multiplied by
+
+**Add a material** on the header, and a slider button on each row for the
+figures. A price on its own is not enough to cost anything: a film's **density**
+turns its microns into a weight, an ink's **solids %** says how much of the tin
+has to be bought for what stays on the film, and its **laydown g/m²** says how
+much stays. All three were seeded once and then reachable nowhere, so a film the
+works started buying could not be added at all — W/O Poly, which is on every
+page of the client's own workbook, was simply missing from the list.
+
+Each kind is asked only what it can answer: density for a film, solids for an
+ink or adhesive, laydown and process/special for an ink. A density box on an ink
+is a question nobody can answer.
+
+A material's **kind is settled when it is created**. Moving a priced film into
+Ink would strip the density it is costed on, and every quotation using it would
+quietly start weighing its pouches off a stand-in instead.
 
 #### Today's rates are already filled in
 
