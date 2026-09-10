@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { History, Save, TrendingDown, TrendingUp } from 'lucide-react';
+import { History, Plus, Save, SlidersHorizontal, TrendingDown, TrendingUp } from 'lucide-react';
 import {
   formatNumber,
   MATERIAL_CATEGORY_LABELS,
@@ -17,8 +17,29 @@ import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { ApiClientError } from '@/lib/api-client';
 import { useMaterials, useRateHistory, useSaveRates } from '../api/rate-api';
+import { MaterialModal } from '../components/MaterialModal';
 
 const CATEGORY_ORDER: MaterialCategory[] = ['FILM', 'INK', 'ADHESIVE', 'SOLVENT', 'CONSUMABLE'];
+
+/**
+ * What the costing multiplies this material's price by, for the button's title.
+ *
+ * A missing density is worth saying out loud: without it a film's pouches are
+ * counted off a flat 1.1 stand-in instead of what the film actually weighs.
+ */
+function specHint(material: Material): string {
+  const parts: string[] = [];
+  if (material.category === 'FILM') {
+    parts.push(
+      material.density != null
+        ? `density ${material.density}`
+        : 'no density — weighed by a stand-in',
+    );
+  }
+  if (material.solidsPercent != null) parts.push(`${material.solidsPercent}% solids`);
+  if (material.laydownGsm != null) parts.push(`${material.laydownGsm} g/m²`);
+  return parts.length > 0 ? `Figures — ${parts.join(', ')}` : 'Figures the costing uses';
+}
 
 function todayISO(): string {
   const now = new Date();
@@ -35,6 +56,9 @@ export default function RatesPage() {
   const [effectiveDate, setEffectiveDate] = useState(todayISO());
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [historyFor, setHistoryFor] = useState<Material | null>(null);
+  /* Null with the modal open adds a new material; a material edits that one. */
+  const [editing, setEditing] = useState<Material | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const { data: materials, isPending, isError, error, refetch } = useMaterials(effectiveDate);
   const saveRates = useSaveRates();
@@ -111,6 +135,10 @@ export default function RatesPage() {
               />
             </Field>
           </div>
+          <Button variant="secondary" onClick={() => setAdding(true)}>
+            <Plus className="size-4" />
+            Add a material
+          </Button>
           <Button onClick={onSave} loading={saveRates.isPending} disabled={pending.length === 0}>
             <Save className="size-4" />
             Save{pending.length > 0 ? ` (${pending.length})` : ''}
@@ -154,7 +182,7 @@ export default function RatesPage() {
                     <th className="px-4 py-2 text-right font-medium">New rate</th>
                     <th className="px-4 py-2 text-right font-medium">Change</th>
                     <th className="px-2 py-2">
-                      <span className="sr-only">History</span>
+                      <span className="sr-only">Figures and history</span>
                     </th>
                   </tr>
                 </thead>
@@ -225,7 +253,16 @@ export default function RatesPage() {
                             </span>
                           )}
                         </td>
-                        <td className="px-2 py-2.5 text-right">
+                        <td className="flex justify-end gap-1 px-2 py-2.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setEditing(material)}
+                            aria-label={`Figures for ${material.name}`}
+                            title={specHint(material)}
+                            className="text-ink-400 hover:bg-ink-100 hover:text-ink-700 cursor-pointer rounded-[var(--radius-md)] p-2"
+                          >
+                            <SlidersHorizontal className="size-4" />
+                          </button>
                           <button
                             type="button"
                             onClick={() => setHistoryFor(material)}
@@ -247,6 +284,14 @@ export default function RatesPage() {
       )}
 
       <RateHistoryModal material={historyFor} onClose={() => setHistoryFor(null)} />
+      <MaterialModal
+        open={adding || editing !== null}
+        material={editing}
+        onClose={() => {
+          setAdding(false);
+          setEditing(null);
+        }}
+      />
     </div>
   );
 }

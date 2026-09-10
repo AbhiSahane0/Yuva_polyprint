@@ -1227,6 +1227,16 @@ permanent public link to a customer's unreleased packaging.
 Reading is open to anyone signed in — the floor works to the file the job
 prints. The buttons that change anything need the cylinders module.
 
+**A pouch weighs what its film weighs.** Each ply at its own density, plus the
+ink and the adhesive it carries — which is the column the client's own sheet
+totals to reach 125 GSM, and there is a whole density table in that workbook for
+the purpose. It used to stand a flat **1.1** in for the density instead: PET
+over white-opaque poly averages 0.985, so a pouch came out 9.1% heavy and 500 kg
+was quoted as 8,730 pouches where the sheet says 9,524 — Rs 15.09 a pouch on a
+document the sheet prices at Rs 13.83. PET over MET PET averages 1.400 and went
+the other way by 27%. A ply with no density on record still falls back to the
+old proxy, because a wrong weight beats a weightless one.
+
 #### What it costs to make
 
 Each quantity on a job is **costed**, and the rate arrives in the box already
@@ -1407,6 +1417,24 @@ recorded rate and who keyed it in.
 
 Saving invalidates the quotation queries too, since their costing depends on
 these rates.
+
+#### Add a material, and edit what its price is multiplied by
+
+**Add a material** on the header, and a slider button on each row for the
+figures. A price on its own is not enough to cost anything: a film's **density**
+turns its microns into a weight, an ink's **solids %** says how much of the tin
+has to be bought for what stays on the film, and its **laydown g/m²** says how
+much stays. All three were seeded once and then reachable nowhere, so a film the
+works started buying could not be added at all — W/O Poly, which is on every
+page of the client's own workbook, was simply missing from the list.
+
+Each kind is asked only what it can answer: density for a film, solids for an
+ink or adhesive, laydown and process/special for an ink. A density box on an ink
+is a question nobody can answer.
+
+A material's **kind is settled when it is created**. Moving a priced film into
+Ink would strip the density it is costed on, and every quotation using it would
+quietly start weighing its pouches off a stand-in instead.
 
 #### Today's rates are already filled in
 

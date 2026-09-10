@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { computeItem, computeItemGeometry, computeTier, computeTotals } from './quotation-math.js';
+import {
+  computeItem,
+  computeItemGeometry,
+  computeTier,
+  computeTotals,
+  structureGsm,
+} from './quotation-math.js';
 
 /**
  * Locks the arithmetic to the client's real quotation #118. If a formula ever
@@ -129,6 +135,70 @@ describe('computeItemGeometry', () => {
 
     expect(g.totalCylinderCost).toBe(0);
     expect(g.costPerCylinder).toBe(8625);
+  });
+
+  /**
+   * **A pouch weighs what its film weighs, not what its thickness implies.**
+   *
+   * The proxy below stands a flat 1.1 in for the laminate's density. PET over
+   * white-opaque poly averages 0.985, so a pouch came out 9.1% heavy: the
+   * works' own sheet says 500 kg of the Anupriya job is 9,524 pouches and this
+   * quoted 8,730, which put Rs 15.09 on a document the sheet prices at
+   * Rs 13.83. PET over MET PET averages 1.400 and went the other way by 27%.
+   *
+   * Density is a property of the film, is on the rate list beside its price,
+   * and is what the client's own sheet uses — there is a whole table of them
+   * in it.
+   */
+  describe('weighing a pouch by its real density', () => {
+    /* The workbook's job: PET 12µ at 1.4 over W/O Poly 110µ at 0.94. */
+    const plies = [
+      { micron: 12, density: 1.4 },
+      { micron: 110, density: 0.94 },
+    ];
+    const coats = { inkGsm: 1.8, adhesiveGsm: 3 };
+
+    it('totals the plies at their own density, plus the coats', () => {
+      // Estimation!G15 — 16.8 + 103.4 + 1.8 + 3
+      expect(structureGsm(plies, coats)).toBe(125);
+    });
+
+    it('reaches the sheet’s own pouch weight and count', () => {
+      const g = computeItemGeometry(
+        { ...paneerBag, widthMm: 700, heightMm: 600, gsm: structureGsm(plies, coats) },
+        2.5,
+      );
+
+      // Estimation!J10 — 19.05 pouches to the kilogram, so J9's 52.5 g.
+      expect(g.pouchesPerKg).toBe(19.05);
+      /* One decimal: the count is rounded to a paisa-sized 2 dp before this. */
+      expect(1000 / g.pouchesPerKg).toBeCloseTo(52.5, 1);
+    });
+
+    it('falls back to the micron proxy when a ply has no density', () => {
+      expect(
+        structureGsm(
+          [
+            { micron: 12, density: 1.4 },
+            { micron: 110, density: null },
+          ],
+          coats,
+        ),
+      ).toBe(0);
+
+      /* Zero means "use the proxy", which is the pre-existing behaviour. */
+      const withoutDensity = computeItemGeometry({ ...paneerBag, gsm: 0 }, 2.5);
+      expect(withoutDensity.pouchesPerKg).toBe(39.86);
+    });
+
+    it('ignores a ply left at zero microns, as the sheet does', () => {
+      const withEmptyMetPet = [
+        { micron: 12, density: 1.4 },
+        { micron: 0, density: 1.4 },
+        { micron: 110, density: 0.94 },
+      ];
+      expect(structureGsm(withEmptyMetPet, coats)).toBe(125);
+    });
   });
 
   it('allows more waste on a three-ply structure than a two-ply one', () => {

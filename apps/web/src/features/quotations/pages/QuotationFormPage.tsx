@@ -27,6 +27,8 @@ import {
   type PouchType,
   type PricingBasis,
   computeItemGeometry,
+  structureGsm,
+  adhesiveGsmFor,
   computeMargin,
   computeMaterialCostPerKg,
   overriddenRate,
@@ -610,6 +612,15 @@ export default function QuotationFormPage() {
         {
           layerCount: layers.length,
           micron: totalMicronForLayers(layers),
+          /* Each ply at its own density, as the works' sheet weighs it. */
+          gsm: structureGsm(layers, {
+            inkGsm: settings?.inkGsm ?? 1.8,
+            adhesiveGsm: adhesiveGsmFor(layers, {
+              thinGsm: settings?.adhesiveCoatThinGsm ?? 2,
+              thickGsm: settings?.adhesiveCoatThickGsm ?? 3,
+              thickPlyMicron: settings?.adhesiveThickPlyMicron ?? 40,
+            }),
+          }),
           widthMm: num(item?.widthMm),
           heightMm: num(item?.heightMm),
           makesPouches: (item?.jobKind ?? 'POUCH') !== 'ROLL',
