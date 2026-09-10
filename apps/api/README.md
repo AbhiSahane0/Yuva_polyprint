@@ -785,6 +785,16 @@ the catalogue. Unlike `seed:costing` it DOES change rates already set — that i
 its purpose — but rates are append-only, so the previous figure stays on the
 Rates screen.
 
+It also **retires the two lamination wages**. The sheet has no line for one,
+though the laminator runs 86 minutes on the job it costs — somebody stands at
+that machine, and the sheet does not pay them. Seeded at Rs 18,000 and Rs 8,000
+they put the rate 48 paise a kilogram over the sheet; on 10 September 2026 the
+works chose the sheet. Retired rather than deleted, so the Costing screen shows
+them greyed with a Restore beside them and the decision stays visible.
+
+With those off, the workbook reconciles **exactly** — Rs 263.40 a kilogram and
+Rs 13.83 a pouch, on local and on Neon alike.
+
 Master data lives in `costing_machines`, `costing_labour`, and the `costing_*`
 keys in settings. `npm run seed:costing -w @yuva/api` loads the works' own 2022
 figures — **check them before quoting on them**.

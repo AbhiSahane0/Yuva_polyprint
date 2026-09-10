@@ -80,6 +80,17 @@ const SETTINGS: [string, string, string][] = [
   ['stationSurcharge8', '0', 'Estimation F61'],
 ];
 
+/**
+ * Wages the sheet has no line for.
+ *
+ * Retired rather than deleted: the Costing screen shows a retired role greyed
+ * out with a Restore beside it, so the decision stays visible and is one click
+ * from being reversed. Somebody does stand at the laminator for 86 minutes on
+ * the job the sheet costs — the sheet simply does not pay them, and the works
+ * costs against the sheet.
+ */
+const RETIRE_LABOUR = ['Lamination Operator', 'Lamination Helper'];
+
 async function main() {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -137,6 +148,15 @@ async function main() {
     await prisma.appSetting.upsert({ where: { key }, update: { value }, create: { key, value } });
     console.log(
       `  SETTING  ${key.padEnd(32)} ${existing?.value ?? '(default)'} → ${value}   ${note}`,
+    );
+  }
+
+  for (const role of RETIRE_LABOUR) {
+    const existing = await prisma.costingLabour.findUnique({ where: { role } });
+    if (!existing || !existing.isActive) continue;
+    await prisma.costingLabour.update({ where: { role }, data: { isActive: false } });
+    console.log(
+      `  RETIRED  ${role.padEnd(32)} Rs ${existing.monthlySalary}/month — the sheet has no such line`,
     );
   }
 
