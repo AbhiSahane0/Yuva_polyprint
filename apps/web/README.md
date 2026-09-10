@@ -1280,12 +1280,6 @@ material cost to the rate. A rate nobody can explain is a rate nobody can defend
 across a table, and the office is asked "why is it 251?" by customers holding
 three other quotations.
 
-**The rate arrives filled in.** There is no button to press to accept a figure
-the system already worked out — there were three cards offering it, which read
-as something magical happening off to one side, and it is not magic: it is what
-the job costs plus the works' margin. So it is in the box, with an **ⓘ** beside
-it for the working.
-
 **The rate follows the costing.** Change the film, the colours or the quantity
 and the price changes with them — no notice to read, no button to press. A rate
 worked out for a 60µ poly sitting on a 110µ one is not a decision anybody made;
@@ -1313,8 +1307,8 @@ workbook's own figures.
 
 Each quantity row reports two margins —
 `37.3% gross · 8.0% net`. Gross subtracts materials; net subtracts everything,
-including the press setup. They are computed once and shared, so the panel and
-the rows cannot disagree about the same job.
+including the press setup. They are computed once and shared, so the rate in
+the box and the margin beside it cannot disagree about the same job.
 
 The pair exists because one figure was the flattering one, and most flattering
 exactly where it did most harm: materials cost the same per kilogram at any
@@ -1327,11 +1321,16 @@ best one there.
 Net is **absent, not zero**, when the line cannot be costed yet — a job that
 earns nothing and a job nobody has costed are different claims.
 
-**It suggests; it does not impose.** The rate boxes work exactly as they always
-did and **Use this rate** writes the figure in, because the works knows things
-this does not — what the customer paid last year, and who else is quoting. On a
-line sold by the piece it converts using the quotation's own pieces-per-kilogram
-so the figure shown is the figure the document carries.
+**The rate arrives in the box.** There was a card offering it and a button to
+accept it; both are gone, because the office read them as something magical
+happening off to one side and it is not magic — it is what the job costs plus
+the works' margin. On a line sold by the piece it converts using the quotation's
+own pieces-per-kilogram, so the figure shown is the figure the document carries.
+
+A rate typed by hand still holds. The costed figure is written only when the
+**computed** number moves, so what the works knows and this does not — what the
+customer paid last year, who else is quoting — survives until something that
+genuinely changes the cost is touched.
 
 #### Corrections go back to the customer
 
