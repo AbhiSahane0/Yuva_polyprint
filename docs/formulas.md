@@ -7,6 +7,9 @@ Written to be read by whoever has to defend a rate across a table, not only by
 whoever maintains the code. Each section names the file it lives in so the two
 can be checked against each other.
 
+For **what has to be entered before any of this can run**, see
+[`setup.md`](./setup.md).
+
 The reference throughout is **"3. Anupriya.xlsx"**, 5 kg atta packaging,
 23 March 2022 — the sheet the office reconciles against. It has two tabs,
 **Estimation** and **Costing**, and they cost the same job two different ways.

@@ -372,12 +372,13 @@ sheet stores as ranges (`"15-16"`, `"60-70"`) are kept in their own text columns
 
 Each app documents itself, next to the code it describes:
 
-| Document                                               | Covers                                                                                                                                                              |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`apps/api/README.md`](./apps/api/README.md)           | Every endpoint, the request/response envelope, **all the calculations with worked examples**, the data model, and the scripts                                       |
-| [`apps/web/README.md`](./apps/web/README.md)           | Every screen and what it does, how server state is handled, which figures are previewed in the browser, and the UI components                                       |
-| [`docs/formulas.md`](./docs/formulas.md)               | **Every formula in one place** — the laminate, the pouch, the cylinder, the rate, GST and the advance, each against the cell it answers to in the client's workbook |
-| [`docs/database-schema.md`](./docs/database-schema.md) | ER diagram and full column reference, generated from the live database                                                                                              |
+| Document                                               | Covers                                                                                                                                                                       |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/api/README.md`](./apps/api/README.md)           | Every endpoint, the request/response envelope, **all the calculations with worked examples**, the data model, and the scripts                                                |
+| [`apps/web/README.md`](./apps/web/README.md)           | Every screen and what it does, how server state is handled, which figures are previewed in the browser, and the UI components                                                |
+| [`docs/setup.md`](./docs/setup.md)                     | **What to enter before the first quotation** — machines, wages, films, inks, adhesive and the overheads, in dependency order, and what goes wrong quietly when one is missed |
+| [`docs/formulas.md`](./docs/formulas.md)               | **Every formula in one place** — the laminate, the pouch, the cylinder, the rate, GST and the advance, each against the cell it answers to in the client's workbook          |
+| [`docs/database-schema.md`](./docs/database-schema.md) | ER diagram and full column reference, generated from the live database                                                                                                       |
 
 Start with [`docs/formulas.md`](./docs/formulas.md) if you want to understand how
 a quotation is priced and costed. It is the reference: every figure in order,
