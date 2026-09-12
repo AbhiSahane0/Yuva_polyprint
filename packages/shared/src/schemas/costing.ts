@@ -28,10 +28,10 @@ export const machineSchema = z.object({
   /**
    * Which colour brings each station motor on, as "3,4,6".
    *
-   * Their sheet uses the 3rd, 4th and 6th. Its own layout implies the 3rd, 5th
-   * and 7th, and two of its four references are off by one — the readings agree
-   * everywhere except a four-colour job. Editable rather than decided here,
-   * because only the works knows which motor is wired to which station.
+   * The 3rd, 4th and 6th, which is what their sheet computes and what the
+   * operator confirms. Its own layout implies the 3rd, 5th and 7th, and two of
+   * its four references are off by one — the readings differ at four colours
+   * and at six. Editable, because a rewired press is a fact about the works.
    */
   stationColourSteps: z
     .string()

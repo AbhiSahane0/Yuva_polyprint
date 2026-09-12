@@ -1418,12 +1418,11 @@ model CostingMachine {
 
   /// Which colour switches each station motor on, as "3,4,6".
   ///
-  /// Read straight off the works' sheet, where the 3rd, 4th and 6th colour each
-  /// bring one on. The layout of that sheet implies the 3rd, 5th and 7th, and
-  /// two of its four references are off by one — the readings
-  /// differ at four colours and at six. Kept editable rather than decided
-  /// here, because only the works knows which motors are actually wired to
-  /// which stations.
+  /// The 3rd, 4th and 6th, read off the works' sheet and confirmed by the
+  /// operator. The layout of that sheet implies the 3rd, 5th and 7th and two of
+  /// its four references are off by one, so the readings differ at four colours
+  /// and at six — the press runs to the formulas as written. Editable because a
+  /// rewired press is a fact about the works, not about this code.
   stationColourSteps String @default("") @map("station_colour_steps")
 
   /**

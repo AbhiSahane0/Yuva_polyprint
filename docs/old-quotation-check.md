@@ -171,27 +171,28 @@ a script, a preview pane — sees nothing. Excel fills them on open.
 
 ---
 
-## Still open
-
-**On a six-colour job, does the press run two station motors or three?**
+## Settled: what the press draws at six colours
 
 The press draws its 30 HP main drive plus 12 HP for each station motor that is
 on, and the sheet brings them on as colours are added. Its formulas switch them
 at the **3rd, 4th and 6th** colour; the layout of the same rows implies the
-**3rd, 5th and 7th**, and two of its four references are off by one.
+**3rd, 5th and 7th**, and two of its four references are off by one. Every job
+in this set agrees under either reading except a six-colour one, and there is no
+six-colour job here.
 
-Everything in this set agrees either way except a six-colour job — and there
-isn't one here. Simla Farsan settles the four-colour case in favour of the
-formulas as written, because it only reproduces at 54 HP. So the open question
-is narrow:
+**The works confirmed the 3rd, 4th and 6th** — the formulas as written, which is
+what the system already used. So a six-colour job runs three station motors at
+66 HP, not two at 54.
 
-| Colours | As the sheet computes                 | As its layout implies |
-| ------- | ------------------------------------- | --------------------- |
-| 4       | 54 HP ← **confirmed by Simla Farsan** | 42 HP                 |
-| **6**   | **66 HP**                             | **54 HP**             |
+| Colours | Motors | Press draws |
+| ------- | ------ | ----------- |
+| 1–2     | none   | 30 HP       |
+| 3       | one    | 42 HP       |
+| 4–5     | two    | 54 HP       |
+| 6–8     | three  | 66 HP       |
 
-Everything else — 1, 2, 3, 5, 7, 8 colours — is identical under both readings.
+Simla Farsan is the four-colour job in this set and only reproduces at 54 HP, so
+the data already agreed with the operator before anyone asked.
 
-The system uses the sheet's own 3, 4, 6, which is editable on the Costing screen
-as **Motors come on at colour**. One question to whoever runs the press settles
-it.
+It stays editable on the Costing screen as **Motors come on at colour**, because
+a rewired press is a fact about the works rather than about this code.

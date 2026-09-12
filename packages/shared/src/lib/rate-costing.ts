@@ -57,8 +57,8 @@ export interface CostingMachine {
    */
   stationHorsepower?: number;
   /**
-   * Which colour switches each station on — `[3, 4, 6]` on the works' press.
-   * Empty leaves the load fixed.
+   * Which colour switches each station on — `[3, 4, 6]` on the works' press,
+   * confirmed by the operator. Empty leaves the load fixed.
    */
   stationColourSteps?: number[];
   /**

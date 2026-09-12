@@ -139,10 +139,12 @@ const sheetStructure = (): CostingInput => ({
  * kilogram on the client's own two-colour Govt Sugar quotation, which was the
  * worst of seven old sheets it was checked against.
  *
- * The 3rd/4th/6th is what that sheet computes; its layout implies the 3rd, 5th
- * and 7th, and two of its four references are off by one. The readings differ
- * at four colours and at six, which is why the steps are a setting rather than
- * a decision made here.
+ * The 3rd/4th/6th is what that sheet computes, and what the operator confirms.
+ * Its layout implies the 3rd, 5th and 7th, and two of its four references are
+ * off by one; the readings differ at four colours and at six. Simla Farsan is
+ * the four-colour job in the client's own set and only reproduces at 54 HP, so
+ * the data agreed before anyone asked. The steps stay a setting because a
+ * rewired press is a fact about the works.
  */
 describe('what a press draws', () => {
   const press = {

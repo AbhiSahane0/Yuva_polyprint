@@ -100,11 +100,11 @@ const RETIRE_LABOUR = ['Lamination Operator', 'Lamination Helper'];
  * seven-colour job draws 66, and charging 66 throughout overstated electricity
  * on every job short of a full press — Rs 1.53 a kilogram on a two-colour one.
  *
- * The 3rd/4th/6th is what the sheet computes. Its own layout implies the 3rd,
- * 5th and 7th and two of its four references are off by one; the two readings
- * differ at four colours and at six. Following the sheet, because that
- * is what reproduces the quotations the works has already sent — and it is one
- * box on the Costing screen if they say otherwise.
+ * The 3rd/4th/6th is what the sheet computes, and what the operator confirms.
+ * Its own layout implies the 3rd, 5th and 7th and two of its four references
+ * are off by one; the readings differ at four colours and at six. It stays one
+ * box on the Costing screen, because a rewired press is a fact about the works
+ * rather than about this script.
  */
 const PRESS_STATION_LOAD = {
   name: 'Rotogravure press',
