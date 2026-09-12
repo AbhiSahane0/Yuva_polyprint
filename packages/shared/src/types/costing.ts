@@ -5,6 +5,10 @@ export interface Machine {
   name: string;
   kind: MachineKind;
   horsepower: number;
+  /** What one printing station adds to the load. Zero is a fixed load. */
+  stationHorsepower: number;
+  /** Which colour switches each station motor on, as "3,4,6". */
+  stationColourSteps: string;
   powerRatePerHpHour: number;
   speedMPerMin: number;
   setupMinutes: number;

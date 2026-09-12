@@ -337,6 +337,27 @@ returning costs nothing.
 The old single page put customer, jobs, terms and totals on one scroll. It
 worked, but never said how much was left or what still needed doing.
 
+#### The date decides what it costs
+
+The quotation carries a date, on the Customer step, defaulting to today. It is
+not only what gets printed: **the rates and the overheads in force on that day
+are what price the job**, so an older one entered now is costed as it would have
+been then rather than at today's film prices.
+
+The server always did this. The screen did not — it read today's rates whatever
+the quotation said — so opening a quotation written for an older day showed a
+rate the server would never have stored. Both now read the same day.
+
+Two consequences worth knowing:
+
+- **A film with no rate recorded before that date is free.** Rates carry forward
+  from the last entry on or before the day asked for, and if there isn't one
+  there is no price at all. It costs nothing, silently. This is real: rebuilding
+  the client's 2022 quotations came out about Rs 20 a kilogram light on every one
+  of them, because the blended adhesive had only ever been priced in 2026.
+- **Settings answer the same question**, so an overhead that has since moved does
+  not rewrite a quotation made before it moved.
+
 **There is no Terms step.** The terms were the same six lines on every quotation
 this works has ever sent, and a seven-row textarea asking to confirm them was a
 step the office had to walk past on the way to the totals. They are printed from
@@ -1250,7 +1271,9 @@ hour whether it runs 500 kg or 5,000 — which is the whole reason a quotation
 carries tiers, and the reason a bigger order genuinely costs less a kilogram.
 
 The figures come from the works' own workbook, reproduced rather than improved
-— every cell of "3. Anupriya.xlsx" ties out, down to Rs 263.40 a kilogram. The
+— every cell of "3. Anupriya.xlsx" ties out, down to Rs 263.40 a kilogram, and
+seven more of their 2022 quotations reproduce exactly per kilogram and per
+pouch. See [`docs/old-quotation-check.md`](../../docs/old-quotation-check.md). The
 five places a fresh implementation would differ are **settings** on the Costing
 screen, each defaulting to what the sheet does: how ink is costed, how adhesive
 is costed, what the margin is taken on, what the EMI is spread over, and how
@@ -1279,6 +1302,18 @@ and dry, the adhesive batch, every machine's minutes, and the chain from
 material cost to the rate. A rate nobody can explain is a rate nobody can defend
 across a table, and the office is asked "why is it 251?" by customers holding
 three other quotations.
+
+**Three figures are set on the quotation, not the works.** Margin %, transport
+per kg and pouch making per kg sit at the top of the Jobs step; left blank each
+follows the Costing screen, so an ordinary job keeps up with the works' own
+figures as they change. They are there because the client varies all three job
+to job — across seven of their own quotations, margins of 5%, 9% and 10%,
+transport at Rs 5 and Rs 10, and nothing charged for making a pouch on two of
+them, with **five of the seven written on the same day**.
+
+A blank box means "follow the works' figure", which is not the same as zero:
+`z.coerce.number()` turns an empty string into 0, and on a margin box that would
+quote a job at cost and look like somebody meant it.
 
 **The rate follows the costing.** Change the film, the colours or the quantity
 and the price changes with them — no notice to read, no button to press. A rate

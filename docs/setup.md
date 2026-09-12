@@ -46,11 +46,14 @@ it takes to set before it runs.
 
 | Machine           | Process    |  HP | Rs / HP-hour | Speed    | Setup  |
 | ----------------- | ---------- | --: | -----------: | -------- | ------ |
-| Rotogravure press | Printing   |  66 |         9.00 | 65 m/min | 60 min |
+| Rotogravure press | Printing   |  30 |         9.00 | 65 m/min | 60 min |
 | Laminator         | Lamination |   6 |        35.00 | 70 m/min | 30 min |
 | Slitter           | Slitting   |   3 |        60.00 | 80 m/min | 30 min |
 
-The press's 66 HP is the 30 HP main drive plus three 12 HP stations.
+**The press's 30 HP is the main drive alone.** Its three 12 HP station motors
+go in beside it — `Each station adds 12`, `Motors come on at colour 3,4,6` —
+because the press does not draw its whole load on every job: two colours draws
+30 HP, seven draws 66.
 
 There is a fourth figure, **setup power**, which asks how much load a machine
 draws while it is being threaded rather than running. It starts at **zero**,
@@ -170,13 +173,13 @@ move whatever has drifted.
 | Working days a month    | 26              | Turns a salary into a rate per minute              |
 | Hours a day             | 8               | The shift, for the same reason                     |
 | Wastage                 | 8%              | Film spoiled setting up and running                |
-| Margin                  | 9%              | Added to cost — see the note below                 |
+| Margin                  | 9%              | Added to cost — set per quotation too              |
 | Trim                    | 15 mm           | Added to the web width                             |
-| Transport               | Rs 10 / kg      | On the quantity consumed                           |
+| Transport               | Rs 10 / kg      | On the quantity consumed — per quotation too       |
 | Packing                 | Rs 5 / kg       | On the quantity consumed                           |
 | Sundries                | Rs 250 / job    | A flat sum the works does not itemise              |
 | Bank EMI                | Rs 4,166.66     | Spread over 24 machine hours a month               |
-| Pouch making            | Rs 15 / kg      | Nothing is charged on a roll                       |
+| Pouch making            | Rs 15 / kg      | Nothing on a roll — per quotation too              |
 | 6th / 7th / 8th station | 5.50 / 7.50 / 0 | Surcharge past five colours                        |
 | Ink GSM                 | 1.8             | What the laminate is weighed with                  |
 | Adhesive coat           | 2 or 3          | 3 above 40µ, 2 below, per bond                     |
@@ -184,6 +187,12 @@ move whatever has drifted.
 | Cylinder mounting       | 80 mm           | Face beyond the web, also charged for              |
 | GST                     | 18%             | On material and cylinders alike                    |
 | Advance                 | 70% / 100%      | Material and cylinders, on the GST-inclusive value |
+
+> **Three of these are set per quotation when a job is not the ordinary case.**
+> Margin, transport and pouch making each have a box on the Jobs step; left
+> blank they follow the figures here. The client's own seven old sheets set all
+> three by hand — margins of 5%, 9% and 10%, transport at Rs 5 and Rs 10, and
+> nothing charged for pouch making on the jobs sold as reels.
 
 > **The margin is taken on materials only.** That is what the workbook does, and
 > it is why the margin per kilogram does not change between 500 kg and 5,000 kg —

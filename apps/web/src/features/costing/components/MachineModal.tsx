@@ -28,6 +28,8 @@ const BLANK = {
   speedMPerMin: '',
   setupMinutes: '',
   setupPowerFactor: '1',
+  stationHorsepower: '',
+  stationColourSteps: '',
 };
 
 export function MachineModal({ open, machine, onClose }: Props) {
@@ -48,6 +50,8 @@ export function MachineModal({ open, machine, onClose }: Props) {
             speedMPerMin: String(machine.speedMPerMin),
             setupMinutes: String(machine.setupMinutes),
             setupPowerFactor: String(machine.setupPowerFactor),
+            stationHorsepower: machine.stationHorsepower ? String(machine.stationHorsepower) : '',
+            stationColourSteps: machine.stationColourSteps,
           }
         : BLANK,
     );
@@ -131,7 +135,11 @@ export function MachineModal({ open, machine, onClose }: Props) {
         <Field
           label="Connected load"
           htmlFor="m-hp"
-          hint="HP — a press counts its stations too"
+          hint={
+            Number(form.stationHorsepower) > 0
+              ? 'HP of the main drive alone — the stations are added below'
+              : 'HP'
+          }
           error={errors.horsepower}
         >
           <NumberInput
@@ -192,6 +200,47 @@ export function MachineModal({ open, machine, onClose }: Props) {
             onChange={(event) => set('setupPowerFactor', event.target.value)}
           />
         </Field>
+
+        {/*
+          A press does not draw its whole connected load on every job. The
+          works' sheet runs the main drive alone until the third colour and
+          brings a station motor on at the third, the fourth and the sixth, so a
+          two-colour job draws 30 HP where a seven-colour one draws 66.
+
+          Only a press has these; a laminator and a slitter draw what they draw.
+        */}
+        {form.kind === 'PRINTING' ? (
+          <>
+            <Field
+              label="Each station adds"
+              htmlFor="m-stationhp"
+              hint="HP per station motor — blank if the load never changes"
+              error={errors.stationHorsepower}
+            >
+              <NumberInput
+                id="m-stationhp"
+                value={form.stationHorsepower}
+                invalid={Boolean(errors.stationHorsepower)}
+                onChange={(event) => set('stationHorsepower', event.target.value)}
+              />
+            </Field>
+
+            <Field
+              label="Motors come on at colour"
+              htmlFor="m-stationsteps"
+              hint="Comma separated, like 3,4,6"
+              error={errors.stationColourSteps}
+            >
+              <Input
+                id="m-stationsteps"
+                value={form.stationColourSteps}
+                invalid={Boolean(errors.stationColourSteps)}
+                onChange={(event) => set('stationColourSteps', event.target.value)}
+                placeholder="3,4,6"
+              />
+            </Field>
+          </>
+        ) : null}
       </div>
 
       {/* Load × rate, so the figure can be checked against an electricity bill. */}

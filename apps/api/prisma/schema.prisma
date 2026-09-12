@@ -277,6 +277,15 @@ model Quotation {
   /// keeps showing the quantity it was written for.
   selectedQuantity Int @default(1) @map("selected_quantity")
 
+  /// Costing figures this quotation overrides, or null for the works' own.
+  ///
+  /// The client's own sheets set all three by hand job to job — margins of 5%,
+  /// 9% and 10%, transport at Rs 5 and Rs 10, pouch making at 0, 11.04 and 15.
+  /// Holding one figure for the works made their own history unreproducible.
+  marginPercent    Decimal? @map("margin_percent") @db.Decimal(5, 2)
+  transportPerKg   Decimal? @map("transport_per_kg") @db.Decimal(10, 2)
+  pouchMakingPerKg Decimal? @map("pouch_making_per_kg") @db.Decimal(10, 2)
+
   /// Rates as they stood when this quotation was made.
   cylinderRate           Decimal @map("cylinder_rate") @db.Decimal(10, 4)
   gstPercent             Decimal @map("gst_percent") @db.Decimal(5, 2)
@@ -519,6 +528,31 @@ model AppSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("app_settings")
+}
+
+/// What a setting was on a given day.
+///
+/// The works' own sheets carry a bank EMI of Rs 4,166.66 in March and April
+/// 2022 and Rs 10,000 in July — one figure, changed in between, not something
+/// that varies job to job. Material rates already answer "what was this worth
+/// then"; settings could not, so an old quotation repriced at today's
+/// overheads and could never reproduce itself.
+///
+/// `AppSetting` remains the current value — and is also where the GSTIN lookup
+/// cache lives, which is why this sits beside it rather than replacing it. A
+/// key with no history here simply never changed.
+model AppSettingHistory {
+  key   String
+  value String
+
+  /// The day this value came into force.
+  effectiveDate DateTime @map("effective_date") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([key, effectiveDate])
+  @@index([key, effectiveDate(sort: Desc)])
+  @@map("app_setting_history")
 }
 
 /// Broad grouping for the rates screen.
@@ -1367,7 +1401,29 @@ model CostingMachine {
   kind MachineKind
 
   /// Connected load. Power is costed as horsepower × a rate per hour.
+  ///
+  /// On a press with `stationHorsepower` this is the MAIN DRIVE alone — what it
+  /// draws with nothing but the first colour on — and the stations are added to
+  /// it. On every other machine it is the whole load.
   horsepower Decimal @db.Decimal(10, 2)
+
+  /// What one printing station adds to the load when its colour is inked.
+  ///
+  /// Zero means a fixed load, which is what a laminator or a slitter has. The
+  /// works' press is a 30 HP drive with three 12 HP station motors, and their
+  /// sheet switches those on as colours are added — so a two-colour job draws
+  /// 30 HP and a seven-colour job draws 66. Charging the full connected load on
+  /// every job overstated electricity on anything short of a full press.
+  stationHorsepower Decimal @default(0) @map("station_horsepower") @db.Decimal(10, 2)
+
+  /// Which colour switches each station motor on, as "3,4,6".
+  ///
+  /// The 3rd, 4th and 6th, read off the works' sheet and confirmed by the
+  /// operator. The layout of that sheet implies the 3rd, 5th and 7th and two of
+  /// its four references are off by one, so the readings differ at four colours
+  /// and at six — the press runs to the formulas as written. Editable because a
+  /// rewired press is a fact about the works, not about this code.
+  stationColourSteps String @default("") @map("station_colour_steps")
 
   /**
    * Rupees per horsepower-hour.

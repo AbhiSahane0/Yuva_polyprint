@@ -61,10 +61,24 @@ export function useNextQuotationNumber(enabled: boolean) {
   });
 }
 
-export function useSettings() {
+/**
+ * The works' figures, as they stood on `onDate`.
+ *
+ * Without a date this is what the works holds now, which is what a new
+ * quotation wants. With one it is what it held then — so opening a quotation
+ * written for an older day costs it on that day's overheads, which is what the
+ * server does when it saves. The two disagreed before, silently: the screen
+ * showed today's rate against a line the server had priced at 2022's.
+ */
+export function useSettings(onDate?: string) {
   return useQuery({
-    queryKey: ['settings'],
-    queryFn: () => request<AppSettings>({ url: '/settings', method: 'GET' }),
+    queryKey: ['settings', onDate ?? 'today'],
+    queryFn: () =>
+      request<AppSettings>({
+        url: '/settings',
+        method: 'GET',
+        ...(onDate ? { params: { onDate } } : {}),
+      }),
     staleTime: 5 * 60_000,
   });
 }

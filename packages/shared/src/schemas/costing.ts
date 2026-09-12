@@ -17,6 +17,28 @@ export const machineSchema = z.object({
     .number()
     .positive('Connected load must be more than 0')
     .max(10_000, 'That looks wrong — check the horsepower'),
+  /**
+   * What one printing station adds when its colour is inked.
+   *
+   * Zero is a fixed load, which is what a laminator or a slitter has. The
+   * works' press is a 30 HP drive with three 12 HP station motors, and their
+   * own sheet switches those on as colours are added.
+   */
+  stationHorsepower: z.coerce.number().min(0).max(10_000).default(0),
+  /**
+   * Which colour brings each station motor on, as "3,4,6".
+   *
+   * The 3rd, 4th and 6th, which is what their sheet computes and what the
+   * operator confirms. Its own layout implies the 3rd, 5th and 7th, and two of
+   * its four references are off by one — the readings differ at four colours
+   * and at six. Editable, because a rewired press is a fact about the works.
+   */
+  stationColourSteps: z
+    .string()
+    .trim()
+    .max(40)
+    .regex(/^$|^\d+(\s*,\s*\d+)*$/, 'Colour numbers separated by commas, like 3,4,6')
+    .default(''),
   powerRatePerHpHour: z.coerce.number().min(0).max(10_000, 'That looks wrong — check the rate'),
   speedMPerMin: z.coerce
     .number()

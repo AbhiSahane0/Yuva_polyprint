@@ -710,6 +710,37 @@ station is charged on the stations a job occupies — one cylinder each — not 
 how many inks are priced. The sheet counts seven stations on a job it prices
 four inks for.
 
+**A press draws what the colours on it draw.** Its 30 HP main drive runs alone
+until the third colour, and a 12 HP station motor comes on at the third, the
+fourth and the sixth — so a two-colour job draws 30 HP where a seven-colour job
+draws 66. Charging the full connected load on every job overstated electricity
+on everything short of a full press, by Rs 1.53 a kilogram on the client's own
+two-colour Govt Sugar quotation.
+
+| Colours | Motors | Press draws |
+| ------- | ------ | ----------- |
+| 1–2     | none   | 30 HP       |
+| 3       | one    | 42 HP       |
+| 4–5     | two    | 54 HP       |
+| 6–8     | three  | 66 HP       |
+
+`costing_machines.station_horsepower` and `station_colour_steps` hold it, and a
+machine with no station load — a laminator, a slitter — keeps one figure whatever
+it prints. The steps are `3,4,6` because that is what the sheet's formulas
+compute and what the operator confirms; the layout of those same rows implies
+`3,5,7`, and two of its four references are off by one.
+
+**Three figures belong to the quotation, not the works.** `margin_percent`,
+`transport_per_kg` and `pouch_making_per_kg` are columns on `quotations`, null
+for "use the Costing screen". The client varies all three job to job: across
+seven of their own quotations, margins of 5%, 9% and 10%, transport at Rs 5 and
+Rs 10, and pouch making at 0, 11.04 and 15 — **five of those seven written on the
+same day**, so none of it is a price that moved over time.
+
+**Everything is priced at the quotation's own date.** `loadCostingContext` reads
+the material rates and the settings in force on it, so an older job entered now
+is costed as it would have been then rather than at today's film prices.
+
 **Why the margin reads the same at every quantity.** Because the sheet's margin
 is nine per cent of the MATERIAL cost, and material scales exactly with the
 order — so material per kilogram, and the margin it produces, are identical at
@@ -801,14 +832,35 @@ figures — **check them before quoting on them**.
 
 ### Settings
 
-| Method | Path        | Notes                                 |
-| ------ | ----------- | ------------------------------------- |
-| GET    | `/settings` | All settings, with defaults filled in |
-| PATCH  | `/settings` | Update any subset                     |
+| Method | Path                          | Notes                                 |
+| ------ | ----------------------------- | ------------------------------------- |
+| GET    | `/settings`                   | All settings, with defaults filled in |
+| GET    | `/settings?onDate=2022-03-23` | What the works held **then**          |
+| PATCH  | `/settings`                   | Update any subset                     |
 
 Stored as key/value rows so a new setting never needs a migration. Anything
 missing falls back to a documented default, so a fresh database works with no
 seeding step.
+
+#### A setting has a history
+
+`app_setting_history` records what a figure was on a given day, the way
+`material_rates` always has for a price. The client's own sheets carry a bank
+EMI of Rs 4,166.66 in March and April 2022 and Rs 10,000 in July — one figure,
+changed in between, not something that varies job to job. Without a history a
+quotation dated 2022 was repriced at today's overheads and could never reproduce
+itself.
+
+**Today reads the current row; only a past date consults the history.** The
+current value is not derived from the history, so the two cannot drift — and
+`app_settings` is also where the GSTIN lookup cache lives, which is why the
+history sits beside it rather than replacing it. A key with no entry simply never
+changed.
+
+`PATCH /settings` dates the change **today**, which is what saving the Costing
+screen means: this is what the works pays from now on. The screen does not offer
+to rewrite what a figure was months ago — that is the basis of quotations already
+sent.
 
 | Setting                       | Default                           | Meaning                                                                                    |
 | ----------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -1594,13 +1646,14 @@ Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `customers`                 | Companies that order. Text fields use `'NA'` where the imported sheet was blank.                                                                            |
 | `jobs`                      | Products and their full 55-column specification.                                                                                                            |
-| `quotations`                | Customer-facing documents. Totals frozen at save; `lost_reason` says why a loss was lost.                                                                   |
+| `quotations`                | Customer-facing documents. Totals frozen at save; carries its own date, margin, transport and pouch making; `lost_reason` says why a loss was lost.         |
 | `quotation_items`           | One priced line: its design, its gazette, its geometry and its cylinders.                                                                                   |
 | `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted.                                                                      |
 | `quotation_item_quantities` | One line's figures at one quoted quantity.                                                                                                                  |
 | `quotation_tiers`           | One quoted quantity and the document totals at it.                                                                                                          |
 | `materials`                 | The rate catalogue, with density for films.                                                                                                                 |
 | `material_rates`            | One material's price on one date — one row per active material per day.                                                                                     |
+| `app_setting_history`       | One setting's value from one date — what the works held then, the way `material_rates` answers it for a price.                                              |
 | `stock_batches`             | One delivery of one material, and what is left of it. Unique batch code per material. Keeps the delivery note's own figure when it arrived in another unit. |
 | `suppliers`                 | Who the works buys from. What they supply is derived from their orders, never stored.                                                                       |
 | `purchase_orders`           | One order to one supplier. Progress follows its receipts; delay is computed, not stored.                                                                    |
@@ -1936,19 +1989,20 @@ Your `.env` stays pointed at Docker throughout.
 
 ## Scripts
 
-| Command                              | Does                                                  |
-| ------------------------------------ | ----------------------------------------------------- |
-| `npm run dev`                        | Watch mode on port 4000                               |
-| `npm run build` / `start`            | Compile to `dist/`, then run it                       |
-| `npm test`                           | Vitest, including the shell smoke tests               |
-| `npm run db:migrate`                 | Create and apply a migration                          |
-| `npm run db:studio`                  | Prisma Studio                                         |
-| `npm run seed:materials`             | Seed the 16 materials and opening rates. Idempotent.  |
-| `npm run seed:costing`               | Machines, wages and ink figures. Never overwrites.    |
-| `npm run seed:excel-rates`           | The workbook's own rates. DOES overwrite — see above. |
-| `npm run import:legacy -- --dry-run` | Parse the legacy sheet, write nothing                 |
-| `npm run import:legacy [-- --fresh]` | Import it; `--fresh` replaces existing rows           |
-| `npm run schema:docs`                | Regenerate the database documentation                 |
+| Command                              | Does                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------ |
+| `npm run dev`                        | Watch mode on port 4000                                                        |
+| `npm run build` / `start`            | Compile to `dist/`, then run it                                                |
+| `npm test`                           | Vitest, including the shell smoke tests                                        |
+| `npm run db:migrate`                 | Create and apply a migration                                                   |
+| `npm run db:studio`                  | Prisma Studio                                                                  |
+| `npm run seed:materials`             | Seed the 16 materials and opening rates. Idempotent.                           |
+| `npm run seed:costing`               | Machines, wages and ink figures. Never overwrites.                             |
+| `npm run seed:excel-rates`           | The workbook's own rates. DOES overwrite — see above.                          |
+| `npm run seed:old-quotations`        | Rebuilds seven of the works' 2022 quotations and checks each against its sheet |
+| `npm run import:legacy -- --dry-run` | Parse the legacy sheet, write nothing                                          |
+| `npm run import:legacy [-- --fresh]` | Import it; `--fresh` replaces existing rows                                    |
+| `npm run schema:docs`                | Regenerate the database documentation                                          |
 
 ### PDF rendering
 

@@ -8,7 +8,8 @@ whoever maintains the code. Each section names the file it lives in so the two
 can be checked against each other.
 
 For **what has to be entered before any of this can run**, see
-[`setup.md`](./setup.md).
+[`setup.md`](./setup.md). For **proof that this reproduces the works' own
+quotations**, see [`old-quotation-check.md`](./old-quotation-check.md).
 
 The reference throughout is **"3. Anupriya.xlsx"**, 5 kg atta packaging,
 23 March 2022 — the sheet the office reconciles against. It has two tabs,
@@ -444,7 +445,7 @@ cost before margin = material cost + overhead cost + electricity
 
 margin base   = material cost only        ← the sheet
               | cost before margin        ← the alternative
-margin amount = margin base × margin %                  (9%)
+margin amount = margin base × margin %    (the quotation's, else the works')
 total cost    = cost before margin + margin amount
 ```
 
@@ -732,9 +733,29 @@ per-batch adhesive, the hardener, ethyl acetate, toluene.
 is taken on, what the EMI is spread over. Each ships set to what the sheet does;
 move one and the rate moves off the client's spreadsheet, deliberately.
 
+### As at a date
+
+**A quotation is costed on the figures in force on its own date**, not on
+today's. Material rates have always carried a history; settings do too, so an
+older job entered now is priced as it would have been then. The client's own
+sheets change the blended ink rate from Rs 800 to Rs 600 and the bank EMI from
+Rs 4,166.66 to Rs 10,000 between March and July 2022 — one figure each, changed
+in between, not something that varies job to job.
+
+Today reads the current value, and only a date in the past consults the record
+of changes. Saving the Costing screen records the change against today: the
+screen does not offer to rewrite what a figure was months ago, because that is
+the basis of quotations already sent.
+
 ### Per quotation
 
-Cylinder rate, GST %, material advance %, cylinder advance % — and on each line,
+**Margin %, transport per kg and pouch making per kg** — the three the client
+varies job to job. Their own seven old sheets carry margins of 5%, 9% and 10%,
+transport at Rs 5 and Rs 10, and pouch making at 0, 11.04 and 15, with nothing
+charged on the jobs sold as reels. Left blank each follows the Costing screen,
+so an ordinary quotation keeps up with the works' own figures as they change.
+
+Also cylinder rate, GST %, material advance %, cylinder advance % — and on each line,
 the lanes, the repeat, the cylinder count, and a rate typed over the one the
 costing worked out.
 

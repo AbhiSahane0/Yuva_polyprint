@@ -89,7 +89,11 @@ import {
 import { QuotationPreview } from '../components/QuotationPreview';
 import { SendQuotationModal } from '../components/SendQuotationModal';
 import { CostingBreakdownModal } from '@/features/costing/components/CostingBreakdownModal';
-import { useRateCosting, type RateCostingLine } from '@/features/costing/api/use-rate-costing';
+import {
+  useRateCosting,
+  type RateCostingLine,
+  type RateCostingOverrides,
+} from '@/features/costing/api/use-rate-costing';
 import { LayerFields } from '../components/LayerFields';
 import { QuantityFields, type QuantityResult } from '../components/QuantityFields';
 import { StepIndicator, type Step } from '../components/StepIndicator';
@@ -107,6 +111,13 @@ import { StepIndicator, type Step } from '../components/StepIndicator';
  * always free, and nothing is submitted until the last step.
  */
 
+/** A blank override box means "follow the works' figure", which is not zero. */
+function numOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 const STEPS: Step[] = [
   { id: 'customer', label: 'Customer' },
   { id: 'details', label: 'Details' },
@@ -116,7 +127,7 @@ const STEPS: Step[] = [
 
 /** Which fields each step owns, so Next checks that step and nothing else. */
 const STEP_FIELDS: (keyof CreateQuotationFormValues)[][] = [
-  ['customerName'],
+  ['customerName', 'date'],
   ['addressLine1', 'addressLine2', 'addressLine3', 'mobile', 'email', 'gstNumber'],
   ['items'],
   [],
@@ -251,11 +262,9 @@ export default function QuotationFormPage() {
   const [reviewing, setReviewing] = useState<QuotationSummary | null>(null);
   const [sending, setSending] = useState<QuotationSummary | null>(null);
 
-  const { data: settings } = useSettings();
   // Only asked for on a new quotation; an existing one already has its number.
   const { data: nextNumber } = useNextQuotationNumber(!isEdit);
   const { data: existing, isPending: loadingExisting } = useQuotation(id ?? null);
-  const { data: materials } = useMaterials();
 
   const createQuotation = useCreateQuotation();
   const updateQuotation = useUpdateQuotation();
@@ -296,6 +305,10 @@ export default function QuotationFormPage() {
       customerId: null,
       saveAsCustomer: false,
       selectedQuantity: 1,
+      /* Blank follows the works' figures on the Costing screen. */
+      marginPercent: '',
+      transportPerKg: '',
+      pouchMakingPerKg: '',
       customerName: '',
       brandName: '',
       addressLine1: '',
@@ -315,6 +328,18 @@ export default function QuotationFormPage() {
   const { control, register, handleSubmit, setValue, getValues, trigger, formState, reset } = form;
   const items = useFieldArray({ control, name: 'items' });
   const watched = useWatch({ control });
+
+  /*
+   * Everything is priced on the quotation's OWN date.
+   *
+   * The server always did — it reads the rates and the overheads in force on
+   * that day — and the screen did not, so opening a quotation written for an
+   * older date showed today's rates against a line the server had priced at
+   * that date's. On a new quotation the date is today and the two are the same.
+   */
+  const pricingDate = (watched.date as string | undefined) || today();
+  const { data: settings } = useSettings(pricingDate);
+  const { data: materials } = useMaterials(pricingDate);
 
   /*
    * Which quantity the customer is quoted, 1-based.
@@ -479,6 +504,10 @@ export default function QuotationFormPage() {
       status: existing.status,
       terms: existing.terms,
       notes: existing.notes,
+      /* Null on the row means the quotation follows the works', so show blank. */
+      marginPercent: existing.marginPercent ?? '',
+      transportPerKg: existing.transportPerKg ?? '',
+      pouchMakingPerKg: existing.pouchMakingPerKg ?? '',
       items: existing.items.map((item) => ({
         id: item.id,
         jobId: item.jobId,
@@ -1080,6 +1109,26 @@ export default function QuotationFormPage() {
                   <Input id="brandName" placeholder="e.g. Ashoka" {...register('brandName')} />
                 </Field>
               </div>
+
+              {/*
+                The date the quotation is written for, which is today unless
+                somebody says otherwise.
+
+                It is not only what gets printed: everything is costed on the
+                rates and overheads in force that day, so an older job entered
+                now is priced as it would have been then rather than at
+                today's film prices.
+              */}
+              <div className="sm:col-span-4">
+                <Field
+                  label="Date"
+                  htmlFor="date"
+                  hint="Rates and overheads of this day are what price it"
+                  error={formState.errors.date?.message}
+                >
+                  <Input id="date" type="date" {...register('date')} />
+                </Field>
+              </div>
             </div>
           </FieldSection>
         ) : null}
@@ -1167,6 +1216,55 @@ export default function QuotationFormPage() {
 
         {step === 2 ? (
           <div className="flex flex-col gap-5">
+            {/*
+              Three figures the works varies job to job.
+
+              Held on the Costing screen as the works' own, and overridden here
+              when a job is not the ordinary case — the client's own sheets set
+              all three by hand, with margins of 5%, 9% and 10% across seven
+              quotations and nothing charged for pouch making on the two sold as
+              reels. Left blank they follow the Costing screen, so a quotation
+              that never overrode one keeps up with it.
+            */}
+            <FieldSection
+              title="This quotation's costing"
+              description="Blank follows the works' own figures on the Costing screen."
+            >
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+                <div className="sm:col-span-4">
+                  <Field label="Margin %" htmlFor="marginPercent">
+                    <NumberInput
+                      id="marginPercent"
+                      placeholder={String(settings?.defaultMarginPercent ?? 9)}
+                      {...register('marginPercent')}
+                    />
+                  </Field>
+                </div>
+                <div className="sm:col-span-4">
+                  <Field label="Transport, Rs/kg" htmlFor="transportPerKg">
+                    <NumberInput
+                      id="transportPerKg"
+                      placeholder={String(settings?.transportPerKg ?? 10)}
+                      {...register('transportPerKg')}
+                    />
+                  </Field>
+                </div>
+                <div className="sm:col-span-4">
+                  <Field
+                    label="Pouch making, Rs/kg"
+                    htmlFor="pouchMakingPerKg"
+                    hint="Zero on a job sold as a reel"
+                  >
+                    <NumberInput
+                      id="pouchMakingPerKg"
+                      placeholder={String(settings?.pouchMakingPerKg ?? 15)}
+                      {...register('pouchMakingPerKg')}
+                    />
+                  </Field>
+                </div>
+              </div>
+            </FieldSection>
+
             {items.fields.map((field, index) => (
               <JobCard
                 key={field.id}
@@ -1184,6 +1282,11 @@ export default function QuotationFormPage() {
                 errors={formState.errors.items?.[index] as JobErrors | undefined}
                 canRemove={items.fields.length > 1}
                 onRemove={() => items.remove(index)}
+                costingOverrides={{
+                  marginPercent: numOrNull(watched.marginPercent),
+                  transportPerKg: numOrNull(watched.transportPerKg),
+                  pouchMakingPerKg: numOrNull(watched.pouchMakingPerKg),
+                }}
                 selectedQuantity={selectedQuantity}
                 onSelectQuantity={(position) =>
                   setValue('selectedQuantity', position as never, { shouldDirty: true })
@@ -1315,6 +1418,7 @@ function JobCard({
   errors,
   canRemove,
   onRemove,
+  costingOverrides,
   selectedQuantity,
   onSelectQuantity,
 }: {
@@ -1335,6 +1439,8 @@ function JobCard({
   errors: JobErrors | undefined;
   canRemove: boolean;
   onRemove: () => void;
+  /** Quotation-wide costing the office has overridden; blank follows the works'. */
+  costingOverrides: RateCostingOverrides;
   /** Quotation-wide: which quantity the customer is quoted, 1-based. */
   selectedQuantity: number;
   onSelectQuantity: (position: number) => void;
@@ -1407,7 +1513,7 @@ function JobCard({
    * the rows that report what the typed one earns. Two computations would let
    * the same screen disagree with itself about the same job.
    */
-  const costing = useRateCosting(costingLine, materials);
+  const costing = useRateCosting(costingLine, materials, costingOverrides);
 
   /** Which row's working is open, if any. */
   const [working, setWorking] = useState<number | null>(null);

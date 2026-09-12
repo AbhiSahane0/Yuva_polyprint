@@ -180,7 +180,8 @@ function headlineTier(row: {
  */
 async function loadCostingContext(onDate: string) {
   const [settings, rates, materials] = await Promise.all([
-    getSettings(),
+    /* The overheads the works held then, not the ones it holds now. */
+    getSettings(onDate),
     getRateMap(onDate),
     prisma.material.findMany({ select: { id: true, name: true, density: true } }),
   ]);
@@ -241,6 +242,9 @@ function toQuotation(row: QuotationRow): Quotation {
     gstNumber: row.gstNumber,
     decidedAt: row.decidedAt ? row.decidedAt.toISOString() : null,
     lostReason: row.lostReason,
+    marginPercent: row.marginPercent === null ? null : toNumber(row.marginPercent),
+    transportPerKg: row.transportPerKg === null ? null : toNumber(row.transportPerKg),
+    pouchMakingPerKg: row.pouchMakingPerKg === null ? null : toNumber(row.pouchMakingPerKg),
     cylinderRate: toNumber(row.cylinderRate),
     gstPercent: toNumber(row.gstPercent),
     materialAdvancePercent: toNumber(row.materialAdvancePercent),
@@ -569,12 +573,24 @@ export async function getQuotationById(id: string): Promise<Quotation> {
 }
 
 export async function createQuotation(input: CreateQuotationInput): Promise<Quotation> {
-  const settings = await getSettings();
+  /* Dated, so a quotation written up for an older day carries that day's rates. */
+  const settings = await getSettings(input.date);
   const rates = {
     cylinderRate: input.cylinderRate ?? settings.cylinderRate,
     gstPercent: input.gstPercent ?? settings.gstPercent,
     materialAdvancePercent: input.materialAdvancePercent ?? settings.materialAdvancePercent,
     cylinderAdvancePercent: input.cylinderAdvancePercent ?? settings.cylinderAdvancePercent,
+  };
+
+  /*
+   * Null rather than the works' figure, so a quotation that never overrode one
+   * follows the Costing screen as it changes rather than freezing the number
+   * that happened to be there the day it was written.
+   */
+  const costingOverrides = {
+    marginPercent: input.marginPercent ?? null,
+    transportPerKg: input.transportPerKg ?? null,
+    pouchMakingPerKg: input.pouchMakingPerKg ?? null,
   };
 
   const costing = await loadCostingContext(input.date);
@@ -680,6 +696,7 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
             // `resolveSelectedQuantity`.
             selectedQuantity: resolveSelectedQuantity(input.selectedQuantity, tiers.length),
             ...rates,
+            ...costingOverrides,
             terms: input.terms.length > 0 ? input.terms : DEFAULT_TERMS,
             notes: input.notes,
             ...(input.status === 'SENT' ? { sentAt: new Date() } : {}),
@@ -835,6 +852,25 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
       input.cylinderAdvancePercent ?? toNumber(existing.cylinderAdvancePercent),
   };
 
+  /*
+   * An override the update did not mention keeps what it had. Null is a real
+   * value here — "follow the works' figure" — so it cannot be told apart from
+   * "unchanged" by looking at the stored row alone, and the input is what
+   * decides.
+   */
+  const nullable = (value: unknown): number | null =>
+    value === null || value === undefined ? null : Number(value);
+  const costingOverrides = {
+    marginPercent:
+      input.marginPercent !== undefined ? input.marginPercent : nullable(existing.marginPercent),
+    transportPerKg:
+      input.transportPerKg !== undefined ? input.transportPerKg : nullable(existing.transportPerKg),
+    pouchMakingPerKg:
+      input.pouchMakingPerKg !== undefined
+        ? input.pouchMakingPerKg
+        : nullable(existing.pouchMakingPerKg),
+  };
+
   // Reprice from whichever line set applies — the new one if sent, else the stored one.
   const items: QuotationItemInput[] =
     input.items ??
@@ -948,6 +984,7 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
         ),
         ...(becomingSent ? { sentAt: new Date() } : {}),
         ...rates,
+        ...costingOverrides,
         tiers: { create: tiers },
       },
     });

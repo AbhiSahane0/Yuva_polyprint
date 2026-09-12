@@ -15,6 +15,11 @@ around and export as PNG or PDF, paste
 
 ```mermaid
 erDiagram
+  app_setting_history {
+    text key PK
+    text value
+    date effective_date PK
+  }
   app_settings {
     text key PK
     text value
@@ -187,27 +192,28 @@ erDiagram
 
 | Table | Columns | Rows | Purpose |
 | --- | ---: | ---: | --- |
-| `app_settings` | 3 | 36 | Editable rates: cylinder rate, GST %, advance %. |
+| `app_setting_history` | 4 | 3 |  |
+| `app_settings` | 3 | 39 | Editable rates: cylinder rate, GST %, advance %. |
 | `costing_labour` | 8 | 7 |  |
-| `costing_machines` | 12 | 3 |  |
+| `costing_machines` | 14 | 3 |  |
 | `customers` | 17 | 71 | Companies that order from Yuva Polyprint. |
 | `cylinder_events` | 11 | 0 |  |
 | `cylinders` | 16 | 0 |  |
 | `job_artwork` | 17 | 0 |  |
 | `jobs` | 55 | 419 | Products and their full engineering specification. |
-| `login_events` | 7 | 37 |  |
-| `material_rates` | 6 | 255 |  |
-| `materials` | 13 | 19 |  |
+| `login_events` | 7 | 41 |  |
+| `material_rates` | 6 | 355 |  |
+| `materials` | 13 | 23 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
 | `purchase_receipts` | 11 | 1 |  |
-| `quotation_emails` | 10 | 1 |  |
-| `quotation_item_layers` | 9 | 10 |  |
-| `quotation_item_quantities` | 13 | 7 |  |
-| `quotation_items` | 31 | 5 | One priced line on a quotation. |
-| `quotation_tiers` | 14 | 7 |  |
-| `quotations` | 28 | 5 | Customer-facing quotations, with totals frozen at save. |
-| `sessions` | 6 | 9 |  |
+| `quotation_emails` | 10 | 0 |  |
+| `quotation_item_layers` | 9 | 34 |  |
+| `quotation_item_quantities` | 13 | 19 |  |
+| `quotation_items` | 31 | 17 | One priced line on a quotation. |
+| `quotation_tiers` | 14 | 18 |  |
+| `quotations` | 31 | 17 | Customer-facing quotations, with totals frozen at save. |
+| `sessions` | 6 | 4 |  |
 | `stock_batches` | 14 | 0 |  |
 | `stock_movements` | 13 | 5 |  |
 | `suppliers` | 11 | 1 |  |
@@ -270,6 +276,15 @@ erDiagram
 
 ## Full column reference
 
+### `app_setting_history`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `key` | `text` |  | PK |
+| `value` | `text` |  |  |
+| `effective_date` | `date` |  | PK |
+| `created_at` | `timestamp` |  |  |
+
 ### `app_settings`
 
 | Column | Type | Null | Key |
@@ -307,6 +322,8 @@ erDiagram
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
 | `setup_power_factor` | `decimal(4,3)` |  |  |
+| `station_horsepower` | `decimal(10,2)` |  |  |
+| `station_colour_steps` | `text` |  |  |
 
 ### `customers`
 
@@ -669,6 +686,9 @@ erDiagram
 | `is_latest` | `boolean` |  |  |
 | `won_tier_id` | `text` | ✓ | FK → `quotation_tiers.id` |
 | `selected_quantity` | `integer` |  |  |
+| `margin_percent` | `decimal(5,2)` | ✓ |  |
+| `transport_per_kg` | `decimal(10,2)` | ✓ |  |
+| `pouch_making_per_kg` | `decimal(10,2)` | ✓ |  |
 
 ### `sessions`
 
