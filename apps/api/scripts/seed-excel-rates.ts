@@ -91,6 +91,28 @@ const SETTINGS: [string, string, string][] = [
  */
 const RETIRE_LABOUR = ['Lamination Operator', 'Lamination Helper'];
 
+/**
+ * What the press draws, as the sheet works it out.
+ *
+ * Not the full connected load on every job: the 30 HP main drive runs alone
+ * until the third colour, and a 12 HP station motor comes on at the third, the
+ * fourth and the sixth. A two-colour job therefore draws 30 HP where a
+ * seven-colour job draws 66, and charging 66 throughout overstated electricity
+ * on every job short of a full press — Rs 1.53 a kilogram on a two-colour one.
+ *
+ * The 3rd/4th/6th is what the sheet computes. Its own layout implies the 3rd,
+ * 5th and 7th and two of its four references are off by one; the two readings
+ * differ at four colours and at six. Following the sheet, because that
+ * is what reproduces the quotations the works has already sent — and it is one
+ * box on the Costing screen if they say otherwise.
+ */
+const PRESS_STATION_LOAD = {
+  name: 'Rotogravure press',
+  horsepower: 30,
+  stationHorsepower: 12,
+  stationColourSteps: '3,4,6',
+};
+
 async function main() {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -157,6 +179,24 @@ async function main() {
     await prisma.costingLabour.update({ where: { role }, data: { isActive: false } });
     console.log(
       `  RETIRED  ${role.padEnd(32)} Rs ${existing.monthlySalary}/month — the sheet has no such line`,
+    );
+  }
+
+  const press = await prisma.costingMachine.findUnique({
+    where: { name: PRESS_STATION_LOAD.name },
+  });
+  if (press && Number(press.stationHorsepower) === 0) {
+    await prisma.costingMachine.update({
+      where: { name: PRESS_STATION_LOAD.name },
+      data: {
+        horsepower: PRESS_STATION_LOAD.horsepower,
+        stationHorsepower: PRESS_STATION_LOAD.stationHorsepower,
+        stationColourSteps: PRESS_STATION_LOAD.stationColourSteps,
+      },
+    });
+    console.log(
+      `  PRESS    ${PRESS_STATION_LOAD.name.padEnd(32)} ${press.horsepower} HP flat → ` +
+        `30 HP + 12 per station at colours ${PRESS_STATION_LOAD.stationColourSteps}`,
     );
   }
 

@@ -30,6 +30,8 @@ const toMachine = (row: Prisma.CostingMachineGetPayload<Record<string, never>>):
   name: row.name,
   kind: row.kind,
   horsepower: toNumber(row.horsepower),
+  stationHorsepower: toNumber(row.stationHorsepower),
+  stationColourSteps: row.stationColourSteps,
   powerRatePerHpHour: toNumber(row.powerRatePerHpHour),
   speedMPerMin: toNumber(row.speedMPerMin),
   setupMinutes: row.setupMinutes,

@@ -22,16 +22,25 @@ const MACHINES: {
   powerRatePerHpHour: number;
   speedMPerMin: number;
   setupMinutes: number;
+  stationHorsepower?: number;
+  stationColourSteps?: string;
   sortOrder: number;
 }[] = [
   {
-    /* 30 HP press plus three 12 HP stations, costed at the Rs 9 tariff. */
+    /*
+     * 30 HP main drive, and a 12 HP station motor brought on by the 3rd, 4th
+     * and 6th colour — which is what their sheet does, so a two-colour job
+     * draws 30 HP and a seven-colour one draws 66. Costed at the Rs 9 tariff.
+     */
     name: 'Rotogravure press',
     kind: 'PRINTING',
-    horsepower: 66,
+    /* The main drive alone; the station motors are added as colours are inked. */
+    horsepower: 30,
     powerRatePerHpHour: 9,
     speedMPerMin: 65,
     setupMinutes: 60,
+    stationHorsepower: 12,
+    stationColourSteps: '3,4,6',
     sortOrder: 1,
   },
   {

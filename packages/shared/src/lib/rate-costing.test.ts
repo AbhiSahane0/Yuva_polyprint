@@ -4,7 +4,9 @@ import {
   batchSolidsFor,
   costRate,
   inkGsmOf,
+  machineHorsepower,
   parseAdhesiveRatio,
+  parseStationSteps,
   marginsAt,
   salaryPerMinute,
   unpricedColours,
@@ -125,6 +127,77 @@ const input = (over: Partial<CostingInput> = {}): CostingInput => ({
 const sheetStructure = (): CostingInput => ({
   ...input(),
   job: { ...JOB, colours: [{ name: 'All', laydownGsm: 1.8, solidsPercent: 23, ratePerKg: 202 }] },
+});
+
+/**
+ * **A press draws what the colours on it draw.**
+ *
+ * Their sheet does not charge the full connected load on every job: the 30 HP
+ * main drive runs alone until the third colour, and a 12 HP station motor comes
+ * on at the third, the fourth and the sixth. Charging 66 HP throughout
+ * overstated electricity on every job short of a full press — by Rs 1.53 a
+ * kilogram on the client's own two-colour Govt Sugar quotation, which was the
+ * worst of seven old sheets it was checked against.
+ *
+ * The 3rd/4th/6th is what that sheet computes; its layout implies the 3rd, 5th
+ * and 7th, and two of its four references are off by one. The readings differ
+ * at four colours and at six, which is why the steps are a setting rather than
+ * a decision made here.
+ */
+describe('what a press draws', () => {
+  const press = {
+    name: 'Rotogravure',
+    kind: 'PRINTING' as const,
+    horsepower: 30,
+    powerRatePerHpHour: 9,
+    speedMPerMin: 65,
+    setupMinutes: 60,
+    stationHorsepower: 12,
+    stationColourSteps: [3, 4, 6],
+  };
+
+  it.each([
+    [1, 30],
+    [2, 30],
+    [3, 42],
+    [4, 54],
+    [5, 54],
+    [6, 66],
+    [7, 66],
+    [8, 66],
+  ])('draws %i colours at %i HP', (colours, hp) => {
+    expect(machineHorsepower(press, colours)).toBe(hp);
+  });
+
+  it('keeps a fixed load where there are no station motors', () => {
+    const laminator = { ...press, stationHorsepower: 0, stationColourSteps: [] };
+    expect(machineHorsepower(laminator, 2)).toBe(30);
+    expect(machineHorsepower(laminator, 8)).toBe(30);
+  });
+
+  it('reads the steps the Costing screen holds', () => {
+    expect(parseStationSteps('3,4,6')).toEqual([3, 4, 6]);
+    expect(parseStationSteps(' 3 , 5,7 ')).toEqual([3, 5, 7]);
+    /* Blank, or nonsense, leaves the load fixed rather than guessing. */
+    expect(parseStationSteps('')).toEqual([]);
+    expect(parseStationSteps('abc')).toEqual([]);
+  });
+
+  it('disagrees with the sheet’s own layout at four colours and at six', () => {
+    const asWritten = [3, 4, 6];
+    const asImplied = [3, 5, 7];
+    const written = (c: number) =>
+      machineHorsepower({ ...press, stationColourSteps: asWritten }, c);
+    const implied = (c: number) =>
+      machineHorsepower({ ...press, stationColourSteps: asImplied }, c);
+
+    for (const colours of [1, 2, 3, 5, 7, 8]) expect(written(colours)).toBe(implied(colours));
+
+    expect(written(4)).toBe(54);
+    expect(implied(4)).toBe(42);
+    expect(written(6)).toBe(66);
+    expect(implied(6)).toBe(54);
+  });
 });
 
 describe('the film arithmetic matches the works’ sheet', () => {

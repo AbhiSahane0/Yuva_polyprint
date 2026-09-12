@@ -17,6 +17,20 @@ export const QUOTATION_STATUS_LABELS: Record<QuotationStatus, string> = {
 const positiveNumber = (label: string) =>
   z.coerce.number({ message: `${label} is required` }).positive(`${label} must be more than 0`);
 
+/**
+ * An override box the office left empty.
+ *
+ * `z.coerce.number()` turns '' into 0, which on a margin box would quote every
+ * job at cost and look like a deliberate choice. Empty has to mean "follow the
+ * works' figure", so it becomes undefined and never reaches the row.
+ */
+const blankIsUnset = (min: number, max: number) =>
+  z
+    .union([z.literal(''), z.null(), z.undefined()])
+    .transform(() => undefined)
+    .or(z.coerce.number().min(min).max(max))
+    .optional();
+
 const zeroOrMore = (label: string) =>
   z.coerce.number({ message: `${label} is required` }).min(0, `${label} cannot be negative`);
 
@@ -287,6 +301,18 @@ const createQuotationBaseSchema = z.object({
    * See `resolveSelectedQuantity`.
    */
   selectedQuantity: z.coerce.number().int().min(1).max(3).default(1),
+
+  /**
+   * Costing figures this quotation overrides. Omitted means "use the works' own".
+   *
+   * The client's own sheets set all three by hand, job to job: margins of 5%,
+   * 9% and 10% across seven quotations, transport at Rs 5 and Rs 10, and pouch
+   * making at 0, 11.04 and 15 — nothing on a job sold as a reel. Holding one
+   * figure for the works made their own history unreproducible.
+   */
+  marginPercent: blankIsUnset(0, 100),
+  transportPerKg: blankIsUnset(0, 10000),
+  pouchMakingPerKg: blankIsUnset(0, 10000),
 
   /** Rates may be overridden per quotation; omitted means "use the settings". */
   cylinderRate: z.coerce.number().positive().optional(),

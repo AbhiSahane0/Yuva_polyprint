@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import {
   adhesiveGsmFor,
   costRate,
+  parseStationSteps,
   unpricedColours,
   type CostingBreakdown,
   type CostingColour,
@@ -41,15 +42,32 @@ export interface RateCostingLine {
 }
 
 /**
+ * Figures this quotation overrides, or null/undefined to follow the works'.
+ *
+ * Margin, transport and pouch making are the three the client varies job to
+ * job — their own sheets set all three by hand — so they are on the quotation
+ * as well as on the Costing screen. Anything left unset follows the works',
+ * which is what an ordinary job means.
+ */
+export interface RateCostingOverrides {
+  marginPercent?: number | null;
+  transportPerKg?: number | null;
+  pouchMakingPerKg?: number | null;
+}
+
+/**
  * What each quantity on a line costs to make.
  *
- * A hook rather than something the panel keeps to itself, because two places
- * need the same answer: the panel, which suggests a rate, and the quantity
- * rows beneath it, which have to say what margin the rate somebody TYPED
- * actually earns. Computing it twice would let the two disagree about the same
- * job on the same screen.
+ * A hook rather than something one screen keeps to itself, because two places
+ * need the same answer: the rate box, which fills itself in, and the quantity
+ * rows beneath it, which say what margin that rate actually earns. Computing it
+ * twice would let the two disagree about the same job on the same screen.
  */
-export function useRateCosting(line: RateCostingLine, materials: Material[]) {
+export function useRateCosting(
+  line: RateCostingLine,
+  materials: Material[],
+  overrides: RateCostingOverrides = {},
+) {
   const { data: settings } = useSettings();
   const { data: master } = useCostingMasterData();
 
@@ -121,6 +139,17 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
       })),
   );
 
+  /** Stable across renders, so the memo below does not rerun on every keystroke. */
+  const overrideKey = [
+    overrides.marginPercent,
+    overrides.transportPerKg,
+    overrides.pouchMakingPerKg,
+  ].join('|');
+
+  /** A blank box means "follow the works' figure", which is not the same as 0. */
+  const pick = (value: number | null | undefined, fallback: number): number =>
+    value === null || value === undefined || !Number.isFinite(value) ? fallback : value;
+
   const input: CostingInput | null = useMemo(() => {
     if (!settings || !master) return null;
     if (line.layers.length === 0) return null;
@@ -177,30 +206,37 @@ export function useRateCosting(line: RateCostingLine, materials: Material[]) {
         stationCount: line.colourCount,
         adhesiveSplitRatio: settings.adhesiveSplitRatio,
       },
-      machines: master.machines,
+      /*
+       * A press's station motors come on as colours are added — the catalogue
+       * holds that as "3,4,6" and the engine wants the numbers.
+       */
+      machines: master.machines.map((machine) => ({
+        ...machine,
+        stationColourSteps: parseStationSteps(machine.stationColourSteps),
+      })),
       labour: master.labour,
       overheads: {
         workingDaysPerMonth: settings.workingDaysPerMonth,
         hoursPerDay: settings.hoursPerDay,
-        transportPerKg: settings.transportPerKg,
+        transportPerKg: pick(overrides.transportPerKg, settings.transportPerKg),
         packingPerKg: settings.packingPerKg,
         otherPerJob: settings.otherPerJob,
         emiPerMonth: settings.emiPerMonth,
         emiHoursPerMonth: settings.emiHoursPerMonth,
         emiBasis: settings.emiBasis,
-        pouchMakingPerKg: settings.pouchMakingPerKg,
+        pouchMakingPerKg: pick(overrides.pouchMakingPerKg, settings.pouchMakingPerKg),
         stationSurcharges: [
           settings.stationSurcharge6,
           settings.stationSurcharge7,
           settings.stationSurcharge8,
         ],
-        marginPercent: settings.defaultMarginPercent,
+        marginPercent: pick(overrides.marginPercent, settings.defaultMarginPercent),
         marginBasis: settings.marginBasis,
         inkCostModel: settings.inkCostModel,
         adhesiveCostModel: settings.adhesiveCostModel,
       },
     };
-  }, [settings, master, line, colourKey, materials, inks]);
+  }, [settings, master, line, colourKey, materials, inks, overrideKey]);
 
   /*
    * One rate per quantity, not one rate. Setting a press takes the same hour

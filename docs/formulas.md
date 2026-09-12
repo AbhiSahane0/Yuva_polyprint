@@ -444,7 +444,7 @@ cost before margin = material cost + overhead cost + electricity
 
 margin base   = material cost only        ← the sheet
               | cost before margin        ← the alternative
-margin amount = margin base × margin %                  (9%)
+margin amount = margin base × margin %    (the quotation's, else the works')
 total cost    = cost before margin + margin amount
 ```
 
@@ -734,7 +734,13 @@ move one and the rate moves off the client's spreadsheet, deliberately.
 
 ### Per quotation
 
-Cylinder rate, GST %, material advance %, cylinder advance % — and on each line,
+**Margin %, transport per kg and pouch making per kg** — the three the client
+varies job to job. Their own seven old sheets carry margins of 5%, 9% and 10%,
+transport at Rs 5 and Rs 10, and pouch making at 0, 11.04 and 15, with nothing
+charged on the jobs sold as reels. Left blank each follows the Costing screen,
+so an ordinary quotation keeps up with the works' own figures as they change.
+
+Also cylinder rate, GST %, material advance %, cylinder advance % — and on each line,
 the lanes, the repeat, the cylinder count, and a rate typed over the one the
 costing worked out.
 

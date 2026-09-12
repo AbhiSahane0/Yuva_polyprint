@@ -277,6 +277,15 @@ model Quotation {
   /// keeps showing the quantity it was written for.
   selectedQuantity Int @default(1) @map("selected_quantity")
 
+  /// Costing figures this quotation overrides, or null for the works' own.
+  ///
+  /// The client's own sheets set all three by hand job to job — margins of 5%,
+  /// 9% and 10%, transport at Rs 5 and Rs 10, pouch making at 0, 11.04 and 15.
+  /// Holding one figure for the works made their own history unreproducible.
+  marginPercent    Decimal? @map("margin_percent") @db.Decimal(5, 2)
+  transportPerKg   Decimal? @map("transport_per_kg") @db.Decimal(10, 2)
+  pouchMakingPerKg Decimal? @map("pouch_making_per_kg") @db.Decimal(10, 2)
+
   /// Rates as they stood when this quotation was made.
   cylinderRate           Decimal @map("cylinder_rate") @db.Decimal(10, 4)
   gstPercent             Decimal @map("gst_percent") @db.Decimal(5, 2)
@@ -1367,7 +1376,30 @@ model CostingMachine {
   kind MachineKind
 
   /// Connected load. Power is costed as horsepower × a rate per hour.
+  ///
+  /// On a press with `stationHorsepower` this is the MAIN DRIVE alone — what it
+  /// draws with nothing but the first colour on — and the stations are added to
+  /// it. On every other machine it is the whole load.
   horsepower Decimal @db.Decimal(10, 2)
+
+  /// What one printing station adds to the load when its colour is inked.
+  ///
+  /// Zero means a fixed load, which is what a laminator or a slitter has. The
+  /// works' press is a 30 HP drive with three 12 HP station motors, and their
+  /// sheet switches those on as colours are added — so a two-colour job draws
+  /// 30 HP and a seven-colour job draws 66. Charging the full connected load on
+  /// every job overstated electricity on anything short of a full press.
+  stationHorsepower Decimal @default(0) @map("station_horsepower") @db.Decimal(10, 2)
+
+  /// Which colour switches each station motor on, as "3,4,6".
+  ///
+  /// Read straight off the works' sheet, where the 3rd, 4th and 6th colour each
+  /// bring one on. The layout of that sheet implies the 3rd, 5th and 7th, and
+  /// two of its four references are off by one — the readings
+  /// differ at four colours and at six. Kept editable rather than decided
+  /// here, because only the works knows which motors are actually wired to
+  /// which stations.
+  stationColourSteps String @default("") @map("station_colour_steps")
 
   /**
    * Rupees per horsepower-hour.

@@ -44,8 +44,23 @@ export const MACHINE_KIND_LABELS: Record<MachineKind, string> = {
 export interface CostingMachine {
   name: string;
   kind: MachineKind;
-  /** Connected load. The sheets cost power as horsepower × a rate per hour. */
+  /**
+   * Connected load, costed as horsepower × a rate per hour.
+   *
+   * On a press carrying `stationHorsepower` this is the MAIN DRIVE alone and
+   * the stations are added to it. Everywhere else it is the whole load.
+   */
   horsepower: number;
+  /**
+   * What one printing station adds when its colour is inked. Zero is a fixed
+   * load, which is what a laminator or a slitter has.
+   */
+  stationHorsepower?: number;
+  /**
+   * Which colour switches each station on — `[3, 4, 6]` on the works' press.
+   * Empty leaves the load fixed.
+   */
+  stationColourSteps?: number[];
   /**
    * Rupees per horsepower-hour.
    *
@@ -507,6 +522,36 @@ export function unpricedColours(colours: CostingColour[]): string[] {
   return colours.filter((colour) => !(colour.ratePerKg > 0)).map((colour) => colour.name);
 }
 
+/**
+ * What a press draws with this many colours on it.
+ *
+ * Their sheet does not charge the full connected load on every job: the main
+ * drive runs alone until the third colour, and a 12 HP station motor comes on
+ * at the third, the fourth and the sixth. A two-colour job therefore draws
+ * 30 HP where a seven-colour job draws 66, and charging 66 throughout overstated
+ * electricity on every job short of a full press — by Rs 1.53 a kilogram on a
+ * two-colour one.
+ *
+ * A machine with no station load keeps its horsepower whatever it prints.
+ */
+export function machineHorsepower(machine: CostingMachine, colours: number): number {
+  const perStation = machine.stationHorsepower ?? 0;
+  const steps = machine.stationColourSteps ?? [];
+  if (perStation <= 0 || steps.length === 0) return machine.horsepower;
+
+  const live = steps.filter((step) => step > 0 && colours >= step).length;
+  return round(machine.horsepower + perStation * live, 4);
+}
+
+/** Splits "3,4,6" into the colours that switch each station motor on. */
+export function parseStationSteps(steps: string): number[] {
+  return steps
+    .split(',')
+    .map((part) => Number(part.trim()))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => a - b);
+}
+
 /** Rupees a minute for one wage, given the works' month. */
 export function salaryPerMinute(
   monthlySalary: number,
@@ -680,6 +725,18 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
 
   const materialCost = round(filmCost + inkCost + adhesiveCost, 2);
 
+  /*
+   * Printing stations the job occupies.
+   *
+   * NOT the number of colours priced: the works' sheet counts seven stations on
+   * a job it prices four inks for, because a station is occupied — drawing
+   * power and paid a surcharge — whether or not its ink appears in the costing.
+   */
+  const stationsOn =
+    job.stationCount !== null && job.stationCount !== undefined && job.stationCount > 0
+      ? job.stationCount
+      : job.colours.length;
+
   /* --- machines, and the people on them ---------------------------------
    * Printing runs the first ply. Lamination runs each ply after it — one pass
    * per ply, which is what a laminator does. Slitting runs the printed length
@@ -712,8 +769,13 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
     const setupFactor = machine.setupPowerFactor ?? 0;
     const poweredMinutes = runMinutes + machine.setupMinutes * setupFactor;
 
+    /*
+     * The press draws what the colours on it draw — see `machineHorsepower`.
+     * Stations, not priced colours: a station is inked and drawing whether or
+     * not its ink appears in the costing.
+     */
     const electricityCost = round(
-      ((machine.horsepower * machine.powerRatePerHpHour) / 60) * poweredMinutes,
+      ((machineHorsepower(machine, stationsOn) * machine.powerRatePerHpHour) / 60) * poweredMinutes,
       2,
     );
 
@@ -780,11 +842,7 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
    * A surcharge for each station past the fifth. `stationSurcharges[0]` is the
    * sixth, and a five-colour job pays none of them.
    */
-  const stations =
-    job.stationCount !== null && job.stationCount !== undefined && job.stationCount > 0
-      ? job.stationCount
-      : job.colours.length;
-  const extraStations = Math.max(0, stations - 5);
+  const extraStations = Math.max(0, stationsOn - 5);
   const stationSurchargePerKg = round(sum(overheads.stationSurcharges.slice(0, extraStations)), 4);
 
   const pouchMakingPerKg = job.makesPouches ? overheads.pouchMakingPerKg : 0;

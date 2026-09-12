@@ -155,6 +155,10 @@ export interface Quotation extends QuotationSummary {
   /** Why they said no. Empty unless the quotation was lost. */
   lostReason: string;
 
+  /** Costing figures this quotation overrides, or null for the works' own. */
+  marginPercent: number | null;
+  transportPerKg: number | null;
+  pouchMakingPerKg: number | null;
   cylinderRate: number;
   gstPercent: number;
   materialAdvancePercent: number;
