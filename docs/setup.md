@@ -78,6 +78,12 @@ the whole time the machine is occupied — running _and_ being set.
 | Slitting Operator  | Slitting |  12,000 |     0.9615 |
 | Slitting Helper    | Slitting |   8,000 |     0.6410 |
 
+> **Retiring is asked about, and a retired name can be added back.** Taking a
+> machine or a wage out of the costing drops the rate on every quotation costed
+> afterwards, so it asks first. The row stays, greyed, with a Restore beside it —
+> and typing the same name again brings that row back with whatever figures you
+> just entered, rather than refusing it.
+
 > **There is no lamination wage here, and that is deliberate.** The estimation
 > sheet has no line for one, so following it means the laminator runs unattended
 > on paper. In fact somebody stands there for about 86 minutes on a 500 kg job.

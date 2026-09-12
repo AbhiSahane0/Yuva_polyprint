@@ -660,6 +660,15 @@ moves the price of every quotation raised afterwards, which is the same
 authority a rate change carries. Retire rather than delete, for the same reason
 a retired material stays: quotations were costed against it.
 
+**A name a retired row holds is not free, and adding it back revives that row.**
+Retiring keeps the row, so the name stays taken — and the row is off the screen
+unless the caller asks for retired ones, so `POST /costing/machines` used to fail
+with "there is already a machine with that name" about a machine nobody could
+see. It now reactivates that row with whatever figures were sent, which is what
+was being asked for and beats a second row: the id survives, so everything
+already pointing at it still does. A name held by a row that is still active
+conflicts as before. `POST /materials` follows the same rule.
+
 ### Building a rate from what it costs to make
 
 `packages/shared/src/lib/rate-costing.ts`. Nothing on the server computes it —
@@ -1339,12 +1348,29 @@ costPerKg = Σ(componentGsm × componentRate) ÷ compositeGsm
 margin %  = (sellingRate − costPerKg) ÷ sellingRate × 100
 ```
 
-A ply may carry a **rate the office typed** instead. The rates master prices a
-film at the gauge it is stocked in, so quoting a 20µ PET when 12 and 19 are on
-the list means neither rate applies — the line asks for one, and what is typed
-is stored on the ply. It never reaches the rates master. Recognised on reload by
-`overriddenRate`: the ply keeps the film's name, and a name stating a gauge
-different from the one quoted is the override, so no flag has to be stored.
+A ply may carry a **rate the office agreed for this job** instead, held in
+`rate_override`. It never reaches the rates master: a figure keyed while quoting
+is a decision about one document, and letting it edit the price list would make
+every quotation a chance to change what every other quotation costs.
+
+Two different reasons to type one, and for a long time only the first was
+handled:
+
+- **A gauge the rates master does not stock.** `PET 12µm` prices a 12µ PET;
+  quote 20µ when 12 and 19 are on the list and neither rate applies, so the line
+  asks and refuses to cost itself until it is answered.
+- **A price agreed for this job.** The works' own quotations carry PET at 185,
+  175 and 190 — every one at 12µ, every one written on 23 March 2022.
+
+The override used to be **deduced** rather than stored: the ply keeps the film's
+name, and a name stating a gauge different from the one quoted was taken to be
+the override. That caught the first reason and missed the second completely — a
+rate agreed at the film's own gauge was saved and then invisible, so reopening
+the quotation and saving replaced what had been charged with the catalogue
+price. Silently, on a document that had already gone out.
+
+It is a column now. Plies written before it read through `overriddenRate` as
+they always did, so nothing already saved moves.
 
 Otherwise every ply is costed against **its own material's rate**, so a
 metallised PET is priced as MET PET and not as the plain PET beside it — same 12µ and the same
@@ -1648,7 +1674,7 @@ Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 | `jobs`                      | Products and their full 55-column specification.                                                                                                            |
 | `quotations`                | Customer-facing documents. Totals frozen at save; carries its own date, margin, transport and pouch making; `lost_reason` says why a loss was lost.         |
 | `quotation_items`           | One priced line: its design, its gazette, its geometry and its cylinders.                                                                                   |
-| `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted.                                                                      |
+| `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted. `rate_override` is the price agreed for this job, when one was.      |
 | `quotation_item_quantities` | One line's figures at one quoted quantity.                                                                                                                  |
 | `quotation_tiers`           | One quoted quantity and the document totals at it.                                                                                                          |
 | `materials`                 | The rate catalogue, with density for films.                                                                                                                 |
