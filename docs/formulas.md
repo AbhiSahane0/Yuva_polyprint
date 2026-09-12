@@ -8,7 +8,8 @@ whoever maintains the code. Each section names the file it lives in so the two
 can be checked against each other.
 
 For **what has to be entered before any of this can run**, see
-[`setup.md`](./setup.md).
+[`setup.md`](./setup.md). For **proof that this reproduces the works' own
+quotations**, see [`old-quotation-check.md`](./old-quotation-check.md).
 
 The reference throughout is **"3. Anupriya.xlsx"**, 5 kg atta packaging,
 23 March 2022 — the sheet the office reconciles against. It has two tabs,

@@ -228,7 +228,7 @@ async function main() {
           ethylAcetateRatePerKg: priceOf(settings.defaultEthylAcetateMaterial),
           tolueneRatePerKg: priceOf(settings.defaultTolueneMaterial),
         },
-        makesPouches: n(s.pouchMaking) > 0,
+        makesPouches: true,
         adhesiveSplitRatio: settings.adhesiveSplitRatio,
       },
       machines,
@@ -285,8 +285,15 @@ async function main() {
           items: [
             {
               jobName: String(s.job).trim(),
-              jobKind: n(s.pouchMaking) > 0 ? 'POUCH' : 'ROLL',
-              pouchType: n(s.pouchMaking) > 0 ? 'CENTRE_SEAL' : null,
+              /*
+               * A pouch either way. Nothing charged for MAKING one is not the
+               * same as not making one: their Simla and Kalantri 5 kg sheets
+               * put zero in that row and still count the pouches and print a
+               * per-pouch cost, so reading it as a reel loses the figure the
+               * customer is actually quoted.
+               */
+              jobKind: 'POUCH',
+              pouchType: 'CENTRE_SEAL',
               pricingBasis: 'PER_KG',
               widthMm: n(s.widthMm),
               heightMm: n(s.heightMm),
