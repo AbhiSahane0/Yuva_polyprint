@@ -732,6 +732,20 @@ per-batch adhesive, the hardener, ethyl acetate, toluene.
 is taken on, what the EMI is spread over. Each ships set to what the sheet does;
 move one and the rate moves off the client's spreadsheet, deliberately.
 
+### As at a date
+
+**A quotation is costed on the figures in force on its own date**, not on
+today's. Material rates have always carried a history; settings do too, so an
+older job entered now is priced as it would have been then. The client's own
+sheets change the blended ink rate from Rs 800 to Rs 600 and the bank EMI from
+Rs 4,166.66 to Rs 10,000 between March and July 2022 — one figure each, changed
+in between, not something that varies job to job.
+
+Today reads the current value, and only a date in the past consults the record
+of changes. Saving the Costing screen records the change against today: the
+screen does not offer to rewrite what a figure was months ago, because that is
+the basis of quotations already sent.
+
 ### Per quotation
 
 **Margin %, transport per kg and pouch making per kg** — the three the client

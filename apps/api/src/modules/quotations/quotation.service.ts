@@ -180,7 +180,8 @@ function headlineTier(row: {
  */
 async function loadCostingContext(onDate: string) {
   const [settings, rates, materials] = await Promise.all([
-    getSettings(),
+    /* The overheads the works held then, not the ones it holds now. */
+    getSettings(onDate),
     getRateMap(onDate),
     prisma.material.findMany({ select: { id: true, name: true, density: true } }),
   ]);
@@ -572,7 +573,8 @@ export async function getQuotationById(id: string): Promise<Quotation> {
 }
 
 export async function createQuotation(input: CreateQuotationInput): Promise<Quotation> {
-  const settings = await getSettings();
+  /* Dated, so a quotation written up for an older day carries that day's rates. */
+  const settings = await getSettings(input.date);
   const rates = {
     cylinderRate: input.cylinderRate ?? settings.cylinderRate,
     gstPercent: input.gstPercent ?? settings.gstPercent,

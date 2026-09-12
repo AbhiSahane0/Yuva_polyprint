@@ -46,11 +46,14 @@ it takes to set before it runs.
 
 | Machine           | Process    |  HP | Rs / HP-hour | Speed    | Setup  |
 | ----------------- | ---------- | --: | -----------: | -------- | ------ |
-| Rotogravure press | Printing   |  66 |         9.00 | 65 m/min | 60 min |
+| Rotogravure press | Printing   |  30 |         9.00 | 65 m/min | 60 min |
 | Laminator         | Lamination |   6 |        35.00 | 70 m/min | 30 min |
 | Slitter           | Slitting   |   3 |        60.00 | 80 m/min | 30 min |
 
-The press's 66 HP is the 30 HP main drive plus three 12 HP stations.
+**The press's 30 HP is the main drive alone.** Its three 12 HP station motors
+go in beside it — `Each station adds 12`, `Motors come on at colour 3,4,6` —
+because the press does not draw its whole load on every job: two colours draws
+30 HP, seven draws 66.
 
 There is a fourth figure, **setup power**, which asks how much load a machine
 draws while it is being threaded rather than running. It starts at **zero**,

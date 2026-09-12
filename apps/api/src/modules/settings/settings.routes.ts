@@ -9,8 +9,11 @@ const router = Router();
 
 router.get(
   '/',
-  asyncHandler(async (_req, res) => {
-    ok(res, await getSettings());
+  asyncHandler(async (req, res) => {
+    /* `?onDate=yyyy-mm-dd` asks what the works held then, for repricing an
+     * older quotation on the screen the same way the server would. */
+    const onDate = typeof req.query.onDate === 'string' ? req.query.onDate : undefined;
+    ok(res, await getSettings(onDate));
   }),
 );
 

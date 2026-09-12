@@ -53,6 +53,16 @@ export interface RateCostingOverrides {
   marginPercent?: number | null;
   transportPerKg?: number | null;
   pouchMakingPerKg?: number | null;
+  /**
+   * The quotation's own date, so it is costed on the figures of that day.
+   *
+   * Not an override — the date is a fact about the quotation — but it travels
+   * with them because it decides the same thing: which overheads apply. The
+   * server has always priced at the quotation's date; the screen priced at
+   * today's, so opening an older quotation showed a rate the server would
+   * never have stored.
+   */
+  onDate?: string;
 }
 
 /**
@@ -68,7 +78,7 @@ export function useRateCosting(
   materials: Material[],
   overrides: RateCostingOverrides = {},
 ) {
-  const { data: settings } = useSettings();
+  const { data: settings } = useSettings(overrides.onDate);
   const { data: master } = useCostingMasterData();
 
   const inks = useMemo(
@@ -144,6 +154,7 @@ export function useRateCosting(
     overrides.marginPercent,
     overrides.transportPerKg,
     overrides.pouchMakingPerKg,
+    overrides.onDate,
   ].join('|');
 
   /** A blank box means "follow the works' figure", which is not the same as 0. */

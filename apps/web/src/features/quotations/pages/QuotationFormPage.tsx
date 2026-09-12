@@ -127,7 +127,7 @@ const STEPS: Step[] = [
 
 /** Which fields each step owns, so Next checks that step and nothing else. */
 const STEP_FIELDS: (keyof CreateQuotationFormValues)[][] = [
-  ['customerName'],
+  ['customerName', 'date'],
   ['addressLine1', 'addressLine2', 'addressLine3', 'mobile', 'email', 'gstNumber'],
   ['items'],
   [],
@@ -262,11 +262,9 @@ export default function QuotationFormPage() {
   const [reviewing, setReviewing] = useState<QuotationSummary | null>(null);
   const [sending, setSending] = useState<QuotationSummary | null>(null);
 
-  const { data: settings } = useSettings();
   // Only asked for on a new quotation; an existing one already has its number.
   const { data: nextNumber } = useNextQuotationNumber(!isEdit);
   const { data: existing, isPending: loadingExisting } = useQuotation(id ?? null);
-  const { data: materials } = useMaterials();
 
   const createQuotation = useCreateQuotation();
   const updateQuotation = useUpdateQuotation();
@@ -330,6 +328,18 @@ export default function QuotationFormPage() {
   const { control, register, handleSubmit, setValue, getValues, trigger, formState, reset } = form;
   const items = useFieldArray({ control, name: 'items' });
   const watched = useWatch({ control });
+
+  /*
+   * Everything is priced on the quotation's OWN date.
+   *
+   * The server always did — it reads the rates and the overheads in force on
+   * that day — and the screen did not, so opening a quotation written for an
+   * older date showed today's rates against a line the server had priced at
+   * that date's. On a new quotation the date is today and the two are the same.
+   */
+  const pricingDate = (watched.date as string | undefined) || today();
+  const { data: settings } = useSettings(pricingDate);
+  const { data: materials } = useMaterials(pricingDate);
 
   /*
    * Which quantity the customer is quoted, 1-based.
@@ -1097,6 +1107,26 @@ export default function QuotationFormPage() {
               <div className="sm:col-span-5">
                 <Field label="Brand" htmlFor="brandName">
                   <Input id="brandName" placeholder="e.g. Ashoka" {...register('brandName')} />
+                </Field>
+              </div>
+
+              {/*
+                The date the quotation is written for, which is today unless
+                somebody says otherwise.
+
+                It is not only what gets printed: everything is costed on the
+                rates and overheads in force that day, so an older job entered
+                now is priced as it would have been then rather than at
+                today's film prices.
+              */}
+              <div className="sm:col-span-4">
+                <Field
+                  label="Date"
+                  htmlFor="date"
+                  hint="Rates and overheads of this day are what price it"
+                  error={formState.errors.date?.message}
+                >
+                  <Input id="date" type="date" {...register('date')} />
                 </Field>
               </div>
             </div>
