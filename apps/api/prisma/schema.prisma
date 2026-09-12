@@ -479,6 +479,21 @@ model QuotationItemLayer {
   /// nothing.
   density      Decimal? @db.Decimal(6, 4)
   ratePerKg    Decimal? @map("rate_per_kg") @db.Decimal(12, 2)
+
+  /// The rate the office agreed for this job's film, when they typed one.
+  ///
+  /// Null means "use the film's own rate". Stated rather than deduced: a typed
+  /// rate used to be inferred from the ply quoting a gauge the material does
+  /// not name, which held while an unstocked gauge was the only reason to type
+  /// one. Film prices turn out to be agreed per job — the works' sheets carry
+  /// PET at 185, 175 and 190, all at 12µ and all on the same day — and at the
+  /// stocked gauge such a rate was stored and then invisible, so reopening the
+  /// quotation and saving replaced it with the catalogue price.
+  ///
+  /// Null on every row written before this existed; those are read through the
+  /// old inference, so nothing already saved moves.
+  rateOverride Decimal? @map("rate_override") @db.Decimal(12, 2)
+
   /// micron × density, stored so the printed breakdown needs no arithmetic.
   gsm          Decimal  @db.Decimal(10, 3)
 

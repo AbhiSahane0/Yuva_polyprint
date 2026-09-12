@@ -475,9 +475,28 @@ not stock.** A 20µ PET is a real enquiry; a dropdown of stocked films cannot
 offer a number nobody has priced, and for a while that meant such a job could
 not be quoted without a developer adding the film first.
 
+#### The rate agreed for this job
+
+Every chosen film carries a rate box. Blank follows the price list; typed, that
+is what the ply costs on this quotation and nowhere else.
+
+It is offered on every ply because **a film's price is agreed job to job**. The
+works' own quotations carry PET at 185, 175 and 190 — every one at 12µ, every
+one written on 23 March 2022. The box used to appear only for a gauge the rates
+master does not stock, which covered the other reason to type a rate and missed
+this one entirely: a rate agreed at the film's own gauge was stored and then
+invisible, so reopening the quotation and pressing Save replaced what had been
+charged with the catalogue price. Silently, and on a document that had already
+gone out.
+
+It is stored now — `rate_override` on the ply — rather than deduced from the
+gauge. Plies saved before that column existed still read through the old
+inference, so nothing already on file moves.
+
 #### A gauge off the price list has to be priced
 
-Type a gauge the chosen film is not stocked at and the row asks for a rate:
+The same box, with a different name and a harder rule behind it. Type a gauge
+the chosen film is not stocked at and it becomes the only price there is:
 
 ```
 Layer 1   [ PET 12µm ▾ ]   Micron [ 20 ]   Rate for this gauge [ Rs. / kg ]

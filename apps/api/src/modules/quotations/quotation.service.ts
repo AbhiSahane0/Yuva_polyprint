@@ -71,6 +71,21 @@ function toLayer(row: ItemRow['layers'][number]): QuotationItemLayer {
     micron: toNumber(row.micron),
     density: row.density === null ? null : Number(row.density),
     ratePerKg: row.ratePerKg === null ? null : Number(row.ratePerKg),
+    /*
+     * What the office typed, or null to follow the film's own rate.
+     *
+     * Rows written before the column existed hold null whatever was typed, so
+     * they fall back to the gauge inference that was all there ever was — which
+     * keeps every quotation already saved reading exactly as it did.
+     */
+    rateOverride:
+      row.rateOverride !== null
+        ? Number(row.rateOverride)
+        : overriddenRate({
+            materialName: row.materialName,
+            micron: toNumber(row.micron),
+            ratePerKg: row.ratePerKg === null ? null : Number(row.ratePerKg),
+          }),
     gsm: toNumber(row.gsm),
   };
 }
@@ -317,6 +332,13 @@ function priceQuotation(
           stockRate: costing.rateOfId(layer.materialId ?? null),
           override: layer.rateOverride ?? null,
         }),
+        /*
+         * Stored as well as applied, so reopening the quotation knows a rate
+         * was agreed for this job rather than having to deduce it from the
+         * gauge. Deducing it lost every rate typed at the film's OWN gauge —
+         * the works agrees PET at 185, 175 and 190, all of them 12µ.
+         */
+        rateOverride: layer.rateOverride ?? null,
         gsm: density === null ? 0 : round(micron * density, 3),
       };
     });
@@ -742,6 +764,7 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
                   micron: layer.micron,
                   density: layer.density,
                   ratePerKg: layer.ratePerKg,
+                  rateOverride: layer.rateOverride,
                   gsm: layer.gsm,
                 })),
               },
@@ -907,19 +930,20 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
          *
          * This path reprices from storage when a PATCH does not resend the
          * lines. Every other figure can be re-derived from the material; a rate
-         * quoted for a gauge the rates master does not stock cannot be, and
-         * dropping it here would silently reprice a 20µ PET at the 12µ rate on
-         * the next unrelated edit.
+         * agreed for this job cannot be, and dropping it here would silently
+         * reprice the ply at the catalogue price on the next unrelated edit.
          *
-         * Recognised by the mismatch rather than a stored flag: the ply keeps
-         * the material's name, and a name that states a gauge different from
-         * the one quoted is exactly the case the override exists for.
+         * The stored column where there is one; the old gauge inference for
+         * rows written before it existed.
          */
-        rateOverride: overriddenRate({
-          materialName: layer.materialName,
-          micron: toNumber(layer.micron),
-          ratePerKg: layer.ratePerKg === null ? null : toNumber(layer.ratePerKg),
-        }),
+        rateOverride:
+          layer.rateOverride !== null
+            ? toNumber(layer.rateOverride)
+            : overriddenRate({
+                materialName: layer.materialName,
+                micron: toNumber(layer.micron),
+                ratePerKg: layer.ratePerKg === null ? null : toNumber(layer.ratePerKg),
+              }),
       })),
       /*
        * Fed back as stored, both units populated. Which pair is actually read
@@ -1029,6 +1053,7 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
               micron: layer.micron,
               density: layer.density,
               ratePerKg: layer.ratePerKg,
+              rateOverride: layer.rateOverride,
               gsm: layer.gsm,
             })),
           },

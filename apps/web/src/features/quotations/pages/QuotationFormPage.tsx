@@ -31,7 +31,6 @@ import {
   adhesiveGsmFor,
   computeMargin,
   computeMaterialCostPerKg,
-  overriddenRate,
   plyRatePerKg,
   resolveSelectedQuantity,
   round,
@@ -531,14 +530,14 @@ export default function QuotationFormPage() {
            * A rate that was typed goes back in the box; one that came from the
            * film does not.
            *
-           * There is no stored flag saying which it was, and there does not
-           * need to be: the ply keeps the film's name, and a name stating a
-           * gauge different from the one quoted is exactly the case the box is
-           * shown for. Reading it back this way means reopening a quotation
-           * shows what was actually charged rather than an empty box beside a
-           * price nobody can account for.
+           * The server says which it was — the ply stores it. It used to be
+           * deduced from the ply quoting a gauge the material does not name,
+           * which missed every rate agreed at the film's OWN gauge: the works
+           * agrees PET at 185, 175 and 190, all of them 12µ. Those came back as
+           * an empty box, and the next save replaced what was charged with the
+           * catalogue price.
            */
-          rateOverride: overriddenRate(layer),
+          rateOverride: layer.rateOverride,
         })),
         quantities: item.quantities.map((quantity) => ({
           quantityKg: quantity.quantityKg,

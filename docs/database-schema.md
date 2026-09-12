@@ -201,19 +201,19 @@ erDiagram
 | `cylinders` | 16 | 0 |  |
 | `job_artwork` | 17 | 0 |  |
 | `jobs` | 55 | 419 | Products and their full engineering specification. |
-| `login_events` | 7 | 41 |  |
+| `login_events` | 7 | 42 |  |
 | `material_rates` | 6 | 355 |  |
 | `materials` | 13 | 23 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
 | `purchase_receipts` | 11 | 1 |  |
 | `quotation_emails` | 10 | 0 |  |
-| `quotation_item_layers` | 9 | 34 |  |
+| `quotation_item_layers` | 10 | 34 |  |
 | `quotation_item_quantities` | 13 | 19 |  |
 | `quotation_items` | 31 | 17 | One priced line on a quotation. |
-| `quotation_tiers` | 14 | 18 |  |
+| `quotation_tiers` | 14 | 19 |  |
 | `quotations` | 31 | 17 | Customer-facing quotations, with totals frozen at save. |
-| `sessions` | 6 | 4 |  |
+| `sessions` | 6 | 5 |  |
 | `stock_batches` | 14 | 0 |  |
 | `stock_movements` | 13 | 5 |  |
 | `suppliers` | 11 | 1 |  |
@@ -580,6 +580,7 @@ erDiagram
 | `density` | `decimal(6,4)` | ✓ |  |
 | `rate_per_kg` | `decimal(12,2)` | ✓ |  |
 | `gsm` | `decimal(10,3)` |  |  |
+| `rate_override` | `decimal(12,2)` | ✓ |  |
 
 ### `quotation_item_quantities`
 

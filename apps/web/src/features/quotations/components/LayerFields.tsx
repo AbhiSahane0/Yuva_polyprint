@@ -8,6 +8,7 @@ import {
 import { Layers } from 'lucide-react';
 import {
   filmFamily,
+  formatNumber,
   formatRs,
   micronFromFilmName,
   resolveFilm,
@@ -265,25 +266,36 @@ export function LayerFields({
               </div>
 
               {/*
-               * The rate, asked for only when the film's own cannot apply.
+               * The rate agreed for this job's film.
                *
-               * `PET 12µm` prices a 12µ PET. Quote 20µ against it and neither
-               * the 12µ nor the 19µ rate is right, so rather than cost the ply
-               * at a price that happens to be on file, the row asks. Used for
-               * this quotation and stored on it; the rates master is not
-               * touched, because a figure keyed while quoting should not
-               * change what every other quotation costs.
+               * Offered on every ply, because a film price is agreed job to
+               * job: the works' own sheets carry PET at 185, 175 and 190 — all
+               * at 12µ, all written on the same day. It used to appear only
+               * when the gauge quoted was one the rates master does not stock,
+               * which covered the other reason to type a rate and missed this
+               * one entirely.
+               *
+               * Blank follows the film's own rate. Typed, it is used for this
+               * quotation and stored on it; the rates master is never touched,
+               * because a figure keyed while quoting should not change what
+               * every other quotation costs.
                */}
-              {offStock ? (
+              {film ? (
                 <div className="col-span-1 sm:col-span-3">
                   <Field
-                    label="Rate for this gauge"
+                    label={offStock ? 'Rate for this gauge' : 'Rate for this job'}
                     htmlFor={`items.${itemIndex}.layers.${index}.rateOverride`}
                     error={errors?.[index]?.rateOverride?.message}
                   >
                     <NumberInput
                       id={`items.${itemIndex}.layers.${index}.rateOverride`}
-                      placeholder="Rs. / kg"
+                      placeholder={
+                        offStock
+                          ? 'Rs. / kg'
+                          : film.currentRate === null
+                            ? 'Rs. / kg'
+                            : formatNumber(film.currentRate, 2)
+                      }
                       invalid={Boolean(errors?.[index]?.rateOverride)}
                       {...register(`items.${itemIndex}.layers.${index}.rateOverride`)}
                     />
@@ -310,7 +322,7 @@ export function LayerFields({
               <div
                 className={cn(
                   'text-ink-500 pb-2.5 text-xs',
-                  offStock ? 'col-span-2 sm:col-span-3' : 'col-span-1 sm:col-span-6',
+                  film ? 'col-span-2 sm:col-span-3' : 'col-span-1 sm:col-span-6',
                 )}
               >
                 {!film ? null : offStock ? (
