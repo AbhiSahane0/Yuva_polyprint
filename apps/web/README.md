@@ -1458,6 +1458,15 @@ Two details that are easy to lose in a refactor, and are tested:
 through, because a dialog in front of a safe action is how the office learns to
 click through the dangerous one.
 
+**Retiring does not free the name, and adding it back revives the row.** A
+retired machine, wage or material keeps its row, because quotations costed
+against it have to be able to say what they were priced on — so the name stays
+taken. Typing it again used to fail with "there is already a machine with that
+name" against a machine nobody could see, since retired rows are hidden unless
+**Show retired** is on. Now it brings the row back with whatever figures were
+just typed, keeping its id so nothing pointing at it is orphaned. A name held by
+a row that is still live clashes as it always did — that one is a real mistake.
+
 ### Costing — `/costing`
 
 What the works costs to run: the machines, the wages, and the overheads every

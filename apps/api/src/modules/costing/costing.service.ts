@@ -72,7 +72,37 @@ function nameTaken(error: unknown, what: string): never {
   throw error;
 }
 
+/**
+ * A name that belongs to a RETIRED row brings that row back.
+ *
+ * Retiring keeps the row so quotations costed against it can still say what
+ * they were priced on — but the name stays taken, and the row is off the screen
+ * unless "Show retired" is on. Adding it again therefore failed with "there is
+ * already a machine with that name" against a machine nobody could see.
+ *
+ * Reviving is what was actually asked for, and it is better than a second row:
+ * the id survives, so everything already pointing at it still does. The figures
+ * typed now win — they are the current answer to the same question.
+ */
+async function revive<T extends { id: string; isActive: boolean }>(
+  existing: T | null,
+): Promise<string | null> {
+  return existing && !existing.isActive ? existing.id : null;
+}
+
 export async function createMachine(input: MachineInput): Promise<Machine> {
+  const retiredId = await revive(
+    await prisma.costingMachine.findUnique({ where: { name: input.name } }),
+  );
+  if (retiredId) {
+    return toMachine(
+      await prisma.costingMachine.update({
+        where: { id: retiredId },
+        data: { ...input, isActive: true },
+      }),
+    );
+  }
+
   try {
     return toMachine(await prisma.costingMachine.create({ data: input }));
   } catch (error) {
@@ -106,6 +136,19 @@ export async function retireMachine(id: string): Promise<Machine> {
 }
 
 export async function createLabour(input: LabourInput): Promise<Labour> {
+  /* A retired role of the same name comes back — see `revive`. */
+  const retiredId = await revive(
+    await prisma.costingLabour.findUnique({ where: { role: input.role } }),
+  );
+  if (retiredId) {
+    return toLabour(
+      await prisma.costingLabour.update({
+        where: { id: retiredId },
+        data: { ...input, isActive: true },
+      }),
+    );
+  }
+
   try {
     return toLabour(await prisma.costingLabour.create({ data: input }));
   } catch (error) {

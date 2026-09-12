@@ -272,11 +272,36 @@ export async function getRateHistory(
 }
 
 export async function createMaterial(input: CreateMaterialInput): Promise<Material> {
+  /*
+   * A name that belongs to a material taken OFF the price list brings it back.
+   *
+   * Taking one off keeps the row, because quotations priced against it must
+   * still be able to say what they were costed on — but the name stays taken
+   * and the row is off the screen, so adding it again failed against a material
+   * nobody could see. Reviving is what was asked for, and it keeps the id, so
+   * the rate history and everything pointing at it survive.
+   */
   const clash = await prisma.material.findUnique({
     where: { name: input.name },
-    select: { id: true },
+    select: { id: true, isActive: true },
   });
-  if (clash) throw ApiError.conflict(`A material named "${input.name}" already exists`);
+  if (clash) {
+    if (clash.isActive) {
+      throw ApiError.conflict(`A material named "${input.name}" already exists`);
+    }
+    await prisma.material.update({
+      where: { id: clash.id },
+      data: {
+        ...input,
+        density: input.density ?? null,
+        solidsPercent: input.solidsPercent ?? null,
+        laydownGsm: input.laydownGsm ?? null,
+        inkKind: input.inkKind ?? null,
+        isActive: true,
+      },
+    });
+    return readBack(clash.id);
+  }
 
   const created = await prisma.material.create({
     data: {
@@ -289,10 +314,15 @@ export async function createMaterial(input: CreateMaterialInput): Promise<Materi
     select: { id: true },
   });
 
+  return readBack(created.id);
+}
+
+/** The full shape the list serves, which is what a caller expects back. */
+async function readBack(id: string): Promise<Material> {
   const found = (await listMaterials({ includeInactive: true })).find(
-    (material) => material.id === created.id,
+    (material) => material.id === id,
   );
-  if (!found) throw ApiError.internal('Material was created but could not be read back');
+  if (!found) throw ApiError.internal('Material was saved but could not be read back');
   return found;
 }
 
