@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Field, NumberInput, Select } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { canAccess, useAuthStore } from '@/features/auth/auth-store';
 import { useSettings } from '@/features/quotations/api/quotation-api';
 import { useMaterials } from '@/features/rates/api/rate-api';
@@ -53,6 +54,19 @@ export default function CostingPage() {
 
   const retireMachine = useRetireMachine();
   const retireLabour = useRetireLabour();
+
+  /*
+   * Retiring is asked about; restoring is not.
+   *
+   * Taking a machine or a wage out of the costing moves the rate on every
+   * quotation costed afterwards, and it moves it DOWN — the job looks cheaper
+   * to make than it is, at once and without a word. Putting one back is the
+   * inverse, and a dialog in front of a safe action only teaches the office to
+   * click through dialogs.
+   */
+  const [retiring, setRetiring] = useState<
+    { kind: 'machine'; row: Machine } | { kind: 'labour'; row: Labour } | null
+  >(null);
 
   if (isPending || !data || !settings) return <LoadingState label="Loading costing data…" />;
 
@@ -167,7 +181,11 @@ export default function CostingPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => retireMachine.mutate(row.id)}
+                              onClick={() =>
+                                row.isActive
+                                  ? setRetiring({ kind: 'machine', row })
+                                  : retireMachine.mutate(row.id)
+                              }
                             >
                               {row.isActive ? 'Retire' : 'Restore'}
                             </Button>
@@ -255,7 +273,11 @@ export default function CostingPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => retireLabour.mutate(row.id)}
+                            onClick={() =>
+                              row.isActive
+                                ? setRetiring({ kind: 'labour', row })
+                                : retireLabour.mutate(row.id)
+                            }
                           >
                             {row.isActive ? 'Retire' : 'Restore'}
                           </Button>
@@ -282,6 +304,40 @@ export default function CostingPage() {
         labour={labour ?? null}
         onClose={() => setLabour(undefined)}
       />
+
+      <ConfirmDialog
+        open={retiring !== null}
+        title={
+          retiring?.kind === 'machine'
+            ? `Retire ${retiring.row.name}?`
+            : retiring
+              ? `Retire ${retiring.row.role}?`
+              : 'Retire'
+        }
+        confirmLabel="Retire"
+        loading={retireMachine.isPending || retireLabour.isPending}
+        onClose={() => setRetiring(null)}
+        onConfirm={() => {
+          if (!retiring) return;
+          const done = { onSettled: () => setRetiring(null) };
+          if (retiring.kind === 'machine') retireMachine.mutate(retiring.row.id, done);
+          else retireLabour.mutate(retiring.row.id, done);
+        }}
+      >
+        {retiring?.kind === 'machine' ? (
+          <>
+            It stops being costed, so every rate worked out from now on drops by whatever this
+            machine was adding — its power and the people standing at it. Quotations already saved
+            keep the figures they were saved with.
+          </>
+        ) : (
+          <>
+            This wage stops being charged, so every rate worked out from now on drops by what this
+            person was costing. Quotations already saved keep the figures they were saved with.
+          </>
+        )}
+        <p className="mt-2">It stays on this screen, greyed, with a Restore beside it.</p>
+      </ConfirmDialog>
     </div>
   );
 }

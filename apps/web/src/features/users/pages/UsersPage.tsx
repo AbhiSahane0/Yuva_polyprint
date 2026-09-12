@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyRound, Pencil, Plus, ShieldCheck, UserPlus, Users as UsersIcon } from 'lucide-react';
 import { MODULE_LABELS, type User } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -36,6 +37,11 @@ export default function UsersPage() {
   const [editing, setEditing] = useState<User | null>(null);
   const [creating, setCreating] = useState(false);
   const [resetting, setResetting] = useState<User | null>(null);
+  /*
+   * Deactivating is asked about; restoring is not. One click and somebody
+   * cannot sign in, which they discover at the machine rather than here.
+   */
+  const [deactivating, setDeactivating] = useState<User | null>(null);
 
   function toggleActive(user: User) {
     updateUser.mutate(
@@ -138,7 +144,7 @@ export default function UsersPage() {
                     <Button
                       variant={user.isActive ? 'ghost' : 'secondary'}
                       size="sm"
-                      onClick={() => toggleActive(user)}
+                      onClick={() => (user.isActive ? setDeactivating(user) : toggleActive(user))}
                     >
                       {user.isActive ? 'Deactivate' : 'Restore'}
                     </Button>
@@ -153,6 +159,24 @@ export default function UsersPage() {
       <UserFormModal open={creating} user={null} onClose={() => setCreating(false)} />
       <UserFormModal open={editing !== null} user={editing} onClose={() => setEditing(null)} />
       <ResetPasswordModal user={resetting} onClose={() => setResetting(null)} />
+
+      <ConfirmDialog
+        open={deactivating !== null}
+        title={`Deactivate ${deactivating?.displayName ?? ''}?`}
+        confirmLabel="Deactivate"
+        loading={updateUser.isPending}
+        onClose={() => setDeactivating(null)}
+        onConfirm={() => {
+          if (!deactivating) return;
+          toggleActive(deactivating);
+          setDeactivating(null);
+        }}
+      >
+        They will not be able to sign in, and will find that out at the machine rather than here.
+        Nothing they have already entered changes — rates and quotations keep their name on them,
+        which is why this deactivates rather than deletes.
+        <p className="mt-2">Restore them from this screen whenever you need to.</p>
+      </ConfirmDialog>
     </div>
   );
 }

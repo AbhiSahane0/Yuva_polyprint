@@ -1417,6 +1417,28 @@ Save and watches nothing happen.
 Save now names the field and takes you to it — _"Enter Valid Mobile Number —
 taken back to Details"_.
 
+#### Asking before something cannot be clicked back
+
+Anything that reaches the server on one click and cannot be undone by pressing
+the same button again asks first — **Retire** on a machine or a wage, and
+**Deactivate** on a user. Deleting a customer, a design, an artwork file or a
+quotation already did.
+
+The dialog says what it costs rather than "Are you sure?": retiring a press
+takes its power and its people out of the costing, so **every rate worked out
+afterwards drops** — the job reads cheaper to make than it is, at once and
+without a word. Quotations already saved keep the figures they were saved with.
+
+Two details that are easy to lose in a refactor, and are tested:
+
+- **The button says what it does** — "Retire", "Deactivate" — never "OK".
+- **Cancel comes first in the DOM**, so the focus trap lands on the safe control
+  and Enter on a dialog nobody read does nothing.
+
+**Only the destructive direction asks.** Restore is the inverse and goes straight
+through, because a dialog in front of a safe action is how the office learns to
+click through the dangerous one.
+
 ### Costing — `/costing`
 
 What the works costs to run: the machines, the wages, and the overheads every
