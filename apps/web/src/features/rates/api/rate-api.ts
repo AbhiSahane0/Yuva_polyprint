@@ -59,6 +59,22 @@ export function useCreateMaterial() {
   });
 }
 
+/**
+ * Removes a material the works never used.
+ *
+ * Refused by the server the moment it is on a quotation, a stock batch or a
+ * purchase line — those have to stay able to say what they were priced on, and
+ * taking it off the price list is what that case wants instead.
+ */
+export function useDeleteMaterial() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      request<{ id: string }>({ url: `/materials/${id}`, method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: materialKeys.all }),
+  });
+}
+
 export function useUpdateMaterial() {
   const queryClient = useQueryClient();
   return useMutation({

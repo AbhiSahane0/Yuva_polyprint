@@ -1530,6 +1530,29 @@ the press's 800 mm face on 95% of them.
 It also feeds the suggested number of lanes, so a wider margin proposes fewer of
 them and the cylinder it suggests still fits the press.
 
+#### Deleting a material, and when it is refused
+
+Each row has a **Delete**, and it asks first — the dialog says the price history
+goes with it, because `material_rates` cascades.
+
+**Only a material nothing has used can go.** On a quotation, a stock batch, a
+stock movement or a purchase line, the server refuses and names what is using
+it:
+
+> PET 12µm is on 18 quotation lines. Take it off the price list instead —
+> deleting it would leave those unable to say what they were priced on.
+
+Three of those four the database would refuse anyway, but with a foreign-key
+error nobody can act on. The fourth is the interesting one: a quotation ply is
+`SetNull`, so the database would **allow** it. The ply snapshots the name,
+micron, density and rate, so the document would still read — and the link to
+what it was priced on would be gone, silently. So it is refused on purpose.
+
+That leaves delete for what it is good for: a name typed wrong, a film added and
+thought better of. Anything the works actually used is taken **off the price
+list** instead, on the figures dialog beside it — the row stays, so the record
+can still answer for itself.
+
 #### Add a material, and edit what its price is multiplied by
 
 **Add a material** on the header, and a slider button on each row for the

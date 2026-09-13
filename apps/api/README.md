@@ -358,6 +358,7 @@ The two mail routes have their own section:
 | GET    | `/materials`             | With the rate in force, the previous one, and the change %. **Also materialises any missing daily rates** — see [Carry-forward](#carry-forward) |
 | POST   | `/materials`             | Add a material                                                                                                                                  |
 | PATCH  | `/materials/:id`         | Rename, re-price-group, set density, retire                                                                                                     |
+| DELETE | `/materials/:id`         | Remove one nothing has used; refused with what does                                                                                             |
 | GET    | `/materials/:id/history` | Every recorded rate, newest first                                                                                                               |
 | PUT    | `/materials/rates`       | Save a day's rates in one request                                                                                                               |
 
