@@ -266,6 +266,37 @@ export async function updateSupplier(id: string, input: UpdateSupplierInput): Pr
   return supplier;
 }
 
+/**
+ * Removes a supplier nobody has ordered from.
+ *
+ * An order names who it was placed with, and a purchase order is a document
+ * that left the building — so a supplier with any order against them is
+ * refused and retired instead, which is what the switch on their card does.
+ * The database agrees: `purchase_orders.supplier_id` is `Restrict`. This says
+ * it in words first, because a foreign-key error is not an answer.
+ *
+ * What is left is the case this exists for: a name typed wrong, or a supplier
+ * added and never used.
+ */
+export async function deleteSupplier(id: string): Promise<{ id: string }> {
+  const supplier = await prisma.supplier.findUnique({
+    where: { id },
+    select: { id: true, name: true },
+  });
+  if (!supplier) throw ApiError.notFound('Supplier not found');
+
+  const orders = await prisma.purchaseOrder.count({ where: { supplierId: id } });
+  if (orders > 0) {
+    throw ApiError.conflict(
+      `${supplier.name} is on ${orders} purchase ${orders === 1 ? 'order' : 'orders'}. ` +
+        'Retire them instead — an order has to stay able to say who it was placed with.',
+    );
+  }
+
+  await prisma.supplier.delete({ where: { id } });
+  return { id };
+}
+
 /* --- Orders -------------------------------------------------------------- */
 
 /** The number the next order will take. A peek, not a reservation. */

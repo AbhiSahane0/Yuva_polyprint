@@ -1,20 +1,24 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Truck, X } from 'lucide-react';
+import { Plus, Search, Trash2, Truck, X } from 'lucide-react';
 import {
   formatNumber,
   formatRs,
   PURCHASE_STATUS_LABELS,
   type PurchaseOrderStatus,
+  type Supplier,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { useDebounce } from '@/hooks/useDebounce';
+import { ApiClientError } from '@/lib/api-client';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
-import { usePurchaseOrders, useSuppliers } from '../api/purchase-api';
+import { useDeleteSupplier, usePurchaseOrders, useSuppliers } from '../api/purchase-api';
 import { SupplierModal } from '../components/SupplierModal';
 import { NewOrderModal } from '../components/NewOrderModal';
 
@@ -37,6 +41,13 @@ export default function PurchasePage() {
   const [delayedOnly, setDelayedOnly] = useState(false);
   const [newOrder, setNewOrder] = useState(false);
   const [supplier, setSupplier] = useState<string | null | undefined>(undefined);
+  /*
+   * Deleting is for a supplier nobody ordered from — a name typed wrong. One
+   * with an order against them is refused by the server and retired instead,
+   * which is the switch on their card.
+   */
+  const [deleting, setDeleting] = useState<Supplier | null>(null);
+  const deleteSupplier = useDeleteSupplier();
 
   const debounced = useDebounce(search, 300);
   const params = useMemo(
@@ -235,6 +246,7 @@ export default function PurchasePage() {
                   <th className="px-4 py-3 font-semibold">Last rate</th>
                   <th className="px-4 py-3 text-right font-semibold">Open</th>
                   <th className="px-4 py-3 font-semibold">Contact</th>
+                  <th className="w-12 px-2 py-3" />
                 </tr>
               </thead>
               <tbody>
@@ -265,6 +277,22 @@ export default function PurchasePage() {
                       {[row.contactPerson, row.mobile].filter((v) => v && v !== 'NA').join(' · ') ||
                         '—'}
                     </td>
+                    <td className="px-2 py-3 text-right">
+                      <button
+                        type="button"
+                        /* The row opens their card. Without this, deleting
+                           would open the thing being deleted first. */
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDeleting(row);
+                        }}
+                        aria-label={`Delete ${row.name}`}
+                        title="Delete — only a supplier nobody has ordered from"
+                        className="text-ink-400 hover:bg-danger-50 hover:text-danger-600 cursor-pointer rounded-[var(--radius-md)] p-2"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -279,6 +307,38 @@ export default function PurchasePage() {
         onClose={() => setSupplier(undefined)}
         suppliers={suppliers ?? []}
       />
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title={`Delete ${deleting?.name ?? ''}?`}
+        confirmLabel="Delete"
+        loading={deleteSupplier.isPending}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => {
+          if (!deleting) return;
+          deleteSupplier.mutate(deleting.id, {
+            onSuccess: () => {
+              toast.success(`${deleting.name} deleted`);
+              setDeleting(null);
+            },
+            onError: (cause) =>
+              toast.error(
+                cause instanceof ApiClientError ? cause.message : 'Could not delete that supplier',
+              ),
+          });
+        }}
+      >
+        {deleting && deleting.orderCount > 0 ? (
+          <>
+            They are on {deleting.orderCount}{' '}
+            {deleting.orderCount === 1 ? 'purchase order' : 'purchase orders'}, so this will be
+            refused — an order has to stay able to say who it was placed with. Retire them instead,
+            on their card: they leave the form and the orders keep their name.
+          </>
+        ) : (
+          'They go for good. Nobody has ordered from them, so no order loses its supplier.'
+        )}
+      </ConfirmDialog>
     </div>
   );
 }

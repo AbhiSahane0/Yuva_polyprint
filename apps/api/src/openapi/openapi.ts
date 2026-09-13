@@ -623,6 +623,15 @@ export function buildOpenApiDocument(serverUrl: string) {
           requestBody: body(updateSupplierSchema),
           responses: { 200: ok('The supplier.'), ...COMMON },
         },
+        delete: {
+          tags: ['Purchase'],
+          summary: 'Delete a supplier nobody has ordered from',
+          description:
+            'Refused, by name, for a supplier with any order against them — an order has to ' +
+            'stay able to say who it was placed with. Retire those instead.',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The id that went.'), ...COMMON },
+        },
       },
       '/api/purchase/orders': {
         get: {
@@ -934,6 +943,27 @@ export function buildOpenApiDocument(serverUrl: string) {
           parameters: [ID_PARAM],
           requestBody: body(updateMaterialSchema),
           responses: { 200: ok('Updated.'), ...COMMON },
+        },
+        delete: {
+          tags: ['Materials'],
+          summary: 'Delete a material',
+          description:
+            'For a mistake — a name typed wrong, a film added and thought better of. Refused, ' +
+            'by name, the moment it is on a quotation or a purchase line: those have to stay ' +
+            'able to say what they were priced on. Stock refuses too until `discardStock` says ' +
+            'the caller has seen how much goes; the batches and their movements then go with ' +
+            'the material, and the rate history cascades.',
+          parameters: [
+            ID_PARAM,
+            {
+              name: 'discardStock',
+              in: 'query' as const,
+              required: false,
+              schema: { type: 'string', enum: ['true', 'false'] },
+              description: 'Delete the stock batches and movements along with it.',
+            },
+          ],
+          responses: { 200: ok('The id that went.'), ...COMMON },
         },
       },
       '/api/materials/{id}/history': {

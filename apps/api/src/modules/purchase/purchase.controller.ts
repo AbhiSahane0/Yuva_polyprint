@@ -30,6 +30,10 @@ export async function updateSupplier(req: Request, res: Response) {
   );
 }
 
+export async function removeSupplier(req: Request, res: Response) {
+  ok(res, await purchaseService.deleteSupplier(req.params.id as string));
+}
+
 export async function listOrders(req: Request, res: Response) {
   ok(
     res,

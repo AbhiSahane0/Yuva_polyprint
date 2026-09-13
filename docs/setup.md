@@ -78,6 +78,12 @@ the whole time the machine is occupied — running _and_ being set.
 | Slitting Operator  | Slitting |  12,000 |     0.9615 |
 | Slitting Helper    | Slitting |   8,000 |     0.6410 |
 
+> **The `3,4,6` on the press is when its station motors switch on.** The press
+> draws 30 HP on its own and 12 HP more at the third, fourth and sixth colour,
+> so a two-colour job is not charged a full press. See
+> [`stations.md`](./stations.md) for what a station is and how the count for a
+> job is decided.
+
 > **Retiring is asked about, and a retired name can be added back.** Taking a
 > machine or a wage out of the costing drops the rate on every quotation costed
 > afterwards, so it asks first. The row stays, greyed, with a Restore beside it —
@@ -120,6 +126,15 @@ rather than left as eight rows of noise on a screen the office reads every
 morning. **Add a material** puts one back in a few seconds when a job needs it,
 and the density examples above are the ones worth having to hand: PET 1.40,
 poly 0.94, BOPP 0.91, foil 2.70.
+
+> **Deleting is for a mistake, and it always asks.** A name typed wrong, a film
+> added and thought better of — the bin on each Rates row, and on each Inventory
+> row too. A material on a **quotation** or a **purchase order** is refused and
+> says which, because those have to stay able to say what they were priced on;
+> take that one off the price list instead. A material **holding stock** is
+> deleted from Inventory, where the dialog names the quantity and batch count
+> that go with it. Suppliers work the same way on the Purchase screen: one
+> nobody has ordered from goes, one with orders is retired.
 
 **Rates keep their history.** When a price rises, type the new one — the old
 figure stays on record against its date, so a quotation already sent keeps the

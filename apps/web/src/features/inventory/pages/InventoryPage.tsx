@@ -1,21 +1,27 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PackagePlus, Search, X } from 'lucide-react';
+import { PackagePlus, Search, Trash2, X } from 'lucide-react';
 import {
   formatNumber,
   formatRs,
   HEALTH_LABELS,
   MATERIAL_CATEGORY_LABELS,
   type MaterialCategory,
+  type StockSummary,
   type StockHealth,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { useDebounce } from '@/hooks/useDebounce';
+import { canAccess, useAuthStore } from '@/features/auth/auth-store';
+import { ApiClientError } from '@/lib/api-client';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
+import { useDeleteMaterial } from '@/features/rates/api/rate-api';
 import { useStock } from '../api/inventory-api';
 import { ReceiveStockModal } from '../components/ReceiveStockModal';
 
@@ -58,6 +64,16 @@ export default function InventoryPage() {
   const [category, setCategory] = useState<MaterialCategory | 'ALL'>('ALL');
   const [lowOnly, setLowOnly] = useState(false);
   const [receiving, setReceiving] = useState(false);
+  /*
+   * Deleting a material is a change to the price list, not to stock, so it
+   * needs the rates module even though the button is here. Somebody who can
+   * record a movement should not thereby be able to remove the material the
+   * movement was against.
+   */
+  const user = useAuthStore((state) => state.user);
+  const canDelete = canAccess(user, 'rates');
+  const [deleting, setDeleting] = useState<StockSummary | null>(null);
+  const deleteMaterial = useDeleteMaterial();
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -189,6 +205,7 @@ export default function InventoryPage() {
                   <th className="px-4 py-3 font-semibold">Where</th>
                   <th className="px-4 py-3 text-right font-semibold">Rate</th>
                   <th className="px-4 py-3 text-right font-semibold">Value</th>
+                  {canDelete ? <th className="w-12 px-2 py-3" /> : null}
                 </tr>
               </thead>
               <tbody>
@@ -236,6 +253,24 @@ export default function InventoryPage() {
                         <span className="text-ink-300">—</span>
                       )}
                     </td>
+                    {canDelete ? (
+                      <td className="px-2 py-3 text-right">
+                        <button
+                          type="button"
+                          /* The row opens the material. Without this, deleting
+                             would navigate to the thing being deleted first. */
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setDeleting(item);
+                          }}
+                          aria-label={`Delete ${item.name}`}
+                          title="Delete this material"
+                          className="text-ink-400 hover:bg-danger-50 hover:text-danger-600 cursor-pointer rounded-[var(--radius-md)] p-2"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -245,11 +280,11 @@ export default function InventoryPage() {
           {/* Mobile: the same rows, as cards. */}
           <ul className="divide-ink-100 divide-y md:hidden">
             {items.map((item) => (
-              <li key={item.materialId}>
+              <li key={item.materialId} className="flex items-center">
                 <button
                   type="button"
                   onClick={() => navigate(`/inventory/${item.materialId}`)}
-                  className="w-full cursor-pointer px-4 py-3.5 text-left"
+                  className="min-w-0 flex-1 cursor-pointer px-4 py-3.5 text-left"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <p className="text-ink-900 text-sm font-medium">{item.name}</p>
@@ -261,6 +296,18 @@ export default function InventoryPage() {
                     {item.locations.length > 0 ? ` · ${item.locations.join(', ')}` : ''}
                   </p>
                 </button>
+                {canDelete ? (
+                  /* Beside the row rather than inside it — a button within a
+                     button is invalid, and the outer one would swallow the tap. */
+                  <button
+                    type="button"
+                    onClick={() => setDeleting(item)}
+                    aria-label={`Delete ${item.name}`}
+                    className="text-ink-400 hover:bg-danger-50 hover:text-danger-600 mr-2 shrink-0 cursor-pointer rounded-[var(--radius-md)] p-2"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -268,6 +315,56 @@ export default function InventoryPage() {
       )}
 
       <ReceiveStockModal open={receiving} onClose={() => setReceiving(false)} />
+
+      {/*
+       * What goes with it is said in figures before the button is pressed, not
+       * in the abstract: "3 batches, 420 KG" is something the office can weigh
+       * against what is on the shelf. A material holding nothing says so too,
+       * so the same dialog reads honestly either way.
+       */}
+      <ConfirmDialog
+        open={deleting !== null}
+        title={`Delete ${deleting?.name ?? ''}?`}
+        confirmLabel="Delete"
+        loading={deleteMaterial.isPending}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => {
+          if (!deleting) return;
+          deleteMaterial.mutate(
+            { id: deleting.materialId, discardStock: deleting.batchCount > 0 },
+            {
+              onSuccess: () => {
+                toast.success(`${deleting.name} deleted`);
+                setDeleting(null);
+              },
+              onError: (cause) =>
+                toast.error(
+                  cause instanceof ApiClientError
+                    ? cause.message
+                    : 'Could not delete that material',
+                ),
+            },
+          );
+        }}
+      >
+        {deleting && deleting.batchCount > 0 ? (
+          <>
+            <strong className="text-ink-900">
+              {formatNumber(deleting.quantity, deleting.quantity % 1 === 0 ? 0 : 2)} {deleting.unit}
+            </strong>{' '}
+            is on the books across {deleting.batchCount}{' '}
+            {deleting.batchCount === 1 ? 'batch' : 'batches'}. Deleting the material takes those
+            batches and every movement against them with it — the ledger will no longer show that
+            this was ever received or issued.
+          </>
+        ) : (
+          'It goes for good, and its whole price history with it. Nothing is held against it, so no stock record is lost.'
+        )}
+        <p className="mt-2">
+          Refused if it is on a quotation or a purchase order, saying which — those have to stay
+          able to say what they were priced on.
+        </p>
+      </ConfirmDialog>
     </div>
   );
 }

@@ -41,6 +41,17 @@ router.patch(
   validate({ params: idParamSchema, body: updateSupplierSchema }),
   asyncHandler(controller.updateSupplier),
 );
+/*
+ * Deleting is for a supplier nobody ordered from — a name typed wrong, or one
+ * added and never used. Anyone with an order against them is refused and
+ * retired instead, because the order names who it was placed with.
+ */
+router.delete(
+  '/suppliers/:id',
+  requireModule('purchase'),
+  validate({ params: idParamSchema }),
+  asyncHandler(controller.removeSupplier),
+);
 
 /* Before `/orders/:id`, or "next-number" is read as an id and answers 404. */
 router.get('/orders/next-number', asyncHandler(controller.nextNumber));

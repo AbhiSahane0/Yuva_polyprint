@@ -327,50 +327,76 @@ async function readBack(id: string): Promise<Material> {
 }
 
 /**
- * Removes a material the works never actually used.
+ * Removes a material, and says what is in the way when it cannot.
  *
  * Deleting is for a mistake — a name typed wrong, a film added and thought
- * better of. Anything the works has actually quoted, bought or stocked is
- * **retired instead**, because the record has to stay able to say what it was
- * priced on. The database agrees: stock and purchase lines are `Restrict`, so
- * it would refuse anyway, but a raw foreign-key error is not an answer anybody
- * can act on.
+ * better of. Two things are never deleted around: a **quotation** ply and a
+ * **purchase** line. Those are documents the works sent out, and each has to
+ * stay able to say what it was priced on. A purchase line is `Restrict` so the
+ * database would refuse it anyway, with a foreign-key error nobody can act on;
+ * a quotation ply is `SetNull`, so the database would happily allow it and the
+ * link would vanish without a word. Both are refused here, by name.
  *
- * A quotation ply is `SetNull` rather than restricted — it snapshots the name,
- * micron, density and rate, so the document survives readable. It still counts
- * as used here: severing the link silently is not something to do on one click.
- *
- * The rate history goes with it, which is why this is refused the moment the
- * material has been used for anything at all.
+ * **Stock is different.** A batch is the works' own record of what it holds,
+ * not a promise made to anybody, and a material received by mistake has to be
+ * removable. So stock does not refuse outright — it refuses until the caller
+ * says to discard it, which the Inventory screen does after showing exactly
+ * how much goes. Rates cascade; the batches and their movements are deleted
+ * here, in one transaction with the material, so a half-deleted material
+ * cannot be left behind.
  */
-export async function deleteMaterial(id: string): Promise<{ id: string }> {
+export async function deleteMaterial(
+  id: string,
+  options: { discardStock?: boolean } = {},
+): Promise<{ id: string }> {
   const material = await prisma.material.findUnique({
     where: { id },
-    select: { id: true, name: true },
+    select: { id: true, name: true, unit: true },
   });
   if (!material) throw ApiError.notFound('Material not found');
 
-  const [onQuotations, batches, movements, purchaseLines] = await Promise.all([
+  const [onQuotations, purchaseLines, batches, movements, held] = await Promise.all([
     prisma.quotationItemLayer.count({ where: { materialId: id } }),
+    prisma.purchaseOrderLine.count({ where: { materialId: id } }),
     prisma.stockBatch.count({ where: { materialId: id } }),
     prisma.stockMovement.count({ where: { materialId: id } }),
-    prisma.purchaseOrderLine.count({ where: { materialId: id } }),
+    prisma.stockBatch.aggregate({ where: { materialId: id }, _sum: { quantity: true } }),
   ]);
 
   const used: string[] = [];
   if (onQuotations > 0) used.push(`${onQuotations} quotation ${plural(onQuotations, 'line')}`);
-  if (batches > 0) used.push(`${batches} stock ${plural(batches, 'batch', 'batches')}`);
-  if (movements > 0) used.push(`${movements} stock ${plural(movements, 'movement')}`);
   if (purchaseLines > 0) used.push(`${purchaseLines} purchase ${plural(purchaseLines, 'line')}`);
 
   if (used.length > 0) {
     throw ApiError.conflict(
-      `${material.name} is on ${used.join(', ')}. Take it off the price list instead — ` +
+      `${material.name} is on ${used.join(' and ')}. Take it off the price list instead — ` +
         'deleting it would leave those unable to say what they were priced on.',
     );
   }
 
-  await prisma.material.delete({ where: { id } });
+  const stocked = batches > 0 || movements > 0;
+  if (stocked && !options.discardStock) {
+    const quantity = Number(held._sum.quantity ?? 0);
+    throw ApiError.conflict(
+      `${material.name} is on the inventory — ${quantity} ${material.unit} across ` +
+        `${batches} stock ${plural(batches, 'batch', 'batches')}. Delete it from Inventory, ` +
+        'where what goes with it is shown before you confirm.',
+    );
+  }
+
+  /*
+   * One transaction: movements point at batches, batches at the material, and
+   * a material deleted while its ledger survived would leave rows nothing can
+   * name. Rates cascade in the database, so they are not listed here.
+   */
+  await prisma.$transaction(async (tx) => {
+    if (stocked) {
+      await tx.stockMovement.deleteMany({ where: { materialId: id } });
+      await tx.stockBatch.deleteMany({ where: { materialId: id } });
+    }
+    await tx.material.delete({ where: { id } });
+  });
+
   return { id };
 }
 

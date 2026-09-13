@@ -8,6 +8,7 @@ import type {
   UpdateMaterialInput,
 } from '@yuva/shared';
 import { request } from '@/lib/api-client';
+import { inventoryKeys } from '@/features/inventory/api/inventory-api';
 
 export const materialKeys = {
   all: ['materials'] as const,
@@ -62,16 +63,30 @@ export function useCreateMaterial() {
 /**
  * Removes a material the works never used.
  *
- * Refused by the server the moment it is on a quotation, a stock batch or a
- * purchase line — those have to stay able to say what they were priced on, and
- * taking it off the price list is what that case wants instead.
+ * Refused by the server the moment it is on a quotation or a purchase line —
+ * those have to stay able to say what they were priced on, and taking it off
+ * the price list is what that case wants instead.
+ *
+ * `discardStock` is what the Inventory screen sends, because that is the
+ * screen showing how much stock goes with it. Without it a material holding
+ * stock is refused and says so; a caller cannot wipe a ledger by accident.
+ *
+ * Stock is invalidated as well as the price list: a material that goes takes
+ * its batches with it, and the Inventory screen is looking at those.
  */
 export function useDeleteMaterial() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      request<{ id: string }>({ url: `/materials/${id}`, method: 'DELETE' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: materialKeys.all }),
+    mutationFn: ({ id, discardStock = false }: { id: string; discardStock?: boolean }) =>
+      request<{ id: string }>({
+        url: `/materials/${id}`,
+        method: 'DELETE',
+        ...(discardStock ? { params: { discardStock: 'true' } } : {}),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: materialKeys.all });
+      void queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
+    },
   });
 }
 

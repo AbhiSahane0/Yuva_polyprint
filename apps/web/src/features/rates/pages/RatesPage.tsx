@@ -327,23 +327,31 @@ export default function RatesPage() {
         onClose={() => setDeleting(null)}
         onConfirm={() => {
           if (!deleting) return;
-          deleteMaterial.mutate(deleting.id, {
-            onSuccess: () => {
-              toast.success(`${deleting.name} deleted`);
-              setDeleting(null);
+          deleteMaterial.mutate(
+            /* No `discardStock` here: this screen is the price list and does
+               not show what is held. A material with stock is refused and told
+               to be deleted from Inventory, where the figures are on screen. */
+            { id: deleting.id },
+            {
+              onSuccess: () => {
+                toast.success(`${deleting.name} deleted`);
+                setDeleting(null);
+              },
+              onError: (cause) =>
+                toast.error(
+                  cause instanceof ApiClientError
+                    ? cause.message
+                    : 'Could not delete that material',
+                ),
             },
-            onError: (cause) =>
-              toast.error(
-                cause instanceof ApiClientError ? cause.message : 'Could not delete that material',
-              ),
-          });
+          );
         }}
       >
         It goes for good, and its whole price history with it.
         <p className="mt-2">
-          Only a material nothing has used can be deleted. If it is on a quotation, a stock batch or
-          a purchase order, this is refused and says which — those have to stay able to say what
-          they were priced on. Take it off the price list instead, on the figures beside it.
+          Refused if it is on a quotation or a purchase order, saying which — those have to stay
+          able to say what they were priced on. Refused too while it holds stock: delete it from
+          Inventory instead, where how much goes with it is on screen before you confirm.
         </p>
       </ConfirmDialog>
     </div>

@@ -1038,6 +1038,29 @@ Blank and zero are different. Blank means nobody is watching; **zero means
 low **at** the level, not one kilogram below it — at the reorder level is when
 to reorder.
 
+#### Deleting a material from here, stock and all
+
+Each row has a **Delete**, and it always asks. This is the screen that can
+discard stock, because it is the screen that shows how much there is — the
+dialog names the figure before the button is pressed:
+
+> **250 KG** is on the books across 1 batch. Deleting the material takes those
+> batches and every movement against them with it — the ledger will no longer
+> show that this was ever received or issued.
+
+A material holding nothing says so instead, so the same dialog reads honestly
+either way.
+
+**A quotation or a purchase order still refuses it**, naming which. A batch is
+the works' own note of what it holds and a material received by mistake has to
+be removable; a quotation is a document that left the building, and it has to
+stay able to say what it was priced on. That line is where the two part company.
+
+The button needs the **rates** module, not inventory, and is not rendered
+without it. Deleting a material is a change to the price list: somebody who may
+record a movement should not thereby be able to remove the material the movement
+was against.
+
 #### "Not stocked" is not "out of stock"
 
 Every material in the rates catalogue appears here, so a works that has never
@@ -1074,6 +1097,22 @@ undertook to chase.
 **Suppliers do not store what they supply or what they last charged.** Both are
 read off the orders placed with them. A stored list is one somebody has to keep
 up to date, and it is the copy that would be wrong.
+
+#### Deleting a supplier
+
+Each supplier row has a **Delete**, and it asks first. It is for a name typed
+wrong, or a supplier added and never used — nothing is lost with them, because
+what they supply and what they last charged were never stored in the first
+place.
+
+**Anyone with an order against them is refused**, by count: "Sharma Films is on
+3 purchase orders. Retire them instead — an order has to stay able to say who it
+was placed with." The dialog says so before the button is pressed when it can
+see the count, so the refusal is rarely a surprise. Retiring is the switch on
+their card: they leave the form, and the old orders keep their name.
+
+A cancelled order counts the same as a live one. It is still a record of an
+order placed.
 
 #### One order — `/purchase/:id`
 
@@ -1535,23 +1574,32 @@ them and the cylinder it suggests still fits the press.
 Each row has a **Delete**, and it asks first — the dialog says the price history
 goes with it, because `material_rates` cascades.
 
-**Only a material nothing has used can go.** On a quotation, a stock batch, a
-stock movement or a purchase line, the server refuses and names what is using
-it:
+**A material on a quotation or a purchase order never goes.** The server
+refuses and names what is using it:
 
 > PET 12µm is on 18 quotation lines. Take it off the price list instead —
 > deleting it would leave those unable to say what they were priced on.
 
-Three of those four the database would refuse anyway, but with a foreign-key
-error nobody can act on. The fourth is the interesting one: a quotation ply is
-`SetNull`, so the database would **allow** it. The ply snapshots the name,
-micron, density and rate, so the document would still read — and the link to
-what it was priced on would be gone, silently. So it is refused on purpose.
+A purchase line the database would refuse anyway, but with a foreign-key error
+nobody can act on. The quotation ply is the interesting one: it is `SetNull`, so
+the database would **allow** it. The ply snapshots the name, micron, density and
+rate, so the document would still read — and the link to what it was priced on
+would be gone, silently. So it is refused on purpose.
 
-That leaves delete for what it is good for: a name typed wrong, a film added and
-thought better of. Anything the works actually used is taken **off the price
-list** instead, on the figures dialog beside it — the row stays, so the record
-can still answer for itself.
+**Stock is refused from this screen too**, and says where to go instead:
+
+> Green PET 12µm is on the inventory — 250 KG across 1 stock batch. Delete it
+> from Inventory, where what goes with it is shown before you confirm.
+
+That is not squeamishness about stock — [Inventory](#inventory--inventory) will
+delete it, batches and all. It is that this screen is the price list and does
+not show what is held, and nobody should discard a ledger from a screen that
+never told them there was one.
+
+That leaves delete here for what it is good for: a name typed wrong, a film
+added and thought better of. Anything the works actually quoted is taken **off
+the price list** instead, on the figures dialog beside it — the row stays, so
+the record can still answer for itself.
 
 #### Add a material, and edit what its price is multiplied by
 

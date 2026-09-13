@@ -377,6 +377,7 @@ Each app documents itself, next to the code it describes:
 | [`apps/api/README.md`](./apps/api/README.md)                   | Every endpoint, the request/response envelope, **all the calculations with worked examples**, the data model, and the scripts                                                |
 | [`apps/web/README.md`](./apps/web/README.md)                   | Every screen and what it does, how server state is handled, which figures are previewed in the browser, and the UI components                                                |
 | [`docs/old-quotation-check.md`](./docs/old-quotation-check.md) | **Seven of the works' own 2022 quotations, rebuilt here and matched to the paisa** — what was entered on each, what came out, and the two figures that changed over time     |
+| [`docs/stations.md`](./docs/stations.md)                       | **Printing stations** — what one is, what decides how many a job has when there is no artwork yet, and what each one adds to the rate and the cylinder bill                  |
 | [`docs/setup.md`](./docs/setup.md)                             | **What to enter before the first quotation** — machines, wages, films, inks, adhesive and the overheads, in dependency order, and what goes wrong quietly when one is missed |
 | [`docs/formulas.md`](./docs/formulas.md)                       | **Every formula in one place** — the laminate, the pouch, the cylinder, the rate, GST and the advance, each against the cell it answers to in the client's workbook          |
 | [`docs/database-schema.md`](./docs/database-schema.md)         | ER diagram and full column reference, generated from the live database                                                                                                       |
@@ -411,6 +412,12 @@ Quotations, Rates (which carries Costing), Inventory, Purchase, Design &
 Cylinders (which carries its artwork), Jobs. The sidebar
 hides the rest, and the API refuses it independently, because hiding a link is
 not access control.
+
+**A button belongs to what it changes, not to the screen it sits on.** Deleting
+a material is on the Inventory screen as well as Rates, and on both it needs the
+**rates** module — it is a change to the price list. Somebody who may record a
+stock movement should not thereby be able to remove the material the movement
+was against.
 
 Full detail, including how sessions and passwords are stored:
 [`apps/api/README.md`](./apps/api/README.md#authentication-and-access).
