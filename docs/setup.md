@@ -78,6 +78,12 @@ the whole time the machine is occupied — running _and_ being set.
 | Slitting Operator  | Slitting |  12,000 |     0.9615 |
 | Slitting Helper    | Slitting |   8,000 |     0.6410 |
 
+> **Retiring is asked about, and a retired name can be added back.** Taking a
+> machine or a wage out of the costing drops the rate on every quotation costed
+> afterwards, so it asks first. The row stays, greyed, with a Restore beside it —
+> and typing the same name again brings that row back with whatever figures you
+> just entered, rather than refusing it.
+
 > **There is no lamination wage here, and that is deliberate.** The estimation
 > sheet has no line for one, so following it means the laminator runs unattended
 > on paper. In fact somebody stands there for about 86 minutes on a 500 kg job.
@@ -100,14 +106,20 @@ two prices, and the name is what the system reads the thickness from. A film
 named without one — `PP Woven`, sold by GSM — is priced at its rate whatever
 thickness is quoted.
 
-| Film           | Density g/cm³ | Rs / kg | Where it sits                           |
-| -------------- | ------------: | ------: | --------------------------------------- |
-| PET 12µm       |          1.40 |     185 | Printed outer ply, on almost every job  |
-| MET PET 12µm   |          1.40 |     180 | Metallised barrier, middle ply          |
-| W/O Poly 110µm |          0.94 |     163 | White-opaque sealing ply                |
-| PE 60µm        |          0.94 |     190 | Plain sealing ply                       |
-| BOPP 20µm      |          0.91 |     168 | Alternative outer ply                   |
-| Foil 7µm       |          2.70 |     410 | Full barrier, heaviest film on the list |
+| Film           | Density g/cm³ | Rs / kg | Where it sits                          |
+| -------------- | ------------: | ------: | -------------------------------------- |
+| PET 12µm       |          1.40 |     185 | Printed outer ply, on almost every job |
+| MET PET 12µm   |          1.40 |     180 | Metallised barrier, middle ply         |
+| W/O Poly 110µm |          0.94 |     163 | White-opaque sealing ply               |
+| PE 60µm        |          0.94 |     190 | Plain sealing ply                      |
+
+**Only the films the works actually quotes.** The catalogue shipped with eleven —
+BOPP, foil, POF, PP woven, PVC/PETG and three more gauges — and none of them
+appears on a single one of the client's own quotations, so they were deleted
+rather than left as eight rows of noise on a screen the office reads every
+morning. **Add a material** puts one back in a few seconds when a job needs it,
+and the density examples above are the ones worth having to hand: PET 1.40,
+poly 0.94, BOPP 0.91, foil 2.70.
 
 **Rates keep their history.** When a price rises, type the new one — the old
 figure stays on record against its date, so a quotation already sent keeps the

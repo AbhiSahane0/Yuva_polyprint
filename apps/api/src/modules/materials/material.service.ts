@@ -272,11 +272,36 @@ export async function getRateHistory(
 }
 
 export async function createMaterial(input: CreateMaterialInput): Promise<Material> {
+  /*
+   * A name that belongs to a material taken OFF the price list brings it back.
+   *
+   * Taking one off keeps the row, because quotations priced against it must
+   * still be able to say what they were costed on — but the name stays taken
+   * and the row is off the screen, so adding it again failed against a material
+   * nobody could see. Reviving is what was asked for, and it keeps the id, so
+   * the rate history and everything pointing at it survive.
+   */
   const clash = await prisma.material.findUnique({
     where: { name: input.name },
-    select: { id: true },
+    select: { id: true, isActive: true },
   });
-  if (clash) throw ApiError.conflict(`A material named "${input.name}" already exists`);
+  if (clash) {
+    if (clash.isActive) {
+      throw ApiError.conflict(`A material named "${input.name}" already exists`);
+    }
+    await prisma.material.update({
+      where: { id: clash.id },
+      data: {
+        ...input,
+        density: input.density ?? null,
+        solidsPercent: input.solidsPercent ?? null,
+        laydownGsm: input.laydownGsm ?? null,
+        inkKind: input.inkKind ?? null,
+        isActive: true,
+      },
+    });
+    return readBack(clash.id);
+  }
 
   const created = await prisma.material.create({
     data: {
@@ -289,11 +314,69 @@ export async function createMaterial(input: CreateMaterialInput): Promise<Materi
     select: { id: true },
   });
 
+  return readBack(created.id);
+}
+
+/** The full shape the list serves, which is what a caller expects back. */
+async function readBack(id: string): Promise<Material> {
   const found = (await listMaterials({ includeInactive: true })).find(
-    (material) => material.id === created.id,
+    (material) => material.id === id,
   );
-  if (!found) throw ApiError.internal('Material was created but could not be read back');
+  if (!found) throw ApiError.internal('Material was saved but could not be read back');
   return found;
+}
+
+/**
+ * Removes a material the works never actually used.
+ *
+ * Deleting is for a mistake — a name typed wrong, a film added and thought
+ * better of. Anything the works has actually quoted, bought or stocked is
+ * **retired instead**, because the record has to stay able to say what it was
+ * priced on. The database agrees: stock and purchase lines are `Restrict`, so
+ * it would refuse anyway, but a raw foreign-key error is not an answer anybody
+ * can act on.
+ *
+ * A quotation ply is `SetNull` rather than restricted — it snapshots the name,
+ * micron, density and rate, so the document survives readable. It still counts
+ * as used here: severing the link silently is not something to do on one click.
+ *
+ * The rate history goes with it, which is why this is refused the moment the
+ * material has been used for anything at all.
+ */
+export async function deleteMaterial(id: string): Promise<{ id: string }> {
+  const material = await prisma.material.findUnique({
+    where: { id },
+    select: { id: true, name: true },
+  });
+  if (!material) throw ApiError.notFound('Material not found');
+
+  const [onQuotations, batches, movements, purchaseLines] = await Promise.all([
+    prisma.quotationItemLayer.count({ where: { materialId: id } }),
+    prisma.stockBatch.count({ where: { materialId: id } }),
+    prisma.stockMovement.count({ where: { materialId: id } }),
+    prisma.purchaseOrderLine.count({ where: { materialId: id } }),
+  ]);
+
+  const used: string[] = [];
+  if (onQuotations > 0) used.push(`${onQuotations} quotation ${plural(onQuotations, 'line')}`);
+  if (batches > 0) used.push(`${batches} stock ${plural(batches, 'batch', 'batches')}`);
+  if (movements > 0) used.push(`${movements} stock ${plural(movements, 'movement')}`);
+  if (purchaseLines > 0) used.push(`${purchaseLines} purchase ${plural(purchaseLines, 'line')}`);
+
+  if (used.length > 0) {
+    throw ApiError.conflict(
+      `${material.name} is on ${used.join(', ')}. Take it off the price list instead — ` +
+        'deleting it would leave those unable to say what they were priced on.',
+    );
+  }
+
+  await prisma.material.delete({ where: { id } });
+  return { id };
+}
+
+/** "1 line" but "2 lines", without a dependency for it. */
+function plural(count: number, one: string, many = `${one}s`): string {
+  return count === 1 ? one : many;
 }
 
 export async function updateMaterial(id: string, input: UpdateMaterialInput): Promise<Material> {

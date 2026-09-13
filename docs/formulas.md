@@ -554,11 +554,21 @@ profitable than it is because a price was not keyed in that morning.
 ### 8.1 Which rate prices a ply
 
 ```
-1. the rate the office typed on the line, if there is one
+1. the rate the office typed for this job, if there is one
 2. otherwise the film's own rate — but only if the gauge quoted is the
    gauge the film is stocked and priced at
 3. otherwise nothing, and the line reads as uncostable
 ```
+
+**A typed rate is stored, not deduced.** `quotation_item_layers.rate_override`
+holds it. It used to be inferred from the ply quoting a gauge the material does
+not name, which was sound while an unstocked gauge was the only reason to type
+one — and wrong once film prices turned out to be agreed job to job. The works'
+own sheets carry PET at 185, 175 and 190, every one at 12µ and every one written
+on the same day; at the stocked gauge such a rate was saved and then invisible,
+so reopening the quotation and pressing Save replaced what was charged with the
+catalogue price. Rows written before the column exists fall back to the old
+inference, so nothing already saved moves.
 
 `PET 12µm` and `PET 19µm` are two materials at two prices. Quote a 20µ PET and
 neither rate is right, so the line asks rather than silently costing it at the

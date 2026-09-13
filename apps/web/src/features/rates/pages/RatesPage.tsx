@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { History, Plus, Save, SlidersHorizontal, TrendingDown, TrendingUp } from 'lucide-react';
+import {
+  History,
+  Plus,
+  Save,
+  SlidersHorizontal,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
 import {
   formatNumber,
   MATERIAL_CATEGORY_LABELS,
@@ -16,8 +24,9 @@ import { Spinner } from '@/components/ui/Spinner';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { ApiClientError } from '@/lib/api-client';
-import { useMaterials, useRateHistory, useSaveRates } from '../api/rate-api';
+import { useDeleteMaterial, useMaterials, useRateHistory, useSaveRates } from '../api/rate-api';
 import { MaterialModal } from '../components/MaterialModal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 const CATEGORY_ORDER: MaterialCategory[] = ['FILM', 'INK', 'ADHESIVE', 'SOLVENT', 'CONSUMABLE'];
 
@@ -59,6 +68,14 @@ export default function RatesPage() {
   /* Null with the modal open adds a new material; a material edits that one. */
   const [editing, setEditing] = useState<Material | null>(null);
   const [adding, setAdding] = useState(false);
+  /*
+   * Deleting is for a mistake — a name typed wrong, a film added and thought
+   * better of. The server refuses the moment it is on a quotation, a stock
+   * batch or a purchase line, and says which; taking it off the price list is
+   * what that case wants, and that is on the figures dialog beside it.
+   */
+  const [deleting, setDeleting] = useState<Material | null>(null);
+  const deleteMaterial = useDeleteMaterial();
 
   const { data: materials, isPending, isError, error, refetch } = useMaterials(effectiveDate);
   const saveRates = useSaveRates();
@@ -272,6 +289,15 @@ export default function RatesPage() {
                           >
                             <History className="size-4" />
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleting(material)}
+                            aria-label={`Delete ${material.name}`}
+                            title="Delete — only a material nothing has used"
+                            className="text-ink-400 hover:bg-danger-50 hover:text-danger-600 cursor-pointer rounded-[var(--radius-md)] p-2"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
                         </td>
                       </tr>
                     );
@@ -292,6 +318,34 @@ export default function RatesPage() {
           setEditing(null);
         }}
       />
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title={`Delete ${deleting?.name ?? ''}?`}
+        confirmLabel="Delete"
+        loading={deleteMaterial.isPending}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => {
+          if (!deleting) return;
+          deleteMaterial.mutate(deleting.id, {
+            onSuccess: () => {
+              toast.success(`${deleting.name} deleted`);
+              setDeleting(null);
+            },
+            onError: (cause) =>
+              toast.error(
+                cause instanceof ApiClientError ? cause.message : 'Could not delete that material',
+              ),
+          });
+        }}
+      >
+        It goes for good, and its whole price history with it.
+        <p className="mt-2">
+          Only a material nothing has used can be deleted. If it is on a quotation, a stock batch or
+          a purchase order, this is refused and says which — those have to stay able to say what
+          they were priced on. Take it off the price list instead, on the figures beside it.
+        </p>
+      </ConfirmDialog>
     </div>
   );
 }

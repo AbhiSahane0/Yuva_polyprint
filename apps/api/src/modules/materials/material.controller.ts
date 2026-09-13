@@ -25,6 +25,10 @@ export async function update(req: Request, res: Response) {
   );
 }
 
+export async function remove(req: Request, res: Response) {
+  ok(res, await materialService.deleteMaterial(req.params.id as string));
+}
+
 export async function history(req: Request, res: Response) {
   ok(res, await materialService.getRateHistory(req.params.id as string));
 }

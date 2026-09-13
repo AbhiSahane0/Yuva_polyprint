@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Field, NumberInput, Select } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { canAccess, useAuthStore } from '@/features/auth/auth-store';
 import { useSettings } from '@/features/quotations/api/quotation-api';
 import { useMaterials } from '@/features/rates/api/rate-api';
@@ -45,7 +46,19 @@ export default function CostingPage() {
   const canEdit = canAccess(user, 'rates');
 
   const [showRetired, setShowRetired] = useState(false);
-  const { data, isPending } = useCostingMasterData(showRetired);
+  /*
+   * Always fetched WITH the retired rows, and filtered below for display.
+   *
+   * Asking the server for active rows only made the "Show retired" button
+   * impossible to reach: it appears when something retired exists, and nothing
+   * retired was ever in the response to prove it did. Retiring a machine or a
+   * wage therefore hid it for good — the row was still there, and no screen
+   * could offer to bring it back.
+   *
+   * The rate costing asks separately, and for active rows only: a retired
+   * machine must not be costed just because this screen can see it.
+   */
+  const { data, isPending } = useCostingMasterData(true);
   const { data: settings } = useSettings();
 
   const [machine, setMachine] = useState<Machine | null | undefined>(undefined);
@@ -54,7 +67,23 @@ export default function CostingPage() {
   const retireMachine = useRetireMachine();
   const retireLabour = useRetireLabour();
 
+  /*
+   * Retiring is asked about; restoring is not.
+   *
+   * Taking a machine or a wage out of the costing moves the rate on every
+   * quotation costed afterwards, and it moves it DOWN — the job looks cheaper
+   * to make than it is, at once and without a word. Putting one back is the
+   * inverse, and a dialog in front of a safe action only teaches the office to
+   * click through dialogs.
+   */
+  const [retiring, setRetiring] = useState<
+    { kind: 'machine'; row: Machine } | { kind: 'labour'; row: Labour } | null
+  >(null);
+
   if (isPending || !data || !settings) return <LoadingState label="Loading costing data…" />;
+
+  const machines = showRetired ? data.machines : data.machines.filter((m) => m.isActive);
+  const labourRows = showRetired ? data.labour : data.labour.filter((l) => l.isActive);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
@@ -92,7 +121,7 @@ export default function CostingPage() {
           ) : null}
         </div>
 
-        {data.machines.length === 0 ? (
+        {machines.length === 0 ? (
           <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white">
             <EmptyState
               title="No machines on record"
@@ -117,7 +146,7 @@ export default function CostingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.machines.map((row) => (
+                  {machines.map((row) => (
                     <tr
                       key={row.id}
                       className={cn(
@@ -167,7 +196,11 @@ export default function CostingPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => retireMachine.mutate(row.id)}
+                              onClick={() =>
+                                row.isActive
+                                  ? setRetiring({ kind: 'machine', row })
+                                  : retireMachine.mutate(row.id)
+                              }
                             >
                               {row.isActive ? 'Retire' : 'Restore'}
                             </Button>
@@ -211,7 +244,7 @@ export default function CostingPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.labour.map((row) => (
+                {labourRows.map((row) => (
                   <tr
                     key={row.id}
                     className={cn(
@@ -255,7 +288,11 @@ export default function CostingPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => retireLabour.mutate(row.id)}
+                            onClick={() =>
+                              row.isActive
+                                ? setRetiring({ kind: 'labour', row })
+                                : retireLabour.mutate(row.id)
+                            }
                           >
                             {row.isActive ? 'Retire' : 'Restore'}
                           </Button>
@@ -282,6 +319,40 @@ export default function CostingPage() {
         labour={labour ?? null}
         onClose={() => setLabour(undefined)}
       />
+
+      <ConfirmDialog
+        open={retiring !== null}
+        title={
+          retiring?.kind === 'machine'
+            ? `Retire ${retiring.row.name}?`
+            : retiring
+              ? `Retire ${retiring.row.role}?`
+              : 'Retire'
+        }
+        confirmLabel="Retire"
+        loading={retireMachine.isPending || retireLabour.isPending}
+        onClose={() => setRetiring(null)}
+        onConfirm={() => {
+          if (!retiring) return;
+          const done = { onSettled: () => setRetiring(null) };
+          if (retiring.kind === 'machine') retireMachine.mutate(retiring.row.id, done);
+          else retireLabour.mutate(retiring.row.id, done);
+        }}
+      >
+        {retiring?.kind === 'machine' ? (
+          <>
+            It stops being costed, so every rate worked out from now on drops by whatever this
+            machine was adding — its power and the people standing at it. Quotations already saved
+            keep the figures they were saved with.
+          </>
+        ) : (
+          <>
+            This wage stops being charged, so every rate worked out from now on drops by what this
+            person was costing. Quotations already saved keep the figures they were saved with.
+          </>
+        )}
+        <p className="mt-2">It stays on this screen, greyed, with a Restore beside it.</p>
+      </ConfirmDialog>
     </div>
   );
 }

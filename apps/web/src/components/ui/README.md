@@ -1,12 +1,32 @@
 # UI primitives
 
 Generic, feature-agnostic building blocks: Button, Input, **NumberInput**,
-Select, Combobox, Field, Modal, Badge, Toaster, EmptyState, ReadOnlyValue,
-Spinner, LoadingState.
+Select, Combobox, Field, Modal, **ConfirmDialog**, Badge, Toaster, EmptyState,
+ReadOnlyValue, Spinner, LoadingState.
 
 Rules: no business logic, no data fetching, no feature imports. Style with the
 design tokens in `src/styles/index.css` (`bg-brand-600`, `text-ink-500`, …)
 rather than raw hex values.
+
+## `ConfirmDialog` asks before something that cannot be clicked back
+
+For anything that reaches the server on one click and is not undone by pressing
+the same button again — Retire on a machine or a wage, Deactivate on a user.
+
+Two rules, both tested, because both are easy to lose in a refactor:
+
+- **The button carries the verb.** `confirmLabel="Retire"`, never "OK". A person
+  skimming reads the button, not the sentence.
+- **Cancel is first in the DOM**, so the focus trap lands on the safe control and
+  Enter on a dialog nobody read does nothing.
+
+Say what it costs rather than "Are you sure?" — retiring a press takes its power
+and its people out of the costing, so every rate worked out afterwards drops.
+That is worth a sentence; "this cannot be undone" is not, especially when it can.
+
+**Only the destructive direction should use it.** Restore is the inverse and
+should go straight through: a dialog in front of a safe action is how people
+learn to click through the dangerous one.
 
 ## `Combobox` options can carry a key
 

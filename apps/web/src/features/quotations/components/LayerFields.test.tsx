@@ -99,20 +99,33 @@ describe('LayerFields', () => {
     expect(options.filter((o) => o === 'PET')).toHaveLength(1);
   });
 
-  it('uses the stocked rate when the gauge typed is one the master holds', () => {
+  /*
+   * **A film's price is agreed job to job.**
+   *
+   * The works' own quotations carry PET at 185, 175 and 190 — every one at 12µ,
+   * every one written on 23 March 2022. The box used to appear only for a gauge
+   * the rates master does not stock, which covered the other reason to type a
+   * rate and missed this one completely: a rate agreed at the film's own gauge
+   * was stored and then invisible, so reopening the quotation and pressing Save
+   * replaced what was charged with the catalogue price.
+   */
+  it('offers a rate on a film stocked at the gauge typed, and shows the list price', () => {
     render(<Host />);
     pick('PET');
     type('19');
-    // PET 19µm is a real material at Rs. 218. Asking for a rate here would end
-    // with the same film quoted at two prices on two quotations.
-    expect(rateBox(0)).toBeNull();
+    // PET 19µm is a real material at Rs. 218 — offered as the placeholder, so
+    // leaving the box alone follows the list.
+    expect(rateBox(0)).toBeTruthy();
+    expect(rateBox(0)!.placeholder).toBe('218.00');
     expect(screen.getByText(/218\.00/)).toBeTruthy();
   });
 
-  it('does not ask for a rate at the gauge the film is stocked at', () => {
+  it('calls it the rate for this job at the stocked gauge', () => {
     render(<Host />);
     pick('PET');
-    expect(rateBox(0)).toBeNull();
+    expect(rateBox(0)).toBeTruthy();
+    expect(screen.getByText('Rate for this job')).toBeTruthy();
+    expect(screen.queryByText('Rate for this gauge')).toBeNull();
     expect(screen.getByText(/210\.00/)).toBeTruthy();
   });
 
@@ -131,29 +144,32 @@ describe('LayerFields', () => {
     expect(screen.getByText(/PET 19µm is priced at 19µ/)).toBeTruthy();
   });
 
-  it('stops asking when the gauge is put back', () => {
+  it('changes what it calls the box when the gauge goes off the list and back', () => {
     render(<Host />);
     pick('PET');
     type('20');
-    expect(rateBox(0)).toBeTruthy();
+    // Off the list the film's own rate cannot apply, so the box is the only
+    // price there is — and the label says which gauge it is for.
+    expect(screen.getByText('Rate for this gauge')).toBeTruthy();
 
     type('12');
-    expect(rateBox(0)).toBeNull();
+    expect(screen.getByText('Rate for this job')).toBeTruthy();
+    expect(screen.queryByText('Rate for this gauge')).toBeNull();
   });
 
-  it('does not ask while the box is empty mid-edit', () => {
-    render(<Host />);
-    pick('PET');
-    type('');
-    // Asking for a rate the moment a digit is deleted makes the row flicker.
-    expect(rateBox(0)).toBeNull();
-  });
-
-  it('never asks for a film whose name states no gauge', () => {
+  it('offers a rate for a film whose name states no gauge', () => {
     render(<Host />);
     pick('PP Woven');
     type('90');
-    // PP Woven is priced by GSM, so its rate applies at any thickness.
+    // PP Woven is priced by GSM, so its rate applies at any thickness — but the
+    // works may still have agreed a different price for this job.
+    expect(rateBox(0)).toBeTruthy();
+    expect(screen.getByText('Rate for this job')).toBeTruthy();
+  });
+
+  it('offers nothing until a film is chosen', () => {
+    render(<Host layers={[{ materialId: null, micron: '', rateOverride: '' }, {}]} />);
+    // A rate for a film nobody has picked is a box with no question behind it.
     expect(rateBox(0)).toBeNull();
   });
 

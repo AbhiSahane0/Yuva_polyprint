@@ -475,9 +475,28 @@ not stock.** A 20µ PET is a real enquiry; a dropdown of stocked films cannot
 offer a number nobody has priced, and for a while that meant such a job could
 not be quoted without a developer adding the film first.
 
+#### The rate agreed for this job
+
+Every chosen film carries a rate box. Blank follows the price list; typed, that
+is what the ply costs on this quotation and nowhere else.
+
+It is offered on every ply because **a film's price is agreed job to job**. The
+works' own quotations carry PET at 185, 175 and 190 — every one at 12µ, every
+one written on 23 March 2022. The box used to appear only for a gauge the rates
+master does not stock, which covered the other reason to type a rate and missed
+this one entirely: a rate agreed at the film's own gauge was stored and then
+invisible, so reopening the quotation and pressing Save replaced what had been
+charged with the catalogue price. Silently, and on a document that had already
+gone out.
+
+It is stored now — `rate_override` on the ply — rather than deduced from the
+gauge. Plies saved before that column existed still read through the old
+inference, so nothing already on file moves.
+
 #### A gauge off the price list has to be priced
 
-Type a gauge the chosen film is not stocked at and the row asks for a rate:
+The same box, with a different name and a harder rule behind it. Type a gauge
+the chosen film is not stocked at and it becomes the only price there is:
 
 ```
 Layer 1   [ PET 12µm ▾ ]   Micron [ 20 ]   Rate for this gauge [ Rs. / kg ]
@@ -1417,6 +1436,48 @@ Save and watches nothing happen.
 Save now names the field and takes you to it — _"Enter Valid Mobile Number —
 taken back to Details"_.
 
+#### Asking before something cannot be clicked back
+
+Anything that reaches the server on one click and cannot be undone by pressing
+the same button again asks first — **Retire** on a machine or a wage, and
+**Deactivate** on a user. Deleting a customer, a design, an artwork file or a
+quotation already did.
+
+The dialog says what it costs rather than "Are you sure?": retiring a press
+takes its power and its people out of the costing, so **every rate worked out
+afterwards drops** — the job reads cheaper to make than it is, at once and
+without a word. Quotations already saved keep the figures they were saved with.
+
+Two details that are easy to lose in a refactor, and are tested:
+
+- **The button says what it does** — "Retire", "Deactivate" — never "OK".
+- **Cancel comes first in the DOM**, so the focus trap lands on the safe control
+  and Enter on a dialog nobody read does nothing.
+
+**Only the destructive direction asks.** Restore is the inverse and goes straight
+through, because a dialog in front of a safe action is how the office learns to
+click through the dangerous one.
+
+**Show retired is always fetched, never gated on itself.** The button appears
+when something retired exists — and the page used to ask the server for active
+rows only until the button was pressed, so nothing retired was ever in the
+answer to prove anything retired existed. The button could not render, and a
+retired machine or wage was beyond reach: the row was still there, and no screen
+could offer to bring it back. The page now always asks for them and filters for
+display. (The rate costing asks separately, active rows only — a retired machine
+must not be costed just because this screen can see it.) The artwork panel's
+**Show replaced** had the same shape once: a toggle derived from the very list it
+would reveal.
+
+**Retiring does not free the name, and adding it back revives the row.** A
+retired machine, wage or material keeps its row, because quotations costed
+against it have to be able to say what they were priced on — so the name stays
+taken. Typing it again used to fail with "there is already a machine with that
+name" against a machine nobody could see, since retired rows are hidden unless
+**Show retired** is on. Now it brings the row back with whatever figures were
+just typed, keeping its id so nothing pointing at it is orphaned. A name held by
+a row that is still live clashes as it always did — that one is a real mistake.
+
 ### Costing — `/costing`
 
 What the works costs to run: the machines, the wages, and the overheads every
@@ -1468,6 +1529,29 @@ the press's 800 mm face on 95% of them.
 
 It also feeds the suggested number of lanes, so a wider margin proposes fewer of
 them and the cylinder it suggests still fits the press.
+
+#### Deleting a material, and when it is refused
+
+Each row has a **Delete**, and it asks first — the dialog says the price history
+goes with it, because `material_rates` cascades.
+
+**Only a material nothing has used can go.** On a quotation, a stock batch, a
+stock movement or a purchase line, the server refuses and names what is using
+it:
+
+> PET 12µm is on 18 quotation lines. Take it off the price list instead —
+> deleting it would leave those unable to say what they were priced on.
+
+Three of those four the database would refuse anyway, but with a foreign-key
+error nobody can act on. The fourth is the interesting one: a quotation ply is
+`SetNull`, so the database would **allow** it. The ply snapshots the name,
+micron, density and rate, so the document would still read — and the link to
+what it was priced on would be gone, silently. So it is refused on purpose.
+
+That leaves delete for what it is good for: a name typed wrong, a film added and
+thought better of. Anything the works actually used is taken **off the price
+list** instead, on the figures dialog beside it — the row stays, so the record
+can still answer for itself.
 
 #### Add a material, and edit what its price is multiplied by
 

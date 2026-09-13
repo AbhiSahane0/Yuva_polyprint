@@ -11,6 +11,11 @@ export interface QuotationItemLayer {
   /** Null when the chosen material has no density recorded. */
   density: number | null;
   ratePerKg: number | null;
+  /**
+   * The rate the office agreed for this job's film, or null to follow the
+   * film's own. Read back so reopening a quotation puts it in the box.
+   */
+  rateOverride: number | null;
   /** micron × density. */
   gsm: number;
 }

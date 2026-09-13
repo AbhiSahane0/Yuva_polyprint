@@ -37,6 +37,19 @@ router.patch(
   validate({ params: idParamSchema, body: updateMaterialSchema }),
   asyncHandler(controller.update),
 );
+/*
+ * Deleting is for a mistake — a name typed wrong, a film added and thought
+ * better of. Anything actually quoted, bought or stocked is refused with what
+ * is using it, because the record has to stay able to say what it was priced
+ * on. Same authority as changing a rate: it is the price list.
+ */
+router.delete(
+  '/:id',
+  requireModule('rates'),
+  validate({ params: idParamSchema }),
+  asyncHandler(controller.remove),
+);
+
 router.get('/:id/history', validate({ params: idParamSchema }), asyncHandler(controller.history));
 
 export default router;
