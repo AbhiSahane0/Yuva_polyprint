@@ -106,14 +106,20 @@ two prices, and the name is what the system reads the thickness from. A film
 named without one — `PP Woven`, sold by GSM — is priced at its rate whatever
 thickness is quoted.
 
-| Film           | Density g/cm³ | Rs / kg | Where it sits                           |
-| -------------- | ------------: | ------: | --------------------------------------- |
-| PET 12µm       |          1.40 |     185 | Printed outer ply, on almost every job  |
-| MET PET 12µm   |          1.40 |     180 | Metallised barrier, middle ply          |
-| W/O Poly 110µm |          0.94 |     163 | White-opaque sealing ply                |
-| PE 60µm        |          0.94 |     190 | Plain sealing ply                       |
-| BOPP 20µm      |          0.91 |     168 | Alternative outer ply                   |
-| Foil 7µm       |          2.70 |     410 | Full barrier, heaviest film on the list |
+| Film           | Density g/cm³ | Rs / kg | Where it sits                          |
+| -------------- | ------------: | ------: | -------------------------------------- |
+| PET 12µm       |          1.40 |     185 | Printed outer ply, on almost every job |
+| MET PET 12µm   |          1.40 |     180 | Metallised barrier, middle ply         |
+| W/O Poly 110µm |          0.94 |     163 | White-opaque sealing ply               |
+| PE 60µm        |          0.94 |     190 | Plain sealing ply                      |
+
+**Only the films the works actually quotes.** The catalogue shipped with eleven —
+BOPP, foil, POF, PP woven, PVC/PETG and three more gauges — and none of them
+appears on a single one of the client's own quotations, so they were deleted
+rather than left as eight rows of noise on a screen the office reads every
+morning. **Add a material** puts one back in a few seconds when a job needs it,
+and the density examples above are the ones worth having to hand: PET 1.40,
+poly 0.94, BOPP 0.91, foil 2.70.
 
 **Rates keep their history.** When a price rises, type the new one — the old
 figure stays on record against its date, so a quotation already sent keeps the

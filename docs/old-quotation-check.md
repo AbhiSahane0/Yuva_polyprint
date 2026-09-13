@@ -86,6 +86,26 @@ a price that moved over time. This is what per-quotation overrides exist for.
 
 ---
 
+## The catalogue these seven need
+
+Fourteen materials, and every one is load-bearing. The catalogue shipped with
+nine more — BOPP, foil, LDPE, POF, PP woven, PVC/PETG, two spare gauges and a
+Gold ink — and not one of them appears on any of these quotations, so they were
+deleted.
+
+| Material                                           | Why it stays                                     |
+| -------------------------------------------------- | ------------------------------------------------ |
+| PET 12µm · MET PET 12µm · W/O Poly 110µm           | The plies these seven are made of                |
+| PE 60µm                                            | On a quotation built from the client's own Excel |
+| Ink — Blended · Adhesive — Blended                 | What the **flat** method prices every job at     |
+| Ink — Cyan / Magenta / Yellow / Black              | The Costing tab's per-colour rates               |
+| Adhesive — PU · Hardener · Ethyl Acetate · Toluene | The Costing tab's batch and solvent              |
+
+> **The four process inks cannot be deleted even though the flat method never
+> prices them.** The costing needs at least one ink carrying a laydown before it
+> will quote at all, and the two blends have none — they are a rate, not a
+> colour. Remove the four and every quotation stops costing itself.
+
 ## What the works held centrally
 
 Identical on all seven, read from the Costing screen and the rate list:
