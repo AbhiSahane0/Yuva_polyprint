@@ -80,6 +80,22 @@ export function useUpdateSupplier(id: string) {
   });
 }
 
+/**
+ * Removes a supplier nobody has ordered from.
+ *
+ * Refused by the server for anyone with an order against them — the order
+ * names who it was placed with — and retiring is what that case wants, which
+ * is the switch on their card.
+ */
+export function useDeleteSupplier() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (id: string) =>
+      request<{ id: string }>({ url: `/purchase/suppliers/${id}`, method: 'DELETE' }),
+    onSuccess: invalidate,
+  });
+}
+
 export function useCreatePurchaseOrder() {
   const invalidate = useInvalidate();
   return useMutation({

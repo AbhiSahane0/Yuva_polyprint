@@ -358,7 +358,7 @@ The two mail routes have their own section:
 | GET    | `/materials`             | With the rate in force, the previous one, and the change %. **Also materialises any missing daily rates** — see [Carry-forward](#carry-forward) |
 | POST   | `/materials`             | Add a material                                                                                                                                  |
 | PATCH  | `/materials/:id`         | Rename, re-price-group, set density, retire                                                                                                     |
-| DELETE | `/materials/:id`         | Remove one nothing has used; refused with what does                                                                                             |
+| DELETE | `/materials/:id`         | Remove one nothing has quoted or bought. `?discardStock=true` takes its stock with it                                                           |
 | GET    | `/materials/:id/history` | Every recorded rate, newest first                                                                                                               |
 | PUT    | `/materials/rates`       | Save a day's rates in one request                                                                                                               |
 
@@ -374,6 +374,40 @@ cannot backdate anything.
 
 Rates are saved as a **batch, not per field** — the office keys the morning's
 rates in together, and a partial save would leave the day half-recorded.
+
+#### What `DELETE /materials/:id` refuses, and what it does not
+
+Deleting is for a mistake — a name typed wrong, a film added and thought better
+of. Two things are never deleted around:
+
+- **a quotation ply**, and
+- **a purchase line**.
+
+Both are documents the works sent out, and each has to stay able to say what it
+was priced on. The refusal names them: "PET 12µm is on 18 quotation lines. Take
+it off the price list instead — deleting it would leave those unable to say what
+they were priced on."
+
+A purchase line is `Restrict`, so the database would refuse it anyway, with a
+foreign-key error nobody can act on. A quotation ply is `SetNull`, so the
+database would **allow** it — the ply snapshots the name, micron, density and
+rate, so the document still reads while the link to what priced it disappears
+without a word. That one is refused on purpose.
+
+**Stock is not in that class.** A batch is the works' own note of what it holds,
+not a promise made to anybody, and a material received by mistake has to be
+removable. So stock refuses only until the caller says it has seen how much goes
+— `?discardStock=true`, which the Inventory screen sends after showing the
+quantity and batch count in the dialog. The batches and their movements are then
+deleted in the same transaction as the material, and the rate history cascades.
+
+Without the flag the refusal says where to do it properly: "Green PET 12µm is on
+the inventory — 250 KG across 1 stock batch. Delete it from Inventory, where
+what goes with it is shown before you confirm."
+
+The route needs the **rates** module, not inventory — deleting a material is a
+change to the price list. Somebody who may record a movement should not thereby
+be able to remove the material the movement was against.
 
 ### Inventory
 
@@ -407,6 +441,7 @@ its own movements and reports what does not match.
 | GET    | `/purchase/suppliers`          | With what each supplies and last charged, derived from orders    |
 | POST   | `/purchase/suppliers`          | Add a supplier                                                   |
 | PATCH  | `/purchase/suppliers/:id`      | Edit, or retire — orders already placed still name them          |
+| DELETE | `/purchase/suppliers/:id`      | Remove one nobody has ordered from; refused with the count       |
 | GET    | `/purchase/orders`             | Open first, with the totals                                      |
 | POST   | `/purchase/orders`             | Raise an order. Several lines, each in the unit it is ordered in |
 | GET    | `/purchase/orders/next-number` | A peek, not a reservation                                        |
@@ -421,6 +456,13 @@ Query on `GET /purchase/orders`: `q` (PO number or supplier), `status`,
 `POST /purchase/receipts` needs the **inventory** module as well as purchase: it
 creates stock, and somebody who may raise orders but not touch the ledger should
 not reach it through a second door.
+
+`DELETE /purchase/suppliers/:id` is for a name typed wrong, or a supplier added
+and never used. Anyone with an order against them is refused by count —
+"Sharma Films is on 3 purchase orders. Retire them instead — an order has to
+stay able to say who it was placed with." The database agrees
+(`purchase_orders.supplier_id` is `Restrict`), but a foreign-key error is not an
+answer, and what that case wants is the retire switch on their card.
 
 `PATCH /purchase/orders/:id` accepts only ORDERED, IN_TRANSIT and CANCELLED, and
 refuses even those once deliveries exist — the status follows the receipts by

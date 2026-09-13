@@ -25,8 +25,21 @@ export async function update(req: Request, res: Response) {
   );
 }
 
+/**
+ * `?discardStock=true` says the caller has seen what stock goes with it.
+ *
+ * Read as a string the same way `includeInactive` is on the list — a flag that
+ * only ever arrives from a dialog that has already shown the figures. Without
+ * it, a material holding stock is refused and told where to do this properly.
+ */
 export async function remove(req: Request, res: Response) {
-  ok(res, await materialService.deleteMaterial(req.params.id as string));
+  const query = req.query as { discardStock?: string };
+  ok(
+    res,
+    await materialService.deleteMaterial(req.params.id as string, {
+      discardStock: query.discardStock === 'true',
+    }),
+  );
 }
 
 export async function history(req: Request, res: Response) {

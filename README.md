@@ -412,6 +412,12 @@ Cylinders (which carries its artwork), Jobs. The sidebar
 hides the rest, and the API refuses it independently, because hiding a link is
 not access control.
 
+**A button belongs to what it changes, not to the screen it sits on.** Deleting
+a material is on the Inventory screen as well as Rates, and on both it needs the
+**rates** module — it is a change to the price list. Somebody who may record a
+stock movement should not thereby be able to remove the material the movement
+was against.
+
 Full detail, including how sessions and passwords are stored:
 [`apps/api/README.md`](./apps/api/README.md#authentication-and-access).
 

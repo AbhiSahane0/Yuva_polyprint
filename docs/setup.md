@@ -121,6 +121,15 @@ morning. **Add a material** puts one back in a few seconds when a job needs it,
 and the density examples above are the ones worth having to hand: PET 1.40,
 poly 0.94, BOPP 0.91, foil 2.70.
 
+> **Deleting is for a mistake, and it always asks.** A name typed wrong, a film
+> added and thought better of — the bin on each Rates row, and on each Inventory
+> row too. A material on a **quotation** or a **purchase order** is refused and
+> says which, because those have to stay able to say what they were priced on;
+> take that one off the price list instead. A material **holding stock** is
+> deleted from Inventory, where the dialog names the quantity and batch count
+> that go with it. Suppliers work the same way on the Purchase screen: one
+> nobody has ordered from goes, one with orders is retired.
+
 **Rates keep their history.** When a price rises, type the new one — the old
 figure stays on record against its date, so a quotation already sent keeps the
 margin it was made on.

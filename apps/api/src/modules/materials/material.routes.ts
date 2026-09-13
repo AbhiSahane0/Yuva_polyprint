@@ -39,9 +39,15 @@ router.patch(
 );
 /*
  * Deleting is for a mistake — a name typed wrong, a film added and thought
- * better of. Anything actually quoted, bought or stocked is refused with what
- * is using it, because the record has to stay able to say what it was priced
- * on. Same authority as changing a rate: it is the price list.
+ * better of. Anything quoted or bought is refused with what is using it,
+ * because the record has to stay able to say what it was priced on. Stock is
+ * the works' own note of what it holds, so it goes with the material once the
+ * caller has said so — `?discardStock=true`, which only the Inventory screen
+ * sends, and only after showing how much.
+ *
+ * Same authority as changing a rate: it is the price list. That is deliberate
+ * even though the button also sits on Inventory — somebody who can record a
+ * movement should not thereby be able to remove the material it moved.
  */
 router.delete(
   '/:id',
