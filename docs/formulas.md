@@ -484,6 +484,10 @@ A five-colour job pays no surcharge. Note the surcharge is charged on
 job it prices four inks for, because a station is paid for whether or not its
 ink appears in the costing.
 
+What a station is, what decides how many a job has when there is no artwork
+yet, and the other two places the count spends money — the station motors and
+the cylinder bill — are in [`stations.md`](./stations.md).
+
 ### 6.11 Per piece
 
 ```

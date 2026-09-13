@@ -78,6 +78,12 @@ the whole time the machine is occupied — running _and_ being set.
 | Slitting Operator  | Slitting |  12,000 |     0.9615 |
 | Slitting Helper    | Slitting |   8,000 |     0.6410 |
 
+> **The `3,4,6` on the press is when its station motors switch on.** The press
+> draws 30 HP on its own and 12 HP more at the third, fourth and sixth colour,
+> so a two-colour job is not charged a full press. See
+> [`stations.md`](./stations.md) for what a station is and how the count for a
+> job is decided.
+
 > **Retiring is asked about, and a retired name can be added back.** Taking a
 > machine or a wage out of the costing drops the rate on every quotation costed
 > afterwards, so it asks first. The row stays, greyed, with a Restore beside it —
