@@ -1458,6 +1458,17 @@ Two details that are easy to lose in a refactor, and are tested:
 through, because a dialog in front of a safe action is how the office learns to
 click through the dangerous one.
 
+**Show retired is always fetched, never gated on itself.** The button appears
+when something retired exists — and the page used to ask the server for active
+rows only until the button was pressed, so nothing retired was ever in the
+answer to prove anything retired existed. The button could not render, and a
+retired machine or wage was beyond reach: the row was still there, and no screen
+could offer to bring it back. The page now always asks for them and filters for
+display. (The rate costing asks separately, active rows only — a retired machine
+must not be costed just because this screen can see it.) The artwork panel's
+**Show replaced** had the same shape once: a toggle derived from the very list it
+would reveal.
+
 **Retiring does not free the name, and adding it back revives the row.** A
 retired machine, wage or material keeps its row, because quotations costed
 against it have to be able to say what they were priced on — so the name stays
