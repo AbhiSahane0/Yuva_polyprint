@@ -1421,10 +1421,24 @@ material cost to the rate. A rate nobody can explain is a rate nobody can defend
 across a table, and the office is asked "why is it 251?" by customers holding
 three other quotations.
 
+**Pouch making is charged per pouch, and the style decides what it costs.**
+A standup pays the making rate; a **Standup zipper** or **Zipper** pays making
+plus the zipper across its mouth, charged by the metre of finished width; a
+**D punch** pays making plus the punch. The ⓘ breakdown shows the parts and then
+what they come to on a kilogram — `Pouch making — Rs. 0.74 × 181.2 pouches`.
+
+That is the works' own pouch workbook, and it is per pouch because per kilogram
+cannot describe it: across the workbook's nine costed jobs the same charge reads
+between Rs 11 and Rs 64 a kilogram, purely because a small pouch packs 130 to a
+kilo and a big one 14.
+
 **Three figures are set on the quotation, not the works.** Margin %, transport
 per kg and pouch making per kg sit at the top of the Jobs step; left blank each
 follows the Costing screen, so an ordinary job keeps up with the works' own
-figures as they change. They are there because the client varies all three job
+figures as they change. Pouch making's box is still in **rupees per kilogram**
+even though the works' figure is per pouch — it replaces the whole charge rather
+than any part of it, which is what the office means by overriding it, and it is
+the unit every quotation written before this already carries. They are there because the client varies all three job
 to job — across seven of their own quotations, margins of 5%, 9% and 10%,
 transport at Rs 5 and Rs 10, and nothing charged for making a pouch on two of
 them, with **five of the seven written on the same day**.

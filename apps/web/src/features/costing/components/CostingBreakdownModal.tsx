@@ -213,10 +213,52 @@ export function CostingBreakdownModal({
               <Line label="Extra printing stations" value={b.stationSurchargePerKg} decimals={2} />
             ) : null}
             {b.pouchMakingPerKg > 0 ? (
-              <Line label="Pouch making" value={b.pouchMakingPerKg} decimals={2} />
+              <Line
+                label={
+                  /*
+                   * The charge is per POUCH, so the figure in this column is it
+                   * spread over a kilogram of them. Saying which, and how many,
+                   * is the difference between a number that can be checked and
+                   * one that has to be taken on trust.
+                   */
+                  b.pouchExpense.perPouch > 0
+                    ? `Pouch making — ${formatRs(b.pouchExpense.perPouch, 2)} × ${formatNumber(
+                        b.piecesPerKg,
+                        1,
+                      )} pouches`
+                    : 'Pouch making — set on this quotation'
+                }
+                value={b.pouchMakingPerKg}
+                decimals={2}
+              />
             ) : null}
             <Line label="Rate per kilogram" value={b.ratePerKg} decimals={2} strong />
           </dl>
+
+          {/*
+            What making one pouch is made of.
+            
+            Only where it has parts to show: a plain standup is making and
+            nothing else, and a line the office has priced by hand has no parts
+            at all — the override replaces the whole charge, so listing them
+            would put a breakdown on screen that does not reconcile.
+          */}
+          {b.pouchExpense.zipper > 0 || b.pouchExpense.punch > 0 ? (
+            <dl className="divide-ink-100 mt-3 divide-y">
+              <Line
+                label="Forming, sealing, cutting — a pouch"
+                value={b.pouchExpense.making}
+                decimals={4}
+              />
+              {b.pouchExpense.zipper > 0 ? (
+                <Line label="Zipper across the mouth" value={b.pouchExpense.zipper} decimals={4} />
+              ) : null}
+              {b.pouchExpense.punch > 0 ? (
+                <Line label="D punch" value={b.pouchExpense.punch} decimals={4} />
+              ) : null}
+              <Line label="One pouch" value={b.pouchExpense.perPouch} decimals={4} strong />
+            </dl>
+          ) : null}
 
           {/* The two costs the two margins are measured against. */}
           <dl className="divide-ink-100 mt-3 divide-y">

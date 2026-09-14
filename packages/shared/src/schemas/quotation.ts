@@ -451,7 +451,17 @@ export const settingsSchema = z.object({
    * time alone; charging the setup as well is truer but does not tie out.
    */
   emiBasis: z.enum(['RUN_TIME', 'OCCUPIED']),
-  pouchMakingPerKg: z.coerce.number().min(0).max(10_000),
+  /**
+   * Making one pouch — forming, sealing and cutting. **Per pouch, not per
+   * kilogram**: the same charge reads between Rs 11 and Rs 64 a kilogram across
+   * the works' own nine costed pouches, depending on nothing but how big the
+   * pouch is.
+   */
+  pouchMakingPerPouch: z.coerce.number().min(0).max(1_000),
+  /** The zipper, by the metre, charged across the pouch's mouth. */
+  zipperRatePerMetre: z.coerce.number().min(0).max(10_000),
+  /** What the D punch adds, on top of making. */
+  dPunchPerPouch: z.coerce.number().min(0).max(1_000),
   /** What the sixth, seventh and eighth printing stations each add, per kg. */
   stationSurcharge6: z.coerce.number().min(0).max(10_000),
   stationSurcharge7: z.coerce.number().min(0).max(10_000),
@@ -545,7 +555,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
   emiPerMonth: 4166.66,
   emiHoursPerMonth: 24,
   emiBasis: 'RUN_TIME',
-  pouchMakingPerKg: 15,
+  /*
+   * From the works' pouch workbook: its standup pouches are charged 0.25 each,
+   * its D punch 0.60 — which is 0.25 of making and 0.35 of punching — and its
+   * zippers at 3.60 and 3.80 a metre on two different sheets. 3.60 is the one
+   * that appears more often.
+   */
+  pouchMakingPerPouch: 0.25,
+  zipperRatePerMetre: 3.6,
+  dPunchPerPouch: 0.35,
   stationSurcharge6: 5.5,
   stationSurcharge7: 7.5,
   stationSurcharge8: 9,

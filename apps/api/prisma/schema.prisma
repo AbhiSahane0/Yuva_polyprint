@@ -40,6 +40,9 @@ enum PouchType {
   STANDUP
   STANDUP_ZIPPER
   ZIPPER
+  /// A punched D-shaped carry hole. Its own style because the punch is its own
+  /// charge on top of making, which is what the works' pouch workbook shows.
+  D_PUNCH
   SPOUT
   CENTRE_SEAL
   THREE_SIDE_SEAL

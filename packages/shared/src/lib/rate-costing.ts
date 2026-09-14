@@ -1,3 +1,5 @@
+import type { PouchType } from '../constants/job.js';
+import { pouchExpense, type PouchExpense, type PouchMakingRates } from './pouch-making.js';
 import { round } from './quotation-math.js';
 
 /**
@@ -121,8 +123,26 @@ export interface CostingOverheads {
    */
   emiBasis: 'RUN_TIME' | 'OCCUPIED';
 
-  /** Charged only when the line is made into pouches. */
-  pouchMakingPerKg: number;
+  /**
+   * What making one pouch costs — see `pouchExpense`.
+   *
+   * Per POUCH, because that is how the works' own pouch workbook charges it and
+   * how the work is actually done. It used to be one rate per kilogram, which
+   * cannot describe the job: across the workbook's nine costed pouches the same
+   * charge reads between Rs 11 and Rs 64 a kilogram, depending on nothing but
+   * how big the pouch is.
+   */
+  pouchMaking?: PouchMakingRates | null;
+
+  /**
+   * A per-quotation figure that replaces the computed pouch charge, per kg.
+   *
+   * The office's override, and it stays in kilograms because that is the unit
+   * it overrides: "charge Rs 20 a kilo for making on this one, whatever the
+   * style says". Null uses the styles. Quotations written before the charge
+   * became per pouch carry one of these and still price exactly as they did.
+   */
+  pouchMakingPerKgOverride?: number | null;
   /**
    * What each printing station beyond the fifth adds, per kilogram. The sheet
    * charges 5.5 for the sixth and 7.5 for the seventh.
@@ -277,6 +297,20 @@ export interface CostingJob {
   makesPouches: boolean;
 
   /**
+   * The style, which decides what making one costs: a zipper is charged across
+   * the mouth by the metre, a D punch adds its punch. Null charges making only.
+   */
+  pouchType?: PouchType | null;
+
+  /**
+   * The FINISHED pouch width, millimetres — what the zipper crosses.
+   *
+   * Not `filmWidthMm`, which is the flat sheet: a standup's bottom gusset
+   * lengthens the film without widening the mouth the zipper is sewn into.
+   */
+  pouchWidthMm?: number;
+
+  /**
    * Printing stations the job occupies — one cylinder each.
    *
    * NOT the number of colours priced. The works' sheet counts seven stations
@@ -418,7 +452,18 @@ export interface CostingBreakdown {
   /** Everything above, over the quantity ORDERED. */
   baseRatePerKg: number;
   stationSurchargePerKg: number;
+  /** The pouch charge spread over a kilogram — what the rate actually carries. */
   pouchMakingPerKg: number;
+  /**
+   * And what it is made of, on one pouch.
+   *
+   * Reported so the breakdown can show the working: a standup zipper at
+   * Rs 0.744 is Rs 0.25 of making and Rs 0.494 of zipper, and "0.744" on its
+   * own is a figure nobody can check. Zero throughout on a roll, and on a line
+   * where the office has overridden the charge — the parts no longer add up to
+   * what is being charged, so reporting them would be a lie.
+   */
+  pouchExpense: PouchExpense;
   ratePerKg: number;
 
   /* --- and what that is per piece --------------------------------------- */
@@ -845,10 +890,13 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
   const extraStations = Math.max(0, stationsOn - 5);
   const stationSurchargePerKg = round(sum(overheads.stationSurcharges.slice(0, extraStations)), 4);
 
-  const pouchMakingPerKg = job.makesPouches ? overheads.pouchMakingPerKg : 0;
-  const ratePerKg = round(baseRatePerKg + stationSurchargePerKg + pouchMakingPerKg, 2);
-
-  /* --- per piece --------------------------------------------------------- */
+  /*
+   * --- per piece, BEFORE the rate ----------------------------------------
+   *
+   * The pouch charge is per pouch now, so the rate cannot be finished until the
+   * count is known. It used to sit after, when the charge was a flat rate per
+   * kilogram that did not depend on how big the pouch was.
+   */
   const ownPieceWeightG = round((job.filmWidthMm * job.filmHeightMm * totalGsm) / 1_000_000, 4);
   const piecesPerKg =
     job.piecesPerKgOverride && job.piecesPerKgOverride > 0
@@ -857,6 +905,27 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
         ? round(1000 / ownPieceWeightG, 4)
         : 0;
   const pieceWeightG = piecesPerKg > 0 ? round(1000 / piecesPerKg, 4) : ownPieceWeightG;
+
+  /*
+   * What making one pouch costs, and what that comes to on a kilogram of them.
+   *
+   * A roll is made into nothing and pays neither. The office's own figure, when
+   * it has set one, replaces the whole charge rather than any part of it — it
+   * is stated per kilogram because that is the unit it overrides, and it is
+   * what quotations written before this was per pouch still carry.
+   */
+  const expense: PouchExpense = job.makesPouches
+    ? pouchExpense(job.pouchType, job.pouchWidthMm ?? job.filmWidthMm, overheads.pouchMaking)
+    : { making: 0, zipper: 0, punch: 0, perPouch: 0 };
+
+  const override = overheads.pouchMakingPerKgOverride;
+  const pouchMakingPerKg = !job.makesPouches
+    ? 0
+    : override !== null && override !== undefined
+      ? round(override, 4)
+      : round(expense.perPouch * piecesPerKg, 4);
+
+  const ratePerKg = round(baseRatePerKg + stationSurchargePerKg + pouchMakingPerKg, 2);
   const ratePerPiece = piecesPerKg > 0 ? round(ratePerKg / piecesPerKg, 4) : 0;
 
   /*
@@ -914,6 +983,10 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
     baseRatePerKg,
     stationSurchargePerKg,
     pouchMakingPerKg,
+    pouchExpense:
+      override !== null && override !== undefined
+        ? { making: 0, zipper: 0, punch: 0, perPouch: 0 }
+        : expense,
     ratePerKg,
 
     pieceWeightG,

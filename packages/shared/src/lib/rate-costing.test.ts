@@ -66,7 +66,14 @@ const MASTER = {
     otherPerJob: 250,
     emiPerMonth: 4166.66,
     emiHoursPerMonth: 24,
-    pouchMakingPerKg: 15,
+    /*
+     * The sheet charges 15 a kilogram for pouch making, flat, so the parity
+     * block below reproduces it through the OVERRIDE — which is exactly what
+     * the seven real quotations rebuilt from those sheets carry. By style this
+     * job would pay 0.25 a pouch over 43.13 pouches, or 10.78 a kilogram.
+     */
+    pouchMaking: { makingPerPouch: 0.25, zipperRatePerMetre: 3.6, dPunchPerPouch: 0.35 },
+    pouchMakingPerKgOverride: 15,
     stationSurcharges: [5.5, 7.5, 9],
     marginPercent: 9,
     /* The works' own choices — see the parity block at the foot of this file. */
@@ -445,6 +452,74 @@ describe('what the rate is built from', () => {
     const roll = costRate({ ...input(), job: { ...JOB, makesPouches: false } })!;
     expect(roll.pouchMakingPerKg).toBe(0);
     expect(costRate(input())!.pouchMakingPerKg).toBe(15);
+  });
+
+  /**
+   * **The charge is per pouch, and a kilogram of small pouches costs more to
+   * make than a kilogram of big ones.**
+   *
+   * Which is the whole reason it moved. A flat rate per kilogram cannot say
+   * that, and across the works' own nine costed pouches the same per-pouch
+   * charge reads anywhere between Rs 11 and Rs 64 a kilogram.
+   */
+  it('spreads the per-pouch charge over however many pouches a kilogram makes', () => {
+    const byStyle = {
+      ...input(),
+      job: { ...JOB, pouchType: 'STANDUP' as const, pouchWidthMm: 700 },
+      overheads: { ...input().overheads, pouchMakingPerKgOverride: null },
+    };
+
+    const result = costRate(byStyle)!;
+    expect(result.pouchExpense.perPouch).toBeCloseTo(0.25, 4);
+    expect(result.pouchMakingPerKg).toBeCloseTo(0.25 * result.piecesPerKg, 3);
+
+    /* Half the pouch, twice as many to the kilogram, twice the charge on it. */
+    const smaller = costRate({
+      ...byStyle,
+      job: { ...byStyle.job, piecesPerKgOverride: result.piecesPerKg * 2 },
+    })!;
+    expect(smaller.pouchMakingPerKg).toBeCloseTo(result.pouchMakingPerKg * 2, 3);
+  });
+
+  it('adds the zipper across the mouth, by the metre', () => {
+    const zipped = costRate({
+      ...input(),
+      job: { ...JOB, pouchType: 'STANDUP_ZIPPER' as const, pouchWidthMm: 130 },
+      overheads: { ...input().overheads, pouchMakingPerKgOverride: null },
+    })!;
+
+    // 0.13 m at Rs 3.60, on top of the making charge every pouch pays.
+    expect(zipped.pouchExpense.zipper).toBeCloseTo(0.468, 4);
+    expect(zipped.pouchExpense.perPouch).toBeCloseTo(0.718, 4);
+  });
+
+  it('adds the punch on a D punch, and nothing on a roll', () => {
+    const punched = costRate({
+      ...input(),
+      job: { ...JOB, pouchType: 'D_PUNCH' as const, pouchWidthMm: 190 },
+      overheads: { ...input().overheads, pouchMakingPerKgOverride: null },
+    })!;
+    expect(punched.pouchExpense.perPouch).toBeCloseTo(0.6, 4);
+    expect(punched.pouchExpense.zipper).toBe(0);
+
+    const roll = costRate({
+      ...input(),
+      job: { ...JOB, makesPouches: false, pouchType: null },
+      overheads: { ...input().overheads, pouchMakingPerKgOverride: null },
+    })!;
+    expect(roll.pouchExpense.perPouch).toBe(0);
+    expect(roll.pouchMakingPerKg).toBe(0);
+  });
+
+  /*
+   * The override replaces the whole charge, so the parts would no longer add up
+   * to what is being charged. Reporting them anyway would put a breakdown on
+   * screen that does not reconcile with the figure above it.
+   */
+  it('reports no breakdown when the office has overridden the charge', () => {
+    const overridden = costRate(input())!;
+    expect(overridden.pouchMakingPerKg).toBe(15);
+    expect(overridden.pouchExpense.perPouch).toBe(0);
   });
 
   it('adds up to the rate it reports', () => {

@@ -430,7 +430,7 @@ Estimation `F38`.
 ### 6.7 The machines
 
 Printing runs the first ply. Lamination runs one pass per bond. Slitting runs
-the printed length again. Pouch making is charged per kilogram, not by the
+the printed length again. Pouch making is charged per pouch, not by the
 minute.
 
 ```
@@ -511,12 +511,68 @@ extra stations   = max(0, stations − 5)
 station surcharge per kg = sum of the surcharges for the 6th, 7th, 8th
                            (Rs 5.50, Rs 7.50, Rs 0)
 
-pouch making per kg      = Rs 15 on a pouch job, 0 on a roll
+pouch expense per pouch  = making
+                         + zipper  (width m × Rs/metre, zippered styles only)
+                         + punch   (D punch only)
+pouch making per kg      = pouch expense × pouches per kg, 0 on a roll
+                           — or the quotation's own Rs/kg, where it has one
 
 RATE PER KG = base rate + station surcharge + pouch making
 ```
 
 Estimation `G57` + `G59` + `G60` + `G62` = `G63`.
+
+### 6.10a What making a pouch costs
+
+**Per pouch, not per kilogram**, which is what the works' own pouch workbook
+(`costing_for_Standup.xlsx` — four sheets, one per style, nine costed jobs)
+charges and how the work is actually done. Three figures compose it, all on the
+Costing screen:
+
+| Setting                | Default | Applies to             |
+| ---------------------- | ------: | ---------------------- |
+| Pouch making, Rs/pouch |    0.25 | every pouch            |
+| Zipper, Rs/metre       |    3.60 | Standup zipper, Zipper |
+| D punch, Rs/pouch      |    0.35 | D punch                |
+
+```
+standup        = 0.25
+standup zipper = 0.25 + (width mm ÷ 1000) × 3.60
+zipper         = 0.25 + (width mm ÷ 1000) × 3.60
+D punch        = 0.25 + 0.35                      = 0.60
+roll           = 0
+```
+
+The **finished pouch width** is what the zipper crosses, not the flat film
+width: a standup's bottom gusset lengthens the sheet it is cut from without
+widening the mouth.
+
+The workbook's own figures are reproduced exactly — its standup pouches cost
+0.25, its D punch 0.60, and `(width cm × 3.8) ÷ 100` is a 13 cm pouch paying
+Rs 0.494 for 0.13 m of zipper at Rs 3.80 a metre.
+
+**Why per pouch matters.** Across those nine jobs the same charge reads anywhere
+from Rs 11 to Rs 64 a kilogram, purely because a small pouch packs 130 to a kilo
+and a big one 14:
+
+|              | Rs/pouch | pouches/kg | Rs/kg |
+| ------------ | -------: | ---------: | ----: |
+| Shamali Tea  |    0.494 |        130 | 64.22 |
+| Agasti Ghee  |    0.250 |        203 | 50.75 |
+| Humza Samosa |    0.800 |         14 | 11.20 |
+
+A single rate per kilogram — which is what this was, at Rs 15 — cannot describe
+that.
+
+**One deliberate difference from the workbook.** Its standup-zipper sheet
+charges the zipper alone, with nothing for making, so a zipper pouch is formed,
+sealed and cut for free. Confirmed with the works that it should pay making as
+well, so a 13 cm zipper pouch is 0.744 here where the sheet says 0.494.
+
+**The quotation's own figure still wins**, and it is still stated per kilogram —
+that is the unit it overrides, and it is what every quotation written before
+this carries. The seven 2022 quotations rebuilt from the client's sheets all set
+it, so they reproduce exactly as before.
 
 A five-colour job pays no surcharge. Note the surcharge is charged on
 **stations occupied**, not colours priced: the sheet counts seven stations on a

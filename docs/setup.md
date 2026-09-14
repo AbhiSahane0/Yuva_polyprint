@@ -206,7 +206,9 @@ move whatever has drifted.
 | Packing                 | Rs 5 / kg       | On the quantity consumed                           |
 | Sundries                | Rs 250 / job    | A flat sum the works does not itemise              |
 | Bank EMI                | Rs 4,166.66     | Spread over 24 machine hours a month               |
-| Pouch making            | Rs 15 / kg      | Nothing on a roll — per quotation too              |
+| Pouch making            | Rs 0.25 / pouch | Forming, sealing and cutting one — every pouch     |
+| Zipper                  | Rs 3.60 / metre | Across the mouth, on a zipper or standup zipper    |
+| D punch                 | Rs 0.35 / pouch | On top of making                                   |
 | 6th / 7th / 8th station | 5.50 / 7.50 / 0 | Surcharge past five colours                        |
 | Ink GSM                 | 1.8             | What the laminate is weighed with                  |
 | Adhesive coat           | 2 or 3          | 3 above 40µ, 2 below, per bond                     |
@@ -215,11 +217,21 @@ move whatever has drifted.
 | GST                     | 18%             | On material and cylinders alike                    |
 | Advance                 | 70% / 100%      | Material and cylinders, on the GST-inclusive value |
 
+> **Pouch making is charged per POUCH, and the style decides what it costs.**
+> A standup pays making; a zipper pays making plus the zipper across its mouth,
+> by the metre; a D punch pays making plus the punch. This is the works' own
+> pouch workbook — and it is charged per pouch because per kilogram cannot say
+> it: across the nine jobs in that workbook the same charge reads between Rs 11
+> and Rs 64 a kilogram, purely because a small pouch packs 130 to a kilo and a
+> big one 14.
+
 > **Three of these are set per quotation when a job is not the ordinary case.**
 > Margin, transport and pouch making each have a box on the Jobs step; left
-> blank they follow the figures here. The client's own seven old sheets set all
-> three by hand — margins of 5%, 9% and 10%, transport at Rs 5 and Rs 10, and
-> nothing charged for pouch making on the jobs sold as reels.
+> blank they follow the figures here. Pouch making's box is still in **rupees
+> per kilogram**, because it replaces the whole charge rather than any part of
+> it. The client's own seven old sheets set all three by hand — margins of 5%,
+> 9% and 10%, transport at Rs 5 and Rs 10, and nothing charged for pouch making
+> on the jobs sold as reels.
 
 > **The margin is taken on materials only.** That is what the workbook does, and
 > it is why the margin per kilogram does not change between 500 kg and 5,000 kg —

@@ -1277,14 +1277,22 @@ export default function QuotationFormPage() {
                   </Field>
                 </div>
                 <div className="sm:col-span-4">
+                  {/*
+                    Per KILOGRAM, where the works' figure is per pouch, and that
+                    is deliberate: this replaces the whole charge rather than
+                    any part of it. "Charge Rs 20 a kilo for making on this one,
+                    whatever the style says" is what the office actually means
+                    when it overrides, and it is the unit every quotation
+                    written before the charge became per pouch already carries.
+                  */}
                   <Field
                     label="Pouch making, Rs/kg"
                     htmlFor="pouchMakingPerKg"
-                    hint="Zero on a job sold as a reel"
+                    hint="Blank follows the style; zero on a reel"
                   >
                     <NumberInput
                       id="pouchMakingPerKg"
-                      placeholder={String(settings?.pouchMakingPerKg ?? 15)}
+                      placeholder="by style"
                       {...register('pouchMakingPerKg')}
                     />
                   </Field>
@@ -1527,11 +1535,15 @@ function JobCard({
       /* One cylinder per colour, which is what the line is charged for. */
       colourCount: Math.max(1, num(item?.cylinderCount) || 1),
       makesPouches: jobKind !== 'ROLL',
+      /* The style decides what making one costs, and the FINISHED width is what
+         a zipper crosses — the film width includes the side gussets. */
+      pouchType: jobKind === 'ROLL' ? null : pouchType,
+      pouchWidthMm: num(item?.widthMm),
       quantitiesKg: (cost?.quantities ?? []).map((quantity) => quantity?.quantityKg ?? 0),
       /* The document's own count, so the suggestion and the line agree. */
       piecesPerKg: cost?.geometry.pouchesPerKg ?? 0,
     }),
-    [item, films, filmWidthMm, filmHeightMm, jobKind, cost],
+    [item, films, filmWidthMm, filmHeightMm, jobKind, pouchType, cost],
   );
 
   /*
