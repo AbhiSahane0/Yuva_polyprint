@@ -234,6 +234,12 @@ Either way:
 cost per pouch = total amount ÷ total pouches
 ```
 
+**The form prices per kilogram**, so a line entered today takes the first pair;
+`cost per pouch` is what the Quantities panel shows in its pouch strip and what
+the customer's document prints under the per-kilogram rate. The per-pouch pair
+is still computed and still stored, for quotations written before the form
+settled on kilograms.
+
 ### 5.2 Document totals
 
 ```

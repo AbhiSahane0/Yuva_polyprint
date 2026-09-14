@@ -41,7 +41,6 @@ import {
   createQuotationSchema,
   formatNumber,
   formatRs,
-  pricingBasisFor,
   totalMicronForLayers,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
@@ -183,7 +182,7 @@ const BLANK_ITEM = {
   pouchTypeNote: '',
   // The trade convention for a standup pouch, which the office can change on
   // the line — see the switch in the Quantities panel.
-  pricingBasis: pricingBasisFor('POUCH', 'STANDUP'),
+  pricingBasis: 'PER_KG',
   quantities: [{ quantityKg: '', ratePerKg: '', quantityPouches: '', ratePerPouch: '' }],
 } as unknown as ItemValues;
 
@@ -195,16 +194,25 @@ const BLANK_ITEM = {
  * it: if they disagreed, the margin shown while choosing a price would not be
  * the one that gets stored.
  */
-function basisOf(
-  item: { jobKind?: unknown; pouchType?: unknown; pricingBasis?: unknown } | undefined,
-): PricingBasis {
-  const jobKind = (item?.jobKind ?? 'POUCH') as 'POUCH' | 'ROLL';
-  const pouchType = (item?.pouchType || null) as PouchType | null;
-  const chosen = (item?.pricingBasis || null) as PricingBasis | null;
-
-  // A reel has no pouches to count, whatever was stored against it.
-  if (jobKind === 'ROLL') return 'PER_KG';
-  return chosen ?? pricingBasisFor(jobKind, pouchType);
+function basisOf(): PricingBasis {
+  /*
+   * Every line this form writes is priced per kilogram.
+   *
+   * It used to follow the style — a standup quoted per piece, everything else
+   * by weight — with a switch on the Quantities panel to override it. But the
+   * switch decided which PAIR of boxes existed, so whichever unit was picked,
+   * the other was off screen: quoting per piece hid the weight the film is
+   * bought in, quoting per kilo hid the count the customer asks for.
+   *
+   * The panel now shows both from one typed pair, and the typed pair is the
+   * kilograms — because that is what the film is bought in and what every line
+   * of the costing is worked out from. The pouch figures are the same money
+   * read the other way round, and they are derived rather than typed.
+   *
+   * `pricingBasisFor` stays in the shared package: the schema still uses it to
+   * fill the field in for a request that omits it.
+   */
+  return 'PER_KG';
 }
 
 const num = (value: unknown): number => {
@@ -602,7 +610,7 @@ export default function QuotationFormPage() {
    */
   const costed: ItemCosting[] = useMemo(() => {
     return (watched.items ?? []).map((item) => {
-      const basis = basisOf(item);
+      const basis = basisOf();
 
       const layers = (item?.layers ?? []).map((layer) => {
         const film = layer?.materialId ? filmById.get(String(layer.materialId)) : undefined;
@@ -1446,7 +1454,6 @@ function JobCard({
 }) {
   const jobKind = (item?.jobKind ?? 'POUCH') as 'POUCH' | 'ROLL';
   const pouchType = (item?.pouchType || null) as PouchType | null;
-  const basis = basisOf(item);
 
   /*
    * Whether the office has taken the repeats over.
@@ -1534,21 +1541,15 @@ function JobCard({
   const lastComputed = useRef<Record<number, number>>({});
 
   useEffect(() => {
-    const field = basis === 'PER_POUCH' ? 'ratePerPouch' : 'ratePerKg';
-    const pieces = cost?.geometry.pouchesPerKg ?? 0;
-
     costing.results.forEach((result, position) => {
       if (!result) return;
 
-      const perKg = round(result.ratePerKg, 2);
-      const next = basis === 'PER_POUCH' ? (pieces > 0 ? round(perKg / pieces, 4) : null) : perKg;
-      if (next === null) return;
-
+      const next = round(result.ratePerKg, 2);
       if (lastComputed.current[position] === next) return;
       lastComputed.current[position] = next;
-      setNumber(setValue, `items.${index}.quantities.${position}.${field}`, next);
+      setNumber(setValue, `items.${index}.quantities.${position}.ratePerKg`, next);
     });
-  }, [costing.results, basis, cost?.geometry.pouchesPerKg, index, setValue]);
+  }, [costing.results, index, setValue]);
 
   /**
    * Fill the repeats in as the size is typed, until the office says otherwise.
@@ -1782,11 +1783,6 @@ function JobCard({
                 if (nextKind === 'ROLL') {
                   setValue(`items.${index}.isGazette`, false, { shouldDirty: true });
                 }
-                setValue(
-                  `items.${index}.pricingBasis`,
-                  pricingBasisFor(nextKind, nextPouchType) as ItemValues['pricingBasis'],
-                  { shouldDirty: true },
-                );
               }}
             >
               {JOB_KINDS.map((kind) => (
@@ -1816,16 +1812,6 @@ function JobCard({
                     shouldDirty: true,
                     shouldValidate: true,
                   });
-                  /*
-                   * The style resets the unit to the trade's convention for it.
-                   * Landing on the conventional answer is what someone who never
-                   * touches the switch expects.
-                   */
-                  setValue(
-                    `items.${index}.pricingBasis`,
-                    pricingBasisFor('POUCH', next) as ItemValues['pricingBasis'],
-                    { shouldDirty: true },
-                  );
                 }}
               >
                 <option value="">— Choose —</option>
@@ -2067,18 +2053,13 @@ function JobCard({
           <QuantityFields
             control={control}
             register={register}
+            /* The pouch box writes back into the kilogram one. */
+            setValue={setValue}
             itemIndex={index}
-            pricingBasis={basis}
+            /* What turns the kilograms into pouches. Zero until every ply has a
+               film with a density, which is what the strip says instead. */
+            pouchesPerKg={cost?.geometry.pouchesPerKg ?? 0}
             showsPouches={jobKind !== 'ROLL'}
-            onBasisChange={
-              jobKind === 'ROLL'
-                ? undefined
-                : (next) =>
-                    setValue(`items.${index}.pricingBasis`, next as ItemValues['pricingBasis'], {
-                      shouldDirty: true,
-                      shouldValidate: true,
-                    })
-            }
             results={cost?.quantities ?? []}
             costings={costing.results}
             onShowWorking={setWorking}

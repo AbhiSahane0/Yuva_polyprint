@@ -1168,17 +1168,25 @@ PER_POUCH   totalAmount = quantityPouches × ratePerPouch
 PER_KG      totalAmount = quantityKg      × ratePerKg
 ```
 
-**The basis is chosen on the line**, and stored on it as `pricingBasis`. A line
-that does not state one takes the convention for its style — standup and
-standup-zipper by the piece, because the converting work dominates their cost
-and the trade writes those orders in pieces; everything else by weight. That is
-`pricingBasisFor()` in `@yuva/shared`, and it is the schema's default, not its
-rule.
+**The basis is stored on the line** as `pricingBasis`, and the API still honours
+both. A line that does not state one takes the convention for its style —
+standup and standup-zipper by the piece, everything else by weight — which is
+`pricingBasisFor()` in `@yuva/shared`, the schema's default rather than its rule.
 
-> It used to be the rule: derived from the style and never chosen, with the
+**The quotation form now writes `PER_KG` on every line it saves.** It used to
+offer a Kilogram / Pouches switch on the Quantities panel, and the switch
+decided which pair of boxes existed — so whichever unit was picked, the other
+was off screen. The panel now shows both from one typed pair, and the typed pair
+is the kilograms, because that is what the film is bought in and what every line
+of the costing is worked out from. The pouch figures are derived.
+
+`PER_POUCH` is therefore a legacy basis on the write path and a live one on the
+read path: quotations written before the change still carry it, still reprice
+correctly, and still print the per-piece rate they were quoted at.
+
+> Before either, the basis was derived from the style and never chosen, with the
 > server re-deriving it rather than trusting the client. That refused a real
-> order — a customer who buys standup pouches by the kilogram — so the office
-> now decides, and the choice travels with the line.
+> order — a customer who buys standup pouches by the kilogram.
 
 **A roll is still forced to `PER_KG`**, in the schema's transform, whatever the
 request asks for. There are no pouches on a reel to count. Note that the reprice

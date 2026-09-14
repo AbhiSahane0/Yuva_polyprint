@@ -404,10 +404,9 @@ and only appears for a pouch.
 > Standup · Standup zipper · Zipper · Spout pouch · Centre seal ·
 > Three side seal · Other
 
-**The style decides how the line is priced.** Picking one sets the basis to the
-trade's convention for it, and the switch in the Quantities panel changes it —
-that switch is where the basis is stated, not under the style. Choosing Other
-reveals a box to say what it is.
+**The style no longer decides how the line is priced.** Every line this form
+writes is priced per kilogram, and the pouch figures are worked out from it —
+see [Quantities](#quantities). Choosing Other reveals a box to say what it is.
 
 **A roll is not a pouch.** Choosing it clears the style and any gazette, hides
 both controls, and forces kilograms. Film on a reel has not been converted into
@@ -570,59 +569,68 @@ spreadsheet, not a failed prefill.
 
 #### Quantities
 
-One to three per line, each with its own quantity and rate, and its result
-alongside:
-
-> **Rs. 1,45,000** · 51.52 kg · 25,000 pouches · **31.2% margin**
-
-Margin under 15% turns amber.
-
-**Both units are reported, not just the one that was not typed.** The office
-quotes in whichever the customer buys; the works runs on the other. A per-pouch
-order still has to be laminated and slit by weight, and a per-kilo one still has
-to come off the machine as a countable number of pieces.
-
-**The margin is material only.** It is the selling rate against the material
-cost of a kilogram — films, ink and adhesive — and **cylinders, printing,
-lamination, slitting and wastage are not in it**:
+One to three per line. Each is **a quantity — in kilograms or in pouches,
+whichever you were given — and a rate per kilogram**:
 
 ```
-margin % = (selling per kg − material per kg) ÷ selling per kg
+QUANTITIES                                                     Add a quantity
+
+  Quantity 1                              Rate 1  (i)
+  [   500   ]  =  [  21,565  ]            [  281.24  ]      Rs. 1,40,621
+      kg              pouches                 per kg        21.1% gross · 7.1% net
+ ┌──────────────────────────────────────────────────────────────────────────┐
+ │  Rs. 6.52  per pouch  ·  23.19 g each                                    │
+ └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-Hovering it spells out the two figures that made it, and says what it leaves
-out. That lives on hover because it is a question asked once and a line of noise
-afterwards. Note that a per-pouch line converts first — 1,000 pouches at Rs. 10
-is Rs. 10,000 for 6.16 kg, so the selling rate is Rs. 1,623/kg — which is why a
-small light pouch sold per piece always shows a spectacular figure.
+**The two units are two boxes, not two modes.** There used to be a
+`Sold by [Kilogram | Pouches]` switch, and it decided which pair of fields the
+row was bound to — so whichever unit was picked, the other was off screen.
+Quoting per piece hid the weight the film is bought in; quoting per kilo hid the
+count the customer asks for.
 
-**Kilogram or Pouches is chosen here**, on the switch in the panel header:
+They are two readings of one number, so the row shows them as one, joined by the
+equals sign that says so. **Type into whichever the customer gave you** — an
+enquiry arrives as "five hundred kilos" or as "a lakh pouches" depending on who
+is ringing, and neither should need converting by hand before it can be keyed
+in. The kilograms are what the form holds; the pouch box writes back into them
+at the laminate's own weight per pouch.
 
-```
-QUANTITIES              Sold by [ Kilogram | Pouches ]     Add a quantity
-```
+**The pouch box is disabled, not hidden, until the laminate has a weight.** It
+needs every ply to have a film with a density before it can convert anything.
+Hiding it would make the row change shape as films are chosen; disabling it
+leaves the layout still and says what it is waiting for.
 
-Only the chosen pair is asked for — kg and rate per kg, or pouches and rate per
-pouch — but **both are kept**, so a customer who asks for the price the other way
-round is answered without re-typing the first one.
+**A roll has neither the pouch box nor the strip.** Film on a reel has not been
+converted into anything, so there is nothing to count — absent rather than shown
+empty.
 
-> The boxes and the total disagreed for a while. Switching the unit swaps which
-> two fields the row is bound to, and React reused the same input — same
-> element, same position, new name — while react-hook-form's `register` never
-> writes back into an input it already holds. So the boxes went on showing the
-> kilograms that were typed while the form read and wrote the pouch fields
-> underneath: **100 and Rs. 400 on screen, Rs. 0 as the total beside them.** A
-> quotation could be sent on a figure nobody entered. The boxes are keyed on the
-> field name now, so switching remounts them and fills them from what is stored.
+**The rate stays per kilogram**, because that is what the costing works out and
+what the film is bought at. What one pouch comes to is the strip underneath, and
+it is the largest figure on the panel: it is the one the customer asks for by
+name. The weight beside it is what turned one into the other, so the arithmetic
+can be followed without leaving the row.
 
-The style seeds it: standup and standup zipper start on Pouches, everything else
-on Kilogram, which is what the trade does. Changing the style resets the switch
-to that style's convention, so anyone who never touches it gets the conventional
-answer. A **roll has no switch** — there are no pouches on a reel to count.
+> The switch carried a real defect as well as hiding half the answer. React
+> reused the same input across it — same element, same position, new name —
+> while react-hook-form's `register` never writes back into an input it already
+> holds. So the boxes went on showing the kilograms that were typed while the
+> form read and wrote the pouch fields underneath: **100 and Rs. 400 on screen,
+> Rs. 0 as the total beside them.** A quotation could be sent on a figure nobody
+> entered. With both units on screen at once that class of bug cannot happen.
 
-> This used to be decided entirely by the style, with no way to override it. A
-> customer who orders standup pouches by the kilogram could not be quoted the
-> way they actually buy.
+**Gross and net margins** sit beside the total. Gross is the selling rate
+against the material cost of a kilogram — films, ink and adhesive only. Net is
+against what the job actually costs to make, including wages, power, transport,
+packing and the press setup, and is **absent rather than zero** while the line
+cannot be costed. Hovering either spells out the two figures that made it. Net
+under 5% is red, under 12% amber.
+
+**The customer's document carries both too.** A pouch job prints the rate per
+kilogram with the rate each underneath it in smaller type — it is the same price
+read the other way round, not a second charge, and printing it saves the
+customer doing the sum against the pouches-per-kilogram column and getting a
+different answer. A roll gets no such line.
 
 Every job on one quotation must be priced at the same number of quantities. They
 are columns on one document, and a job with three where another has two would

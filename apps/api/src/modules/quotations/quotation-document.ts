@@ -152,17 +152,36 @@ export function renderQuotationHtml(quotation: Quotation): string {
         }
         <td class="r">${
           // Order quantity in the unit the line was quoted in: pouches for a
-          // standup, kilograms for everything else.
+          // standup quoted per piece, kilograms for everything else.
           item.pricingBasis === 'PER_POUCH'
             ? formatNumber(q?.quantityPouches ?? 0)
             : formatNumber(q?.quantityKg ?? 0)
         }</td>
         <td class="r">${item.jobKind === 'ROLL' ? '—' : formatNumber(q?.totalPouches ?? 0)}</td>
-        <td class="r">${
-          item.pricingBasis === 'PER_POUCH'
-            ? `${formatNumber(q?.ratePerPouch ?? 0, 2)} /pc`
-            : formatNumber(q?.ratePerKg ?? 0, 2)
-        }</td>
+        <td class="r">${(() => {
+          /*
+           * The rate, and on a pouch job the rate each underneath it.
+           *
+           * A line priced per kilogram used to print only the per-kilogram
+           * figure, which is the one the works quotes in and NOT the one the
+           * customer reads: they buy pouches, and "what does one cost" is the
+           * first question back. It is not a second price — it is this one
+           * divided by the pouches in a kilogram, which the column beside it
+           * already gives — so printing it saves the customer the arithmetic
+           * rather than inviting them to do it and get a different answer.
+           *
+           * `costPerPouch` is the total over the count, so it is exactly what
+           * the order works out to per piece whichever way the line was priced.
+           */
+          if (item.pricingBasis === 'PER_POUCH') {
+            return `${formatNumber(q?.ratePerPouch ?? 0, 2)} /pc`;
+          }
+          const perKg = formatNumber(q?.ratePerKg ?? 0, 2);
+          const each = q?.costPerPouch ?? 0;
+          return item.jobKind === 'ROLL' || each <= 0
+            ? perKg
+            : `${perKg}<br/><span class="sub">${formatNumber(each, 2)} /pc</span>`;
+        })()}</td>
         <td class="r">${formatRs(q?.totalAmount ?? 0)}</td>
         ${
           first
@@ -289,6 +308,9 @@ export function renderQuotationHtml(quotation: Quotation): string {
   /* Money and measurements must never wrap — a split "Rs. 8,625" reads as two
      different numbers on a customer-facing document. */
   td.r { text-align: right; white-space: nowrap; }
+  /* The per-piece rate under the per-kilogram one. Smaller and grey, because
+     it is the same price read the other way round and not a second charge. */
+  td.r .sub { font-size: 6.6pt; color: #666; }
   /* The job name needs room, but this cannot key on child position: a line
      priced at several quantities spans its description down the extra rows, so
      those rows begin at the order-quantity column and position two is a
