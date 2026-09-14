@@ -312,11 +312,19 @@ which is the whole reason a quotation carries tiers.
 ### 6.1 How much film is actually bought
 
 ```
-wastage kg  = order kg × wastage %                    (8%, Estimation J5)
+wastage kg  = order kg × wastage %      8% on a reel, 7% on a pouch job,
+                                        or the quotation's own figure
 consumed kg = order kg + wastage kg                   (Estimation I6)
 ```
 
 Note the divisor at the end is the **ordered** quantity, not the consumed one.
+**Two figures, from two of the works' documents.** The Estimation sheet carries
+8% and everything used to be costed on it; the pouch workbook that costs the
+standup, zipper and D punch work carries 7%. A quotation may pin its own, and
+the seven 2022 quotations rebuilt from the Estimation sheet do — they are all
+pouches, so a rule keyed on "is it a pouch" alone would have moved every one of
+them off the sheet it reproduces.
+
 The wastage is already inside the cost; dividing by the consumed weight would
 charge for it and then hand it back.
 
@@ -837,8 +845,9 @@ setup power factor.
 
 **Overheads and defaults** — working days a month, hours a day, transport per
 kg, packing per kg, sundries per job, bank EMI and the hours it spreads over,
-pouch making per kg, the 6th/7th/8th station surcharges, trim, **cylinder
-mounting**, wastage %, margin %, solvent per 100 of ink, ethyl acetate %.
+**pouch making per pouch, D punch per pouch, zipper per metre**, the 6th/7th/8th
+station surcharges, trim, **cylinder mounting**, **wastage % and wastage % on a
+pouch job**, margin %, solvent per 100 of ink, ethyl acetate %.
 
 **Which material prices what** — the flat ink and flat adhesive blends, the
 per-batch adhesive, the hardener, ethyl acetate, toluene.

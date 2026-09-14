@@ -1432,8 +1432,13 @@ cannot describe it: across the workbook's nine costed jobs the same charge reads
 between Rs 11 and Rs 64 a kilogram, purely because a small pouch packs 130 to a
 kilo and a big one 14.
 
-**Three figures are set on the quotation, not the works.** Margin %, transport
-per kg and pouch making per kg sit at the top of the Jobs step; left blank each
+**Wastage is two figures, not one.** The works runs **pouch jobs at 7%** and
+everything else at **8%**, from two of its own documents — the pouch workbook
+and the Estimation sheet. One percentage point is roughly Rs 2 a kilogram, since
+film is about four-fifths of a rate, so which one applies is not a detail.
+
+**Four figures are set on the quotation, not the works.** Margin %, transport
+per kg, pouch making per kg and wastage % sit at the top of the Jobs step; left blank each
 follows the Costing screen, so an ordinary job keeps up with the works' own
 figures as they change. Pouch making's box is still in **rupees per kilogram**
 even though the works' figure is per pouch — it replaces the whole charge rather

@@ -164,6 +164,7 @@ export interface Quotation extends QuotationSummary {
   marginPercent: number | null;
   transportPerKg: number | null;
   pouchMakingPerKg: number | null;
+  wastagePercent: number | null;
   cylinderRate: number;
   gstPercent: number;
   materialAdvancePercent: number;

@@ -260,6 +260,7 @@ function toQuotation(row: QuotationRow): Quotation {
     marginPercent: row.marginPercent === null ? null : toNumber(row.marginPercent),
     transportPerKg: row.transportPerKg === null ? null : toNumber(row.transportPerKg),
     pouchMakingPerKg: row.pouchMakingPerKg === null ? null : toNumber(row.pouchMakingPerKg),
+    wastagePercent: row.wastagePercent === null ? null : toNumber(row.wastagePercent),
     cylinderRate: toNumber(row.cylinderRate),
     gstPercent: toNumber(row.gstPercent),
     materialAdvancePercent: toNumber(row.materialAdvancePercent),
@@ -613,6 +614,7 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
     marginPercent: input.marginPercent ?? null,
     transportPerKg: input.transportPerKg ?? null,
     pouchMakingPerKg: input.pouchMakingPerKg ?? null,
+    wastagePercent: input.wastagePercent ?? null,
   };
 
   const costing = await loadCostingContext(input.date);
@@ -892,6 +894,8 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
       input.pouchMakingPerKg !== undefined
         ? input.pouchMakingPerKg
         : nullable(existing.pouchMakingPerKg),
+    wastagePercent:
+      input.wastagePercent !== undefined ? input.wastagePercent : nullable(existing.wastagePercent),
   };
 
   // Reprice from whichever line set applies — the new one if sent, else the stored one.

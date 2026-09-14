@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pouchExpense, type PouchMakingRates } from './pouch-making.js';
+import { pouchExpense, wastagePercentFor, type PouchMakingRates } from './pouch-making.js';
 
 /**
  * **Checked against the works' own pouch workbook** — `costing_for_Standup.xlsx`,
@@ -119,5 +119,55 @@ describe('what making one pouch costs', () => {
   it('adds its own parts up', () => {
     const expense = pouchExpense('STANDUP_ZIPPER', 250, RATES);
     expect(expense.perPouch).toBeCloseTo(expense.making + expense.zipper, 6);
+  });
+});
+
+/**
+ * **Two wastage figures, from two of the works' own documents.**
+ *
+ * The Estimation sheet carries 8% and everything is costed on it; the pouch
+ * workbook that costs the standup, zipper and D punch work carries 7%.
+ *
+ * Worth a test of its own for what it moves rather than for how hard it is.
+ * Wastage inflates the film bought and film is about four-fifths of a rate, so
+ * one percentage point is roughly Rs 2 a kilogram on every quotation in the
+ * system — and it arrives without anybody touching a quotation.
+ *
+ * The case that matters is the last one. The seven 2022 quotations rebuilt from
+ * the Estimation sheet are all POUCHES, and they reproduce their sheets to the
+ * paisa at 8%. A rule keyed on "is it a pouch" alone would have moved every one
+ * of them, so each pins its own figure and the pin beats the rule.
+ */
+describe('which wastage a line is costed at', () => {
+  const WORKS = { defaultWastagePercent: 8, pouchWastagePercent: 7 };
+
+  it('costs a pouch job at the works’ pouch figure', () => {
+    expect(wastagePercentFor({ makesPouches: true, ...WORKS })).toBe(7);
+  });
+
+  it('costs a reel at the Estimation sheet’s figure', () => {
+    expect(wastagePercentFor({ makesPouches: false, ...WORKS })).toBe(8);
+  });
+
+  it('lets a quotation pin its own, whichever kind of job it is', () => {
+    expect(wastagePercentFor({ makesPouches: true, override: 8, ...WORKS })).toBe(8);
+    expect(wastagePercentFor({ makesPouches: false, override: 12.5, ...WORKS })).toBe(12.5);
+  });
+
+  /*
+   * Zero is a figure somebody typed — a job that spoils nothing — and it is not
+   * the same as leaving the box empty. `??` alone would have read it as empty
+   * and quietly costed the line at 7%.
+   */
+  it('treats a pinned zero as a figure, not as a blank', () => {
+    expect(wastagePercentFor({ makesPouches: true, override: 0, ...WORKS })).toBe(0);
+  });
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+    ['NaN', Number.NaN],
+  ])('follows the works when the quotation says %s', (_label, override) => {
+    expect(wastagePercentFor({ makesPouches: true, override, ...WORKS })).toBe(7);
   });
 });

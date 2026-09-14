@@ -4,6 +4,7 @@ import {
   costRate,
   parseStationSteps,
   unpricedColours,
+  wastagePercentFor,
   type CostingBreakdown,
   type CostingColour,
   type CostingInput,
@@ -64,6 +65,7 @@ export interface RateCostingOverrides {
   marginPercent?: number | null;
   transportPerKg?: number | null;
   pouchMakingPerKg?: number | null;
+  wastagePercent?: number | null;
   /**
    * The quotation's own date, so it is costed on the figures of that day.
    *
@@ -191,7 +193,12 @@ export function useRateCosting(
     return {
       job: {
         orderQtyKg: 0, // set per quantity below
-        wastagePercent: settings.defaultWastagePercent,
+        wastagePercent: wastagePercentFor({
+          makesPouches: line.makesPouches,
+          override: overrides.wastagePercent,
+          defaultWastagePercent: settings.defaultWastagePercent,
+          pouchWastagePercent: settings.pouchWastagePercent,
+        }),
         filmWidthMm: line.filmWidthMm,
         filmHeightMm: line.filmHeightMm,
         ups: line.ups,

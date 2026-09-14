@@ -282,12 +282,19 @@ model Quotation {
 
   /// Costing figures this quotation overrides, or null for the works' own.
   ///
-  /// The client's own sheets set all three by hand job to job — margins of 5%,
+  /// The client's own sheets set these by hand job to job — margins of 5%,
   /// 9% and 10%, transport at Rs 5 and Rs 10, pouch making at 0, 11.04 and 15.
   /// Holding one figure for the works made their own history unreproducible.
+  ///
+  /// Wastage joined them when the works gave a second figure for it: 7% on the
+  /// pouch jobs its pouch workbook covers, 8% on everything else, where one
+  /// number had been read from the Estimation sheet. The seven 2022 quotations
+  /// rebuilt from that sheet set it here, so they keep reproducing whatever the
+  /// works' own default becomes.
   marginPercent    Decimal? @map("margin_percent") @db.Decimal(5, 2)
   transportPerKg   Decimal? @map("transport_per_kg") @db.Decimal(10, 2)
   pouchMakingPerKg Decimal? @map("pouch_making_per_kg") @db.Decimal(10, 2)
+  wastagePercent   Decimal? @map("wastage_percent") @db.Decimal(5, 2)
 
   /// Rates as they stood when this quotation was made.
   cylinderRate           Decimal @map("cylinder_rate") @db.Decimal(10, 4)

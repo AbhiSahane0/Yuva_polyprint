@@ -95,3 +95,35 @@ export function pouchExpense(
 
   return { making, zipper, perPouch: round(making + zipper, 4) };
 }
+
+/**
+ * Which wastage figure this line is costed at.
+ *
+ * **The works has two, from two of its own documents.** Its Estimation sheet
+ * carries 8% and everything is costed on that; its pouch workbook, which costs
+ * the standup, zipper and D punch work, carries 7%. One number could hold only
+ * one of them.
+ *
+ * Written as a function with a test rather than inline where it is used,
+ * because of what it moves. Wastage inflates the film bought, and film is about
+ * four-fifths of a rate — so one percentage point is roughly Rs 2 a kilogram on
+ * every quotation in the system, arriving silently.
+ *
+ * **The quotation's own figure beats both**, which is how the seven 2022
+ * quotations rebuilt from the Estimation sheet hold 8% while being pouches. A
+ * rule keyed on "is it a pouch" alone would have moved all seven off the sheets
+ * they reproduce to the paisa.
+ */
+export function wastagePercentFor(input: {
+  /** False on a roll, which is costed on the Estimation sheet's figure. */
+  makesPouches: boolean;
+  /** What this quotation sets for itself, or null to follow the works. */
+  override?: number | null;
+  defaultWastagePercent: number;
+  pouchWastagePercent: number;
+}): number {
+  if (input.override !== null && input.override !== undefined && Number.isFinite(input.override)) {
+    return input.override;
+  }
+  return input.makesPouches ? input.pouchWastagePercent : input.defaultWastagePercent;
+}

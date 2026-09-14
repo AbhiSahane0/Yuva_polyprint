@@ -313,6 +313,7 @@ const createQuotationBaseSchema = z.object({
   marginPercent: blankIsUnset(0, 100),
   transportPerKg: blankIsUnset(0, 10000),
   pouchMakingPerKg: blankIsUnset(0, 10000),
+  wastagePercent: blankIsUnset(0, 100),
 
   /** Rates may be overridden per quotation; omitted means "use the settings". */
   cylinderRate: z.coerce.number().positive().optional(),
@@ -482,7 +483,18 @@ export const settingsSchema = z.object({
    * engraver charges for, and it is theirs to set.
    */
   cylinderMountingMm: z.coerce.number().min(0).max(500),
+  /** Film spoiled setting up and running, on everything but a pouch job. */
   defaultWastagePercent: z.coerce.number().min(0).max(100),
+  /**
+   * And on a pouch job, which the works runs at a different figure.
+   *
+   * Two numbers because the works has two documents: its Estimation sheet
+   * carries 8%, and the pouch workbook that costs its standup, zipper and
+   * D punch work carries 7%. One figure could hold only one of them, and the
+   * seven 2022 quotations verified against the Estimation sheet are pouches —
+   * so a single rule keyed on "is it a pouch" would have moved all seven.
+   */
+  pouchWastagePercent: z.coerce.number().min(0).max(100),
   defaultMarginPercent: z.coerce.number().min(0).max(100),
   /**
    * What the margin is taken on. Their sheet uses the material cost alone,
@@ -570,6 +582,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   /* Read off the works' own jobs: width × lanes + 80 fits their press on 95%. */
   cylinderMountingMm: 80,
   defaultWastagePercent: 8,
+  pouchWastagePercent: 7,
   defaultMarginPercent: 9,
   marginBasis: 'MATERIAL_ONLY',
   inkCostModel: 'FLAT_GSM',

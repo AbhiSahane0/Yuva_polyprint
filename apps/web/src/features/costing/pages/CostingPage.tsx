@@ -398,6 +398,7 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
     ['defaultTrimMm', 'Trim, mm', 'Added to the web width'],
     ['cylinderMountingMm', 'Cylinder mounting, mm', 'Face beyond the web the engraver charges for'],
     ['defaultWastagePercent', 'Wastage %', 'Film spoiled setting up and running'],
+    ['pouchWastagePercent', 'Wastage % on a pouch job', 'The works runs pouches at its own figure'],
     ['defaultMarginPercent', 'Margin %', 'Added to cost, not taken off the rate'],
     ['inkSolventParts', 'Solvent per 100 of ink', 'How the press thins it'],
     ['ethylAcetatePercent', 'Ethyl acetate %', 'The rest is toluene'],

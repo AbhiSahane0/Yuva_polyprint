@@ -1297,6 +1297,24 @@ export default function QuotationFormPage() {
                     />
                   </Field>
                 </div>
+                <div className="sm:col-span-4">
+                  {/*
+                    The works has two: 7% on a pouch job, 8% on everything else,
+                    from two of its own documents. Blank takes whichever this
+                    line is — which is why the placeholder cannot name a figure.
+                  */}
+                  <Field
+                    label="Wastage %"
+                    htmlFor="wastagePercent"
+                    hint="Film spoiled setting up and running"
+                  >
+                    <NumberInput
+                      id="wastagePercent"
+                      placeholder="by job kind"
+                      {...register('wastagePercent')}
+                    />
+                  </Field>
+                </div>
               </div>
             </FieldSection>
 
@@ -1321,6 +1339,7 @@ export default function QuotationFormPage() {
                   marginPercent: numOrNull(watched.marginPercent),
                   transportPerKg: numOrNull(watched.transportPerKg),
                   pouchMakingPerKg: numOrNull(watched.pouchMakingPerKg),
+                  wastagePercent: numOrNull(watched.wastagePercent),
                 }}
                 selectedQuantity={selectedQuantity}
                 onSelectQuantity={(position) =>

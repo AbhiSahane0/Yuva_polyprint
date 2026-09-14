@@ -199,7 +199,8 @@ move whatever has drifted.
 | ----------------------- | --------------- | -------------------------------------------------- |
 | Working days a month    | 26              | Turns a salary into a rate per minute              |
 | Hours a day             | 8               | The shift, for the same reason                     |
-| Wastage                 | 8%              | Film spoiled setting up and running                |
+| Wastage                 | 8%              | Film spoiled setting up and running — a reel       |
+| Wastage on a pouch job  | 7%              | What the works runs pouches at                     |
 | Margin                  | 9%              | Added to cost — set per quotation too              |
 | Trim                    | 15 mm           | Added to the web width                             |
 | Transport               | Rs 10 / kg      | On the quantity consumed — per quotation too       |
@@ -225,9 +226,9 @@ move whatever has drifted.
 > and Rs 64 a kilogram, purely because a small pouch packs 130 to a kilo and a
 > big one 14.
 
-> **Three of these are set per quotation when a job is not the ordinary case.**
-> Margin, transport and pouch making each have a box on the Jobs step; left
-> blank they follow the figures here. Pouch making's box is still in **rupees
+> **Four of these are set per quotation when a job is not the ordinary case.**
+> Margin, transport, pouch making and wastage each have a box on the Jobs step;
+> left blank they follow the figures here. Pouch making's box is still in **rupees
 > per kilogram**, because it replaces the whole charge rather than any part of
 > it. The client's own seven old sheets set all three by hand — margins of 5%,
 > 9% and 10%, transport at Rs 5 and Rs 10, and nothing charged for pouch making
