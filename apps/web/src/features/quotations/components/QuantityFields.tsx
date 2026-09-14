@@ -11,6 +11,7 @@ import {
   formatNumber,
   formatRs,
   marginsAt,
+  round,
   type CostingBreakdown,
   type CreateQuotationFormValues,
 } from '@yuva/shared';
@@ -36,8 +37,11 @@ import { cn } from '@/lib/utils';
  * "five hundred kilos" or as "a lakh pouches" depending on who is ringing, and
  * neither should need converting by hand before it can be keyed in.
  *
- * The **rate** stays per kilogram, because that is what the costing works out
- * and what the film is bought at. What one pouch comes to is underneath.
+ * The **rate** is the same pair: `Rs. 281.24 per kg = Rs. 6.52 per pouch`. The
+ * costing works in kilograms and fills the left box in, but a customer haggles
+ * in the unit they buy — "make it six and a half and we'll take it" — and
+ * typing that into the right box is the whole of it. Nothing has to be worked
+ * backwards on paper to find the per-kilo figure that lands on a round price.
  */
 
 /** What each quantity works out to, computed live so nothing is a surprise. */
@@ -207,37 +211,33 @@ function QuantityRow({
     useWatch({ control, name: `items.${itemIndex}.quantities.${index}.quantityKg` }) ?? 0,
   );
 
+  const ratePerKg = Number(
+    useWatch({ control, name: `items.${itemIndex}.quantities.${index}.ratePerKg` }) ?? 0,
+  );
+
+  const write = (field: string, value: number | string) =>
+    setValue(`items.${itemIndex}.quantities.${index}.${field}` as never, String(value) as never, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+
   /*
-   * What the pouch box shows while it is being typed in.
-   *
-   * The box is derived from the kilograms, so without this it would be rewritten
-   * under the cursor on every keystroke: type "1" and it becomes 0.023 kg, which
-   * rounds back to "1" — but type "10" and the intermediate states fight. Held
-   * locally while focused and dropped on blur, so the box re-syncs the moment
-   * the kilograms change anywhere else.
+   * Typing pouches sets the kilograms. Three decimals, because a pouch is grams
+   * — the weight it implies is exact enough to price and short enough to read.
    */
-  const [typing, setTyping] = useState<string | null>(null);
+  const takePouches = (count: number) => {
+    write('quantityKg', count > 0 ? round(count / pouchesPerKg, 3) : '');
+    write('quantityPouches', Math.max(0, Math.round(count)));
+  };
 
-  const pouches = pouchesPerKg > 0 && kg > 0 ? Math.round(kg * pouchesPerKg) : 0;
-  const pouchBox = typing ?? (pouches > 0 ? String(pouches) : '');
-
-  const takePouches = (text: string) => {
-    setTyping(text);
-    if (pouchesPerKg <= 0) return;
-    const count = Number(text);
-    if (!Number.isFinite(count)) return;
-    /* Three decimals: a pouch is grams, so the weight it implies is exact enough
-       to price and short enough to read. */
-    setValue(
-      `items.${itemIndex}.quantities.${index}.quantityKg`,
-      String(count > 0 ? Math.round((count / pouchesPerKg) * 1000) / 1000 : '') as never,
-      { shouldDirty: true, shouldValidate: true },
-    );
-    setValue(
-      `items.${itemIndex}.quantities.${index}.quantityPouches`,
-      String(Math.max(0, Math.round(count))) as never,
-      { shouldDirty: true },
-    );
+  /*
+   * Typing a rate each sets the rate per kilogram, which is the one the line is
+   * actually priced on. Four decimals, because a pouch is often under ten rupees
+   * and two would round a half-paisa negotiation away.
+   */
+  const takeRateEach = (each: number) => {
+    write('ratePerKg', each > 0 ? round(each * pouchesPerKg, 4) : '');
+    write('ratePerPouch', each > 0 ? round(each, 4) : '');
   };
 
   /* Whether this row can be read as pouches at all — a roll never can, and a
@@ -289,7 +289,7 @@ function QuantityRow({
             error={errors?.quantityKg?.message}
           >
             <div className="flex items-center gap-2">
-              <div className="w-28">
+              <div className="w-24">
                 <NumberInput
                   id={quantityId}
                   invalid={Boolean(errors?.quantityKg)}
@@ -300,35 +300,50 @@ function QuantityRow({
 
               {showsPouches ? (
                 <>
-                  <span className="text-ink-300 mt-2 text-sm" aria-hidden>
-                    =
-                  </span>
-                  <div className="w-28">
-                    <NumberInput
-                      id={pouchId}
-                      value={pouchBox}
-                      aria-label={`Quantity ${index + 1} in pouches`}
-                      disabled={pouchesPerKg <= 0}
-                      onChange={(event) => takePouches(event.target.value)}
-                      onBlur={() => setTyping(null)}
-                    />
-                    <p className="text-ink-400 mt-1 text-xs">pouches</p>
-                  </div>
+                  <Equals />
+                  <PairedBox
+                    id={pouchId}
+                    ariaLabel={`Quantity ${index + 1} in pouches`}
+                    hint="pouches"
+                    derived={pouchesPerKg > 0 && kg > 0 ? kg * pouchesPerKg : 0}
+                    decimals={0}
+                    disabled={pouchesPerKg <= 0}
+                    onType={takePouches}
+                  />
                 </>
               ) : null}
             </div>
           </Field>
         </div>
 
-        <div className="w-32">
+        <div className="min-w-0">
           <div className="relative">
             <Field label={`Rate ${index + 1}`} htmlFor={rateId} error={errors?.ratePerKg?.message}>
-              <NumberInput
-                id={rateId}
-                invalid={Boolean(errors?.ratePerKg)}
-                {...register(rateId as never)}
-              />
-              <p className="text-ink-400 mt-1 text-xs">per kg</p>
+              <div className="flex items-center gap-2">
+                <div className="w-24">
+                  <NumberInput
+                    id={rateId}
+                    invalid={Boolean(errors?.ratePerKg)}
+                    {...register(rateId as never)}
+                  />
+                  <p className="text-ink-400 mt-1 text-xs">per kg</p>
+                </div>
+
+                {showsPouches ? (
+                  <>
+                    <Equals />
+                    <PairedBox
+                      id={`items.${itemIndex}.quantities.${index}.ratePerPouch`}
+                      ariaLabel={`Rate ${index + 1} per pouch`}
+                      hint="per pouch"
+                      derived={pouchesPerKg > 0 && ratePerKg > 0 ? ratePerKg / pouchesPerKg : 0}
+                      decimals={4}
+                      disabled={pouchesPerKg <= 0}
+                      onType={takeRateEach}
+                    />
+                  </>
+                ) : null}
+              </div>
             </Field>
             {/*
               The working, beside the figure it produced. The rate arrives filled
@@ -342,7 +357,7 @@ function QuantityRow({
                 onClick={() => onShowWorking(index)}
                 title="How this rate was worked out"
                 aria-label={`How rate ${index + 1} was worked out`}
-                className="text-ink-400 hover:text-brand-600 absolute top-0 right-0 cursor-pointer p-0.5"
+                className="text-ink-400 hover:text-brand-600 absolute top-0 left-28 cursor-pointer p-0.5"
               >
                 <Info className="size-4" />
               </button>
@@ -387,13 +402,12 @@ function QuantityRow({
       </div>
 
       {/*
-       * What the order comes to, in the two figures the customer is told: what
-       * one pouch costs, and what the lot costs.
+       * What the order comes to, and the two facts that are not boxes.
        *
-       * The rate each is the largest thing on the panel because it is what they
-       * ask for by name, and it is derived — the price is worked out per
-       * kilogram. The weight beside it is what turned one into the other, so the
-       * arithmetic can be followed without leaving the row.
+       * Everything the office types is above; this is what falls out of it. The
+       * total is the figure that goes on the document, so it carries the weight
+       * here — and the count with its weight each is the working behind the
+       * pouch boxes, so the arithmetic can be followed without leaving the row.
        *
        * The strip is here on a roll too, carrying the total alone: money belongs
        * in one place whether or not the job has pouches in it.
@@ -403,17 +417,7 @@ function QuantityRow({
           <span className="text-ink-300 text-xs">&mdash;</span>
         ) : (
           <>
-            {countable ? (
-              <>
-                <span className="text-brand-700 text-base font-semibold tabular-nums">
-                  {formatRs(result.costPerPouch, 2)}
-                </span>
-                <span className="text-ink-500 text-xs">per pouch</span>
-                <span className="text-ink-300 text-xs">&middot;</span>
-              </>
-            ) : null}
-
-            <span className="text-ink-900 text-sm font-semibold tabular-nums">
+            <span className="text-brand-700 text-base font-semibold tabular-nums">
               {formatRs(result.totalAmount)}
             </span>
             <span className="text-ink-500 text-xs">in all</span>
@@ -422,7 +426,8 @@ function QuantityRow({
               <>
                 <span className="text-ink-300 text-xs">&middot;</span>
                 <span className="text-ink-500 text-xs tabular-nums">
-                  {formatNumber(pouchWeightG, 2)} g a pouch
+                  {formatNumber(result.totalPouches)} pouches at {formatNumber(pouchWeightG, 2)} g
+                  each
                 </span>
               </>
             ) : null}
@@ -431,13 +436,87 @@ function QuantityRow({
               <>
                 <span className="text-ink-300 text-xs">&middot;</span>
                 <span className="text-ink-400 text-xs">
-                  the pouch count and the rate each need a film on every ply
+                  the pouch boxes need a film on every ply — the densities are what turn kilograms
+                  into a count
                 </span>
               </>
             ) : null}
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** What says the two boxes are one number rather than two settings. */
+function Equals() {
+  return (
+    <span className="text-ink-300 mb-5 text-sm" aria-hidden>
+      =
+    </span>
+  );
+}
+
+/**
+ * The other half of a pair: shown from the half the form holds, typed into
+ * freely.
+ *
+ * Both pairs work the same way. One box is the field — kilograms, rupees per
+ * kilogram — and the other is that field read through the laminate's weight per
+ * pouch. Typing into this one converts and writes back into the field, so there
+ * is one source of truth and no chance of the two drifting.
+ *
+ * **The local `typing` state is what makes it usable.** Without it the box is
+ * rewritten from the field on every keystroke: type "1" into pouches, that is
+ * 0.023 kg, which renders back as "1" — but the intermediate states of "1000"
+ * fight the cursor, and a rate typed as "6.5" briefly becomes "6.5000000001"
+ * through the round trip. Held while the box has focus and dropped on blur, so
+ * it re-syncs the moment the other half changes anywhere else.
+ *
+ * Disabled rather than hidden when there is nothing to convert with: the row
+ * should not change shape as films are chosen, and a dead box beside a live one
+ * reads as "waiting" where a missing box reads as "not offered".
+ */
+function PairedBox({
+  id,
+  ariaLabel,
+  hint,
+  derived,
+  decimals,
+  disabled,
+  onType,
+}: {
+  id: string;
+  ariaLabel: string;
+  hint: string;
+  derived: number;
+  /** 0 for a count of pouches; 4 for a rate, where half a paisa is negotiable. */
+  decimals: number;
+  disabled: boolean;
+  onType: (value: number) => void;
+}) {
+  const [typing, setTyping] = useState<string | null>(null);
+  const shown = typing ?? (derived > 0 ? String(round(derived, decimals)) : '');
+
+  return (
+    <div className="w-24">
+      <NumberInput
+        id={id}
+        aria-label={ariaLabel}
+        value={shown}
+        disabled={disabled}
+        title={disabled ? 'Choose a film for every ply first' : undefined}
+        onChange={(event) => {
+          setTyping(event.target.value);
+          if (disabled) return;
+          const value = Number(event.target.value);
+          /* An empty box and a half-typed "1." are both Not-a-Number. Neither is
+             an instruction to reprice the line, so neither writes. */
+          if (Number.isFinite(value)) onType(value);
+        }}
+        onBlur={() => setTyping(null)}
+      />
+      <p className="text-ink-400 mt-1 text-xs">{hint}</p>
     </div>
   );
 }

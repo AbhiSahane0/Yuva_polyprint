@@ -569,47 +569,53 @@ spreadsheet, not a failed prefill.
 
 #### Quantities
 
-One to three per line. Each is **a quantity — in kilograms or in pouches,
-whichever you were given — and a rate per kilogram**:
+One to three per line, and every figure on one is typed in **whichever unit you
+were given**:
 
 ```
 QUANTITIES                                                     Add a quantity
 
-  Quantity 1                              Rate 1  (i)
-  [   500   ]  =  [  21,565  ]            [  281.24  ]      Rs. 1,40,621
-      kg              pouches                 per kg        21.1% gross · 7.1% net
+  Quantity 1                     Rate 1 (i)
+  [  500  ] = [  21,565  ]       [  281.24  ] = [  6.5208  ]    21.1% gross · 7.1% net
+      kg          pouches            per kg        per pouch
  ┌──────────────────────────────────────────────────────────────────────────┐
- │  Rs. 6.52  per pouch  ·  23.19 g each                                    │
+ │  Rs. 1,40,621  in all  ·  21,565 pouches at 23.19 g each                 │
  └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-**The two units are two boxes, not two modes.** There used to be a
-`Sold by [Kilogram | Pouches]` switch, and it decided which pair of fields the
-row was bound to — so whichever unit was picked, the other was off screen.
-Quoting per piece hid the weight the film is bought in; quoting per kilo hid the
-count the customer asks for.
+**Two pairs, not two modes.** There used to be a `Sold by [Kilogram | Pouches]`
+switch, and it decided which pair of fields the row was bound to — so whichever
+unit was picked, the other was off screen. Quoting per piece hid the weight the
+film is bought in; quoting per kilo hid the count the customer asks for.
 
-They are two readings of one number, so the row shows them as one, joined by the
-equals sign that says so. **Type into whichever the customer gave you** — an
-enquiry arrives as "five hundred kilos" or as "a lakh pouches" depending on who
-is ringing, and neither should need converting by hand before it can be keyed
-in. The kilograms are what the form holds; the pouch box writes back into them
-at the laminate's own weight per pouch.
+Each pair is two readings of one number, joined by the equals sign that says so.
+**Type into whichever half the conversation gave you:**
 
-**The pouch box is disabled, not hidden, until the laminate has a weight.** It
-needs every ply to have a film with a density before it can convert anything.
-Hiding it would make the row change shape as films are chosen; disabling it
-leaves the layout still and says what it is waiting for.
+| The customer says                     | Type it here          |
+| ------------------------------------- | --------------------- |
+| "five hundred kilos"                  | Quantity, **kg**      |
+| "we need a lakh pouches"              | Quantity, **pouches** |
+| "what's your rate a kilo?"            | Rate, **per kg**      |
+| "make it six-fifty and we'll take it" | Rate, **per pouch**   |
 
-**A roll has neither the pouch box nor the strip.** Film on a reel has not been
-converted into anything, so there is nothing to count — absent rather than shown
-empty.
+The **kilograms and the rate per kilogram are what the form holds** — the film
+is bought by weight and every line of the costing is worked out from it. The
+pouch halves convert at the laminate's own weight per pouch and write back, so
+there is one source of truth and the two cannot drift. A rate each is kept to
+four decimals, because a pouch is often under ten rupees and two would round a
+half-paisa negotiation away.
 
-**The rate stays per kilogram**, because that is what the costing works out and
-what the film is bought at. What one pouch comes to is the strip underneath, and
-it is the largest figure on the panel: it is the one the customer asks for by
-name. The weight beside it is what turned one into the other, so the arithmetic
-can be followed without leaving the row.
+**The pouch halves are disabled, not hidden, until the laminate has a weight.**
+They need every ply to have a film with a density before they can convert
+anything. Hiding them would make the row change shape as films are chosen;
+disabling leaves the layout still and says what it is waiting for.
+
+**A roll has neither pouch box and no pouch figures.** Film on a reel has not
+been converted into anything, so there is nothing to count — the strip still
+carries the total, because money belongs in one place either way.
+
+**The strip is what is not a box:** what the order comes to, and the count with
+the weight that produced it. Everything the office types is above it.
 
 > The switch carried a real defect as well as hiding half the answer. React
 > reused the same input across it — same element, same position, new name —
@@ -618,13 +624,18 @@ can be followed without leaving the row.
 > form read and wrote the pouch fields underneath: **100 and Rs. 400 on screen,
 > Rs. 0 as the total beside them.** A quotation could be sent on a figure nobody
 > entered. With both units on screen at once that class of bug cannot happen.
+>
+> Each derived box holds what is being typed into it locally while it has focus,
+> and drops it on blur. Without that it is rewritten from its partner on every
+> keystroke — "6.5" briefly becomes "6.5000000001" through the round trip, and
+> the intermediate states of a long number fight the cursor.
 
-**Gross and net margins** sit beside the total. Gross is the selling rate
-against the material cost of a kilogram — films, ink and adhesive only. Net is
-against what the job actually costs to make, including wages, power, transport,
-packing and the press setup, and is **absent rather than zero** while the line
-cannot be costed. Hovering either spells out the two figures that made it. Net
-under 5% is red, under 12% amber.
+**Gross and net margins** sit beside the rate, because they are a judgement
+about it. Gross is the selling rate against the material cost of a kilogram —
+films, ink and adhesive only. Net is against what the job actually costs to
+make, including wages, power, transport, packing and the press setup, and is
+**absent rather than zero** while the line cannot be costed. Hovering either
+spells out the two figures that made it. Net under 5% is red, under 12% amber.
 
 **The customer's document carries both too.** A pouch job prints the rate per
 kilogram with the rate each underneath it in smaller type — it is the same price

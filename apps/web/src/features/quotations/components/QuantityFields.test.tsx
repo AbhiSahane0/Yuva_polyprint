@@ -27,6 +27,7 @@ import { QuantityFields, type QuantityResult } from './QuantityFields';
 const kgBox = () => screen.getByLabelText('Quantity 1') as HTMLInputElement;
 const pouchBox = () => screen.getByLabelText(/quantity 1 in pouches/i) as HTMLInputElement;
 const rateBox = () => screen.getByLabelText('Rate 1') as HTMLInputElement;
+const rateEachBox = () => screen.getByLabelText(/rate 1 per pouch/i) as HTMLInputElement;
 
 /** A row bound to one quantity, as the wizard's job card renders it. */
 function Row({
@@ -35,18 +36,22 @@ function Row({
   pouchesPerKg,
   showsPouches,
   startKg = 0,
+  startRate = 0,
 }: {
   results?: (QuantityResult | undefined)[];
   costings?: (CostingBreakdown | null)[];
   pouchesPerKg?: number;
   showsPouches?: boolean;
   startKg?: number;
+  startRate?: number;
 }) {
   const { control, register, setValue } = useForm<CreateQuotationFormValues>({
     defaultValues: {
       items: [
         {
-          quantities: [{ quantityKg: startKg, ratePerKg: 0, quantityPouches: 0, ratePerPouch: 0 }],
+          quantities: [
+            { quantityKg: startKg, ratePerKg: startRate, quantityPouches: 0, ratePerPouch: 0 },
+          ],
         },
       ],
     } as CreateQuotationFormValues,
@@ -109,7 +114,24 @@ describe('QuantityFields', () => {
     expect(pouchBox().disabled).toBe(true);
   });
 
-  it('reads the kilograms back as pouches, a rate each and a weight each', () => {
+  it('shows the rate each beside the rate per kilogram', () => {
+    render(<Row pouchesPerKg={43.13} startKg={500} startRate={281.24} />);
+
+    // 281.24 ÷ 43.13, to four places — half a paisa is negotiable on a pouch.
+    expect(rateEachBox().value).toBe('6.5208');
+  });
+
+  it('fills the rate per kilogram in when the haggling is done per pouch', () => {
+    render(<Row pouchesPerKg={43.13} startKg={500} startRate={281.24} />);
+
+    fireEvent.change(rateEachBox(), { target: { value: '6.5' } });
+
+    // 6.50 × 43.13 — the per-kilogram figure that lands on a round rate each.
+    expect(rateBox().value).toBe('280.345');
+    expect(rateEachBox().value).toBe('6.5');
+  });
+
+  it('reads the kilograms back as pouches, and totals what that comes to', () => {
     const results: QuantityResult[] = [
       {
         quantityKg: 500,
@@ -124,14 +146,12 @@ describe('QuantityFields', () => {
 
     render(<Row results={results} pouchesPerKg={43.13} startKg={500} />);
 
-    expect(screen.getByText('Rs. 1,40,621')).toBeTruthy();
     expect(pouchBox().value).toBe('21565');
 
-    // What the customer asks for by name, and the weight that produced it.
-    expect(screen.getByText('Rs. 6.52')).toBeTruthy();
-    expect(screen.getByText('per pouch')).toBeTruthy();
-    expect(screen.getByText('23.19 g a pouch')).toBeTruthy();
-    expect(screen.getAllByText('Rs. 1,40,621').length).toBeGreaterThan(0);
+    // The total is the figure that goes on the document, and the count with its
+    // weight is the working behind the pouch boxes.
+    expect(screen.getByText('Rs. 1,40,621')).toBeTruthy();
+    expect(screen.getByText(/21,565 pouches at 23\.19 g each/)).toBeTruthy();
   });
 
   /*
@@ -154,8 +174,10 @@ describe('QuantityFields', () => {
 
     render(<Row results={results} pouchesPerKg={0} />);
 
-    expect(screen.getByText(/need a film on every ply/i)).toBeTruthy();
-    expect(screen.queryByText('per pouch')).toBeNull();
+    expect(screen.getByText(/the pouch boxes need a film on every ply/i)).toBeTruthy();
+    // Both halves of both pairs are there, and both are dead until a film is.
+    expect(pouchBox().disabled).toBe(true);
+    expect(rateEachBox().disabled).toBe(true);
   });
 
   it('keeps the total on a roll but offers no pouch box or pouch figures', () => {
@@ -179,8 +201,8 @@ describe('QuantityFields', () => {
     // A reel has no pouches, so no box, no rate each — and no complaint about
     // a missing film, because nothing here was ever going to be counted.
     expect(screen.queryByLabelText(/in pouches/i)).toBeNull();
-    expect(screen.queryByText(/need a film on every ply/i)).toBeNull();
-    expect(screen.queryByText('per pouch')).toBeNull();
+    expect(screen.queryByLabelText(/per pouch/i)).toBeNull();
+    expect(screen.queryByText(/the pouch boxes need a film/i)).toBeNull();
   });
 
   it('reports gross and net side by side once the line can be costed', () => {
