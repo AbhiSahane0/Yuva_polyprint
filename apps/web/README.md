@@ -1836,6 +1836,26 @@ should keep the size the design was drawn at.
 in `styles/index.css` — there is no `tailwind.config.js`. The palette came from
 the approved wireframe, so `bg-brand-600` and `text-ink-500` are the vocabulary.
 
+**The ramps are complete, 50 to 900, and that is load-bearing.** Tailwind v4
+generates a utility only where a `--color-*` token exists, and generates
+**nothing** where one does not — no warning at build, no error in the console,
+no fallback in the browser. The element simply keeps the colour it would have
+had.
+
+The palette used to carry `50/500/600` for the status colours and
+`50/100/500/600/700` for the brand, while the app reached for twelve shades
+outside that — **forty-six dead classes**. `text-danger-700` alone was in
+fourteen files, so the error line on every modal in the app inherited body grey
+and did not read as an error at all. The amber pills lost `bg-warning-100` and
+the GSTIN badge `text-success-800` the same way.
+
+Nobody did anything wrong: 700 is an ordinary shade to reach for, and the
+failure is invisible in the editor, in the diff and on screen. So the palette
+now carries every shade rather than the handful in use, and
+[`styles/theme-tokens.test.ts`](./src/styles/theme-tokens.test.ts) fails the
+build if a class ever names one that is not defined — naming the token and the
+files that wanted it, because "3 missing tokens" sends somebody hunting.
+
 **Routes are lazy-loaded** in `app/router.tsx`, so a screen's code is only
 fetched when someone opens it.
 

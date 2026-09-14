@@ -5,13 +5,37 @@
  * visually consistent with what the client signed off on.
  * Tailwind v4 reads @theme and generates utilities (bg-brand-600, text-ink-500…).
  * ------------------------------------------------------------------------- */
+/*
+ * The ramps are COMPLETE, 50 to 900, and that is the point.
+ *
+ * Tailwind v4 generates a utility only where a token exists, and generates
+ * nothing — no warning, no error, no fallback — where one does not. A partial
+ * ramp therefore turns a plausible class name into silence: `text-danger-700`
+ * was written in fourteen files and every one of them inherited body grey, so
+ * the errors on every modal in the app did not read as errors. The same for
+ * `bg-warning-100` behind the amber pills and `text-success-800` on the GSTIN
+ * badge.
+ *
+ * Nobody did anything wrong: 700 is an ordinary shade to reach for, and the
+ * failure is invisible in the editor and in the browser. So the palette carries
+ * every shade rather than the handful in use, and `theme-tokens.test.ts` fails
+ * the build if a class ever names one that is not here.
+ *
+ * The values are Tailwind's own — indigo, gray, emerald, amber and red — which
+ * is what the shades already in use were taken from.
+ */
 @theme {
   /* Brand (indigo) */
   --color-brand-50: #eef2ff;
   --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
   --color-brand-500: #6366f1;
   --color-brand-600: #4f46e5;
   --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
 
   /* Neutrals */
   --color-ink-25: #fcfcfd;
@@ -26,16 +50,39 @@
   --color-ink-800: #1f2937;
   --color-ink-900: #111827;
 
-  /* Status */
+  /* Status — success is emerald, warning amber, danger red. */
   --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-200: #a7f3d0;
+  --color-success-300: #6ee7b7;
+  --color-success-400: #34d399;
   --color-success-500: #10b981;
   --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-success-800: #065f46;
+  --color-success-900: #064e3b;
+
   --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #fbbf24;
   --color-warning-500: #f59e0b;
   --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-900: #78350f;
+
   --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-200: #fecaca;
+  --color-danger-300: #fca5a5;
+  --color-danger-400: #f87171;
   --color-danger-500: #ef4444;
   --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+  --color-danger-800: #991b1b;
+  --color-danger-900: #7f1d1d;
 
   /* Radii */
   --radius-sm: 6px;
