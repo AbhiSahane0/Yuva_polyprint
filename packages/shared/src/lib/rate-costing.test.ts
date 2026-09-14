@@ -72,7 +72,7 @@ const MASTER = {
      * the seven real quotations rebuilt from those sheets carry. By style this
      * job would pay 0.25 a pouch over 43.13 pouches, or 10.78 a kilogram.
      */
-    pouchMaking: { makingPerPouch: 0.25, zipperRatePerMetre: 3.6, dPunchPerPouch: 0.35 },
+    pouchMaking: { makingPerPouch: 0.25, dPunchPerPouch: 0.6, zipperRatePerMetre: 3.6 },
     pouchMakingPerKgOverride: 15,
     stationSurcharges: [5.5, 7.5, 9],
     marginPercent: 9,
@@ -493,7 +493,7 @@ describe('what the rate is built from', () => {
     expect(zipped.pouchExpense.perPouch).toBeCloseTo(0.718, 4);
   });
 
-  it('adds the punch on a D punch, and nothing on a roll', () => {
+  it('makes a D punch at its own flat rate, and a roll at nothing', () => {
     const punched = costRate({
       ...input(),
       job: { ...JOB, pouchType: 'D_PUNCH' as const, pouchWidthMm: 190 },

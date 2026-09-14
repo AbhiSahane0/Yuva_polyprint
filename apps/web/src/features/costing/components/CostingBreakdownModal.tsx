@@ -243,19 +243,10 @@ export function CostingBreakdownModal({
             at all — the override replaces the whole charge, so listing them
             would put a breakdown on screen that does not reconcile.
           */}
-          {b.pouchExpense.zipper > 0 || b.pouchExpense.punch > 0 ? (
+          {b.pouchExpense.zipper > 0 ? (
             <dl className="divide-ink-100 mt-3 divide-y">
-              <Line
-                label="Forming, sealing, cutting — a pouch"
-                value={b.pouchExpense.making}
-                decimals={4}
-              />
-              {b.pouchExpense.zipper > 0 ? (
-                <Line label="Zipper across the mouth" value={b.pouchExpense.zipper} decimals={4} />
-              ) : null}
-              {b.pouchExpense.punch > 0 ? (
-                <Line label="D punch" value={b.pouchExpense.punch} decimals={4} />
-              ) : null}
+              <Line label="Making one" value={b.pouchExpense.making} decimals={4} />
+              <Line label="Zipper across the mouth" value={b.pouchExpense.zipper} decimals={4} />
               <Line label="One pouch" value={b.pouchExpense.perPouch} decimals={4} strong />
             </dl>
           ) : null}

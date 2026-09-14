@@ -206,9 +206,9 @@ move whatever has drifted.
 | Packing                 | Rs 5 / kg       | On the quantity consumed                           |
 | Sundries                | Rs 250 / job    | A flat sum the works does not itemise              |
 | Bank EMI                | Rs 4,166.66     | Spread over 24 machine hours a month               |
-| Pouch making            | Rs 0.25 / pouch | Forming, sealing and cutting one — every pouch     |
+| Pouch making            | Rs 0.25 / pouch | Forming, sealing and cutting one                   |
+| D punch                 | Rs 0.60 / pouch | What one costs to make instead — a flat charge     |
 | Zipper                  | Rs 3.60 / metre | Across the mouth, on a zipper or standup zipper    |
-| D punch                 | Rs 0.35 / pouch | On top of making                                   |
 | 6th / 7th / 8th station | 5.50 / 7.50 / 0 | Surcharge past five colours                        |
 | Ink GSM                 | 1.8             | What the laminate is weighed with                  |
 | Adhesive coat           | 2 or 3          | 3 above 40µ, 2 below, per bond                     |
@@ -219,7 +219,7 @@ move whatever has drifted.
 
 > **Pouch making is charged per POUCH, and the style decides what it costs.**
 > A standup pays making; a zipper pays making plus the zipper across its mouth,
-> by the metre; a D punch pays making plus the punch. This is the works' own
+> by the metre; a D punch is made at its own flat rate. This is the works' own
 > pouch workbook — and it is charged per pouch because per kilogram cannot say
 > it: across the nine jobs in that workbook the same charge reads between Rs 11
 > and Rs 64 a kilogram, purely because a small pouch packs 130 to a kilo and a

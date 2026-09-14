@@ -1424,8 +1424,8 @@ three other quotations.
 **Pouch making is charged per pouch, and the style decides what it costs.**
 A standup pays the making rate; a **Standup zipper** or **Zipper** pays making
 plus the zipper across its mouth, charged by the metre of finished width; a
-**D punch** pays making plus the punch. The ⓘ breakdown shows the parts and then
-what they come to on a kilogram — `Pouch making — Rs. 0.74 × 181.2 pouches`.
+**D punch** is made at its own flat rate. The ⓘ breakdown shows the parts and then
+what they come to on a kilogram — `Pouch making — Rs. 0.72 × 181.2 pouches`.
 
 That is the works' own pouch workbook, and it is per pouch because per kilogram
 cannot describe it: across the workbook's nine costed jobs the same charge reads

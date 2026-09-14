@@ -10,19 +10,19 @@ import { round } from './quotation-math.js';
  * 14, so one flat rate per kilogram reads as anything from Rs 11 to Rs 64 a
  * kilogram across those same nine jobs. The app charged a single Rs 15.
  *
- * Three figures, each with a plain meaning, rather than a rate per style:
+ * Three figures, all read off that workbook:
  *
  * | | |
  * | --- | --- |
- * | `makingPerPouch` | forming, sealing and cutting — every pouch pays it |
- * | `zipperRatePerMetre` | the zipper, charged across the pouch's mouth |
- * | `dPunchPerPouch` | the punch, on top of making |
+ * | `makingPerPouch` | forming, sealing and cutting one — Rs 0.25 |
+ * | `dPunchPerPouch` | what a D punch costs to make instead — Rs 0.60 flat |
+ * | `zipperRatePerMetre` | the zipper, across the mouth — Rs 3.60 a metre |
  *
- * A rate per style would have been four numbers that cannot be reasoned about
- * — nobody could say why a standup zipper costs what it does. These three
- * compose, and they reproduce the workbook where the workbook is consistent:
- * its standup pouches cost 0.25, which is `makingPerPouch`; its D punch costs
- * 0.60, which is 0.25 + 0.35.
+ * **A D punch is not making plus a punch.** It is its own flat charge, which is
+ * how the workbook states it and how the works confirmed it. Modelling it as
+ * 0.25 + 0.35 would have been a decomposition nobody uses, and it would have
+ * invited somebody to raise the making rate one day and silently move the D
+ * punch with it.
  *
  * **The zipper is charged by the metre**, which is the workbook's own rule:
  * `(width in cm × 3.8) ÷ 100` is a 13 cm pouch paying Rs 0.494 for 0.13 m of
@@ -35,24 +35,25 @@ import { round } from './quotation-math.js';
  * by the making rate. Confirmed with the works before it was written this way.
  */
 export interface PouchMakingRates {
-  /** Forming, sealing and cutting. Every pouch pays it. */
+  /** Forming, sealing and cutting one. What every style but a D punch pays. */
   makingPerPouch: number;
+  /** What a D punch costs to make — a flat charge, not an addition. */
+  dPunchPerPouch: number;
   /** Rupees per metre of zipper, charged across the pouch's width. */
   zipperRatePerMetre: number;
-  /** What the D punch adds, on top of making. */
-  dPunchPerPouch: number;
 }
 
 /** The charge, in the parts it is made of, so a quotation can show its working. */
 export interface PouchExpense {
+  /** Making one of this style. */
   making: number;
+  /** The zipper across its mouth, where it has one. */
   zipper: number;
-  punch: number;
   /** Rupees on one pouch. */
   perPouch: number;
 }
 
-const NOTHING: PouchExpense = { making: 0, zipper: 0, punch: 0, perPouch: 0 };
+export const NO_POUCH_EXPENSE: PouchExpense = { making: 0, zipper: 0, perPouch: 0 };
 
 /** The styles that carry a zipper across the mouth. */
 export const ZIPPERED_POUCHES: readonly PouchType[] = ['STANDUP_ZIPPER', 'ZIPPER'];
@@ -73,7 +74,7 @@ export function pouchExpense(
   pouchWidthMm: number,
   rates: PouchMakingRates | null | undefined,
 ): PouchExpense {
-  if (!pouchType || !rates) return NOTHING;
+  if (!pouchType || !rates) return NO_POUCH_EXPENSE;
 
   /*
    * Every figure floored at zero and defaulted, because this is reached from a
@@ -85,13 +86,12 @@ export function pouchExpense(
   const at = (value: number | undefined) =>
     Number.isFinite(value) && (value as number) > 0 ? (value as number) : 0;
 
-  const making = at(rates.makingPerPouch);
+  /* A D punch is made differently, so it is made at its own rate. */
+  const making = pouchType === 'D_PUNCH' ? at(rates.dPunchPerPouch) : at(rates.makingPerPouch);
 
   const zipper = ZIPPERED_POUCHES.includes(pouchType)
     ? round((at(pouchWidthMm) / 1000) * at(rates.zipperRatePerMetre), 4)
     : 0;
 
-  const punch = pouchType === 'D_PUNCH' ? at(rates.dPunchPerPouch) : 0;
-
-  return { making, zipper, punch, perPouch: round(making + zipper + punch, 4) };
+  return { making, zipper, perPouch: round(making + zipper, 4) };
 }

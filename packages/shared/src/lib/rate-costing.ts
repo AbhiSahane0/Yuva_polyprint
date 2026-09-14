@@ -1,5 +1,10 @@
 import type { PouchType } from '../constants/job.js';
-import { pouchExpense, type PouchExpense, type PouchMakingRates } from './pouch-making.js';
+import {
+  NO_POUCH_EXPENSE,
+  pouchExpense,
+  type PouchExpense,
+  type PouchMakingRates,
+} from './pouch-making.js';
 import { round } from './quotation-math.js';
 
 /**
@@ -298,7 +303,8 @@ export interface CostingJob {
 
   /**
    * The style, which decides what making one costs: a zipper is charged across
-   * the mouth by the metre, a D punch adds its punch. Null charges making only.
+   * the mouth by the metre, a D punch is made at its own flat rate. Null
+   * charges nothing, because a style nobody has chosen has no charge.
    */
   pouchType?: PouchType | null;
 
@@ -458,7 +464,7 @@ export interface CostingBreakdown {
    * And what it is made of, on one pouch.
    *
    * Reported so the breakdown can show the working: a standup zipper at
-   * Rs 0.744 is Rs 0.25 of making and Rs 0.494 of zipper, and "0.744" on its
+   * Rs 0.718 is Rs 0.25 of making and Rs 0.468 of zipper, and "0.718" on its
    * own is a figure nobody can check. Zero throughout on a roll, and on a line
    * where the office has overridden the charge — the parts no longer add up to
    * what is being charged, so reporting them would be a lie.
@@ -916,7 +922,7 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
    */
   const expense: PouchExpense = job.makesPouches
     ? pouchExpense(job.pouchType, job.pouchWidthMm ?? job.filmWidthMm, overheads.pouchMaking)
-    : { making: 0, zipper: 0, punch: 0, perPouch: 0 };
+    : NO_POUCH_EXPENSE;
 
   const override = overheads.pouchMakingPerKgOverride;
   const pouchMakingPerKg = !job.makesPouches
@@ -983,10 +989,7 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
     baseRatePerKg,
     stationSurchargePerKg,
     pouchMakingPerKg,
-    pouchExpense:
-      override !== null && override !== undefined
-        ? { making: 0, zipper: 0, punch: 0, perPouch: 0 }
-        : expense,
+    pouchExpense: override !== null && override !== undefined ? NO_POUCH_EXPENSE : expense,
     ratePerKg,
 
     pieceWeightG,

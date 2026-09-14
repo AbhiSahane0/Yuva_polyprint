@@ -22,11 +22,11 @@ import { pouchExpense, type PouchMakingRates } from './pouch-making.js';
  * 0.744 here where the sheet says 0.494.
  */
 describe('what making one pouch costs', () => {
-  /* The workbook's own figures: standup 0.25, D punch 0.60 = 0.25 + 0.35. */
+  /* The workbook's own figures, confirmed with the works. */
   const RATES: PouchMakingRates = {
     makingPerPouch: 0.25,
+    dPunchPerPouch: 0.6,
     zipperRatePerMetre: 3.6,
-    dPunchPerPouch: 0.35,
   };
 
   it('reproduces the workbook on a plain standup', () => {
@@ -35,9 +35,22 @@ describe('what making one pouch costs', () => {
     expect(pouchExpense('STANDUP', 710, RATES).perPouch).toBe(0.25);
   });
 
-  it('reproduces the workbook on a D punch', () => {
+  /**
+   * **A D punch is its own flat charge, not making plus a punch.**
+   *
+   * That is how the workbook states it and how the works confirmed it. The
+   * decomposition 0.25 + 0.35 gives the same answer today and is a trap
+   * tomorrow: raise the making rate and the D punch would move with it, which
+   * is not what anybody agreed.
+   */
+  it('makes a D punch at its own rate, not at making plus something', () => {
     // D Punch Pouch, Humza Veg Samosa: 0.60.
     expect(pouchExpense('D_PUNCH', 190, RATES).perPouch).toBe(0.6);
+    expect(pouchExpense('D_PUNCH', 190, RATES).making).toBe(0.6);
+
+    const dearer = { ...RATES, makingPerPouch: 5 };
+    expect(pouchExpense('D_PUNCH', 190, dearer).perPouch).toBe(0.6);
+    expect(pouchExpense('STANDUP', 190, dearer).perPouch).toBe(5);
   });
 
   /*
@@ -63,11 +76,10 @@ describe('what making one pouch costs', () => {
     expect(zipped.perPouch).toBeCloseTo(0.744, 4);
   });
 
-  it('leaves the zipper and the punch off the styles that have neither', () => {
+  it('leaves the zipper off the styles that have none', () => {
     for (const style of ['STANDUP', 'CENTRE_SEAL', 'THREE_SIDE_SEAL', 'SPOUT', 'OTHER'] as const) {
       const expense = pouchExpense(style, 200, RATES);
       expect(expense.zipper).toBe(0);
-      expect(expense.punch).toBe(0);
       expect(expense.perPouch).toBe(0.25);
     }
   });
@@ -105,7 +117,7 @@ describe('what making one pouch costs', () => {
   });
 
   it('adds its own parts up', () => {
-    const expense = pouchExpense('D_PUNCH', 250, RATES);
-    expect(expense.perPouch).toBeCloseTo(expense.making + expense.zipper + expense.punch, 6);
+    const expense = pouchExpense('STANDUP_ZIPPER', 250, RATES);
+    expect(expense.perPouch).toBeCloseTo(expense.making + expense.zipper, 6);
   });
 });
