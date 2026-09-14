@@ -8,10 +8,18 @@ Rules: no business logic, no data fetching, no feature imports. Style with the
 design tokens in `src/styles/index.css` (`bg-brand-600`, `text-ink-500`, …)
 rather than raw hex values.
 
+> **A shade with no token generates no CSS, and says nothing about it.** Tailwind
+> v4 builds its utilities from `@theme`, so `text-danger-750` is not an error —
+> it is a class that does nothing, in a file that reads as though it does. The
+> ramps in `index.css` run 50 to 900 for exactly that reason, and
+> `styles/theme-tokens.test.ts` fails the build on any class naming a shade that
+> is not there.
+
 ## `ConfirmDialog` asks before something that cannot be clicked back
 
 For anything that reaches the server on one click and is not undone by pressing
-the same button again — Retire on a machine or a wage, Deactivate on a user.
+the same button again — Retire on a machine or a wage, Deactivate on a user,
+Delete on a material or a supplier.
 
 Two rules, both tested, because both are easy to lose in a refactor:
 
@@ -23,6 +31,12 @@ Two rules, both tested, because both are easy to lose in a refactor:
 Say what it costs rather than "Are you sure?" — retiring a press takes its power
 and its people out of the costing, so every rate worked out afterwards drops.
 That is worth a sentence; "this cannot be undone" is not, especially when it can.
+
+**Say it in figures where there are figures.** Deleting a material from Inventory
+reads "250 KG is on the books across 1 batch. Deleting the material takes those
+batches and every movement against them with it" — a quantity the office can
+weigh against what is on the shelf, not an abstraction. The same dialog says so
+honestly when nothing is held.
 
 **Only the destructive direction should use it.** Restore is the inverse and
 should go straight through: a dialog in front of a safe action is how people

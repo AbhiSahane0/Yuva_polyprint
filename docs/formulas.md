@@ -178,6 +178,22 @@ default. The **mounting margin** (80 mm by default) is face the engraver charges
 for beyond the printed web — it is not in the client's workbook, which stops at
 the film, and is editable on the Costing screen.
 
+**What can be engraved.** The face must be **450 to 1060 mm** and the
+circumference **400 to 600 mm**. Both are checked by `cylinderWarnings` and
+shown in red under the figure, and neither blocks the quotation — an enquiry may
+describe something the works cannot make, and the fix is the lanes or the
+repeat.
+
+Note 400–600 is narrow enough to leave a gap: a design from **301 to 399 mm**
+tall is short of 400 at one repeat and past 600 at two, so no repeat fits it. 43
+of the 395 imported jobs with a height sit there. The suggestion still answers
+with the repeat nearest the preferred 490, and the warning says the result
+cannot be cut.
+
+`CYLINDER_FACE.MAX` (1060) is **not** `MAX_CYLINDER_FACE_MM` (800). The first is
+what the engraver can cut; the second is what the works runs, and is what the
+lane suggestion is built on.
+
 **A design whose cylinders already exist is charged nothing**, transport
 included, because there is nothing to engrave and nothing to deliver. The
 per-cylinder figure is still shown, so the office can see what a new set would
@@ -234,6 +250,29 @@ Either way:
 cost per pouch = total amount ÷ total pouches
 ```
 
+**The form prices per kilogram**, so a line entered today takes the first pair.
+
+That is not the same as asking for the order in kilograms. The Quantities panel
+carries **both units as boxes** — `500 kg = 21,565 pouches` and
+`Rs. 281.24 per kg = Rs. 6.5208 per pouch` — and typing into a pouch box
+converts and writes back into its per-kilogram partner, which is the field the
+line is actually stored and priced on:
+
+```
+quantity kg  = pouches typed ÷ pouches per kg          to 3 dp
+rate per kg  = rate each typed × pouches per kg        to 4 dp
+```
+
+So an order taken as "a lakh pouches at six-fifty" is keyed in exactly that way
+and reaches the arithmetic above as kilograms and rupees per kilogram. Four
+decimals on the rate because a pouch is often under ten rupees, and two would
+round a half-paisa negotiation away.
+
+`cost per pouch` is what the customer's document prints under the per-kilogram
+rate on any pouch job. The per-pouch pair is still computed and still stored,
+and a line genuinely quoted `PER_POUCH` — one written before the form settled on
+kilograms — still prices and prints from it.
+
 ### 5.2 Document totals
 
 ```
@@ -273,11 +312,29 @@ which is the whole reason a quotation carries tiers.
 ### 6.1 How much film is actually bought
 
 ```
-wastage kg  = order kg × wastage %                    (8%, Estimation J5)
+wastage kg  = order kg × wastage %      8% on a reel, 7% on a pouch job,
+                                        or the quotation's own figure
 consumed kg = order kg + wastage kg                   (Estimation I6)
 ```
 
 Note the divisor at the end is the **ordered** quantity, not the consumed one.
+**Two figures, from two of the works' documents**, and **which one applies is
+decided by the STYLE, not by whether the job is a pouch**:
+
+|                  | covers                                    | wastage | ink GSM |
+| ---------------- | ----------------------------------------- | ------: | ------: |
+| Estimation sheet | centre seal, three side seal, spout, roll |      8% |     1.8 |
+| Pouch workbook   | standup, standup zipper, zipper, D punch  |      7% |     1.2 |
+
+That distinction is load-bearing. Every one of the seven 2022 quotations
+verified to the paisa is a **centre seal** pouch — so a rule reading "any pouch"
+would have moved all seven onto figures that never priced them. `isWorkbookPouch`
+is where the list lives.
+
+A quotation may still pin its own wastage, and the seven do, because the figure
+that priced them belongs beside them rather than in a setting somebody may
+reasonably change.
+
 The wastage is already inside the cost; dividing by the consumed weight would
 charge for it and then hand it back.
 
@@ -391,7 +448,7 @@ Estimation `F38`.
 ### 6.7 The machines
 
 Printing runs the first ply. Lamination runs one pass per bond. Slitting runs
-the printed length again. Pouch making is charged per kilogram, not by the
+the printed length again. Pouch making is charged per pouch, not by the
 minute.
 
 ```
@@ -472,12 +529,83 @@ extra stations   = max(0, stations − 5)
 station surcharge per kg = sum of the surcharges for the 6th, 7th, 8th
                            (Rs 5.50, Rs 7.50, Rs 0)
 
-pouch making per kg      = Rs 15 on a pouch job, 0 on a roll
+pouch expense per pouch  = making   (a D punch is made at its own flat rate)
+                         + zipper   (width m × Rs/metre, zippered styles only)
+pouch making per kg      = pouch expense × pouches per kg, 0 on a roll
+                           — or the quotation's own Rs/kg, where it has one
 
 RATE PER KG = base rate + station surcharge + pouch making
 ```
 
 Estimation `G57` + `G59` + `G60` + `G62` = `G63`.
+
+### 6.10a What making a pouch costs
+
+**Per pouch, not per kilogram**, which is what the works' own pouch workbook
+(`costing_for_Standup.xlsx` — four sheets, one per style, nine costed jobs)
+charges and how the work is actually done. Three figures compose it, all on the
+Costing screen:
+
+| Setting                     | Default | Applies to                       |
+| --------------------------- | ------: | -------------------------------- |
+| Pouch making, Rs/pouch      |    0.25 | every style but a D punch        |
+| D punch, Rs/pouch           |    0.60 | a D punch, **instead of** making |
+| D punch wide, Rs/pouch      |    0.80 | a D punch over the width below   |
+| A D punch is wide above, mm |     450 | the works' own cut-off           |
+| Zipper, Rs/metre            |    3.60 | Standup zipper, Zipper           |
+
+```
+standup        = 0.25
+standup zipper = 0.25 + (width mm ÷ 1000) × 3.60
+zipper         = 0.25 + (width mm ÷ 1000) × 3.60
+D punch        = 0.60                             flat, up to 450 mm wide
+D punch (wide) = 0.80                             flat, over 450 mm
+roll           = 0
+```
+
+**It steps at 450 mm, and steps rather than scales**, because above that width
+the punch is a different operation and not a bigger one. The workbook shows both
+rates — 0.60 on a 190 mm pouch, 0.80 on a 485 mm one — without saying where the
+step was; 450 is the works' own answer and sits between the two, so both still
+reproduce. Setting the wide rate to 0 turns the band off and charges the one
+rate.
+
+**A D punch is not making plus a punch.** It is its own flat charge, which is
+what the workbook states. The decomposition 0.25 + 0.35 gives the same answer
+today and is a trap tomorrow: raise the making rate and the D punch would move
+with it, which is not what was agreed.
+
+The **finished pouch width** is what the zipper crosses, not the flat film
+width: a standup's bottom gusset lengthens the sheet it is cut from without
+widening the mouth.
+
+The workbook's own figures are reproduced exactly — its standup pouches cost
+0.25, its D punch 0.60, and `(width cm × 3.6) ÷ 100` is a 13 cm pouch paying
+Rs 0.468 for 0.13 m of zipper at Rs 3.60 a metre. The workbook shows 3.80 on one
+of its two zipper sheets; 3.60 is the rate.
+
+**Why per pouch matters.** Across those nine jobs the same charge reads anywhere
+from Rs 11 to Rs 64 a kilogram, purely because a small pouch packs 130 to a kilo
+and a big one 14:
+
+|              | Rs/pouch | pouches/kg | Rs/kg |
+| ------------ | -------: | ---------: | ----: |
+| Shamali Tea  |    0.494 |        130 | 64.22 |
+| Agasti Ghee  |    0.250 |        203 | 50.75 |
+| Humza Samosa |    0.800 |         14 | 11.20 |
+
+A single rate per kilogram — which is what this was, at Rs 15 — cannot describe
+that.
+
+**One deliberate difference from the workbook.** Its standup-zipper sheet
+charges the zipper alone, with nothing for making, so a zipper pouch is formed,
+sealed and cut for free. Confirmed with the works that it should pay making as
+well, so a 13 cm zipper pouch is 0.718 here where the sheet says 0.468.
+
+**The quotation's own figure still wins**, and it is still stated per kilogram —
+that is the unit it overrides, and it is what every quotation written before
+this carries. The seven 2022 quotations rebuilt from the client's sheets all set
+it, so they reproduce exactly as before.
 
 A five-colour job pays no surcharge. Note the surcharge is charged on
 **stations occupied**, not colours priced: the sheet counts seven stations on a
@@ -737,8 +865,9 @@ setup power factor.
 
 **Overheads and defaults** — working days a month, hours a day, transport per
 kg, packing per kg, sundries per job, bank EMI and the hours it spreads over,
-pouch making per kg, the 6th/7th/8th station surcharges, trim, **cylinder
-mounting**, wastage %, margin %, solvent per 100 of ink, ethyl acetate %.
+**pouch making per pouch, D punch per pouch, zipper per metre**, the 6th/7th/8th
+station surcharges, trim, **cylinder mounting**, **wastage % and wastage % on a
+pouch job**, **ink GSM and ink GSM on a pouch job**, margin %, solvent per 100 of ink, ethyl acetate %.
 
 **Which material prices what** — the flat ink and flat adhesive blends, the
 per-batch adhesive, the hardener, ethyl acetate, toluene.

@@ -54,6 +54,27 @@ const sheets = JSON.parse(
 
 const n = (v: unknown) => Number(v);
 const write = process.argv.includes('--write');
+
+/**
+ * Estimation!J5 — the figure all seven of these were costed at.
+ *
+ * Kept here rather than read from settings because the works now runs POUCH
+ * jobs at 7%, from its pouch workbook, and every one of these seven is a pouch.
+ * Following the setting would move all seven off the sheets they reproduce, and
+ * the check below would start failing for a reason that has nothing to do with
+ * the code.
+ */
+const SHEET_WASTAGE_PERCENT = 8;
+
+/**
+ * Estimation!F14 — what the sheet weighs the laminate with.
+ *
+ * Pinned for the same reason as the wastage above. The works' pouch workbook
+ * weighs with 1.2, and while these seven are CENTRE SEAL and so are not on that
+ * workbook, the figure that priced them belongs beside the quotations rather
+ * than in a setting somebody may reasonably change.
+ */
+const SHEET_INK_GSM = 1.8;
 const asDate = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
 /* --- 1. What changed over time, recorded against the day it changed ------ */
@@ -208,10 +229,16 @@ async function main() {
         ups: n(s.ups),
         stationCount: n(s.stations),
         layers,
-        wastagePercent: settings.defaultWastagePercent,
+        /*
+         * 8%, which is Estimation!J5 and what all seven of these were costed
+         * at. Pinned rather than followed: these are pouches, and the works now
+         * runs pouch jobs at 7% — so following the setting would quietly move
+         * every one of them off the sheet it reproduces.
+         */
+        wastagePercent: SHEET_WASTAGE_PERCENT,
         trimMm: settings.defaultTrimMm,
-        inkGsmOverride: settings.inkGsm,
-        colours: [{ name: 'All', laydownGsm: settings.inkGsm, solidsPercent: 23, ratePerKg: 202 }],
+        inkGsmOverride: SHEET_INK_GSM,
+        colours: [{ name: 'All', laydownGsm: SHEET_INK_GSM, solidsPercent: 23, ratePerKg: 202 }],
         flatInk: { ratePerKg: priceOf(settings.defaultFlatInkMaterial) },
         adhesive: {
           gsm: adhGsm,
@@ -249,10 +276,18 @@ async function main() {
         marginBasis: settings.marginBasis,
         inkCostModel: settings.inkCostModel,
         adhesiveCostModel: settings.adhesiveCostModel,
-        /* The three the quotation carries. */
+        /* The four the quotation carries. */
         marginPercent: n(s.marginPct),
         transportPerKg: n(s.transRate),
         pouchMakingPerKg: n(s.pouchMaking),
+        pouchMaking: {
+          makingPerPouch: settings.pouchMakingPerPouch,
+          dPunchPerPouch: settings.dPunchPerPouch,
+          dPunchLargePerPouch: settings.dPunchLargePerPouch,
+          dPunchLargeAboveMm: settings.dPunchLargeAboveMm,
+          zipperRatePerMetre: settings.zipperRatePerMetre,
+        },
+        pouchMakingPerKgOverride: n(s.pouchMaking),
       },
     };
 
@@ -282,6 +317,7 @@ async function main() {
           marginPercent: n(s.marginPct),
           transportPerKg: n(s.transRate),
           pouchMakingPerKg: n(s.pouchMaking),
+          wastagePercent: SHEET_WASTAGE_PERCENT,
           items: [
             {
               jobName: String(s.job).trim(),

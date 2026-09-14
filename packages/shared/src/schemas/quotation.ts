@@ -313,6 +313,7 @@ const createQuotationBaseSchema = z.object({
   marginPercent: blankIsUnset(0, 100),
   transportPerKg: blankIsUnset(0, 10000),
   pouchMakingPerKg: blankIsUnset(0, 10000),
+  wastagePercent: blankIsUnset(0, 100),
 
   /** Rates may be overridden per quotation; omitted means "use the settings". */
   cylinderRate: z.coerce.number().positive().optional(),
@@ -400,6 +401,14 @@ export const settingsSchema = z.object({
    */
   inkGsm: z.coerce.number().min(0).max(50),
   /**
+   * And what a pouch-workbook laminate is weighed with.
+   *
+   * The works has two documents and they disagree: the Estimation sheet holds
+   * 1.8, the pouch workbook 1.2. It decides what a pouch WEIGHS, so it moves
+   * the count per kilogram and the price each, not only the ink cost.
+   */
+  pouchInkGsm: z.coerce.number().min(0).max(50),
+  /**
    * Adhesive is worked out from the structure, not stated — the sheet takes a
    * heavier coat under a thick ply and one coat per lamination. These three
    * are its numbers; `adhesiveGsm` is no longer used for costing.
@@ -451,7 +460,21 @@ export const settingsSchema = z.object({
    * time alone; charging the setup as well is truer but does not tie out.
    */
   emiBasis: z.enum(['RUN_TIME', 'OCCUPIED']),
-  pouchMakingPerKg: z.coerce.number().min(0).max(10_000),
+  /**
+   * Making one pouch — forming, sealing and cutting. **Per pouch, not per
+   * kilogram**: the same charge reads between Rs 11 and Rs 64 a kilogram across
+   * the works' own nine costed pouches, depending on nothing but how big the
+   * pouch is.
+   */
+  pouchMakingPerPouch: z.coerce.number().min(0).max(1_000),
+  /** The zipper, by the metre, charged across the pouch's mouth. */
+  zipperRatePerMetre: z.coerce.number().min(0).max(10_000),
+  /** What a D punch costs to make — a flat charge instead of the making rate. */
+  dPunchPerPouch: z.coerce.number().min(0).max(1_000),
+  /** And a wide one, the punch being made across the top. */
+  dPunchLargePerPouch: z.coerce.number().min(0).max(1_000),
+  /** The width at which a D punch becomes the larger job, millimetres. */
+  dPunchLargeAboveMm: z.coerce.number().min(0).max(5_000),
   /** What the sixth, seventh and eighth printing stations each add, per kg. */
   stationSurcharge6: z.coerce.number().min(0).max(10_000),
   stationSurcharge7: z.coerce.number().min(0).max(10_000),
@@ -472,7 +495,18 @@ export const settingsSchema = z.object({
    * engraver charges for, and it is theirs to set.
    */
   cylinderMountingMm: z.coerce.number().min(0).max(500),
+  /** Film spoiled setting up and running, on everything but a pouch job. */
   defaultWastagePercent: z.coerce.number().min(0).max(100),
+  /**
+   * And on a pouch job, which the works runs at a different figure.
+   *
+   * Two numbers because the works has two documents: its Estimation sheet
+   * carries 8%, and the pouch workbook that costs its standup, zipper and
+   * D punch work carries 7%. One figure could hold only one of them, and the
+   * seven 2022 quotations verified against the Estimation sheet are pouches —
+   * so a single rule keyed on "is it a pouch" would have moved all seven.
+   */
+  pouchWastagePercent: z.coerce.number().min(0).max(100),
   defaultMarginPercent: z.coerce.number().min(0).max(100),
   /**
    * What the margin is taken on. Their sheet uses the material cost alone,
@@ -525,6 +559,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   cylinderAdvancePercent: 100,
   // Averages of what the imported jobs actually record.
   inkGsm: 1.8,
+  pouchInkGsm: 1.2,
   adhesiveGsm: 2.5,
   adhesiveCoatThinGsm: 2,
   adhesiveCoatThickGsm: 3,
@@ -545,7 +580,21 @@ export const DEFAULT_SETTINGS: AppSettings = {
   emiPerMonth: 4166.66,
   emiHoursPerMonth: 24,
   emiBasis: 'RUN_TIME',
-  pouchMakingPerKg: 15,
+  /*
+   * Read off the works' pouch workbook and confirmed with them: a standup is
+   * 0.25 to make, a D punch 0.60 flat, and the zipper 3.60 a metre. The
+   * workbook shows 3.80 on one of its two zipper sheets; 3.60 is the rate.
+   */
+  pouchMakingPerPouch: 0.25,
+  dPunchPerPouch: 0.6,
+  dPunchLargePerPouch: 0.8,
+  /*
+   * The works' own cut-off. The workbook shows the two rates — 0.60 on a 190 mm
+   * pouch and 0.80 on a 485 mm one — without saying where the step is; 450 is
+   * the answer they gave, and it sits between the two so both still reproduce.
+   */
+  dPunchLargeAboveMm: 450,
+  zipperRatePerMetre: 3.6,
   stationSurcharge6: 5.5,
   stationSurcharge7: 7.5,
   stationSurcharge8: 9,
@@ -553,6 +602,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   /* Read off the works' own jobs: width × lanes + 80 fits their press on 95%. */
   cylinderMountingMm: 80,
   defaultWastagePercent: 8,
+  pouchWastagePercent: 7,
   defaultMarginPercent: 9,
   marginBasis: 'MATERIAL_ONLY',
   inkCostModel: 'FLAT_GSM',

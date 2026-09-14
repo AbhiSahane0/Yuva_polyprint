@@ -1,40 +1,57 @@
 import { describe, expect, it } from 'vitest';
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { CostingBreakdown, CreateQuotationFormValues, PricingBasis } from '@yuva/shared';
+import type { CostingBreakdown, CreateQuotationFormValues } from '@yuva/shared';
 import { QuantityFields, type QuantityResult } from './QuantityFields';
 
 /**
- * The one thing worth pinning here: **the boxes must state what the form
- * holds**.
+ * **One typed pair, in kilograms, and the pouch figures worked out from it.**
  *
- * Switching kilograms to pouches swaps which two fields the row is bound to,
- * and the office reads a price off those boxes. When they disagreed with the
- * total beside them, the screen showed 100 pouches at Rs. 400 and Rs. 0 as the
- * amount — a quotation could be sent on a figure nobody typed.
+ * There used to be a Kilogram / Pouches switch, and it decided which two
+ * fields the row was BOUND to — so whichever unit was picked, the other was
+ * off screen. It also carried a real defect: `register` is uncontrolled and
+ * React had no reason to replace the input across the switch (same element,
+ * same position, new name), so the box went on showing the kilograms that were
+ * typed while the form read and wrote the pouch fields underneath. 100 pouches
+ * at Rs. 400 with Rs. 0 as the amount, and a quotation could be sent on a
+ * figure nobody typed.
  *
- * The cause was that react-hook-form's `register` is uncontrolled and React
- * had no reason to replace the input: same element, same position, new name.
- * Nothing about that is obvious from reading the component, which is why it is
- * tested rather than commented.
- *
- * The round-trip is the test that bites. jsdom re-registers more eagerly than
- * a browser does, so without the fix it blanks the box to 0 here where Chrome
- * left the kilograms standing — different symptom, same defect, and the
- * round-trip catches both. The first case below is the one that was actually
- * seen on screen; it is asserted because it is the behaviour that matters, not
- * because jsdom reproduces it.
+ * That whole class of bug is gone with the switch. The two units are now two
+ * boxes side by side — `500 kg = 21,565 pouches` — each always visible, each
+ * typeable, and the kilograms are the field the form actually holds. The tests
+ * below pin what replaced it: that typing pouches fills the kilograms in, that
+ * the count follows the weight, and that neither is offered as a control that
+ * cannot answer while the laminate has no density.
  */
 
-/** A host that owns the basis, as the wizard's job card does. */
-function Host() {
-  const [basis, setBasis] = useState<PricingBasis>('PER_KG');
-  const { control, register } = useForm<CreateQuotationFormValues>({
+const kgBox = () => screen.getByLabelText('Quantity 1') as HTMLInputElement;
+const pouchBox = () => screen.getByLabelText(/quantity 1 in pouches/i) as HTMLInputElement;
+const rateBox = () => screen.getByLabelText('Rate 1') as HTMLInputElement;
+const rateEachBox = () => screen.getByLabelText(/rate 1 per pouch/i) as HTMLInputElement;
+
+/** A row bound to one quantity, as the wizard's job card renders it. */
+function Row({
+  results = [],
+  costings,
+  pouchesPerKg,
+  showsPouches,
+  startKg = 0,
+  startRate = 0,
+}: {
+  results?: (QuantityResult | undefined)[];
+  costings?: (CostingBreakdown | null)[];
+  pouchesPerKg?: number;
+  showsPouches?: boolean;
+  startKg?: number;
+  startRate?: number;
+}) {
+  const { control, register, setValue } = useForm<CreateQuotationFormValues>({
     defaultValues: {
       items: [
         {
-          quantities: [{ quantityKg: 0, ratePerKg: 0, quantityPouches: 0, ratePerPouch: 0 }],
+          quantities: [
+            { quantityKg: startKg, ratePerKg: startRate, quantityPouches: 0, ratePerPouch: 0 },
+          ],
         },
       ],
     } as CreateQuotationFormValues,
@@ -44,110 +61,148 @@ function Host() {
     <QuantityFields
       control={control}
       register={register}
+      setValue={setValue}
       itemIndex={0}
-      pricingBasis={basis}
-      onBasisChange={setBasis}
-      results={[] as (QuantityResult | undefined)[]}
+      results={results}
+      {...(costings ? { costings } : {})}
+      {...(pouchesPerKg === undefined ? {} : { pouchesPerKg })}
+      {...(showsPouches === undefined ? {} : { showsPouches })}
     />
   );
 }
 
-const quantityBox = () => screen.getByLabelText(/quantity 1/i) as HTMLInputElement;
-const rateBox = () => screen.getByLabelText(/rate 1/i) as HTMLInputElement;
-const switchTo = (label: 'Kilogram' | 'Pouches') =>
-  fireEvent.click(screen.getByRole('button', { name: label }));
-
 describe('QuantityFields', () => {
-  it('does not carry the kilogram figures over into the pouch boxes', () => {
-    render(<Host />);
+  it('offers no unit switch — both units are boxes, side by side', () => {
+    render(<Row pouchesPerKg={43.13} />);
 
-    fireEvent.change(quantityBox(), { target: { value: '100' } });
-    fireEvent.change(rateBox(), { target: { value: '400' } });
+    expect(screen.queryByRole('button', { name: 'Pouches' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Kilogram' })).toBeNull();
 
-    switchTo('Pouches');
-
-    /*
-     * Nothing has been priced per pouch yet, so both boxes read as nothing —
-     * empty or zero, depending on what the row was seeded with. Showing 100
-     * and 400 is the bug: those are kilograms and rupees per kilogram, and the
-     * total beside them would say Rs. 0.
-     */
-    expect(Number(quantityBox().value || 0)).toBe(0);
-    expect(Number(rateBox().value || 0)).toBe(0);
+    /* Both are typeable, and each says its unit under it — no mode to remember. */
+    expect(kgBox()).toBeTruthy();
+    expect(pouchBox()).toBeTruthy();
+    expect(rateBox()).toBeTruthy();
+    expect(screen.getByText('kg')).toBeTruthy();
+    expect(screen.getByText('pouches')).toBeTruthy();
+    expect(screen.getByText('per kg')).toBeTruthy();
   });
 
-  it('gives the kilogram figures back on switching to them', () => {
-    render(<Host />);
+  it('fills the kilograms in when the order arrives as a number of pouches', () => {
+    render(<Row pouchesPerKg={43.13} />);
 
-    fireEvent.change(quantityBox(), { target: { value: '100' } });
-    fireEvent.change(rateBox(), { target: { value: '400' } });
+    fireEvent.change(pouchBox(), { target: { value: '1000' } });
 
-    switchTo('Pouches');
-    fireEvent.change(quantityBox(), { target: { value: '5000' } });
-    fireEvent.change(rateBox(), { target: { value: '12' } });
-
-    switchTo('Kilogram');
-
-    // Both units are kept, so a customer who asks for the price the other way
-    // round is answered without re-typing the first one.
-    expect(quantityBox().value).toBe('100');
-    expect(rateBox().value).toBe('400');
-
-    switchTo('Pouches');
-    expect(quantityBox().value).toBe('5000');
-    expect(rateBox().value).toBe('12');
+    // 1000 ÷ 43.13, to the gram.
+    expect(kgBox().value).toBe('23.186');
+    expect(pouchBox().value).toBe('1000');
   });
 
-  it('reports both units beside the amount', () => {
+  it('shows the pouch count that the kilograms come to', () => {
+    render(<Row pouchesPerKg={43.13} startKg={500} />);
+
+    // 500 × 43.13, as a whole number of pouches.
+    expect(pouchBox().value).toBe('21565');
+  });
+
+  /*
+   * Nothing to convert with, so the box would be a control that cannot answer.
+   * Disabled rather than absent: the row should not change shape as films are
+   * chosen, and the label says what it is waiting for.
+   */
+  it('disables the pouch box until the laminate has a weight', () => {
+    render(<Row pouchesPerKg={0} />);
+    expect(pouchBox().disabled).toBe(true);
+  });
+
+  it('shows the rate each beside the rate per kilogram', () => {
+    render(<Row pouchesPerKg={43.13} startKg={500} startRate={281.24} />);
+
+    // 281.24 ÷ 43.13, to four places — half a paisa is negotiable on a pouch.
+    expect(rateEachBox().value).toBe('6.5208');
+  });
+
+  it('fills the rate per kilogram in when the haggling is done per pouch', () => {
+    render(<Row pouchesPerKg={43.13} startKg={500} startRate={281.24} />);
+
+    fireEvent.change(rateEachBox(), { target: { value: '6.5' } });
+
+    // 6.50 × 43.13 — the per-kilogram figure that lands on a round rate each.
+    expect(rateBox().value).toBe('280.345');
+    expect(rateEachBox().value).toBe('6.5');
+  });
+
+  it('reads the kilograms back as pouches, and totals what that comes to', () => {
     const results: QuantityResult[] = [
       {
-        quantityKg: 6.16,
-        ratePerKg: 1623.38,
-        totalPouches: 1000,
-        totalAmount: 10000,
-        costPerPouch: 10,
-        marginPercent: 86.9,
-        materialCostPerKg: 213.23,
+        quantityKg: 500,
+        ratePerKg: 281.24,
+        totalPouches: 21_565,
+        totalAmount: 140_621,
+        costPerPouch: 6.52,
+        marginPercent: 21.3,
+        materialCostPerKg: 221.34,
       },
     ];
 
-    function Row() {
-      const { control, register } = useForm<CreateQuotationFormValues>({
-        defaultValues: {
-          items: [{ quantities: [{ quantityPouches: 1000, ratePerPouch: 10 }] }],
-        } as CreateQuotationFormValues,
-      });
-      return (
-        <QuantityFields
-          control={control}
-          register={register}
-          itemIndex={0}
-          pricingBasis="PER_POUCH"
-          onBasisChange={() => {}}
-          results={results}
-        />
-      );
-    }
+    render(<Row results={results} pouchesPerKg={43.13} startKg={500} />);
 
-    render(<Row />);
+    expect(pouchBox().value).toBe('21565');
 
-    // The weight as well as the count: the film is ordered by weight however
-    // the line is sold.
-    expect(screen.getByText('6.16 kg')).toBeTruthy();
-    expect(screen.getByText('1,000 pouches')).toBeTruthy();
+    // The total is the figure that goes on the document, and the count with its
+    // weight is the working behind the pouch boxes.
+    expect(screen.getByText('Rs. 1,40,621')).toBeTruthy();
+    expect(screen.getByText(/21,565 pouches at 23\.19 g each/)).toBeTruthy();
+  });
 
-    // The gross margin says which two figures made it, and what it leaves out.
-    const gross = screen.getByText(/86\.9% gross/);
-    expect(gross.getAttribute('title')).toContain('Rs. 1,623.38');
-    expect(gross.getAttribute('title')).toContain('Rs. 213.23');
-    expect(gross.getAttribute('title')).toContain('Film, ink and adhesive only');
+  /*
+   * Zeroes would read as a costed answer. Until every ply has a film there is
+   * no density, so there is no weight per pouch and therefore no count and no
+   * rate each — which is a different statement from "nought".
+   */
+  it('says what is missing rather than showing a zero rate each', () => {
+    const results: QuantityResult[] = [
+      {
+        quantityKg: 500,
+        ratePerKg: 0,
+        totalPouches: 0,
+        totalAmount: 0,
+        costPerPouch: 0,
+        marginPercent: null,
+        materialCostPerKg: null,
+      },
+    ];
 
-    /*
-     * And net is ABSENT rather than zero, because no costing was supplied.
-     * Showing 0% would read as a job that earns nothing, which is a different
-     * claim from "this line cannot be costed yet".
-     */
-    expect(screen.getByText('net —')).toBeTruthy();
+    render(<Row results={results} pouchesPerKg={0} />);
+
+    expect(screen.getByText(/the pouch boxes need a film on every ply/i)).toBeTruthy();
+    // Both halves of both pairs are there, and both are dead until a film is.
+    expect(pouchBox().disabled).toBe(true);
+    expect(rateEachBox().disabled).toBe(true);
+  });
+
+  it('keeps the total on a roll but offers no pouch box or pouch figures', () => {
+    const results: QuantityResult[] = [
+      {
+        quantityKg: 100,
+        ratePerKg: 400,
+        totalPouches: 0,
+        totalAmount: 40_000,
+        costPerPouch: 0,
+        marginPercent: 46.6,
+        materialCostPerKg: 213.45,
+      },
+    ];
+
+    render(<Row results={results} pouchesPerKg={0} showsPouches={false} startKg={100} />);
+
+    expect(kgBox().value).toBe('100');
+    // Money belongs in one place whether or not the job has pouches in it.
+    expect(screen.getByText('Rs. 40,000')).toBeTruthy();
+    // A reel has no pouches, so no box, no rate each — and no complaint about
+    // a missing film, because nothing here was ever going to be counted.
+    expect(screen.queryByLabelText(/in pouches/i)).toBeNull();
+    expect(screen.queryByLabelText(/per pouch/i)).toBeNull();
+    expect(screen.queryByText(/the pouch boxes need a film/i)).toBeNull();
   });
 
   it('reports gross and net side by side once the line can be costed', () => {
@@ -162,7 +217,7 @@ describe('QuantityFields', () => {
         quantityKg: 100,
         ratePerKg: 400,
         totalPouches: 2000,
-        totalAmount: 40000,
+        totalAmount: 40_000,
         costPerPouch: 20,
         marginPercent: 50,
         materialCostPerKg: 200,
@@ -170,30 +225,9 @@ describe('QuantityFields', () => {
     ];
 
     /* Materials are half the rate; everything is 92% of it. */
-    const costing = {
-      materialCostPerKg: 200,
-      fullCostPerKg: 368,
-    } as CostingBreakdown;
+    const costing = { materialCostPerKg: 200, fullCostPerKg: 368 } as CostingBreakdown;
 
-    function Row() {
-      const { control, register } = useForm<CreateQuotationFormValues>({
-        defaultValues: {
-          items: [{ quantities: [{ quantityKg: 100, ratePerKg: 400 }] }],
-        } as CreateQuotationFormValues,
-      });
-      return (
-        <QuantityFields
-          control={control}
-          register={register}
-          itemIndex={0}
-          pricingBasis="PER_KG"
-          results={results}
-          costings={[costing]}
-        />
-      );
-    }
-
-    render(<Row />);
+    render(<Row results={results} costings={[costing]} pouchesPerKg={20} />);
 
     expect(screen.getByText('50.0% gross')).toBeTruthy();
     expect(screen.getByText('8.0% net')).toBeTruthy();
@@ -204,41 +238,28 @@ describe('QuantityFields', () => {
     expect(net.getAttribute('title')).toContain('setup');
   });
 
-  it('leaves the pouch count off a roll', () => {
+  /*
+   * No costing supplied, so net is ABSENT rather than zero: 0% would read as a
+   * job that earns nothing, which is a different claim from "not costable yet".
+   */
+  it('leaves net out rather than reading zero when the line cannot be costed', () => {
     const results: QuantityResult[] = [
       {
-        quantityKg: 100,
-        ratePerKg: 400,
-        totalPouches: 0,
-        totalAmount: 40000,
-        costPerPouch: 0,
-        marginPercent: 46.6,
-        materialCostPerKg: 213.45,
+        quantityKg: 6.16,
+        ratePerKg: 1623.38,
+        totalPouches: 1000,
+        totalAmount: 10_000,
+        costPerPouch: 10,
+        marginPercent: 86.9,
+        materialCostPerKg: 213.23,
       },
     ];
 
-    function Roll() {
-      const { control, register } = useForm<CreateQuotationFormValues>({
-        defaultValues: {
-          items: [{ quantities: [{ quantityKg: 100, ratePerKg: 400 }] }],
-        } as CreateQuotationFormValues,
-      });
-      return (
-        <QuantityFields
-          control={control}
-          register={register}
-          itemIndex={0}
-          pricingBasis="PER_KG"
-          showsPouches={false}
-          results={results}
-        />
-      );
-    }
+    render(<Row results={results} pouchesPerKg={162.34} />);
 
-    render(<Roll />);
-
-    expect(screen.getByText('100.00 kg')).toBeTruthy();
-    // "0 pouches" reads as a count rather than as an absence.
-    expect(screen.queryByText(/pouches$/)).toBeNull();
+    const gross = screen.getByText(/86\.9% gross/);
+    expect(gross.getAttribute('title')).toContain('Rs. 1,623.38');
+    expect(gross.getAttribute('title')).toContain('Film, ink and adhesive only');
+    expect(screen.getByText('net —')).toBeTruthy();
   });
 });

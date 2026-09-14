@@ -27,6 +27,8 @@ import {
   type PouchType,
   type PricingBasis,
   computeItemGeometry,
+  cylinderWarnings,
+  inkGsmFor,
   structureGsm,
   adhesiveGsmFor,
   computeMargin,
@@ -41,7 +43,6 @@ import {
   createQuotationSchema,
   formatNumber,
   formatRs,
-  pricingBasisFor,
   totalMicronForLayers,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
@@ -183,7 +184,7 @@ const BLANK_ITEM = {
   pouchTypeNote: '',
   // The trade convention for a standup pouch, which the office can change on
   // the line — see the switch in the Quantities panel.
-  pricingBasis: pricingBasisFor('POUCH', 'STANDUP'),
+  pricingBasis: 'PER_KG',
   quantities: [{ quantityKg: '', ratePerKg: '', quantityPouches: '', ratePerPouch: '' }],
 } as unknown as ItemValues;
 
@@ -195,16 +196,44 @@ const BLANK_ITEM = {
  * it: if they disagreed, the margin shown while choosing a price would not be
  * the one that gets stored.
  */
-function basisOf(
-  item: { jobKind?: unknown; pouchType?: unknown; pricingBasis?: unknown } | undefined,
-): PricingBasis {
-  const jobKind = (item?.jobKind ?? 'POUCH') as 'POUCH' | 'ROLL';
-  const pouchType = (item?.pouchType || null) as PouchType | null;
-  const chosen = (item?.pricingBasis || null) as PricingBasis | null;
+function basisOf(): PricingBasis {
+  /*
+   * Every line this form writes is priced per kilogram.
+   *
+   * It used to follow the style — a standup quoted per piece, everything else
+   * by weight — with a switch on the Quantities panel to override it. But the
+   * switch decided which PAIR of boxes existed, so whichever unit was picked,
+   * the other was off screen: quoting per piece hid the weight the film is
+   * bought in, quoting per kilo hid the count the customer asks for.
+   *
+   * The panel now shows both from one typed pair, and the typed pair is the
+   * kilograms — because that is what the film is bought in and what every line
+   * of the costing is worked out from. The pouch figures are the same money
+   * read the other way round, and they are derived rather than typed.
+   *
+   * `pricingBasisFor` stays in the shared package: the schema still uses it to
+   * fill the field in for a request that omits it.
+   */
+  return 'PER_KG';
+}
 
-  // A reel has no pouches to count, whatever was stored against it.
-  if (jobKind === 'ROLL') return 'PER_KG';
-  return chosen ?? pricingBasisFor(jobKind, pouchType);
+/**
+ * The warning for one cylinder dimension, or nothing.
+ *
+ * Rendered through `Field`'s `error` slot, which is already the red line under
+ * a box — this is the same kind of message about the same kind of problem, and
+ * giving it a second style would only make the office learn two.
+ *
+ * It does **not** block the quotation. An enquiry is allowed to describe
+ * something the works cannot make; the office answers it by changing the lanes
+ * or the repeat, and a blocked form with no figure on it helps nobody.
+ */
+function cylinderWarning(
+  cost: ItemCosting | undefined,
+  field: 'width' | 'circumference',
+): string | undefined {
+  if (!cost) return undefined;
+  return cylinderWarnings(cost.geometry).find((warning) => warning.field === field)?.message;
 }
 
 const num = (value: unknown): number => {
@@ -602,7 +631,7 @@ export default function QuotationFormPage() {
    */
   const costed: ItemCosting[] = useMemo(() => {
     return (watched.items ?? []).map((item) => {
-      const basis = basisOf(item);
+      const basis = basisOf();
 
       const layers = (item?.layers ?? []).map((layer) => {
         const film = layer?.materialId ? filmById.get(String(layer.materialId)) : undefined;
@@ -627,9 +656,22 @@ export default function QuotationFormPage() {
         };
       });
 
+      /*
+       * The works weighs a laminate with two different ink figures, depending
+       * on which of its two costing documents the style belongs to — 1.8 on the
+       * Estimation sheet, 1.2 in the pouch workbook. It decides what a pouch
+       * weighs, so it moves the count per kilogram as well as the ink cost, and
+       * both the material cost and the geometry below have to agree on it.
+       */
+      const inkGsm = inkGsmFor({
+        pouchType: (item?.pouchType || null) as PouchType | null,
+        inkGsm: settings?.inkGsm ?? 1.8,
+        pouchInkGsm: settings?.pouchInkGsm ?? 1.2,
+      });
+
       const material = computeMaterialCostPerKg({
         layers,
-        inkGsm: settings?.inkGsm ?? 1.8,
+        inkGsm,
         adhesiveGsm: settings?.adhesiveGsm ?? 2.5,
         inkRate: byName.get(settings?.defaultInkMaterial ?? 'Ink — Black')?.currentRate ?? null,
         adhesiveRate:
@@ -642,7 +684,7 @@ export default function QuotationFormPage() {
           micron: totalMicronForLayers(layers),
           /* Each ply at its own density, as the works' sheet weighs it. */
           gsm: structureGsm(layers, {
-            inkGsm: settings?.inkGsm ?? 1.8,
+            inkGsm,
             adhesiveGsm: adhesiveGsmFor(layers, {
               thinGsm: settings?.adhesiveCoatThinGsm ?? 2,
               thickGsm: settings?.adhesiveCoatThickGsm ?? 3,
@@ -1249,15 +1291,41 @@ export default function QuotationFormPage() {
                   </Field>
                 </div>
                 <div className="sm:col-span-4">
+                  {/*
+                    Per KILOGRAM, where the works' figure is per pouch, and that
+                    is deliberate: this replaces the whole charge rather than
+                    any part of it. "Charge Rs 20 a kilo for making on this one,
+                    whatever the style says" is what the office actually means
+                    when it overrides, and it is the unit every quotation
+                    written before the charge became per pouch already carries.
+                  */}
                   <Field
                     label="Pouch making, Rs/kg"
                     htmlFor="pouchMakingPerKg"
-                    hint="Zero on a job sold as a reel"
+                    hint="Blank follows the style; zero on a reel"
                   >
                     <NumberInput
                       id="pouchMakingPerKg"
-                      placeholder={String(settings?.pouchMakingPerKg ?? 15)}
+                      placeholder="by style"
                       {...register('pouchMakingPerKg')}
+                    />
+                  </Field>
+                </div>
+                <div className="sm:col-span-4">
+                  {/*
+                    The works has two: 7% on a pouch job, 8% on everything else,
+                    from two of its own documents. Blank takes whichever this
+                    line is — which is why the placeholder cannot name a figure.
+                  */}
+                  <Field
+                    label="Wastage %"
+                    htmlFor="wastagePercent"
+                    hint="Film spoiled setting up and running"
+                  >
+                    <NumberInput
+                      id="wastagePercent"
+                      placeholder="by job kind"
+                      {...register('wastagePercent')}
                     />
                   </Field>
                 </div>
@@ -1285,6 +1353,7 @@ export default function QuotationFormPage() {
                   marginPercent: numOrNull(watched.marginPercent),
                   transportPerKg: numOrNull(watched.transportPerKg),
                   pouchMakingPerKg: numOrNull(watched.pouchMakingPerKg),
+                  wastagePercent: numOrNull(watched.wastagePercent),
                 }}
                 selectedQuantity={selectedQuantity}
                 onSelectQuantity={(position) =>
@@ -1446,7 +1515,6 @@ function JobCard({
 }) {
   const jobKind = (item?.jobKind ?? 'POUCH') as 'POUCH' | 'ROLL';
   const pouchType = (item?.pouchType || null) as PouchType | null;
-  const basis = basisOf(item);
 
   /*
    * Whether the office has taken the repeats over.
@@ -1500,11 +1568,15 @@ function JobCard({
       /* One cylinder per colour, which is what the line is charged for. */
       colourCount: Math.max(1, num(item?.cylinderCount) || 1),
       makesPouches: jobKind !== 'ROLL',
+      /* The style decides what making one costs, and the FINISHED width is what
+         a zipper crosses — the film width includes the side gussets. */
+      pouchType: jobKind === 'ROLL' ? null : pouchType,
+      pouchWidthMm: num(item?.widthMm),
       quantitiesKg: (cost?.quantities ?? []).map((quantity) => quantity?.quantityKg ?? 0),
       /* The document's own count, so the suggestion and the line agree. */
       piecesPerKg: cost?.geometry.pouchesPerKg ?? 0,
     }),
-    [item, films, filmWidthMm, filmHeightMm, jobKind, cost],
+    [item, films, filmWidthMm, filmHeightMm, jobKind, pouchType, cost],
   );
 
   /*
@@ -1534,21 +1606,15 @@ function JobCard({
   const lastComputed = useRef<Record<number, number>>({});
 
   useEffect(() => {
-    const field = basis === 'PER_POUCH' ? 'ratePerPouch' : 'ratePerKg';
-    const pieces = cost?.geometry.pouchesPerKg ?? 0;
-
     costing.results.forEach((result, position) => {
       if (!result) return;
 
-      const perKg = round(result.ratePerKg, 2);
-      const next = basis === 'PER_POUCH' ? (pieces > 0 ? round(perKg / pieces, 4) : null) : perKg;
-      if (next === null) return;
-
+      const next = round(result.ratePerKg, 2);
       if (lastComputed.current[position] === next) return;
       lastComputed.current[position] = next;
-      setNumber(setValue, `items.${index}.quantities.${position}.${field}`, next);
+      setNumber(setValue, `items.${index}.quantities.${position}.ratePerKg`, next);
     });
-  }, [costing.results, basis, cost?.geometry.pouchesPerKg, index, setValue]);
+  }, [costing.results, index, setValue]);
 
   /**
    * Fill the repeats in as the size is typed, until the office says otherwise.
@@ -1782,11 +1848,6 @@ function JobCard({
                 if (nextKind === 'ROLL') {
                   setValue(`items.${index}.isGazette`, false, { shouldDirty: true });
                 }
-                setValue(
-                  `items.${index}.pricingBasis`,
-                  pricingBasisFor(nextKind, nextPouchType) as ItemValues['pricingBasis'],
-                  { shouldDirty: true },
-                );
               }}
             >
               {JOB_KINDS.map((kind) => (
@@ -1816,16 +1877,6 @@ function JobCard({
                     shouldDirty: true,
                     shouldValidate: true,
                   });
-                  /*
-                   * The style resets the unit to the trade's convention for it.
-                   * Landing on the conventional answer is what someone who never
-                   * touches the switch expects.
-                   */
-                  setValue(
-                    `items.${index}.pricingBasis`,
-                    pricingBasisFor('POUCH', next) as ItemValues['pricingBasis'],
-                    { shouldDirty: true },
-                  );
                 }}
               >
                 <option value="">— Choose —</option>
@@ -2023,8 +2074,20 @@ function JobCard({
                   which left the office with a total and no way to see where it
                   came from — and no way to spot a repeat typed wrong.
                 */}
+                {/*
+                  Both sizes are worked out, not typed, so a cylinder the works
+                  cannot have engraved is something the office would otherwise
+                  only find out from the engraver. The warning names the box
+                  above that fixes it — lanes for the face, repeats for the
+                  circumference — because the number it is under cannot be
+                  edited directly.
+                */}
                 <div className="sm:col-span-3">
-                  <Field label="Cylinder width" htmlFor={`items.${index}.cylinderWidth`}>
+                  <Field
+                    label="Cylinder width"
+                    htmlFor={`items.${index}.cylinderWidth`}
+                    error={cylinderWarning(cost, 'width')}
+                  >
                     <ReadOnlyValue value={formatNumber(cost?.geometry.cylinderWidth ?? 0)} />
                   </Field>
                 </div>
@@ -2032,6 +2095,7 @@ function JobCard({
                   <Field
                     label="Cylinder circumference"
                     htmlFor={`items.${index}.cylinderCircumference`}
+                    error={cylinderWarning(cost, 'circumference')}
                   >
                     <ReadOnlyValue
                       value={formatNumber(cost?.geometry.cylinderCircumference ?? 0)}
@@ -2067,18 +2131,13 @@ function JobCard({
           <QuantityFields
             control={control}
             register={register}
+            /* The pouch box writes back into the kilogram one. */
+            setValue={setValue}
             itemIndex={index}
-            pricingBasis={basis}
+            /* What turns the kilograms into pouches. Zero until every ply has a
+               film with a density, which is what the strip says instead. */
+            pouchesPerKg={cost?.geometry.pouchesPerKg ?? 0}
             showsPouches={jobKind !== 'ROLL'}
-            onBasisChange={
-              jobKind === 'ROLL'
-                ? undefined
-                : (next) =>
-                    setValue(`items.${index}.pricingBasis`, next as ItemValues['pricingBasis'], {
-                      shouldDirty: true,
-                      shouldValidate: true,
-                    })
-            }
             results={cost?.quantities ?? []}
             costings={costing.results}
             onShowWorking={setWorking}

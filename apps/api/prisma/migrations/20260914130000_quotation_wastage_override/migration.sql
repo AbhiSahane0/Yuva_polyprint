@@ -1,0 +1,11 @@
+-- Wastage becomes a figure a quotation can set for itself.
+--
+-- The works has two: 7% on the pouch jobs its pouch workbook costs, 8% on
+-- everything else, which is the figure the Estimation sheet carries and what
+-- the seven rebuilt 2022 quotations were verified against. One global number
+-- could not hold both, and changing it would have silently moved seven
+-- quotations that reproduce their own sheets to the paisa.
+--
+-- Nullable, like the margin, transport and pouch-making overrides beside it:
+-- null means "whatever the works is on", which is what an ordinary job means.
+ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "wastage_percent" DECIMAL(5,2);

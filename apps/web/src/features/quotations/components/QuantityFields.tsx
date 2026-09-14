@@ -1,14 +1,20 @@
-import { useFieldArray, type Control, type UseFormRegister } from 'react-hook-form';
-import { Layers3 } from 'lucide-react';
+import { useState } from 'react';
+import {
+  useFieldArray,
+  useWatch,
+  type Control,
+  type UseFormRegister,
+  type UseFormSetValue,
+} from 'react-hook-form';
+import { Info, Layers3 } from 'lucide-react';
 import {
   formatNumber,
   formatRs,
   marginsAt,
+  round,
   type CostingBreakdown,
   type CreateQuotationFormValues,
-  type PricingBasis,
 } from '@yuva/shared';
-import { Info } from 'lucide-react';
 import { Field, NumberInput } from '@/components/ui/Field';
 import { cn } from '@/lib/utils';
 
@@ -20,14 +26,22 @@ import { cn } from '@/lib/utils';
  * breath, and answers it honestly: the cylinders cost the same in every column,
  * so the per-pouch figure genuinely falls as the order grows.
  *
- * **Kilogram or pouches is chosen here.** The style suggests it — the trade
- * quotes a standup pouch per piece and a centre-seal one by weight — but that
- * suggestion used to be the only answer available, and a customer who orders
- * standup pouches by the kilogram could not be quoted the way they buy.
+ * **Kilograms and pouches, side by side, both typed.** It used to be a
+ * `Sold by [Kilogram | Pouches]` switch, and the switch decided which pair of
+ * boxes existed — so whichever unit was picked, the other was off screen.
+ * Quoting per piece hid the weight the film is bought in; quoting per kilo hid
+ * the count the customer asks for.
  *
- * Whichever unit is chosen, only that pair is asked for — but **both** are
- * reported beside the result. The film is ordered by weight however it is
- * sold, and the works needs the count however it is priced.
+ * They are two readings of one number, so they are shown as one: `500 kg =
+ * 21,565 pouches`, and typing in either fills the other. An order arrives as
+ * "five hundred kilos" or as "a lakh pouches" depending on who is ringing, and
+ * neither should need converting by hand before it can be keyed in.
+ *
+ * The **rate** is the same pair: `Rs. 281.24 per kg = Rs. 6.52 per pouch`. The
+ * costing works in kilograms and fills the left box in, but a customer haggles
+ * in the unit they buy — "make it six and a half and we'll take it" — and
+ * typing that into the right box is the whole of it. Nothing has to be worked
+ * backwards on paper to find the per-kilo figure that lands on a round price.
  */
 
 /** What each quantity works out to, computed live so nothing is a surprise. */
@@ -43,12 +57,31 @@ export interface QuantityResult {
   materialCostPerKg: number | null;
 }
 
+interface RowProps {
+  control: Control<CreateQuotationFormValues>;
+  register: UseFormRegister<CreateQuotationFormValues>;
+  setValue: UseFormSetValue<CreateQuotationFormValues>;
+  itemIndex: number;
+  index: number;
+  pouchesPerKg: number;
+  pouchWeightG: number;
+  showsPouches: boolean;
+  result: QuantityResult | undefined;
+  costing: CostingBreakdown | null;
+  onShowWorking?: ((index: number) => void) | undefined;
+  errors?: Record<string, { message?: string } | undefined>;
+  chosen: boolean;
+  showsRadio: boolean;
+  onSelectQuantity?: ((position: number) => void) | undefined;
+  onRemove?: (() => void) | undefined;
+}
+
 export function QuantityFields({
   control,
   register,
+  setValue,
   itemIndex,
-  pricingBasis,
-  onBasisChange,
+  pouchesPerKg = 0,
   showsPouches = true,
   results,
   costings,
@@ -59,8 +92,17 @@ export function QuantityFields({
 }: {
   control: Control<CreateQuotationFormValues>;
   register: UseFormRegister<CreateQuotationFormValues>;
+  /** Needed because the pouch box writes back into the kilogram one. */
+  setValue: UseFormSetValue<CreateQuotationFormValues>;
   itemIndex: number;
-  pricingBasis: PricingBasis;
+  /**
+   * What a kilogram of this laminate comes to in pouches.
+   *
+   * What links the two boxes, and what the pouch figures hang off. Zero until
+   * every ply has a film with a density, and the row says so rather than
+   * offering a box that cannot answer.
+   */
+  pouchesPerKg?: number;
   /**
    * What each quantity costs to MAKE — the full activity-based figure, one per
    * row. Absent while the line is not costable, which is why the net margin
@@ -70,13 +112,8 @@ export function QuantityFields({
   /** Opens the working behind one row's rate. */
   onShowWorking?: ((index: number) => void) | undefined;
   /**
-   * Absent on a roll, where the switch is not shown at all — a reel has no
-   * pouches to count, so offering the choice would be offering a mistake.
-   */
-  onBasisChange?: ((next: PricingBasis) => void) | undefined;
-  /**
-   * False on a roll. Weight is reported either way, but a reel has no pieces,
-   * and "0 pouches" reads as a count rather than as an absence.
+   * False on a roll. A reel is film on a core: there is no pouch to count, so
+   * the pouch box and the strip are not shown at all rather than shown empty.
    */
   showsPouches?: boolean;
   /** One per row, in order. Absent entries render as blanks, not zeroes. */
@@ -97,9 +134,8 @@ export function QuantityFields({
     name: `items.${itemIndex}.quantities`,
   });
 
-  const perPouch = pricingBasis === 'PER_POUCH';
-  const quantityField = perPouch ? 'quantityPouches' : 'quantityKg';
-  const rateField = perPouch ? 'ratePerPouch' : 'ratePerKg';
+  /* One pouch's weight, the same at every quantity on this line. */
+  const pouchWeightG = pouchesPerKg > 0 ? 1000 / pouchesPerKg : 0;
 
   return (
     <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4">
@@ -109,38 +145,6 @@ export function QuantityFields({
           Quantities
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {onBasisChange ? (
-            <div
-              className="flex items-center gap-1"
-              role="group"
-              aria-label="How this line is sold"
-            >
-              <span className="text-ink-400 mr-1 text-xs">Sold by</span>
-              {(
-                [
-                  ['PER_KG', 'Kilogram'],
-                  ['PER_POUCH', 'Pouches'],
-                ] as const
-              ).map(([basis, label]) => (
-                <button
-                  key={basis}
-                  type="button"
-                  aria-pressed={pricingBasis === basis}
-                  onClick={() => onBasisChange(basis)}
-                  className={cn(
-                    'focus-visible:ring-brand-500 rounded-[var(--radius-sm)] border px-2.5 py-1 text-xs font-medium transition focus-visible:ring-2 focus-visible:outline-none',
-                    pricingBasis === basis
-                      ? 'border-brand-500 bg-brand-50 text-brand-700'
-                      : 'border-ink-200 text-ink-600 hover:bg-ink-50 bg-white',
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <span className="text-ink-400 text-xs">Sold per kilogram</span>
-          )}
           {onSelectQuantity && fields.length > 1 ? (
             <span className="text-ink-400 text-xs">Ticked one is quoted</span>
           ) : null}
@@ -158,166 +162,361 @@ export function QuantityFields({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2.5">
-        {fields.map((field, index) => {
-          const result = results[index];
+      <div className="flex flex-col gap-3">
+        {fields.map((field, index) => (
+          <QuantityRow
+            key={field.id}
+            control={control}
+            register={register}
+            setValue={setValue}
+            itemIndex={itemIndex}
+            index={index}
+            pouchesPerKg={pouchesPerKg}
+            pouchWeightG={pouchWeightG}
+            showsPouches={showsPouches}
+            result={results[index]}
+            costing={costings?.[index] ?? null}
+            onShowWorking={onShowWorking}
+            errors={errors?.[index]}
+            chosen={(selectedQuantity ?? 1) === index + 1}
+            showsRadio={Boolean(onSelectQuantity) && fields.length > 1}
+            onSelectQuantity={onSelectQuantity}
+            onRemove={fields.length > 1 ? () => remove(index) : undefined}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
-          const chosen = (selectedQuantity ?? 1) === index + 1;
-          const showsRadio = Boolean(onSelectQuantity) && fields.length > 1;
+function QuantityRow({
+  register,
+  control,
+  setValue,
+  itemIndex,
+  index,
+  pouchesPerKg,
+  pouchWeightG,
+  showsPouches,
+  result,
+  costing,
+  onShowWorking,
+  errors,
+  chosen,
+  showsRadio,
+  onSelectQuantity,
+  onRemove,
+}: RowProps) {
+  const kg = Number(
+    useWatch({ control, name: `items.${itemIndex}.quantities.${index}.quantityKg` }) ?? 0,
+  );
 
-          return (
-            <div key={field.id} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-12">
-              {/*
-               * Which quantity the customer actually gets.
-               *
-               * Only shown once there is something to choose between. A radio
-               * beside a single row is a decision nobody has to make, and reads
-               * as though the row might somehow be switched off.
-               */}
-              {showsRadio ? (
-                <div className="col-span-2 flex items-center pb-3 sm:col-span-1 sm:justify-center">
-                  <input
-                    type="radio"
-                    name={`items.${itemIndex}.selectedQuantity`}
-                    checked={chosen}
-                    onChange={() => onSelectQuantity?.(index + 1)}
-                    aria-label={`Quote quantity ${index + 1}`}
-                    title="Quote this quantity — the others stay as working"
-                    className="accent-brand-600 size-4 cursor-pointer"
+  const ratePerKg = Number(
+    useWatch({ control, name: `items.${itemIndex}.quantities.${index}.ratePerKg` }) ?? 0,
+  );
+
+  const write = (field: string, value: number | string) =>
+    setValue(`items.${itemIndex}.quantities.${index}.${field}` as never, String(value) as never, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+
+  /*
+   * Typing pouches sets the kilograms. Three decimals, because a pouch is grams
+   * — the weight it implies is exact enough to price and short enough to read.
+   */
+  const takePouches = (count: number) => {
+    write('quantityKg', count > 0 ? round(count / pouchesPerKg, 3) : '');
+    write('quantityPouches', Math.max(0, Math.round(count)));
+  };
+
+  /*
+   * Typing a rate each sets the rate per kilogram, which is the one the line is
+   * actually priced on. Four decimals, because a pouch is often under ten rupees
+   * and two would round a half-paisa negotiation away.
+   */
+  const takeRateEach = (each: number) => {
+    write('ratePerKg', each > 0 ? round(each * pouchesPerKg, 4) : '');
+    write('ratePerPouch', each > 0 ? round(each, 4) : '');
+  };
+
+  /* Whether this row can be read as pouches at all — a roll never can, and a
+     laminate with a ply still to choose has no weight to divide by yet. */
+  const countable =
+    showsPouches && pouchWeightG > 0 && result !== undefined && result.totalPouches > 0;
+
+  const quantityId = `items.${itemIndex}.quantities.${index}.quantityKg`;
+  const pouchId = `items.${itemIndex}.quantities.${index}.quantityPouches`;
+  const rateId = `items.${itemIndex}.quantities.${index}.ratePerKg`;
+
+  return (
+    <div
+      className={cn(
+        'rounded-[var(--radius-md)] border',
+        /* The quoted row is the one the document carries, so it is the one that
+           reads as chosen rather than merely ticked. */
+        chosen && showsRadio ? 'border-brand-500 bg-brand-50/30' : 'border-ink-200 bg-white',
+      )}
+    >
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-3 p-3">
+        {/*
+         * Which quantity the customer actually gets.
+         *
+         * Only shown once there is something to choose between. A radio beside a
+         * single row is a decision nobody has to make, and reads as though the
+         * row might somehow be switched off.
+         */}
+        {showsRadio ? (
+          <input
+            type="radio"
+            name={`items.${itemIndex}.selectedQuantity`}
+            checked={chosen}
+            onChange={() => onSelectQuantity?.(index + 1)}
+            aria-label={`Quote quantity ${index + 1}`}
+            title="Quote this quantity — the others stay as working"
+            className="accent-brand-600 size-4 shrink-0 cursor-pointer self-center"
+          />
+        ) : null}
+
+        {/*
+         * Two readings of one number, joined by the equals sign that says so.
+         * Type into whichever the customer gave you.
+         */}
+        <div className="min-w-0">
+          <Field
+            label={`Quantity ${index + 1}`}
+            htmlFor={quantityId}
+            error={errors?.quantityKg?.message}
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-24">
+                <NumberInput
+                  id={quantityId}
+                  invalid={Boolean(errors?.quantityKg)}
+                  {...register(quantityId as never)}
+                />
+                <p className="text-ink-400 mt-1 text-xs">kg</p>
+              </div>
+
+              {showsPouches ? (
+                <>
+                  <Equals />
+                  <PairedBox
+                    id={pouchId}
+                    ariaLabel={`Quantity ${index + 1} in pouches`}
+                    hint="pouches"
+                    derived={pouchesPerKg > 0 && kg > 0 ? kg * pouchesPerKg : 0}
+                    decimals={0}
+                    disabled={pouchesPerKg <= 0}
+                    onType={takePouches}
                   />
-                </div>
+                </>
               ) : null}
-              <div className="col-span-1 sm:col-span-2">
-                <Field
-                  label={`Quantity ${index + 1}`}
-                  htmlFor={`items.${itemIndex}.quantities.${index}.${quantityField}`}
-                  hint={perPouch ? 'pouches' : 'kg'}
-                  error={errors?.[index]?.[quantityField]?.message}
-                >
+            </div>
+          </Field>
+        </div>
+
+        <div className="min-w-0">
+          <div className="relative">
+            <Field label={`Rate ${index + 1}`} htmlFor={rateId} error={errors?.ratePerKg?.message}>
+              <div className="flex items-center gap-2">
+                <div className="w-24">
                   <NumberInput
-                    /*
-                     * Keyed on the field, so switching the unit remounts the
-                     * box instead of reusing it.
-                     *
-                     * `register` is uncontrolled: it never writes back into an
-                     * input it is already holding. React reuses this node
-                     * across the switch because nothing about its position
-                     * changed, so the box went on displaying the kilograms
-                     * that were typed while the form was reading and writing
-                     * `quantityPouches` underneath — 100 and Rs. 400 on
-                     * screen, Rs. 0 as the total beside them. Remounting makes
-                     * react-hook-form register a fresh element and fill it
-                     * from what it actually holds.
-                     */
-                    key={quantityField}
-                    id={`items.${itemIndex}.quantities.${index}.${quantityField}`}
-                    invalid={Boolean(errors?.[index]?.[quantityField])}
-                    {...register(`items.${itemIndex}.quantities.${index}.${quantityField}`)}
+                    id={rateId}
+                    invalid={Boolean(errors?.ratePerKg)}
+                    {...register(rateId as never)}
                   />
-                </Field>
-              </div>
+                  <p className="text-ink-400 mt-1 text-xs">per kg</p>
+                </div>
 
-              <div className="col-span-1 sm:col-span-2">
-                <div className="relative">
-                  <Field
-                    label={`Rate ${index + 1}`}
-                    htmlFor={`items.${itemIndex}.quantities.${index}.${rateField}`}
-                    hint={perPouch ? 'per pouch' : 'per kg'}
-                    error={errors?.[index]?.[rateField]?.message}
-                  >
-                    <NumberInput
-                      key={rateField}
-                      id={`items.${itemIndex}.quantities.${index}.${rateField}`}
-                      invalid={Boolean(errors?.[index]?.[rateField])}
-                      {...register(`items.${itemIndex}.quantities.${index}.${rateField}`)}
+                {showsPouches ? (
+                  <>
+                    <Equals />
+                    <PairedBox
+                      id={`items.${itemIndex}.quantities.${index}.ratePerPouch`}
+                      ariaLabel={`Rate ${index + 1} per pouch`}
+                      hint="per pouch"
+                      derived={pouchesPerKg > 0 && ratePerKg > 0 ? ratePerKg / pouchesPerKg : 0}
+                      decimals={4}
+                      disabled={pouchesPerKg <= 0}
+                      onType={takeRateEach}
                     />
-                  </Field>
-                  {/*
-                    The working, beside the figure it produced. The rate arrives
-                    filled in — there is no reason to make somebody press a
-                    button to accept a number the system already worked out —
-                    and this is how they check where it came from.
-                  */}
-                  {costings?.[index] && onShowWorking ? (
-                    <button
-                      type="button"
-                      onClick={() => onShowWorking(index)}
-                      title="How this rate was worked out"
-                      aria-label={`How rate ${index + 1} was worked out`}
-                      className="text-ink-400 hover:text-brand-600 absolute top-0 right-0 cursor-pointer p-0.5"
-                    >
-                      <Info className="size-4" />
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-
-              {/*
-               * What that quantity comes to. Live, because the office is
-               * choosing a price here and the margin is the thing they are
-               * actually watching.
-               */}
-              <div className={cn('col-span-2', showsRadio ? 'sm:col-span-6' : 'sm:col-span-7')}>
-                <div className="text-ink-500 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 pb-2 text-xs">
-                  {result ? (
-                    <>
-                      <span className="text-ink-800 font-medium">
-                        {formatRs(result.totalAmount)}
-                      </span>
-                      {/*
-                       * Both units, always — not just the one that was not
-                       * typed. The office quotes in whichever the customer
-                       * buys, but the works runs on the other: a per-pouch
-                       * order still has to be laminated and slit by weight,
-                       * and a per-kilo one still has to come off the machine
-                       * as a countable number of pouches. Showing only the
-                       * derived half meant reading the typed figure off the
-                       * box above and holding the pair in your head.
-                       */}
-                      <span className="tabular-nums">{formatNumber(result.quantityKg, 2)} kg</span>
-                      {showsPouches ? (
-                        <span className="tabular-nums">
-                          {formatNumber(result.totalPouches)} pouches
-                        </span>
-                      ) : null}
-                      {/* Gross and net — see the Margins component below. */}
-                      {result.marginPercent === null ? (
-                        <span
-                          className="text-ink-400"
-                          title="No margin without a costed structure — every ply needs a film with a rate."
-                        >
-                          margin —
-                        </span>
-                      ) : (
-                        <Margins
-                          ratePerKg={result.ratePerKg}
-                          materialCostPerKg={result.materialCostPerKg ?? 0}
-                          costing={costings?.[index] ?? null}
-                        />
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-ink-300">&mdash;</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="col-span-2 pb-2.5 sm:col-span-1">
-                {fields.length > 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => remove(index)}
-                    aria-label={`Remove quantity ${index + 1}`}
-                    className="text-ink-400 hover:text-danger-600 focus-visible:ring-brand-500 rounded px-1 text-xs focus-visible:ring-2 focus-visible:outline-none"
-                  >
-                    Remove
-                  </button>
+                  </>
                 ) : null}
               </div>
-            </div>
-          );
-        })}
+            </Field>
+            {/*
+              The working, beside the figure it produced. The rate arrives filled
+              in — there is no reason to make somebody press a button to accept a
+              number the system already worked out — and this is how they check
+              where it came from.
+            */}
+            {costing && onShowWorking ? (
+              <button
+                type="button"
+                onClick={() => onShowWorking(index)}
+                title="How this rate was worked out"
+                aria-label={`How rate ${index + 1} was worked out`}
+                className="text-ink-400 hover:text-brand-600 absolute top-0 left-28 cursor-pointer p-0.5"
+              >
+                <Info className="size-4" />
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {/*
+         * The margin sits beside the RATE, because it is a judgement about the
+         * rate — the office types a price here and watches this move. What the
+         * order comes to is money, so it is in the strip with the other money.
+         */}
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5 pb-1 text-xs">
+          {result === undefined ? (
+            <span className="text-ink-300">&mdash;</span>
+          ) : result.marginPercent === null ? (
+            <span
+              className="text-ink-400"
+              title="No margin without a costed structure — every ply needs a film with a rate."
+            >
+              margin &mdash;
+            </span>
+          ) : (
+            <Margins
+              ratePerKg={result.ratePerKg}
+              materialCostPerKg={result.materialCostPerKg ?? 0}
+              costing={costing}
+            />
+          )}
+        </div>
+
+        {onRemove ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove quantity ${index + 1}`}
+            className="text-ink-400 hover:text-danger-600 focus-visible:ring-brand-500 ml-auto shrink-0 rounded px-1 pb-1 text-xs focus-visible:ring-2 focus-visible:outline-none"
+          >
+            Remove
+          </button>
+        ) : null}
       </div>
+
+      {/*
+       * What the order comes to, and the two facts that are not boxes.
+       *
+       * Everything the office types is above; this is what falls out of it. The
+       * total is the figure that goes on the document, so it carries the weight
+       * here — and the count with its weight each is the working behind the
+       * pouch boxes, so the arithmetic can be followed without leaving the row.
+       *
+       * The strip is here on a roll too, carrying the total alone: money belongs
+       * in one place whether or not the job has pouches in it.
+       */}
+      <div className="border-ink-200 bg-brand-50/60 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 rounded-b-[var(--radius-md)] border-t px-3 py-2">
+        {result === undefined ? (
+          <span className="text-ink-300 text-xs">&mdash;</span>
+        ) : (
+          <>
+            <span className="text-brand-700 text-base font-semibold tabular-nums">
+              {formatRs(result.totalAmount)}
+            </span>
+            <span className="text-ink-500 text-xs">in all</span>
+
+            {countable ? (
+              <>
+                <span className="text-ink-300 text-xs">&middot;</span>
+                <span className="text-ink-500 text-xs tabular-nums">
+                  {formatNumber(result.totalPouches)} pouches at {formatNumber(pouchWeightG, 2)} g
+                  each
+                </span>
+              </>
+            ) : null}
+
+            {showsPouches && !countable ? (
+              <>
+                <span className="text-ink-300 text-xs">&middot;</span>
+                <span className="text-ink-400 text-xs">
+                  the pouch boxes need a film on every ply — the densities are what turn kilograms
+                  into a count
+                </span>
+              </>
+            ) : null}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** What says the two boxes are one number rather than two settings. */
+function Equals() {
+  return (
+    <span className="text-ink-300 mb-5 text-sm" aria-hidden>
+      =
+    </span>
+  );
+}
+
+/**
+ * The other half of a pair: shown from the half the form holds, typed into
+ * freely.
+ *
+ * Both pairs work the same way. One box is the field — kilograms, rupees per
+ * kilogram — and the other is that field read through the laminate's weight per
+ * pouch. Typing into this one converts and writes back into the field, so there
+ * is one source of truth and no chance of the two drifting.
+ *
+ * **The local `typing` state is what makes it usable.** Without it the box is
+ * rewritten from the field on every keystroke: type "1" into pouches, that is
+ * 0.023 kg, which renders back as "1" — but the intermediate states of "1000"
+ * fight the cursor, and a rate typed as "6.5" briefly becomes "6.5000000001"
+ * through the round trip. Held while the box has focus and dropped on blur, so
+ * it re-syncs the moment the other half changes anywhere else.
+ *
+ * Disabled rather than hidden when there is nothing to convert with: the row
+ * should not change shape as films are chosen, and a dead box beside a live one
+ * reads as "waiting" where a missing box reads as "not offered".
+ */
+function PairedBox({
+  id,
+  ariaLabel,
+  hint,
+  derived,
+  decimals,
+  disabled,
+  onType,
+}: {
+  id: string;
+  ariaLabel: string;
+  hint: string;
+  derived: number;
+  /** 0 for a count of pouches; 4 for a rate, where half a paisa is negotiable. */
+  decimals: number;
+  disabled: boolean;
+  onType: (value: number) => void;
+}) {
+  const [typing, setTyping] = useState<string | null>(null);
+  const shown = typing ?? (derived > 0 ? String(round(derived, decimals)) : '');
+
+  return (
+    <div className="w-24">
+      <NumberInput
+        id={id}
+        aria-label={ariaLabel}
+        value={shown}
+        disabled={disabled}
+        title={disabled ? 'Choose a film for every ply first' : undefined}
+        onChange={(event) => {
+          setTyping(event.target.value);
+          if (disabled) return;
+          const value = Number(event.target.value);
+          /* An empty box and a half-typed "1." are both Not-a-Number. Neither is
+             an instruction to reprice the line, so neither writes. */
+          if (Number.isFinite(value)) onType(value);
+        }}
+        onBlur={() => setTyping(null)}
+      />
+      <p className="text-ink-400 mt-1 text-xs">{hint}</p>
     </div>
   );
 }
@@ -374,7 +573,7 @@ function Margins({
           className="text-ink-400"
           title="Net needs the full costing — choose a film for every ply, and a quantity of at least a kilogram."
         >
-          net —
+          net &mdash;
         </span>
       ) : (
         <span

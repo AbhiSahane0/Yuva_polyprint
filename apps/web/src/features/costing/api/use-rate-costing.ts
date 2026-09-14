@@ -3,12 +3,15 @@ import {
   adhesiveGsmFor,
   costRate,
   parseStationSteps,
+  inkGsmFor,
   unpricedColours,
+  wastagePercentFor,
   type CostingBreakdown,
   type CostingColour,
   type CostingInput,
   type CostingLayer,
   type Material,
+  type PouchType,
 } from '@yuva/shared';
 import { useSettings } from '@/features/quotations/api/quotation-api';
 import { useCostingMasterData } from './costing-api';
@@ -32,6 +35,16 @@ export interface RateCostingLine {
   /** One cylinder per colour, which is how many the line is charged for. */
   colourCount: number;
   makesPouches: boolean;
+  /**
+   * The style, and the finished width the zipper would cross.
+   *
+   * What making one pouch costs depends on both: a zipper is charged by the
+   * metre across the mouth, a D punch adds its punch. The width is the pouch's
+   * own, not the flat film's — a bottom gusset lengthens the sheet without
+   * widening the mouth.
+   */
+  pouchType: PouchType | null;
+  pouchWidthMm: number;
   /** The quantities being priced, in kilograms. */
   quantitiesKg: number[];
   /**
@@ -53,6 +66,7 @@ export interface RateCostingOverrides {
   marginPercent?: number | null;
   transportPerKg?: number | null;
   pouchMakingPerKg?: number | null;
+  wastagePercent?: number | null;
   /**
    * The quotation's own date, so it is costed on the figures of that day.
    *
@@ -180,7 +194,12 @@ export function useRateCosting(
     return {
       job: {
         orderQtyKg: 0, // set per quantity below
-        wastagePercent: settings.defaultWastagePercent,
+        wastagePercent: wastagePercentFor({
+          pouchType: line.pouchType,
+          override: overrides.wastagePercent,
+          defaultWastagePercent: settings.defaultWastagePercent,
+          pouchWastagePercent: settings.pouchWastagePercent,
+        }),
         filmWidthMm: line.filmWidthMm,
         filmHeightMm: line.filmHeightMm,
         ups: line.ups,
@@ -210,9 +229,16 @@ export function useRateCosting(
           tolueneRatePerKg: rate(settings.defaultTolueneMaterial),
         },
         makesPouches: line.makesPouches,
+        pouchType: line.pouchType,
+        pouchWidthMm: line.pouchWidthMm,
         piecesPerKgOverride: line.piecesPerKg,
-        /* The works weighs the laminate with its own ink figure. */
-        inkGsmOverride: settings.inkGsm,
+        /* The works weighs the laminate with its own ink figure, and it has
+           two — see `inkGsmFor`. */
+        inkGsmOverride: inkGsmFor({
+          pouchType: line.pouchType,
+          inkGsm: settings.inkGsm,
+          pouchInkGsm: settings.pouchInkGsm,
+        }),
         /* One cylinder per station, which is what the line is charged for. */
         stationCount: line.colourCount,
         adhesiveSplitRatio: settings.adhesiveSplitRatio,
@@ -235,7 +261,16 @@ export function useRateCosting(
         emiPerMonth: settings.emiPerMonth,
         emiHoursPerMonth: settings.emiHoursPerMonth,
         emiBasis: settings.emiBasis,
-        pouchMakingPerKg: pick(overrides.pouchMakingPerKg, settings.pouchMakingPerKg),
+        pouchMaking: {
+          makingPerPouch: settings.pouchMakingPerPouch,
+          dPunchPerPouch: settings.dPunchPerPouch,
+          dPunchLargePerPouch: settings.dPunchLargePerPouch,
+          dPunchLargeAboveMm: settings.dPunchLargeAboveMm,
+          zipperRatePerMetre: settings.zipperRatePerMetre,
+        },
+        /* The office's own figure replaces the whole charge, in the unit it is
+           stated in. Null lets the style decide. */
+        pouchMakingPerKgOverride: overrides.pouchMakingPerKg ?? null,
         stationSurcharges: [
           settings.stationSurcharge6,
           settings.stationSurcharge7,

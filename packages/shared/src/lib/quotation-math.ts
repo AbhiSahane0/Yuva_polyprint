@@ -278,17 +278,86 @@ export interface ItemGeometry {
 }
 
 /**
- * The circumferences the works' cylinders actually come in, in millimetres.
+ * The circumferences the works can have engraved, in millimetres.
  *
- * Not invented — read off the 347 imported jobs that record one. They run 310
- * to 740 and cluster around 480; `PREFERRED` is the figure the suggestion aims
- * at, and reproduces the repeat the works actually chose on 85% of those jobs.
+ * **400 to 600 is the works' own answer**, given for this purpose: outside it
+ * the engraver cannot cut the cylinder, so a job that lands outside is not a
+ * job that can be run as drawn.
  *
- * The remaining 15% are jobs where two repeats both fit and the works picked
- * the other one — which cylinder was free that week, not arithmetic. That is
- * precisely why the suggested repeat stays editable.
+ * `PREFERRED` is where the suggestion aims, and is not a limit. It came off the
+ * 347 imported jobs that record a circumference — they cluster around 480, and
+ * aiming at 490 reproduces the repeat the works actually chose on 85% of them.
+ * The other 15% are jobs where two repeats both fit and the works took the
+ * other one: which cylinder was free that week, not arithmetic. That is exactly
+ * why the suggested repeat stays editable.
+ *
+ * Those same imported jobs run 310 to 740, wider than this. They are a record
+ * of what was cut over years, not of what can be cut now — so the range here is
+ * the stated one and the suggestion stays inside it, rather than proposing a
+ * repeat the form would immediately warn about.
  */
-export const CYLINDER_CIRCUMFERENCE = { MIN: 310, MAX: 740, PREFERRED: 490 } as const;
+export const CYLINDER_CIRCUMFERENCE = { MIN: 400, MAX: 600, PREFERRED: 490 } as const;
+
+/**
+ * The cylinder faces the works can have engraved, in millimetres.
+ *
+ * Also the works' own answer. Note it is **not** `MAX_CYLINDER_FACE_MM`, which
+ * is a different figure for a different job: 800 is what the works actually
+ * runs and what the lane suggestion is built on, 1060 is what the engraver can
+ * cut. A cylinder between the two is unusual rather than impossible, and
+ * nothing here should quietly start proposing wider ones — the number of lanes
+ * decides the running metres, and therefore the price of every job.
+ */
+export const CYLINDER_FACE = { MIN: 450, MAX: 1060 } as const;
+
+/** One cylinder dimension being outside what can be engraved. */
+export interface CylinderWarning {
+  /** 'width' or 'circumference' — which box to put it under. */
+  field: 'width' | 'circumference';
+  /** Said in full, because it is read without the field's label in reach. */
+  message: string;
+}
+
+/**
+ * Whether this line's cylinder can be cut, and what is wrong when it cannot.
+ *
+ * A **warning, not a refusal**. An enquiry is allowed to describe something the
+ * works cannot make — that is half of what an enquiry is for — and the office
+ * answers it by changing the lanes or the repeat, which are two boxes above.
+ * Refusing to price it would leave them with a blocked form and no figure to
+ * talk to the customer about.
+ *
+ * Zero is silent. A line still being typed has no size yet, and a form that
+ * complains before anything has been entered is one people learn to ignore.
+ */
+export function cylinderWarnings(geometry: {
+  cylinderWidth: number;
+  cylinderCircumference: number;
+}): CylinderWarning[] {
+  const warnings: CylinderWarning[] = [];
+
+  const { cylinderWidth: width, cylinderCircumference: around } = geometry;
+
+  if (width > 0 && (width < CYLINDER_FACE.MIN || width > CYLINDER_FACE.MAX)) {
+    warnings.push({
+      field: 'width',
+      message:
+        `${round(width, 2)} mm is outside the ${CYLINDER_FACE.MIN}–${CYLINDER_FACE.MAX} mm ` +
+        `the works can have engraved. Change the lanes across.`,
+    });
+  }
+
+  if (around > 0 && (around < CYLINDER_CIRCUMFERENCE.MIN || around > CYLINDER_CIRCUMFERENCE.MAX)) {
+    warnings.push({
+      field: 'circumference',
+      message:
+        `${round(around, 2)} mm is outside the ${CYLINDER_CIRCUMFERENCE.MIN}–` +
+        `${CYLINDER_CIRCUMFERENCE.MAX} mm the works can have engraved. Change the repeats around.`,
+    });
+  }
+
+  return warnings;
+}
 
 /**
  * The widest cylinder face the works can print, in millimetres.

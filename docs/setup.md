@@ -199,14 +199,20 @@ move whatever has drifted.
 | ----------------------- | --------------- | -------------------------------------------------- |
 | Working days a month    | 26              | Turns a salary into a rate per minute              |
 | Hours a day             | 8               | The shift, for the same reason                     |
-| Wastage                 | 8%              | Film spoiled setting up and running                |
+| Wastage                 | 8%              | Film spoiled setting up and running — a reel       |
+| Wastage on a pouch job  | 7%              | Standup, standup zipper, zipper and D punch only   |
+| Ink GSM on a pouch job  | 1.2             | The pouch workbook weighs with less than 1.8       |
 | Margin                  | 9%              | Added to cost — set per quotation too              |
 | Trim                    | 15 mm           | Added to the web width                             |
 | Transport               | Rs 10 / kg      | On the quantity consumed — per quotation too       |
 | Packing                 | Rs 5 / kg       | On the quantity consumed                           |
 | Sundries                | Rs 250 / job    | A flat sum the works does not itemise              |
 | Bank EMI                | Rs 4,166.66     | Spread over 24 machine hours a month               |
-| Pouch making            | Rs 15 / kg      | Nothing on a roll — per quotation too              |
+| Pouch making            | Rs 0.25 / pouch | Forming, sealing and cutting one                   |
+| D punch                 | Rs 0.60 / pouch | What one costs to make instead — a flat charge     |
+| D punch, wide           | Rs 0.80 / pouch | Over the width below                               |
+| A D punch is wide above | 450 mm          | Pouch width at which the rate steps                |
+| Zipper                  | Rs 3.60 / metre | Across the mouth, on a zipper or standup zipper    |
 | 6th / 7th / 8th station | 5.50 / 7.50 / 0 | Surcharge past five colours                        |
 | Ink GSM                 | 1.8             | What the laminate is weighed with                  |
 | Adhesive coat           | 2 or 3          | 3 above 40µ, 2 below, per bond                     |
@@ -215,11 +221,25 @@ move whatever has drifted.
 | GST                     | 18%             | On material and cylinders alike                    |
 | Advance                 | 70% / 100%      | Material and cylinders, on the GST-inclusive value |
 
-> **Three of these are set per quotation when a job is not the ordinary case.**
-> Margin, transport and pouch making each have a box on the Jobs step; left
-> blank they follow the figures here. The client's own seven old sheets set all
-> three by hand — margins of 5%, 9% and 10%, transport at Rs 5 and Rs 10, and
-> nothing charged for pouch making on the jobs sold as reels.
+> **Pouch making is charged per POUCH, and the style decides what it costs.**
+> A standup pays making; a zipper pays making plus the zipper across its mouth,
+> by the metre; a D punch is made at its own flat rate, dearer on a wide pouch.
+>
+> **"A pouch job" means the four styles the pouch workbook costs** — standup,
+> standup zipper, zipper and D punch. Centre seal, three side seal and spout are
+> costed on the Estimation sheet, at 8% wastage and 1.8 ink. This is the works' own
+> pouch workbook — and it is charged per pouch because per kilogram cannot say
+> it: across the nine jobs in that workbook the same charge reads between Rs 11
+> and Rs 64 a kilogram, purely because a small pouch packs 130 to a kilo and a
+> big one 14.
+
+> **Four of these are set per quotation when a job is not the ordinary case.**
+> Margin, transport, pouch making and wastage each have a box on the Jobs step;
+> left blank they follow the figures here. Pouch making's box is still in **rupees
+> per kilogram**, because it replaces the whole charge rather than any part of
+> it. The client's own seven old sheets set all three by hand — margins of 5%,
+> 9% and 10%, transport at Rs 5 and Rs 10, and nothing charged for pouch making
+> on the jobs sold as reels.
 
 > **The margin is taken on materials only.** That is what the workbook does, and
 > it is why the margin per kilogram does not change between 500 kg and 5,000 kg —
@@ -269,16 +289,31 @@ and it is the only part the office repeats.
 3. **The structure.** Choose each ply from the film list and give its thickness.
    The rate and density come with the film; nothing is typed twice.
 
-4. **Colours and cylinders.** How many stations the job occupies. The lanes and
-   the repeat are suggested from the size and can be overridden — and a repeat
-   order on an existing design is quoted with no cylinder charge at all.
+4. **Colours and cylinders.** How many stations the job occupies — see
+   [`stations.md`](./stations.md). The lanes and the repeat are suggested from
+   the size and can be overridden, and a repeat order on an existing design is
+   quoted with no cylinder charge at all.
 
-5. **The quantities.** One, two or three, in kilograms or in pouches. Three
-   quantities is how a customer sees what a bigger order is worth.
+   The two cylinder sizes underneath are worked out, not typed, and each says so
+   in red when it lands outside what the engraver can cut — **450 to 1060 mm**
+   across the face, **400 to 600 mm** around. It is a warning, not a block: the
+   fix is the lanes or the repeat above it, and an enquiry is allowed to
+   describe something the works cannot make.
+
+5. **The quantities.** One, two or three. Each one has **both units side by
+   side** — `500 kg = 21,565 pouches` — so an order taken as "five hundred kilos"
+   and one taken as "a lakh pouches" are both typed in as they were said, and the
+   other half fills itself in. Three quantities is how a customer sees what a
+   bigger order is worth.
 
 6. **The rate arrives on its own.** No button to press. Change the film or the
    quantity and it moves with them. Type over it and what you typed stays until
    something genuinely changes the cost.
+
+   The rate is a pair too — `Rs. 281.24 per kg = Rs. 6.5208 per pouch` — so a
+   customer haggling in the unit they buy ("make it six-fifty and we'll take
+   it") is answered by typing six-fifty. Underneath sits what the order comes to
+   and what one pouch weighs.
 
 7. **Check the working, then send.** The ⓘ beside the rate opens the full
    calculation — every ply, every machine's minutes, the chain from material cost

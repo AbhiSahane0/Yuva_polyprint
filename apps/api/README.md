@@ -782,12 +782,53 @@ it prints. The steps are `3,4,6` because that is what the sheet's formulas
 compute and what the operator confirms; the layout of those same rows implies
 `3,5,7`, and two of its four references are off by one.
 
-**Three figures belong to the quotation, not the works.** `margin_percent`,
-`transport_per_kg` and `pouch_making_per_kg` are columns on `quotations`, null
-for "use the Costing screen". The client varies all three job to job: across
-seven of their own quotations, margins of 5%, 9% and 10%, transport at Rs 5 and
-Rs 10, and pouch making at 0, 11.04 and 15 — **five of those seven written on the
-same day**, so none of it is a price that moved over time.
+**Four figures belong to the quotation, not the works.** `margin_percent`,
+`transport_per_kg`, `pouch_making_per_kg` and `wastage_percent` are columns on
+`quotations`, null for "use the Costing screen". The client varies them job to
+job: across seven of their own quotations, margins of 5%, 9% and 10%, transport
+at Rs 5 and Rs 10, and pouch making at 0, 11.04 and 15 — **five of those seven
+written on the same day**, so none of it is a price that moved over time.
+
+`pouch_making_per_kg` stays in **rupees per kilogram** although the works' own
+figure is now per pouch: it replaces the whole charge rather than any part of
+it, which is what the office means by overriding it, and it is the unit every
+quotation written before the change already carries.
+
+#### Pouch making, and the two costing documents
+
+**Making a pouch is charged per POUCH**, from the works' pouch workbook —
+`costing_for_Standup.xlsx`, four sheets, nine costed jobs, all nine reproduced
+before any of this was written. A rate per kilogram cannot describe the work:
+across those nine the same charge reads between Rs 11 and Rs 64 a kilogram,
+purely because a small pouch packs 130 to a kilo and a big one 14.
+
+```
+standup        = pouchMakingPerPouch                          0.25
+standup zipper = pouchMakingPerPouch + width_m × zipperRate    0.25 + 0.468 …
+zipper         = the same
+D punch        = dPunchPerPouch                                0.60 flat
+D punch, wide  = dPunchLargePerPouch, over 450 mm              0.80 flat
+roll           = 0
+
+pouchMakingPerKg = pouch expense × pieces per kg
+                   — or the quotation's own Rs/kg, where it has one
+```
+
+The **finished** pouch width is what the zipper crosses, not the flat film
+width: a bottom gusset lengthens the sheet without widening the mouth.
+
+**Two figures depend on the style, not on "is it a pouch".** The works costs
+from two documents and they split by style:
+
+|                  | covers                                    | wastage | ink GSM |
+| ---------------- | ----------------------------------------- | ------: | ------: |
+| Estimation sheet | centre seal, three side seal, spout, roll |      8% |     1.8 |
+| Pouch workbook   | standup, standup zipper, zipper, D punch  |      7% |     1.2 |
+
+That distinction is load-bearing. Every one of the seven 2022 quotations
+verified to the paisa is a **centre seal** pouch, so a rule reading "any pouch"
+would have moved all seven onto figures that never priced them.
+`isWorkbookPouch` in `@yuva/shared` holds the list, and both rules read it.
 
 **Everything is priced at the quotation's own date.** `loadCostingContext` reads
 the material rates and the settings in force on it, so an older job entered now
@@ -921,7 +962,15 @@ sent.
 | `gstPercent`                  | 18                                | Applied to material and cylinder totals                                                    |
 | `materialAdvancePercent`      | 70                                | Advance taken on the material total                                                        |
 | `cylinderAdvancePercent`      | 100                               | Advance taken on the cylinder total                                                        |
-| `inkGsm`                      | 1.8                               | Ink laid down per m², for costing                                                          |
+| `inkGsm`                      | 1.8                               | Ink laid down per m², for weighing and costing — Estimation sheet                          |
+| `pouchInkGsm`                 | 1.2                               | And on a pouch-workbook style. Decides the pouch's WEIGHT, so it moves the count per kg    |
+| `pouchMakingPerPouch`         | 0.25                              | Forming, sealing and cutting one pouch — **per pouch, not per kg**                         |
+| `dPunchPerPouch`              | 0.6                               | What a D punch costs to make instead of the making rate                                    |
+| `dPunchLargePerPouch`         | 0.8                               | And a wide one, the punch being made across the top                                        |
+| `dPunchLargeAboveMm`          | 450                               | The pouch width at which the D punch rate steps                                            |
+| `zipperRatePerMetre`          | 3.6                               | The zipper, charged across the pouch's mouth                                               |
+| `defaultWastagePercent`       | 8                                 | Film spoiled setting up and running — Estimation sheet                                     |
+| `pouchWastagePercent`         | 7                                 | And on a pouch-workbook style                                                              |
 | `adhesiveGsm`                 | 2.5                               | Adhesive laid down per m², for costing                                                     |
 | `defaultPetMaterial`          | `PET 12µm`                        | Which material's rate prices the PET layer                                                 |
 | `defaultInkMaterial`          | `Ink — Black`                     | Which rate prices the ink                                                                  |
@@ -1168,17 +1217,25 @@ PER_POUCH   totalAmount = quantityPouches × ratePerPouch
 PER_KG      totalAmount = quantityKg      × ratePerKg
 ```
 
-**The basis is chosen on the line**, and stored on it as `pricingBasis`. A line
-that does not state one takes the convention for its style — standup and
-standup-zipper by the piece, because the converting work dominates their cost
-and the trade writes those orders in pieces; everything else by weight. That is
-`pricingBasisFor()` in `@yuva/shared`, and it is the schema's default, not its
-rule.
+**The basis is stored on the line** as `pricingBasis`, and the API still honours
+both. A line that does not state one takes the convention for its style —
+standup and standup-zipper by the piece, everything else by weight — which is
+`pricingBasisFor()` in `@yuva/shared`, the schema's default rather than its rule.
 
-> It used to be the rule: derived from the style and never chosen, with the
+**The quotation form now writes `PER_KG` on every line it saves.** It used to
+offer a Kilogram / Pouches switch on the Quantities panel, and the switch
+decided which pair of boxes existed — so whichever unit was picked, the other
+was off screen. The panel now shows both from one typed pair, and the typed pair
+is the kilograms, because that is what the film is bought in and what every line
+of the costing is worked out from. The pouch figures are derived.
+
+`PER_POUCH` is therefore a legacy basis on the write path and a live one on the
+read path: quotations written before the change still carry it, still reprice
+correctly, and still print the per-piece rate they were quoted at.
+
+> Before either, the basis was derived from the style and never chosen, with the
 > server re-deriving it rather than trusting the client. That refused a real
-> order — a customer who buys standup pouches by the kilogram — so the office
-> now decides, and the choice travels with the line.
+> order — a customer who buys standup pouches by the kilogram.
 
 **A roll is still forced to `PER_KG`**, in the schema's transform, whatever the
 request asks for. There are no pouches on a reel to count. Note that the reprice
@@ -1207,11 +1264,19 @@ quantityKg  = 50,000 ÷ 107.48      = 465.203 kg
 ratePerKg   = 2,10,000 ÷ 465.203   = ₹451.42
 ```
 
-On the printed quotation a per-pouch line shows its pouch count under Order Qty
-and reads `4.20 /pc` in the rate cell. The Order Qty **total** is only summed
-when every line shares a basis — adding kilograms to pouches would print a
-number the customer could check and find wrong, so a mixed document shows a dash
-there. The money totals are unaffected; those are always rupees.
+On the printed quotation a `PER_POUCH` line shows its pouch count under Order
+Qty and reads `4.20 /pc` in the rate cell. A `PER_KG` line — which is everything
+the form writes now — shows kilograms and the per-kilogram rate, **with the rate
+each underneath it** in smaller type, from `costPerPouch`. That is the same
+price read the other way round rather than a second charge, and printing it
+saves the customer doing the sum against the pouches-per-kilogram column and
+getting a different answer. A roll gets no such line: there is nothing on a reel
+to count, and a per-piece rate on one would be an invented unit.
+
+The Order Qty **total** is only summed when every line shares a basis — adding
+kilograms to pouches would print a number the customer could check and find
+wrong, so a mixed document shows a dash there. The money totals are unaffected;
+those are always rupees.
 
 **6. Cylinder** — the +80 is the mounting allowance:
 
@@ -1383,13 +1448,18 @@ settings rather than from a thickness.
 
 ```
 plyGsm       = ply micron × that material's density      once per ply
-inkGsm       = settings.inkGsm
+inkGsm       = a pouch-workbook style ? pouchInkGsm : inkGsm      1.2 or 1.8
 adhesiveGsm  = settings.adhesiveGsm
 compositeGsm = Σ plyGsm + inkGsm + adhesiveGsm
 
 costPerKg = Σ(componentGsm × componentRate) ÷ compositeGsm
 margin %  = (sellingRate − costPerKg) ÷ sellingRate × 100
 ```
+
+**The ink figure is not only a cost.** It is what the laminate is weighed with,
+so it decides what one pouch weighs and therefore how many come out of a
+kilogram — the divisor on every per-pouch price. The works has two, from its two
+costing documents, and `inkGsmFor` in `@yuva/shared` picks between them.
 
 A ply may carry a **rate the office agreed for this job** instead, held in
 `rate_override`. It never reaches the rates master: a figure keyed while quoting
@@ -1711,32 +1781,32 @@ relabelling would not undo it.
 Full diagram and column reference: [`docs/database-schema.md`](../../docs/database-schema.md).
 Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 
-| Table                       | Holds                                                                                                                                                       |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `customers`                 | Companies that order. Text fields use `'NA'` where the imported sheet was blank.                                                                            |
-| `jobs`                      | Products and their full 55-column specification.                                                                                                            |
-| `quotations`                | Customer-facing documents. Totals frozen at save; carries its own date, margin, transport and pouch making; `lost_reason` says why a loss was lost.         |
-| `quotation_items`           | One priced line: its design, its gazette, its geometry and its cylinders.                                                                                   |
-| `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted. `rate_override` is the price agreed for this job, when one was.      |
-| `quotation_item_quantities` | One line's figures at one quoted quantity.                                                                                                                  |
-| `quotation_tiers`           | One quoted quantity and the document totals at it.                                                                                                          |
-| `materials`                 | The rate catalogue, with density for films.                                                                                                                 |
-| `material_rates`            | One material's price on one date — one row per active material per day.                                                                                     |
-| `app_setting_history`       | One setting's value from one date — what the works held then, the way `material_rates` answers it for a price.                                              |
-| `stock_batches`             | One delivery of one material, and what is left of it. Unique batch code per material. Keeps the delivery note's own figure when it arrived in another unit. |
-| `suppliers`                 | Who the works buys from. What they supply is derived from their orders, never stored.                                                                       |
-| `purchase_orders`           | One order to one supplier. Progress follows its receipts; delay is computed, not stored.                                                                    |
-| `purchase_order_lines`      | One material on an order, in the unit it was ordered in.                                                                                                    |
-| `purchase_receipts`         | One delivery against a line. Accepted stock names the batch it became; rejected stock names nothing.                                                        |
-| `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.                                                                           |
-| `job_artwork`               | A design file, held in R2 with only its description here. A revision supersedes rather than overwrites; erasing the file keeps the row that describes it.   |
-| `costing_machines`          | A machine and what a minute of it costs — load, tariff, speed, setup. Retired, never deleted: quotations were costed against it.                            |
-| `costing_labour`            | A wage, and which machine's minutes it is paid for. Monthly; the working month in settings turns it into a rate per minute.                                 |
-| `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.                                                                               |
-| `app_settings`              | Editable rates and costing defaults.                                                                                                                        |
-| `users`                     | Accounts, their password hash and which modules each may reach.                                                                                             |
-| `sessions`                  | Live sign-ins. Deleted on expiry, so this table is always "right now".                                                                                      |
-| `login_events`              | Every successful sign-in, kept permanently. Survives the account being deleted.                                                                             |
+| Table                       | Holds                                                                                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `customers`                 | Companies that order. Text fields use `'NA'` where the imported sheet was blank.                                                                             |
+| `jobs`                      | Products and their full 55-column specification.                                                                                                             |
+| `quotations`                | Customer-facing documents. Totals frozen at save; carries its own date, margin, transport, pouch making and wastage; `lost_reason` says why a loss was lost. |
+| `quotation_items`           | One priced line: its design, its gazette, its geometry and its cylinders.                                                                                    |
+| `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted. `rate_override` is the price agreed for this job, when one was.       |
+| `quotation_item_quantities` | One line's figures at one quoted quantity.                                                                                                                   |
+| `quotation_tiers`           | One quoted quantity and the document totals at it.                                                                                                           |
+| `materials`                 | The rate catalogue, with density for films.                                                                                                                  |
+| `material_rates`            | One material's price on one date — one row per active material per day.                                                                                      |
+| `app_setting_history`       | One setting's value from one date — what the works held then, the way `material_rates` answers it for a price.                                               |
+| `stock_batches`             | One delivery of one material, and what is left of it. Unique batch code per material. Keeps the delivery note's own figure when it arrived in another unit.  |
+| `suppliers`                 | Who the works buys from. What they supply is derived from their orders, never stored.                                                                        |
+| `purchase_orders`           | One order to one supplier. Progress follows its receipts; delay is computed, not stored.                                                                     |
+| `purchase_order_lines`      | One material on an order, in the unit it was ordered in.                                                                                                     |
+| `purchase_receipts`         | One delivery against a line. Accepted stock names the batch it became; rejected stock names nothing.                                                         |
+| `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.                                                                            |
+| `job_artwork`               | A design file, held in R2 with only its description here. A revision supersedes rather than overwrites; erasing the file keeps the row that describes it.    |
+| `costing_machines`          | A machine and what a minute of it costs — load, tariff, speed, setup. Retired, never deleted: quotations were costed against it.                             |
+| `costing_labour`            | A wage, and which machine's minutes it is paid for. Monthly; the working month in settings turns it into a rate per minute.                                  |
+| `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.                                                                                |
+| `app_settings`              | Editable rates and costing defaults.                                                                                                                         |
+| `users`                     | Accounts, their password hash and which modules each may reach.                                                                                              |
+| `sessions`                  | Live sign-ins. Deleted on expiry, so this table is always "right now".                                                                                       |
+| `login_events`              | Every successful sign-in, kept permanently. Survives the account being deleted.                                                                              |
 
 Two deliberate choices:
 

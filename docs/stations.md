@@ -125,6 +125,10 @@ One cylinder per station, on its own line of the document rather than in the
 per-kg rate. On a 700 mm × 600 mm single-lane job that is **Rs 11,700 each**. A
 design whose cylinders already exist is charged nothing.
 
+Adding a station does not change the cylinder's size, only how many are cut — so
+the face and circumference limits (450–1060 mm and 400–600 mm) are a question
+about the design and the repeats, not about the station count.
+
 ### Together, on a 500 kg job of 254.78 running minutes
 
 | Stations | Electricity/kg | Surcharge/kg |  Together | Cylinders |

@@ -401,13 +401,26 @@ not create a second copy of either.
 Two questions, not one. **Type** is Pouch or Roll; **Pouch type** is the style,
 and only appears for a pouch.
 
-> Standup · Standup zipper · Zipper · Spout pouch · Centre seal ·
+> Standup · Standup zipper · Zipper · **D punch** · Spout pouch · Centre seal ·
 > Three side seal · Other
 
-**The style decides how the line is priced.** Picking one sets the basis to the
-trade's convention for it, and the switch in the Quantities panel changes it —
-that switch is where the basis is stated, not under the style. Choosing Other
-reveals a box to say what it is.
+**The style no longer decides the UNIT a line is priced in.** Every line this
+form writes is priced per kilogram, and the pouch figures are worked out from it
+— see [Quantities](#quantities). Choosing Other reveals a box to say what it is.
+
+**But the style decides three costs**, because the works costs from two
+documents and its pouch workbook keeps a sheet per style:
+
+|                         | what the style changes                                       |
+| ----------------------- | ------------------------------------------------------------ |
+| **Making**              | 0.25 a pouch; a **D punch** 0.60, or 0.80 over 450 mm wide   |
+| **Zipper**              | Standup zipper and Zipper add width × Rs 3.60 a metre        |
+| **Wastage and ink GSM** | those four styles use 7% and 1.2; everything else 8% and 1.8 |
+
+The first four styles are the pouch workbook's; centre seal, three side seal and
+spout are costed on the Estimation sheet. That line matters more than it looks:
+all seven of the client's verified 2022 quotations are **centre seal**, so a
+rule reading "any pouch" would have moved every one of them.
 
 **A roll is not a pouch.** Choosing it clears the style and any gazette, hides
 both controls, and forces kilograms. Film on a reel has not been converted into
@@ -570,59 +583,79 @@ spreadsheet, not a failed prefill.
 
 #### Quantities
 
-One to three per line, each with its own quantity and rate, and its result
-alongside:
-
-> **Rs. 1,45,000** · 51.52 kg · 25,000 pouches · **31.2% margin**
-
-Margin under 15% turns amber.
-
-**Both units are reported, not just the one that was not typed.** The office
-quotes in whichever the customer buys; the works runs on the other. A per-pouch
-order still has to be laminated and slit by weight, and a per-kilo one still has
-to come off the machine as a countable number of pieces.
-
-**The margin is material only.** It is the selling rate against the material
-cost of a kilogram — films, ink and adhesive — and **cylinders, printing,
-lamination, slitting and wastage are not in it**:
+One to three per line, and every figure on one is typed in **whichever unit you
+were given**:
 
 ```
-margin % = (selling per kg − material per kg) ÷ selling per kg
+QUANTITIES                                                     Add a quantity
+
+  Quantity 1                     Rate 1 (i)
+  [  500  ] = [  21,565  ]       [  281.24  ] = [  6.5208  ]    21.1% gross · 7.1% net
+      kg          pouches            per kg        per pouch
+ ┌──────────────────────────────────────────────────────────────────────────┐
+ │  Rs. 1,40,621  in all  ·  21,565 pouches at 23.19 g each                 │
+ └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-Hovering it spells out the two figures that made it, and says what it leaves
-out. That lives on hover because it is a question asked once and a line of noise
-afterwards. Note that a per-pouch line converts first — 1,000 pouches at Rs. 10
-is Rs. 10,000 for 6.16 kg, so the selling rate is Rs. 1,623/kg — which is why a
-small light pouch sold per piece always shows a spectacular figure.
+**Two pairs, not two modes.** There used to be a `Sold by [Kilogram | Pouches]`
+switch, and it decided which pair of fields the row was bound to — so whichever
+unit was picked, the other was off screen. Quoting per piece hid the weight the
+film is bought in; quoting per kilo hid the count the customer asks for.
 
-**Kilogram or Pouches is chosen here**, on the switch in the panel header:
+Each pair is two readings of one number, joined by the equals sign that says so.
+**Type into whichever half the conversation gave you:**
 
-```
-QUANTITIES              Sold by [ Kilogram | Pouches ]     Add a quantity
-```
+| The customer says                     | Type it here          |
+| ------------------------------------- | --------------------- |
+| "five hundred kilos"                  | Quantity, **kg**      |
+| "we need a lakh pouches"              | Quantity, **pouches** |
+| "what's your rate a kilo?"            | Rate, **per kg**      |
+| "make it six-fifty and we'll take it" | Rate, **per pouch**   |
 
-Only the chosen pair is asked for — kg and rate per kg, or pouches and rate per
-pouch — but **both are kept**, so a customer who asks for the price the other way
-round is answered without re-typing the first one.
+The **kilograms and the rate per kilogram are what the form holds** — the film
+is bought by weight and every line of the costing is worked out from it. The
+pouch halves convert at the laminate's own weight per pouch and write back, so
+there is one source of truth and the two cannot drift. A rate each is kept to
+four decimals, because a pouch is often under ten rupees and two would round a
+half-paisa negotiation away.
 
-> The boxes and the total disagreed for a while. Switching the unit swaps which
-> two fields the row is bound to, and React reused the same input — same
-> element, same position, new name — while react-hook-form's `register` never
-> writes back into an input it already holds. So the boxes went on showing the
-> kilograms that were typed while the form read and wrote the pouch fields
-> underneath: **100 and Rs. 400 on screen, Rs. 0 as the total beside them.** A
-> quotation could be sent on a figure nobody entered. The boxes are keyed on the
-> field name now, so switching remounts them and fills them from what is stored.
+**The pouch halves are disabled, not hidden, until the laminate has a weight.**
+They need every ply to have a film with a density before they can convert
+anything. Hiding them would make the row change shape as films are chosen;
+disabling leaves the layout still and says what it is waiting for.
 
-The style seeds it: standup and standup zipper start on Pouches, everything else
-on Kilogram, which is what the trade does. Changing the style resets the switch
-to that style's convention, so anyone who never touches it gets the conventional
-answer. A **roll has no switch** — there are no pouches on a reel to count.
+**A roll has neither pouch box and no pouch figures.** Film on a reel has not
+been converted into anything, so there is nothing to count — the strip still
+carries the total, because money belongs in one place either way.
 
-> This used to be decided entirely by the style, with no way to override it. A
-> customer who orders standup pouches by the kilogram could not be quoted the
-> way they actually buy.
+**The strip is what is not a box:** what the order comes to, and the count with
+the weight that produced it. Everything the office types is above it.
+
+> The switch carried a real defect as well as hiding half the answer. React
+> reused the same input across it — same element, same position, new name —
+> while react-hook-form's `register` never writes back into an input it already
+> holds. So the boxes went on showing the kilograms that were typed while the
+> form read and wrote the pouch fields underneath: **100 and Rs. 400 on screen,
+> Rs. 0 as the total beside them.** A quotation could be sent on a figure nobody
+> entered. With both units on screen at once that class of bug cannot happen.
+>
+> Each derived box holds what is being typed into it locally while it has focus,
+> and drops it on blur. Without that it is rewritten from its partner on every
+> keystroke — "6.5" briefly becomes "6.5000000001" through the round trip, and
+> the intermediate states of a long number fight the cursor.
+
+**Gross and net margins** sit beside the rate, because they are a judgement
+about it. Gross is the selling rate against the material cost of a kilogram —
+films, ink and adhesive only. Net is against what the job actually costs to
+make, including wages, power, transport, packing and the press setup, and is
+**absent rather than zero** while the line cannot be costed. Hovering either
+spells out the two figures that made it. Net under 5% is red, under 12% amber.
+
+**The customer's document carries both too.** A pouch job prints the rate per
+kilogram with the rate each underneath it in smaller type — it is the same price
+read the other way round, not a second charge, and printing it saves the
+customer doing the sum against the pouches-per-kilogram column and getting a
+different answer. A roll gets no such line.
 
 Every job on one quotation must be priced at the same number of quantities. They
 are columns on one document, and a job with three where another has two would
@@ -649,9 +682,9 @@ would have been.
 The rule is read off the works' own records, not invented. Of the 418 imported
 jobs, 347 record a cylinder, and on **84% of those the recorded circumference is
 an exact multiple of the design height** — which is the same relationship the
-engine uses. Those circumferences run 310–740mm and cluster around 480, so the
-suggestion is the multiple landing closest to 490, and the lanes across are as
-many as fit the 800mm face.
+engine uses. Those circumferences cluster around 480, so the suggestion is the
+multiple landing closest to 490, and the lanes across are as many as fit the
+800mm face.
 
 Checked back against the same jobs, that reproduces the repeat the works
 actually chose on **85%**. The remaining 15% are designs where two repeats both
@@ -659,6 +692,47 @@ fit the machine and the works took the other one — which cylinder was free tha
 week, not arithmetic. **That is the whole reason the figure is suggested rather
 than calculated and locked**; a locked one would make those jobs unquotable
 without a developer.
+
+#### When the cylinder cannot be engraved
+
+Both sizes are worked out rather than typed, so a cylinder outside what the
+engraver can cut is something the office would otherwise hear about after the
+quotation went out. Each figure carries the limit under it, in red:
+
+> **430** mm is outside the 450–1060 mm the works can have engraved. Change the
+> lanes across.
+>
+> **920** mm is outside the 400–600 mm the works can have engraved. Change the
+> repeats around.
+
+|                                 | Can be engraved   |
+| ------------------------------- | ----------------- |
+| Cylinder width (the face)       | **450 – 1060 mm** |
+| Cylinder circumference (around) | **400 – 600 mm**  |
+
+**It warns; it does not block.** An enquiry is allowed to describe something the
+works cannot make — that is half of what an enquiry is for — and the office
+answers it by changing the lanes or the repeat, which are the two boxes directly
+above. A blocked form with no figure on it leaves nobody with anything to tell
+the customer.
+
+**The message names the box that fixes it**, because the number it sits under
+cannot be edited: lanes for the face, repeats for the circumference.
+
+> **400–600 is narrower than the works' own history, and deliberately so.** A
+> design over 300mm tall is already past 600 at two repeats and still short of
+> 400 at one, so everything from **301 to 399mm falls between the cylinders** —
+> 43 of the 395 imported jobs that record a height sit there, with three more
+> above. Those are a record of what was cut over years, not of what can be cut
+> now. The suggestion still answers such a height with the repeat closest to the
+> preferred size, and the warning says the result cannot be engraved, which is
+> the honest pair of statements.
+
+**`450–1060` is not the face the lane suggestion uses.** That is 800mm — what
+the works actually runs, and what reproduces its own lane counts on 82% of the
+imported jobs. 1060 is what the engraver can cut. Merging the two would put more
+lanes across every web, which changes the running metres, the machine minutes
+and therefore the rate on every job.
 
 The panel says which it is showing — "Repeats suggested from the size" until
 someone edits one, after which it offers to put the suggestion back. A box that
@@ -1361,10 +1435,36 @@ material cost to the rate. A rate nobody can explain is a rate nobody can defend
 across a table, and the office is asked "why is it 251?" by customers holding
 three other quotations.
 
-**Three figures are set on the quotation, not the works.** Margin %, transport
-per kg and pouch making per kg sit at the top of the Jobs step; left blank each
+**Pouch making is charged per pouch, and the style decides what it costs.**
+A standup pays the making rate; a **Standup zipper** or **Zipper** pays making
+plus the zipper across its mouth, charged by the metre of finished width; a
+**D punch** is made at its own flat rate. The ⓘ breakdown shows the parts and then
+what they come to on a kilogram — `Pouch making — Rs. 0.72 × 181.2 pouches`.
+
+That is the works' own pouch workbook, and it is per pouch because per kilogram
+cannot describe it: across the workbook's nine costed jobs the same charge reads
+between Rs 11 and Rs 64 a kilogram, purely because a small pouch packs 130 to a
+kilo and a big one 14.
+
+**Two of the works' figures depend on the style**, because the works costs from
+two documents:
+
+|                  | covers                                    | wastage | ink GSM |
+| ---------------- | ----------------------------------------- | ------: | ------: |
+| Estimation sheet | centre seal, three side seal, spout, roll |      8% |     1.8 |
+| Pouch workbook   | standup, standup zipper, zipper, D punch  |      7% |     1.2 |
+
+Both move real money. A percentage point of wastage is roughly Rs 2 a kilogram,
+since film is about four-fifths of a rate; the ink figure decides what a pouch
+**weighs**, so it moves the count per kilogram and therefore the price each.
+
+**Four figures are set on the quotation, not the works.** Margin %, transport
+per kg, pouch making per kg and wastage % sit at the top of the Jobs step; left blank each
 follows the Costing screen, so an ordinary job keeps up with the works' own
-figures as they change. They are there because the client varies all three job
+figures as they change. Pouch making's box is still in **rupees per kilogram**
+even though the works' figure is per pouch — it replaces the whole charge rather
+than any part of it, which is what the office means by overriding it, and it is
+the unit every quotation written before this already carries. They are there because the client varies all three job
 to job — across seven of their own quotations, margins of 5%, 9% and 10%,
 transport at Rs 5 and Rs 10, and nothing charged for making a pouch on two of
 them, with **five of the seven written on the same day**.
@@ -1816,6 +1916,26 @@ should keep the size the design was drawn at.
 **Design tokens, not hex values.** Tailwind v4 is configured in CSS via `@theme`
 in `styles/index.css` — there is no `tailwind.config.js`. The palette came from
 the approved wireframe, so `bg-brand-600` and `text-ink-500` are the vocabulary.
+
+**The ramps are complete, 50 to 900, and that is load-bearing.** Tailwind v4
+generates a utility only where a `--color-*` token exists, and generates
+**nothing** where one does not — no warning at build, no error in the console,
+no fallback in the browser. The element simply keeps the colour it would have
+had.
+
+The palette used to carry `50/500/600` for the status colours and
+`50/100/500/600/700` for the brand, while the app reached for twelve shades
+outside that — **forty-six dead classes**. `text-danger-700` alone was in
+fourteen files, so the error line on every modal in the app inherited body grey
+and did not read as an error at all. The amber pills lost `bg-warning-100` and
+the GSTIN badge `text-success-800` the same way.
+
+Nobody did anything wrong: 700 is an ordinary shade to reach for, and the
+failure is invisible in the editor, in the diff and on screen. So the palette
+now carries every shade rather than the handful in use, and
+[`styles/theme-tokens.test.ts`](./src/styles/theme-tokens.test.ts) fails the
+build if a class ever names one that is not defined — naming the token and the
+files that wanted it, because "3 missing tokens" sends somebody hunting.
 
 **Routes are lazy-loaded** in `app/router.tsx`, so a screen's code is only
 fetched when someone opens it.
