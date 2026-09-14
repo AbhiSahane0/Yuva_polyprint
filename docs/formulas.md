@@ -178,6 +178,22 @@ default. The **mounting margin** (80 mm by default) is face the engraver charges
 for beyond the printed web — it is not in the client's workbook, which stops at
 the film, and is editable on the Costing screen.
 
+**What can be engraved.** The face must be **450 to 1060 mm** and the
+circumference **400 to 600 mm**. Both are checked by `cylinderWarnings` and
+shown in red under the figure, and neither blocks the quotation — an enquiry may
+describe something the works cannot make, and the fix is the lanes or the
+repeat.
+
+Note 400–600 is narrow enough to leave a gap: a design from **301 to 399 mm**
+tall is short of 400 at one repeat and past 600 at two, so no repeat fits it. 43
+of the 395 imported jobs with a height sit there. The suggestion still answers
+with the repeat nearest the preferred 490, and the warning says the result
+cannot be cut.
+
+`CYLINDER_FACE.MAX` (1060) is **not** `MAX_CYLINDER_FACE_MM` (800). The first is
+what the engraver can cut; the second is what the works runs, and is what the
+lane suggestion is built on.
+
 **A design whose cylinders already exist is charged nothing**, transport
 included, because there is nothing to engrave and nothing to deliver. The
 per-cylinder figure is still shown, so the office can see what a new set would

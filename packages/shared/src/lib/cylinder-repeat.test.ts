@@ -40,16 +40,48 @@ describe('suggestRepeatHeight', () => {
     expect(height * repeat).toBe(circumference);
   });
 
-  it('keeps the cylinder inside the range the works stocks', () => {
-    for (let height = 60; height <= 700; height += 1) {
+  /** Whether any repeat from 1 to 12 lands this height inside the range. */
+  const fits = (height: number) =>
+    Array.from({ length: 12 }, (_, i) => height * (i + 1)).some(
+      (c) => c >= CYLINDER_CIRCUMFERENCE.MIN && c <= CYLINDER_CIRCUMFERENCE.MAX,
+    );
+
+  it('suggests a cylinder that can be engraved wherever one exists', () => {
+    for (let height = 20; height <= 700; height += 1) {
+      if (!fits(height)) continue;
       const circumference = height * suggestRepeatHeight(height);
-      // Below 60 or above 740 nothing fits, which the fallback handles; in
-      // between, every suggestion must be a cylinder that exists.
-      if (height <= CYLINDER_CIRCUMFERENCE.MAX && height * 12 >= CYLINDER_CIRCUMFERENCE.MIN) {
-        expect(circumference).toBeGreaterThanOrEqual(CYLINDER_CIRCUMFERENCE.MIN);
-        expect(circumference).toBeLessThanOrEqual(CYLINDER_CIRCUMFERENCE.MAX);
-      }
+      expect(circumference).toBeGreaterThanOrEqual(CYLINDER_CIRCUMFERENCE.MIN);
+      expect(circumference).toBeLessThanOrEqual(CYLINDER_CIRCUMFERENCE.MAX);
     }
+  });
+
+  /**
+   * **Some heights have no repeat that fits, and that is a fact about the
+   * works, not a gap in the rule.**
+   *
+   * 400 to 600 is a narrow window: a design over 300mm tall is already past 600
+   * at two repeats and still short of 400 at one. So everything from 301 to
+   * 399mm falls between the cylinders — 43 of the 395 imported jobs that record
+   * a height sit there, with three more above 600.
+   *
+   * The suggestion does not refuse those. It returns the repeat that comes
+   * closest to the preferred size and lets `cylinderWarnings` say the
+   * circumference cannot be engraved, which is the honest answer: the office
+   * can see the figure, change the repeat, or take it up with the engraver.
+   * Returning 1 and saying nothing would hide it.
+   */
+  it('still answers a height no cylinder fits, and lands outside on purpose', () => {
+    expect(fits(350)).toBe(false);
+
+    const repeat = suggestRepeatHeight(350);
+    expect(repeat).toBeGreaterThanOrEqual(1);
+
+    /* One repeat is 350 and two is 700; 350 is the nearer to the preferred 490,
+       so that is what it offers — under the smallest cylinder rather than over
+       the largest, and either way outside. */
+    const circumference = 350 * repeat;
+    expect(circumference).toBe(350);
+    expect(circumference).toBeLessThan(CYLINDER_CIRCUMFERENCE.MIN);
   });
 
   it('never suggests a repeat of zero', () => {

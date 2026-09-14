@@ -668,9 +668,9 @@ would have been.
 The rule is read off the works' own records, not invented. Of the 418 imported
 jobs, 347 record a cylinder, and on **84% of those the recorded circumference is
 an exact multiple of the design height** — which is the same relationship the
-engine uses. Those circumferences run 310–740mm and cluster around 480, so the
-suggestion is the multiple landing closest to 490, and the lanes across are as
-many as fit the 800mm face.
+engine uses. Those circumferences cluster around 480, so the suggestion is the
+multiple landing closest to 490, and the lanes across are as many as fit the
+800mm face.
 
 Checked back against the same jobs, that reproduces the repeat the works
 actually chose on **85%**. The remaining 15% are designs where two repeats both
@@ -678,6 +678,47 @@ fit the machine and the works took the other one — which cylinder was free tha
 week, not arithmetic. **That is the whole reason the figure is suggested rather
 than calculated and locked**; a locked one would make those jobs unquotable
 without a developer.
+
+#### When the cylinder cannot be engraved
+
+Both sizes are worked out rather than typed, so a cylinder outside what the
+engraver can cut is something the office would otherwise hear about after the
+quotation went out. Each figure carries the limit under it, in red:
+
+> **430** mm is outside the 450–1060 mm the works can have engraved. Change the
+> lanes across.
+>
+> **920** mm is outside the 400–600 mm the works can have engraved. Change the
+> repeats around.
+
+|                                 | Can be engraved   |
+| ------------------------------- | ----------------- |
+| Cylinder width (the face)       | **450 – 1060 mm** |
+| Cylinder circumference (around) | **400 – 600 mm**  |
+
+**It warns; it does not block.** An enquiry is allowed to describe something the
+works cannot make — that is half of what an enquiry is for — and the office
+answers it by changing the lanes or the repeat, which are the two boxes directly
+above. A blocked form with no figure on it leaves nobody with anything to tell
+the customer.
+
+**The message names the box that fixes it**, because the number it sits under
+cannot be edited: lanes for the face, repeats for the circumference.
+
+> **400–600 is narrower than the works' own history, and deliberately so.** A
+> design over 300mm tall is already past 600 at two repeats and still short of
+> 400 at one, so everything from **301 to 399mm falls between the cylinders** —
+> 43 of the 395 imported jobs that record a height sit there, with three more
+> above. Those are a record of what was cut over years, not of what can be cut
+> now. The suggestion still answers such a height with the repeat closest to the
+> preferred size, and the warning says the result cannot be engraved, which is
+> the honest pair of statements.
+
+**`450–1060` is not the face the lane suggestion uses.** That is 800mm — what
+the works actually runs, and what reproduces its own lane counts on 82% of the
+imported jobs. 1060 is what the engraver can cut. Merging the two would put more
+lanes across every web, which changes the running metres, the machine minutes
+and therefore the rate on every job.
 
 The panel says which it is showing — "Repeats suggested from the size" until
 someone edits one, after which it offers to put the suggestion back. A box that

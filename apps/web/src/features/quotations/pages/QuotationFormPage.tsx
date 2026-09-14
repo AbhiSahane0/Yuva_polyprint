@@ -27,6 +27,7 @@ import {
   type PouchType,
   type PricingBasis,
   computeItemGeometry,
+  cylinderWarnings,
   structureGsm,
   adhesiveGsmFor,
   computeMargin,
@@ -213,6 +214,25 @@ function basisOf(): PricingBasis {
    * fill the field in for a request that omits it.
    */
   return 'PER_KG';
+}
+
+/**
+ * The warning for one cylinder dimension, or nothing.
+ *
+ * Rendered through `Field`'s `error` slot, which is already the red line under
+ * a box — this is the same kind of message about the same kind of problem, and
+ * giving it a second style would only make the office learn two.
+ *
+ * It does **not** block the quotation. An enquiry is allowed to describe
+ * something the works cannot make; the office answers it by changing the lanes
+ * or the repeat, and a blocked form with no figure on it helps nobody.
+ */
+function cylinderWarning(
+  cost: ItemCosting | undefined,
+  field: 'width' | 'circumference',
+): string | undefined {
+  if (!cost) return undefined;
+  return cylinderWarnings(cost.geometry).find((warning) => warning.field === field)?.message;
 }
 
 const num = (value: unknown): number => {
@@ -2009,8 +2029,20 @@ function JobCard({
                   which left the office with a total and no way to see where it
                   came from — and no way to spot a repeat typed wrong.
                 */}
+                {/*
+                  Both sizes are worked out, not typed, so a cylinder the works
+                  cannot have engraved is something the office would otherwise
+                  only find out from the engraver. The warning names the box
+                  above that fixes it — lanes for the face, repeats for the
+                  circumference — because the number it is under cannot be
+                  edited directly.
+                */}
                 <div className="sm:col-span-3">
-                  <Field label="Cylinder width" htmlFor={`items.${index}.cylinderWidth`}>
+                  <Field
+                    label="Cylinder width"
+                    htmlFor={`items.${index}.cylinderWidth`}
+                    error={cylinderWarning(cost, 'width')}
+                  >
                     <ReadOnlyValue value={formatNumber(cost?.geometry.cylinderWidth ?? 0)} />
                   </Field>
                 </div>
@@ -2018,6 +2050,7 @@ function JobCard({
                   <Field
                     label="Cylinder circumference"
                     htmlFor={`items.${index}.cylinderCircumference`}
+                    error={cylinderWarning(cost, 'circumference')}
                   >
                     <ReadOnlyValue
                       value={formatNumber(cost?.geometry.cylinderCircumference ?? 0)}

@@ -269,9 +269,16 @@ and it is the only part the office repeats.
 3. **The structure.** Choose each ply from the film list and give its thickness.
    The rate and density come with the film; nothing is typed twice.
 
-4. **Colours and cylinders.** How many stations the job occupies. The lanes and
-   the repeat are suggested from the size and can be overridden — and a repeat
-   order on an existing design is quoted with no cylinder charge at all.
+4. **Colours and cylinders.** How many stations the job occupies — see
+   [`stations.md`](./stations.md). The lanes and the repeat are suggested from
+   the size and can be overridden, and a repeat order on an existing design is
+   quoted with no cylinder charge at all.
+
+   The two cylinder sizes underneath are worked out, not typed, and each says so
+   in red when it lands outside what the engraver can cut — **450 to 1060 mm**
+   across the face, **400 to 600 mm** around. It is a warning, not a block: the
+   fix is the lanes or the repeat above it, and an enquiry is allowed to
+   describe something the works cannot make.
 
 5. **The quantities.** One, two or three. Each one has **both units side by
    side** — `500 kg = 21,565 pouches` — so an order taken as "five hundred kilos"
