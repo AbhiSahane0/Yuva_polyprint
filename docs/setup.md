@@ -200,7 +200,8 @@ move whatever has drifted.
 | Working days a month    | 26              | Turns a salary into a rate per minute              |
 | Hours a day             | 8               | The shift, for the same reason                     |
 | Wastage                 | 8%              | Film spoiled setting up and running — a reel       |
-| Wastage on a pouch job  | 7%              | What the works runs pouches at                     |
+| Wastage on a pouch job  | 7%              | Standup, standup zipper, zipper and D punch only   |
+| Ink GSM on a pouch job  | 1.2             | The pouch workbook weighs with less than 1.8       |
 | Margin                  | 9%              | Added to cost — set per quotation too              |
 | Trim                    | 15 mm           | Added to the web width                             |
 | Transport               | Rs 10 / kg      | On the quantity consumed — per quotation too       |
@@ -209,6 +210,8 @@ move whatever has drifted.
 | Bank EMI                | Rs 4,166.66     | Spread over 24 machine hours a month               |
 | Pouch making            | Rs 0.25 / pouch | Forming, sealing and cutting one                   |
 | D punch                 | Rs 0.60 / pouch | What one costs to make instead — a flat charge     |
+| D punch, wide           | Rs 0.80 / pouch | Over the width below — **cut-off is provisional**  |
+| A D punch is wide above | 300 mm          | Pouch width at which the rate steps                |
 | Zipper                  | Rs 3.60 / metre | Across the mouth, on a zipper or standup zipper    |
 | 6th / 7th / 8th station | 5.50 / 7.50 / 0 | Surcharge past five colours                        |
 | Ink GSM                 | 1.8             | What the laminate is weighed with                  |
@@ -220,7 +223,11 @@ move whatever has drifted.
 
 > **Pouch making is charged per POUCH, and the style decides what it costs.**
 > A standup pays making; a zipper pays making plus the zipper across its mouth,
-> by the metre; a D punch is made at its own flat rate. This is the works' own
+> by the metre; a D punch is made at its own flat rate, dearer on a wide pouch.
+>
+> **"A pouch job" means the four styles the pouch workbook costs** — standup,
+> standup zipper, zipper and D punch. Centre seal, three side seal and spout are
+> costed on the Estimation sheet, at 8% wastage and 1.8 ink. This is the works' own
 > pouch workbook — and it is charged per pouch because per kilogram cannot say
 > it: across the nine jobs in that workbook the same charge reads between Rs 11
 > and Rs 64 a kilogram, purely because a small pouch packs 130 to a kilo and a

@@ -401,6 +401,14 @@ export const settingsSchema = z.object({
    */
   inkGsm: z.coerce.number().min(0).max(50),
   /**
+   * And what a pouch-workbook laminate is weighed with.
+   *
+   * The works has two documents and they disagree: the Estimation sheet holds
+   * 1.8, the pouch workbook 1.2. It decides what a pouch WEIGHS, so it moves
+   * the count per kilogram and the price each, not only the ink cost.
+   */
+  pouchInkGsm: z.coerce.number().min(0).max(50),
+  /**
    * Adhesive is worked out from the structure, not stated — the sheet takes a
    * heavier coat under a thick ply and one coat per lamination. These three
    * are its numbers; `adhesiveGsm` is no longer used for costing.
@@ -463,6 +471,10 @@ export const settingsSchema = z.object({
   zipperRatePerMetre: z.coerce.number().min(0).max(10_000),
   /** What a D punch costs to make — a flat charge instead of the making rate. */
   dPunchPerPouch: z.coerce.number().min(0).max(1_000),
+  /** And a wide one, the punch being made across the top. */
+  dPunchLargePerPouch: z.coerce.number().min(0).max(1_000),
+  /** The width at which a D punch becomes the larger job, millimetres. */
+  dPunchLargeAboveMm: z.coerce.number().min(0).max(5_000),
   /** What the sixth, seventh and eighth printing stations each add, per kg. */
   stationSurcharge6: z.coerce.number().min(0).max(10_000),
   stationSurcharge7: z.coerce.number().min(0).max(10_000),
@@ -547,6 +559,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   cylinderAdvancePercent: 100,
   // Averages of what the imported jobs actually record.
   inkGsm: 1.8,
+  pouchInkGsm: 1.2,
   adhesiveGsm: 2.5,
   adhesiveCoatThinGsm: 2,
   adhesiveCoatThickGsm: 3,
@@ -574,6 +587,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
    */
   pouchMakingPerPouch: 0.25,
   dPunchPerPouch: 0.6,
+  dPunchLargePerPouch: 0.8,
+  /*
+   * PROVISIONAL. The workbook gives two D punches — 0.60 on a 190 mm pouch and
+   * 0.80 on a 485 mm one — and no cut-off between them. Anything from 191 to
+   * 485 reproduces both, so this sits in the middle until the works says where
+   * the step actually is. It is on the Costing screen, as one box.
+   */
+  dPunchLargeAboveMm: 300,
   zipperRatePerMetre: 3.6,
   stationSurcharge6: 5.5,
   stationSurcharge7: 7.5,

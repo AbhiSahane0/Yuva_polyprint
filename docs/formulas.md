@@ -318,12 +318,22 @@ consumed kg = order kg + wastage kg                   (Estimation I6)
 ```
 
 Note the divisor at the end is the **ordered** quantity, not the consumed one.
-**Two figures, from two of the works' documents.** The Estimation sheet carries
-8% and everything used to be costed on it; the pouch workbook that costs the
-standup, zipper and D punch work carries 7%. A quotation may pin its own, and
-the seven 2022 quotations rebuilt from the Estimation sheet do — they are all
-pouches, so a rule keyed on "is it a pouch" alone would have moved every one of
-them off the sheet it reproduces.
+**Two figures, from two of the works' documents**, and **which one applies is
+decided by the STYLE, not by whether the job is a pouch**:
+
+|                  | covers                                    | wastage | ink GSM |
+| ---------------- | ----------------------------------------- | ------: | ------: |
+| Estimation sheet | centre seal, three side seal, spout, roll |      8% |     1.8 |
+| Pouch workbook   | standup, standup zipper, zipper, D punch  |      7% |     1.2 |
+
+That distinction is load-bearing. Every one of the seven 2022 quotations
+verified to the paisa is a **centre seal** pouch — so a rule reading "any pouch"
+would have moved all seven onto figures that never priced them. `isWorkbookPouch`
+is where the list lives.
+
+A quotation may still pin its own wastage, and the seven do, because the figure
+that priced them belongs beside them rather than in a setting somebody may
+reasonably change.
 
 The wastage is already inside the cost; dividing by the consumed weight would
 charge for it and then hand it back.
@@ -536,19 +546,28 @@ Estimation `G57` + `G59` + `G60` + `G62` = `G63`.
 charges and how the work is actually done. Three figures compose it, all on the
 Costing screen:
 
-| Setting                | Default | Applies to                       |
-| ---------------------- | ------: | -------------------------------- |
-| Pouch making, Rs/pouch |    0.25 | every style but a D punch        |
-| D punch, Rs/pouch      |    0.60 | a D punch, **instead of** making |
-| Zipper, Rs/metre       |    3.60 | Standup zipper, Zipper           |
+| Setting                     | Default | Applies to                       |
+| --------------------------- | ------: | -------------------------------- |
+| Pouch making, Rs/pouch      |    0.25 | every style but a D punch        |
+| D punch, Rs/pouch           |    0.60 | a D punch, **instead of** making |
+| D punch wide, Rs/pouch      |    0.80 | a D punch over the width below   |
+| A D punch is wide above, mm |     300 | **provisional** — see below      |
+| Zipper, Rs/metre            |    3.60 | Standup zipper, Zipper           |
 
 ```
 standup        = 0.25
 standup zipper = 0.25 + (width mm ÷ 1000) × 3.60
 zipper         = 0.25 + (width mm ÷ 1000) × 3.60
-D punch        = 0.60                             flat
+D punch        = 0.60                             flat, up to 300 mm wide
+D punch (wide) = 0.80                             flat, over 300 mm
 roll           = 0
 ```
+
+**The wide-D-punch threshold is provisional.** The workbook gives two D punches
+— 0.60 on a 190 mm pouch and 0.80 on a 485 mm one — and no cut-off between
+them. Anything from 191 to 485 reproduces both, so 300 sits in the middle until
+the works says where the step actually is. It is one box on the Costing screen.
+Setting the wide rate to 0 turns the band off and charges the one rate.
 
 **A D punch is not making plus a punch.** It is its own flat charge, which is
 what the workbook states. The decomposition 0.25 + 0.35 gives the same answer
@@ -847,7 +866,7 @@ setup power factor.
 kg, packing per kg, sundries per job, bank EMI and the hours it spreads over,
 **pouch making per pouch, D punch per pouch, zipper per metre**, the 6th/7th/8th
 station surcharges, trim, **cylinder mounting**, **wastage % and wastage % on a
-pouch job**, margin %, solvent per 100 of ink, ethyl acetate %.
+pouch job**, **ink GSM and ink GSM on a pouch job**, margin %, solvent per 100 of ink, ethyl acetate %.
 
 **Which material prices what** — the flat ink and flat adhesive blends, the
 per-batch adhesive, the hardener, ethyl acetate, toluene.

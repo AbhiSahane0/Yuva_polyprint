@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { pouchExpense, wastagePercentFor, type PouchMakingRates } from './pouch-making.js';
+import {
+  inkGsmFor,
+  isWorkbookPouch,
+  pouchExpense,
+  wastagePercentFor,
+  type PouchMakingRates,
+} from './pouch-making.js';
 
 /**
  * **Checked against the works' own pouch workbook** — `costing_for_Standup.xlsx`,
@@ -26,6 +32,8 @@ describe('what making one pouch costs', () => {
   const RATES: PouchMakingRates = {
     makingPerPouch: 0.25,
     dPunchPerPouch: 0.6,
+    dPunchLargePerPouch: 0.8,
+    dPunchLargeAboveMm: 300,
     zipperRatePerMetre: 3.6,
   };
 
@@ -138,20 +146,52 @@ describe('what making one pouch costs', () => {
  * paisa at 8%. A rule keyed on "is it a pouch" alone would have moved every one
  * of them, so each pins its own figure and the pin beats the rule.
  */
-describe('which wastage a line is costed at', () => {
-  const WORKS = { defaultWastagePercent: 8, pouchWastagePercent: 7 };
+describe('which of the works’ two documents a style belongs to', () => {
+  it.each([
+    ['STANDUP', true],
+    ['STANDUP_ZIPPER', true],
+    ['ZIPPER', true],
+    ['D_PUNCH', true],
+    ['CENTRE_SEAL', false],
+    ['THREE_SIDE_SEAL', false],
+    ['SPOUT', false],
+    ['OTHER', false],
+  ] as const)('%s is on the pouch workbook: %s', (style, expected) => {
+    expect(isWorkbookPouch(style)).toBe(expected);
+  });
 
-  it('costs a pouch job at the works’ pouch figure', () => {
-    expect(wastagePercentFor({ makesPouches: true, ...WORKS })).toBe(7);
+  /* A roll, and a line whose style has not been chosen. Neither is a pouch. */
+  it('reads a missing style as the Estimation sheet', () => {
+    expect(isWorkbookPouch(null)).toBe(false);
+    expect(isWorkbookPouch(undefined)).toBe(false);
+  });
+
+  /**
+   * **The case that made this narrow.** Every one of the seven 2022 quotations
+   * verified to the paisa is a CENTRE SEAL pouch, costed on the Estimation
+   * sheet. A rule reading "any pouch" would have moved all seven onto the pouch
+   * workbook's 7% and 1.2, which never priced them.
+   */
+  it('leaves a centre seal on the Estimation sheet’s figures', () => {
+    expect(wastagePercentFor({ pouchType: 'CENTRE_SEAL', ...WORKS })).toBe(8);
+    expect(inkGsmFor({ pouchType: 'CENTRE_SEAL', inkGsm: 1.8, pouchInkGsm: 1.2 })).toBe(1.8);
+  });
+});
+
+const WORKS = { defaultWastagePercent: 8, pouchWastagePercent: 7 };
+
+describe('which wastage a line is costed at', () => {
+  it('costs a workbook pouch at the works’ pouch figure', () => {
+    expect(wastagePercentFor({ pouchType: 'STANDUP', ...WORKS })).toBe(7);
   });
 
   it('costs a reel at the Estimation sheet’s figure', () => {
-    expect(wastagePercentFor({ makesPouches: false, ...WORKS })).toBe(8);
+    expect(wastagePercentFor({ pouchType: null, ...WORKS })).toBe(8);
   });
 
   it('lets a quotation pin its own, whichever kind of job it is', () => {
-    expect(wastagePercentFor({ makesPouches: true, override: 8, ...WORKS })).toBe(8);
-    expect(wastagePercentFor({ makesPouches: false, override: 12.5, ...WORKS })).toBe(12.5);
+    expect(wastagePercentFor({ pouchType: 'STANDUP', override: 8, ...WORKS })).toBe(8);
+    expect(wastagePercentFor({ pouchType: null, override: 12.5, ...WORKS })).toBe(12.5);
   });
 
   /*
@@ -160,7 +200,7 @@ describe('which wastage a line is costed at', () => {
    * and quietly costed the line at 7%.
    */
   it('treats a pinned zero as a figure, not as a blank', () => {
-    expect(wastagePercentFor({ makesPouches: true, override: 0, ...WORKS })).toBe(0);
+    expect(wastagePercentFor({ pouchType: 'STANDUP', override: 0, ...WORKS })).toBe(0);
   });
 
   it.each([
@@ -168,6 +208,64 @@ describe('which wastage a line is costed at', () => {
     ['undefined', undefined],
     ['NaN', Number.NaN],
   ])('follows the works when the quotation says %s', (_label, override) => {
-    expect(wastagePercentFor({ makesPouches: true, override, ...WORKS })).toBe(7);
+    expect(wastagePercentFor({ pouchType: 'STANDUP', override, ...WORKS })).toBe(7);
+  });
+});
+
+/**
+ * **The ink figure moves the pouch COUNT, not just the ink cost.**
+ *
+ * It is what the laminate is weighed with, so it decides what one pouch weighs
+ * and therefore how many come out of a kilogram — which is the divisor on every
+ * per-pouch price. The Estimation sheet holds 1.8 and the pouch workbook 1.2.
+ */
+describe('which ink figure a laminate is weighed with', () => {
+  const INK = { inkGsm: 1.8, pouchInkGsm: 1.2 };
+
+  it('weighs a workbook pouch with the pouch figure', () => {
+    expect(inkGsmFor({ pouchType: 'D_PUNCH', ...INK })).toBe(1.2);
+  });
+
+  it('weighs everything else with the Estimation sheet’s', () => {
+    expect(inkGsmFor({ pouchType: 'CENTRE_SEAL', ...INK })).toBe(1.8);
+    expect(inkGsmFor({ pouchType: null, ...INK })).toBe(1.8);
+  });
+});
+
+/**
+ * **A wide D punch costs more**, the punch being made across the top. The
+ * workbook shows both: 0.60 on a 190 mm pouch and 0.80 on a 485 mm one.
+ *
+ * The threshold between them is the works' to set — anything from 191 to 485
+ * reproduces the workbook, and the shipped 300 is a placeholder sitting in the
+ * middle until they say where the step actually is.
+ */
+describe('a wide D punch', () => {
+  const RATES: PouchMakingRates = {
+    makingPerPouch: 0.25,
+    dPunchPerPouch: 0.6,
+    dPunchLargePerPouch: 0.8,
+    dPunchLargeAboveMm: 300,
+    zipperRatePerMetre: 3.6,
+  };
+
+  it('reproduces both of the workbook’s D punches', () => {
+    expect(pouchExpense('D_PUNCH', 190, RATES).perPouch).toBe(0.6);
+    expect(pouchExpense('D_PUNCH', 485, RATES).perPouch).toBe(0.8);
+  });
+
+  it('steps at the threshold, not below it', () => {
+    expect(pouchExpense('D_PUNCH', 300, RATES).perPouch).toBe(0.6);
+    expect(pouchExpense('D_PUNCH', 301, RATES).perPouch).toBe(0.8);
+  });
+
+  /* A works with one D punch rate sets the larger to zero and is charged once. */
+  it('falls back to the one rate when no larger one is set', () => {
+    const single = { ...RATES, dPunchLargePerPouch: 0 };
+    expect(pouchExpense('D_PUNCH', 900, single).perPouch).toBe(0.6);
+  });
+
+  it('leaves every other style alone', () => {
+    expect(pouchExpense('STANDUP', 900, RATES).perPouch).toBe(0.25);
   });
 });

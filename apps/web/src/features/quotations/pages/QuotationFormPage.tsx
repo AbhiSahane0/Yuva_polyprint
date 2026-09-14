@@ -28,6 +28,7 @@ import {
   type PricingBasis,
   computeItemGeometry,
   cylinderWarnings,
+  inkGsmFor,
   structureGsm,
   adhesiveGsmFor,
   computeMargin,
@@ -655,9 +656,22 @@ export default function QuotationFormPage() {
         };
       });
 
+      /*
+       * The works weighs a laminate with two different ink figures, depending
+       * on which of its two costing documents the style belongs to — 1.8 on the
+       * Estimation sheet, 1.2 in the pouch workbook. It decides what a pouch
+       * weighs, so it moves the count per kilogram as well as the ink cost, and
+       * both the material cost and the geometry below have to agree on it.
+       */
+      const inkGsm = inkGsmFor({
+        pouchType: (item?.pouchType || null) as PouchType | null,
+        inkGsm: settings?.inkGsm ?? 1.8,
+        pouchInkGsm: settings?.pouchInkGsm ?? 1.2,
+      });
+
       const material = computeMaterialCostPerKg({
         layers,
-        inkGsm: settings?.inkGsm ?? 1.8,
+        inkGsm,
         adhesiveGsm: settings?.adhesiveGsm ?? 2.5,
         inkRate: byName.get(settings?.defaultInkMaterial ?? 'Ink — Black')?.currentRate ?? null,
         adhesiveRate:
@@ -670,7 +684,7 @@ export default function QuotationFormPage() {
           micron: totalMicronForLayers(layers),
           /* Each ply at its own density, as the works' sheet weighs it. */
           gsm: structureGsm(layers, {
-            inkGsm: settings?.inkGsm ?? 1.8,
+            inkGsm,
             adhesiveGsm: adhesiveGsmFor(layers, {
               thinGsm: settings?.adhesiveCoatThinGsm ?? 2,
               thickGsm: settings?.adhesiveCoatThickGsm ?? 3,

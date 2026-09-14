@@ -1432,10 +1432,17 @@ cannot describe it: across the workbook's nine costed jobs the same charge reads
 between Rs 11 and Rs 64 a kilogram, purely because a small pouch packs 130 to a
 kilo and a big one 14.
 
-**Wastage is two figures, not one.** The works runs **pouch jobs at 7%** and
-everything else at **8%**, from two of its own documents — the pouch workbook
-and the Estimation sheet. One percentage point is roughly Rs 2 a kilogram, since
-film is about four-fifths of a rate, so which one applies is not a detail.
+**Two of the works' figures depend on the style**, because the works costs from
+two documents:
+
+|                  | covers                                    | wastage | ink GSM |
+| ---------------- | ----------------------------------------- | ------: | ------: |
+| Estimation sheet | centre seal, three side seal, spout, roll |      8% |     1.8 |
+| Pouch workbook   | standup, standup zipper, zipper, D punch  |      7% |     1.2 |
+
+Both move real money. A percentage point of wastage is roughly Rs 2 a kilogram,
+since film is about four-fifths of a rate; the ink figure decides what a pouch
+**weighs**, so it moves the count per kilogram and therefore the price each.
 
 **Four figures are set on the quotation, not the works.** Margin %, transport
 per kg, pouch making per kg and wastage % sit at the top of the Jobs step; left blank each

@@ -39,6 +39,10 @@ export interface PouchMakingRates {
   makingPerPouch: number;
   /** What a D punch costs to make — a flat charge, not an addition. */
   dPunchPerPouch: number;
+  /** And what a wide one costs, the punch being made across the top. */
+  dPunchLargePerPouch: number;
+  /** The width, in millimetres, at which a D punch becomes the larger job. */
+  dPunchLargeAboveMm: number;
   /** Rupees per metre of zipper, charged across the pouch's width. */
   zipperRatePerMetre: number;
 }
@@ -57,6 +61,35 @@ export const NO_POUCH_EXPENSE: PouchExpense = { making: 0, zipper: 0, perPouch: 
 
 /** The styles that carry a zipper across the mouth. */
 export const ZIPPERED_POUCHES: readonly PouchType[] = ['STANDUP_ZIPPER', 'ZIPPER'];
+
+/**
+ * The styles the works' pouch workbook costs.
+ *
+ * **This is what "a pouch job" means**, and it is narrower than "not a roll".
+ * The works has two costing documents and they split by style, not by whether
+ * something is technically a pouch:
+ *
+ * | | covers | wastage | ink GSM |
+ * | --- | --- | ---: | ---: |
+ * | Estimation sheet | centre seal, three side seal, spout | 8% | 1.8 |
+ * | Pouch workbook | the four below | 7% | 1.2 |
+ *
+ * Getting this wrong is not a rounding error. Every one of the seven 2022
+ * quotations verified to the paisa is a CENTRE SEAL pouch — so a rule reading
+ * "any pouch" would have moved all seven onto the pouch workbook's figures,
+ * which were never used to price them.
+ */
+export const WORKBOOK_POUCHES: readonly PouchType[] = [
+  'STANDUP',
+  'STANDUP_ZIPPER',
+  'ZIPPER',
+  'D_PUNCH',
+];
+
+/** Whether this line is costed on the pouch workbook rather than the Estimation sheet. */
+export function isWorkbookPouch(pouchType: PouchType | null | undefined): boolean {
+  return pouchType !== null && pouchType !== undefined && WORKBOOK_POUCHES.includes(pouchType);
+}
 
 /**
  * What one pouch of this style costs to make.
@@ -86,8 +119,17 @@ export function pouchExpense(
   const at = (value: number | undefined) =>
     Number.isFinite(value) && (value as number) > 0 ? (value as number) : 0;
 
-  /* A D punch is made differently, so it is made at its own rate. */
-  const making = pouchType === 'D_PUNCH' ? at(rates.dPunchPerPouch) : at(rates.makingPerPouch);
+  /*
+   * A D punch is made differently, so it is made at its own rate — and a wide
+   * one at a dearer rate again, the punch being made across the top. The
+   * workbook shows both: 0.60 on a 190 mm pouch and 0.80 on a 485 mm one.
+   */
+  const making =
+    pouchType === 'D_PUNCH'
+      ? at(pouchWidthMm) > at(rates.dPunchLargeAboveMm) && at(rates.dPunchLargePerPouch) > 0
+        ? at(rates.dPunchLargePerPouch)
+        : at(rates.dPunchPerPouch)
+      : at(rates.makingPerPouch);
 
   const zipper = ZIPPERED_POUCHES.includes(pouchType)
     ? round((at(pouchWidthMm) / 1000) * at(rates.zipperRatePerMetre), 4)
@@ -115,8 +157,8 @@ export function pouchExpense(
  * they reproduce to the paisa.
  */
 export function wastagePercentFor(input: {
-  /** False on a roll, which is costed on the Estimation sheet's figure. */
-  makesPouches: boolean;
+  /** The style. Anything outside the pouch workbook is on the Estimation sheet. */
+  pouchType: PouchType | null | undefined;
   /** What this quotation sets for itself, or null to follow the works. */
   override?: number | null;
   defaultWastagePercent: number;
@@ -125,5 +167,22 @@ export function wastagePercentFor(input: {
   if (input.override !== null && input.override !== undefined && Number.isFinite(input.override)) {
     return input.override;
   }
-  return input.makesPouches ? input.pouchWastagePercent : input.defaultWastagePercent;
+  return isWorkbookPouch(input.pouchType) ? input.pouchWastagePercent : input.defaultWastagePercent;
+}
+
+/**
+ * How much ink the laminate is weighed with, g/m².
+ *
+ * The same split, and it matters twice over: the ink GSM decides what a pouch
+ * WEIGHS, so it moves the count per kilogram and therefore the price each, as
+ * well as what the ink costs. The Estimation sheet holds 1.8 and the pouch
+ * workbook 1.2 — on a 105 GSM laminate that is a little over half a per cent of
+ * the weight, which is half a per cent on every per-pouch price.
+ */
+export function inkGsmFor(input: {
+  pouchType: PouchType | null | undefined;
+  inkGsm: number;
+  pouchInkGsm: number;
+}): number {
+  return isWorkbookPouch(input.pouchType) ? input.pouchInkGsm : input.inkGsm;
 }

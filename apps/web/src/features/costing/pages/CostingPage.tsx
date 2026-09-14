@@ -391,6 +391,8 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
     ['emiHoursPerMonth', 'Machine hours a month', 'What the EMI is spread over'],
     ['pouchMakingPerPouch', 'Pouch making, Rs/pouch', 'Forming, sealing and cutting one'],
     ['dPunchPerPouch', 'D punch, Rs/pouch', 'What one costs to make instead'],
+    ['dPunchLargePerPouch', 'D punch, wide, Rs/pouch', 'The punch is made across the top'],
+    ['dPunchLargeAboveMm', 'A D punch is wide above, mm', 'Pouch width at which the rate steps'],
     ['zipperRatePerMetre', 'Zipper, Rs/metre', 'Charged across the pouch’s mouth'],
     ['stationSurcharge6', '6th station, Rs/kg', 'A job past five colours'],
     ['stationSurcharge7', '7th station, Rs/kg', ''],
@@ -400,6 +402,7 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
     ['defaultWastagePercent', 'Wastage %', 'Film spoiled setting up and running'],
     ['pouchWastagePercent', 'Wastage % on a pouch job', 'The works runs pouches at its own figure'],
     ['defaultMarginPercent', 'Margin %', 'Added to cost, not taken off the rate'],
+    ['pouchInkGsm', 'Ink GSM on a pouch job', 'The pouch workbook weighs with less'],
     ['inkSolventParts', 'Solvent per 100 of ink', 'How the press thins it'],
     ['ethylAcetatePercent', 'Ethyl acetate %', 'The rest is toluene'],
   ];

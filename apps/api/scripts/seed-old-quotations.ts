@@ -65,6 +65,16 @@ const write = process.argv.includes('--write');
  * the code.
  */
 const SHEET_WASTAGE_PERCENT = 8;
+
+/**
+ * Estimation!F14 — what the sheet weighs the laminate with.
+ *
+ * Pinned for the same reason as the wastage above. The works' pouch workbook
+ * weighs with 1.2, and while these seven are CENTRE SEAL and so are not on that
+ * workbook, the figure that priced them belongs beside the quotations rather
+ * than in a setting somebody may reasonably change.
+ */
+const SHEET_INK_GSM = 1.8;
 const asDate = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
 /* --- 1. What changed over time, recorded against the day it changed ------ */
@@ -227,8 +237,8 @@ async function main() {
          */
         wastagePercent: SHEET_WASTAGE_PERCENT,
         trimMm: settings.defaultTrimMm,
-        inkGsmOverride: settings.inkGsm,
-        colours: [{ name: 'All', laydownGsm: settings.inkGsm, solidsPercent: 23, ratePerKg: 202 }],
+        inkGsmOverride: SHEET_INK_GSM,
+        colours: [{ name: 'All', laydownGsm: SHEET_INK_GSM, solidsPercent: 23, ratePerKg: 202 }],
         flatInk: { ratePerKg: priceOf(settings.defaultFlatInkMaterial) },
         adhesive: {
           gsm: adhGsm,
@@ -273,6 +283,8 @@ async function main() {
         pouchMaking: {
           makingPerPouch: settings.pouchMakingPerPouch,
           dPunchPerPouch: settings.dPunchPerPouch,
+          dPunchLargePerPouch: settings.dPunchLargePerPouch,
+          dPunchLargeAboveMm: settings.dPunchLargeAboveMm,
           zipperRatePerMetre: settings.zipperRatePerMetre,
         },
         pouchMakingPerKgOverride: n(s.pouchMaking),

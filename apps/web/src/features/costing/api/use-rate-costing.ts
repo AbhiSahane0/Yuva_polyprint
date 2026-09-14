@@ -3,6 +3,7 @@ import {
   adhesiveGsmFor,
   costRate,
   parseStationSteps,
+  inkGsmFor,
   unpricedColours,
   wastagePercentFor,
   type CostingBreakdown,
@@ -194,7 +195,7 @@ export function useRateCosting(
       job: {
         orderQtyKg: 0, // set per quantity below
         wastagePercent: wastagePercentFor({
-          makesPouches: line.makesPouches,
+          pouchType: line.pouchType,
           override: overrides.wastagePercent,
           defaultWastagePercent: settings.defaultWastagePercent,
           pouchWastagePercent: settings.pouchWastagePercent,
@@ -231,8 +232,13 @@ export function useRateCosting(
         pouchType: line.pouchType,
         pouchWidthMm: line.pouchWidthMm,
         piecesPerKgOverride: line.piecesPerKg,
-        /* The works weighs the laminate with its own ink figure. */
-        inkGsmOverride: settings.inkGsm,
+        /* The works weighs the laminate with its own ink figure, and it has
+           two — see `inkGsmFor`. */
+        inkGsmOverride: inkGsmFor({
+          pouchType: line.pouchType,
+          inkGsm: settings.inkGsm,
+          pouchInkGsm: settings.pouchInkGsm,
+        }),
         /* One cylinder per station, which is what the line is charged for. */
         stationCount: line.colourCount,
         adhesiveSplitRatio: settings.adhesiveSplitRatio,
@@ -257,8 +263,10 @@ export function useRateCosting(
         emiBasis: settings.emiBasis,
         pouchMaking: {
           makingPerPouch: settings.pouchMakingPerPouch,
-          zipperRatePerMetre: settings.zipperRatePerMetre,
           dPunchPerPouch: settings.dPunchPerPouch,
+          dPunchLargePerPouch: settings.dPunchLargePerPouch,
+          dPunchLargeAboveMm: settings.dPunchLargeAboveMm,
+          zipperRatePerMetre: settings.zipperRatePerMetre,
         },
         /* The office's own figure replaces the whole charge, in the unit it is
            stated in. Null lets the style decide. */
