@@ -589,12 +589,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   dPunchPerPouch: 0.6,
   dPunchLargePerPouch: 0.8,
   /*
-   * PROVISIONAL. The workbook gives two D punches — 0.60 on a 190 mm pouch and
-   * 0.80 on a 485 mm one — and no cut-off between them. Anything from 191 to
-   * 485 reproduces both, so this sits in the middle until the works says where
-   * the step actually is. It is on the Costing screen, as one box.
+   * The works' own cut-off. The workbook shows the two rates — 0.60 on a 190 mm
+   * pouch and 0.80 on a 485 mm one — without saying where the step is; 450 is
+   * the answer they gave, and it sits between the two so both still reproduce.
    */
-  dPunchLargeAboveMm: 300,
+  dPunchLargeAboveMm: 450,
   zipperRatePerMetre: 3.6,
   stationSurcharge6: 5.5,
   stationSurcharge7: 7.5,

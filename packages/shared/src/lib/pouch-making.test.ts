@@ -33,7 +33,7 @@ describe('what making one pouch costs', () => {
     makingPerPouch: 0.25,
     dPunchPerPouch: 0.6,
     dPunchLargePerPouch: 0.8,
-    dPunchLargeAboveMm: 300,
+    dPunchLargeAboveMm: 450,
     zipperRatePerMetre: 3.6,
   };
 
@@ -234,18 +234,19 @@ describe('which ink figure a laminate is weighed with', () => {
 
 /**
  * **A wide D punch costs more**, the punch being made across the top. The
- * workbook shows both: 0.60 on a 190 mm pouch and 0.80 on a 485 mm one.
+ * workbook shows both rates — 0.60 on a 190 mm pouch and 0.80 on a 485 mm one —
+ * without saying where the step between them is. **450 mm** is the works' own
+ * answer, and it sits between the two, so the workbook still reproduces.
  *
- * The threshold between them is the works' to set — anything from 191 to 485
- * reproduces the workbook, and the shipped 300 is a placeholder sitting in the
- * middle until they say where the step actually is.
+ * It steps rather than scaling because above that width the punch is a
+ * different operation, not a bigger one.
  */
 describe('a wide D punch', () => {
   const RATES: PouchMakingRates = {
     makingPerPouch: 0.25,
     dPunchPerPouch: 0.6,
     dPunchLargePerPouch: 0.8,
-    dPunchLargeAboveMm: 300,
+    dPunchLargeAboveMm: 450,
     zipperRatePerMetre: 3.6,
   };
 
@@ -254,9 +255,12 @@ describe('a wide D punch', () => {
     expect(pouchExpense('D_PUNCH', 485, RATES).perPouch).toBe(0.8);
   });
 
-  it('steps at the threshold, not below it', () => {
-    expect(pouchExpense('D_PUNCH', 300, RATES).perPouch).toBe(0.6);
-    expect(pouchExpense('D_PUNCH', 301, RATES).perPouch).toBe(0.8);
+  /* 450 itself is not wide — the step is ABOVE it, which is what "over" means
+     and the only reading a boundary case can settle. */
+  it('steps above the threshold, not at it', () => {
+    expect(pouchExpense('D_PUNCH', 449, RATES).perPouch).toBe(0.6);
+    expect(pouchExpense('D_PUNCH', 450, RATES).perPouch).toBe(0.6);
+    expect(pouchExpense('D_PUNCH', 451, RATES).perPouch).toBe(0.8);
   });
 
   /* A works with one D punch rate sets the larger to zero and is charged once. */

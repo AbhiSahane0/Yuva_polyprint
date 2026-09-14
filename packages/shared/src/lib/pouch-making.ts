@@ -41,7 +41,12 @@ export interface PouchMakingRates {
   dPunchPerPouch: number;
   /** And what a wide one costs, the punch being made across the top. */
   dPunchLargePerPouch: number;
-  /** The width, in millimetres, at which a D punch becomes the larger job. */
+  /**
+   * The width, in millimetres, at which a D punch becomes the larger job.
+   *
+   * The works' figure is 450. Above it the punch is a different operation, not
+   * a bigger one — which is why this steps rather than scaling with the width.
+   */
   dPunchLargeAboveMm: number;
   /** Rupees per metre of zipper, charged across the pouch's width. */
   zipperRatePerMetre: number;

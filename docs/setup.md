@@ -210,8 +210,8 @@ move whatever has drifted.
 | Bank EMI                | Rs 4,166.66     | Spread over 24 machine hours a month               |
 | Pouch making            | Rs 0.25 / pouch | Forming, sealing and cutting one                   |
 | D punch                 | Rs 0.60 / pouch | What one costs to make instead — a flat charge     |
-| D punch, wide           | Rs 0.80 / pouch | Over the width below — **cut-off is provisional**  |
-| A D punch is wide above | 300 mm          | Pouch width at which the rate steps                |
+| D punch, wide           | Rs 0.80 / pouch | Over the width below                               |
+| A D punch is wide above | 450 mm          | Pouch width at which the rate steps                |
 | Zipper                  | Rs 3.60 / metre | Across the mouth, on a zipper or standup zipper    |
 | 6th / 7th / 8th station | 5.50 / 7.50 / 0 | Surcharge past five colours                        |
 | Ink GSM                 | 1.8             | What the laminate is weighed with                  |

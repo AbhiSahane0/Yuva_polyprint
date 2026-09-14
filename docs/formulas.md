@@ -551,23 +551,24 @@ Costing screen:
 | Pouch making, Rs/pouch      |    0.25 | every style but a D punch        |
 | D punch, Rs/pouch           |    0.60 | a D punch, **instead of** making |
 | D punch wide, Rs/pouch      |    0.80 | a D punch over the width below   |
-| A D punch is wide above, mm |     300 | **provisional** — see below      |
+| A D punch is wide above, mm |     450 | the works' own cut-off           |
 | Zipper, Rs/metre            |    3.60 | Standup zipper, Zipper           |
 
 ```
 standup        = 0.25
 standup zipper = 0.25 + (width mm ÷ 1000) × 3.60
 zipper         = 0.25 + (width mm ÷ 1000) × 3.60
-D punch        = 0.60                             flat, up to 300 mm wide
-D punch (wide) = 0.80                             flat, over 300 mm
+D punch        = 0.60                             flat, up to 450 mm wide
+D punch (wide) = 0.80                             flat, over 450 mm
 roll           = 0
 ```
 
-**The wide-D-punch threshold is provisional.** The workbook gives two D punches
-— 0.60 on a 190 mm pouch and 0.80 on a 485 mm one — and no cut-off between
-them. Anything from 191 to 485 reproduces both, so 300 sits in the middle until
-the works says where the step actually is. It is one box on the Costing screen.
-Setting the wide rate to 0 turns the band off and charges the one rate.
+**It steps at 450 mm, and steps rather than scales**, because above that width
+the punch is a different operation and not a bigger one. The workbook shows both
+rates — 0.60 on a 190 mm pouch, 0.80 on a 485 mm one — without saying where the
+step was; 450 is the works' own answer and sits between the two, so both still
+reproduce. Setting the wide rate to 0 turns the band off and charges the one
+rate.
 
 **A D punch is not making plus a punch.** It is its own flat charge, which is
 what the workbook states. The decomposition 0.25 + 0.35 gives the same answer
