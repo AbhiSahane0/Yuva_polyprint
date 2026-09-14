@@ -83,6 +83,7 @@ Enum PouchType {
   STANDUP
   STANDUP_ZIPPER
   ZIPPER
+  D_PUNCH
   SPOUT
   CENTRE_SEAL
   THREE_SIDE_SEAL
@@ -185,7 +186,7 @@ Table customers {
   gst_number text [not null, default: `'NA'`]
   brand_name text [not null, default: `'NA'`]
 
-  Note: '71 row(s) at time of generation'
+  Note: '72 row(s) at time of generation'
 }
 
 Table cylinder_events {
@@ -304,7 +305,7 @@ Table jobs {
   customer_source JobCustomerSource [not null, default: `'NONE'::"JobCustomerSource"`]
   needs_customer boolean [not null, default: `false`]
 
-  Note: '419 row(s) at time of generation'
+  Note: '421 row(s) at time of generation'
 }
 
 Table login_events {
@@ -316,7 +317,7 @@ Table login_events {
   user_agent text
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '42 row(s) at time of generation'
+  Note: '45 row(s) at time of generation'
 }
 
 Table material_rates {
@@ -327,7 +328,7 @@ Table material_rates {
   entered_by text [not null, default: `'Office'`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '355 row(s) at time of generation'
+  Note: '227 row(s) at time of generation'
 }
 
 Table materials {
@@ -345,7 +346,7 @@ Table materials {
   solids_percent decimal(6,3)
   ink_kind InkKind
 
-  Note: '23 row(s) at time of generation'
+  Note: '14 row(s) at time of generation'
 }
 
 Table purchase_order_lines {
@@ -420,7 +421,7 @@ Table quotation_item_layers {
   gsm decimal(10,3) [not null]
   rate_override decimal(12,2)
 
-  Note: '34 row(s) at time of generation'
+  Note: '36 row(s) at time of generation'
 }
 
 Table quotation_item_quantities {
@@ -438,7 +439,7 @@ Table quotation_item_quantities {
   material_cost decimal(14,2)
   margin_percent decimal(6,2)
 
-  Note: '19 row(s) at time of generation'
+  Note: '20 row(s) at time of generation'
 }
 
 Table quotation_items {
@@ -474,7 +475,7 @@ Table quotation_items {
   film_width_mm decimal(10,2) [not null]
   film_height_mm decimal(10,2) [not null]
 
-  Note: '17 row(s) at time of generation'
+  Note: '18 row(s) at time of generation'
 }
 
 Table quotation_tiers {
@@ -493,7 +494,7 @@ Table quotation_tiers {
   total_quantity_kg decimal(14,3) [not null]
   total_pouches decimal(14,2) [not null]
 
-  Note: '19 row(s) at time of generation'
+  Note: '20 row(s) at time of generation'
 }
 
 Table quotations {
@@ -528,8 +529,9 @@ Table quotations {
   margin_percent decimal(5,2)
   transport_per_kg decimal(10,2)
   pouch_making_per_kg decimal(10,2)
+  wastage_percent decimal(5,2)
 
-  Note: '17 row(s) at time of generation'
+  Note: '18 row(s) at time of generation'
 }
 
 Table sessions {
@@ -540,7 +542,7 @@ Table sessions {
   last_seen_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '5 row(s) at time of generation'
+  Note: '7 row(s) at time of generation'
 }
 
 Table stock_batches {
@@ -559,7 +561,7 @@ Table stock_batches {
   purchase_quantity decimal(14,3)
   purchase_unit text
 
-  Note: '0 row(s) at time of generation'
+  Note: '1 row(s) at time of generation'
 }
 
 Table stock_movements {

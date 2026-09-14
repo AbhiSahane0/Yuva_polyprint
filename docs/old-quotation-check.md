@@ -42,8 +42,8 @@ decimals before the division — which is what the client's sheet does too.
 ## What was entered on each quotation
 
 Everything below goes in the way the office would put it in: the film rates as a
-rate typed on each ply, and margin, transport and pouch making in the three
-boxes on the Jobs step.
+rate typed on each ply, and margin, transport, pouch making and wastage in the
+four boxes on the Jobs step.
 
 | #   | Job                 | Order     | Ups | Film mm   | Stations | PET        | Poly           | Adhesive |
 | --- | ------------------- | --------- | --- | --------- | -------- | ---------- | -------------- | -------- |
@@ -119,14 +119,30 @@ Identical on all seven, read from the Costing screen and the rate list:
 | Working month                     | 26 days × 8 hours                                                        |
 | Packing                           | Rs 5/kg                                                                  |
 | Sundries                          | Rs 250/job                                                               |
-| Wastage                           | 8%                                                                       |
+| Wastage                           | 8% — **pinned on each quotation**, see below                             |
 | Trim                              | 15 mm                                                                    |
-| Ink GSM                           | 1.8                                                                      |
+| Ink GSM                           | 1.8 — the Estimation sheet's, not the pouch workbook's 1.2               |
 | Blended adhesive                  | Rs 400/kg                                                                |
 | MET PET                           | Rs 180/kg                                                                |
 | 6th / 7th / 8th station surcharge | Rs 5.50 / 7.50 / 0 per kg                                                |
 
 Only Green Peas pays a surcharge — it is the one job past five stations.
+
+> **Why the wastage and the ink figure are pinned rather than followed.**
+>
+> The works later gave a second set of figures for its pouch work, out of a
+> different document: **7% wastage and 1.2 ink GSM** on standup, standup zipper,
+> zipper and D punch pouches, against the Estimation sheet's **8% and 1.8** on
+> everything else.
+>
+> All seven of these are **centre seal** pouches, so they stay on the Estimation
+> sheet's figures — which is exactly why the rule that picks between the two
+> reads the STYLE and not "is it a pouch". A rule on "is it a pouch" would have
+> moved every one of these seven onto figures that never priced them.
+>
+> `seed:old-quotations` pins both anyway, and writes the wastage onto each
+> quotation. A figure that priced a document belongs beside the document, not in
+> a setting somebody may reasonably change one morning.
 
 ### The two that changed over time
 

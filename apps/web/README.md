@@ -401,12 +401,26 @@ not create a second copy of either.
 Two questions, not one. **Type** is Pouch or Roll; **Pouch type** is the style,
 and only appears for a pouch.
 
-> Standup · Standup zipper · Zipper · Spout pouch · Centre seal ·
+> Standup · Standup zipper · Zipper · **D punch** · Spout pouch · Centre seal ·
 > Three side seal · Other
 
-**The style no longer decides how the line is priced.** Every line this form
-writes is priced per kilogram, and the pouch figures are worked out from it —
-see [Quantities](#quantities). Choosing Other reveals a box to say what it is.
+**The style no longer decides the UNIT a line is priced in.** Every line this
+form writes is priced per kilogram, and the pouch figures are worked out from it
+— see [Quantities](#quantities). Choosing Other reveals a box to say what it is.
+
+**But the style decides three costs**, because the works costs from two
+documents and its pouch workbook keeps a sheet per style:
+
+|                         | what the style changes                                       |
+| ----------------------- | ------------------------------------------------------------ |
+| **Making**              | 0.25 a pouch; a **D punch** 0.60, or 0.80 over 450 mm wide   |
+| **Zipper**              | Standup zipper and Zipper add width × Rs 3.60 a metre        |
+| **Wastage and ink GSM** | those four styles use 7% and 1.2; everything else 8% and 1.8 |
+
+The first four styles are the pouch workbook's; centre seal, three side seal and
+spout are costed on the Estimation sheet. That line matters more than it looks:
+all seven of the client's verified 2022 quotations are **centre seal**, so a
+rule reading "any pouch" would have moved every one of them.
 
 **A roll is not a pouch.** Choosing it clears the style and any gazette, hides
 both controls, and forces kilograms. Film on a reel has not been converted into
