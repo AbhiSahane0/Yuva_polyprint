@@ -652,7 +652,7 @@ Detailed rules live next to the code they govern:
 - **Layout shells** — `apps/web/src/components/layout/README.md`
 - **Shared hooks** — `apps/web/src/hooks/README.md`
 
-Four rules worth repeating here:
+Five rules worth repeating here:
 
 1. **Money and material quantities use `Decimal`, never `Float`.** This system
    computes costs, consumption, and estimated-vs-actual variance. Floating point
@@ -665,6 +665,14 @@ Four rules worth repeating here:
 4. **Mobile-first.** Every screen starts at 375px. The shop-floor operator view
    is a separate shell with large touch targets, not a responsive squeeze of the
    office layout.
+5. **A Tailwind colour class only exists if its token does.** Tailwind v4
+   generates a utility from `@theme`, and generates **nothing** — silently — for
+   a shade with no token. `text-danger-700` was written in fourteen files
+   against a palette that stopped at 600, so the error line on every modal in
+   the app inherited body grey and did not read as an error. The ramps are
+   complete now, and `apps/web/src/styles/theme-tokens.test.ts` fails the build
+   if a class ever names a shade that is not defined. Same family as rule 1: a
+   wrong answer that looks like a right one.
 
 ---
 
@@ -733,6 +741,12 @@ Four rules worth repeating here:
   The failure is a preflight the browser blocks, which surfaces as a status of
   `0` and no readable error — the upload code turns that into a message naming
   CORS, because nothing else would.
+- **Vite's file watcher does not fire on this machine**, so the dev server can
+  serve stale code and — more confusingly — stale CSS. Tailwind re-scans source
+  files on a full restart, not on a save, so a class whose utility has never
+  been generated before renders as nothing at all: no gap, a border falling back
+  to black. It cost two false bug reports before it was understood. If a change
+  does not appear, restart `npm run dev -w apps/web` before believing the screen.
 - **The letterhead artwork is 762 KB of PNG**, which becomes ~1 MB of base64 in
   the HTML and ~670 KB of the finished 787 KB PDF. Resampling the header and
   footer to around 800px wide would take the PDF to roughly 200 KB with no code

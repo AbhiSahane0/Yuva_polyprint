@@ -1215,11 +1215,19 @@ quantityKg  = 50,000 ÷ 107.48      = 465.203 kg
 ratePerKg   = 2,10,000 ÷ 465.203   = ₹451.42
 ```
 
-On the printed quotation a per-pouch line shows its pouch count under Order Qty
-and reads `4.20 /pc` in the rate cell. The Order Qty **total** is only summed
-when every line shares a basis — adding kilograms to pouches would print a
-number the customer could check and find wrong, so a mixed document shows a dash
-there. The money totals are unaffected; those are always rupees.
+On the printed quotation a `PER_POUCH` line shows its pouch count under Order
+Qty and reads `4.20 /pc` in the rate cell. A `PER_KG` line — which is everything
+the form writes now — shows kilograms and the per-kilogram rate, **with the rate
+each underneath it** in smaller type, from `costPerPouch`. That is the same
+price read the other way round rather than a second charge, and printing it
+saves the customer doing the sum against the pouches-per-kilogram column and
+getting a different answer. A roll gets no such line: there is nothing on a reel
+to count, and a per-piece rate on one would be an invented unit.
+
+The Order Qty **total** is only summed when every line shares a basis — adding
+kilograms to pouches would print a number the customer could check and find
+wrong, so a mixed document shows a dash there. The money totals are unaffected;
+those are always rupees.
 
 **6. Cylinder** — the +80 is the mounting allowance:
 

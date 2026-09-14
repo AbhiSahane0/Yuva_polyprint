@@ -234,11 +234,28 @@ Either way:
 cost per pouch = total amount ÷ total pouches
 ```
 
-**The form prices per kilogram**, so a line entered today takes the first pair;
-`cost per pouch` is what the Quantities panel shows in its pouch strip and what
-the customer's document prints under the per-kilogram rate. The per-pouch pair
-is still computed and still stored, for quotations written before the form
-settled on kilograms.
+**The form prices per kilogram**, so a line entered today takes the first pair.
+
+That is not the same as asking for the order in kilograms. The Quantities panel
+carries **both units as boxes** — `500 kg = 21,565 pouches` and
+`Rs. 281.24 per kg = Rs. 6.5208 per pouch` — and typing into a pouch box
+converts and writes back into its per-kilogram partner, which is the field the
+line is actually stored and priced on:
+
+```
+quantity kg  = pouches typed ÷ pouches per kg          to 3 dp
+rate per kg  = rate each typed × pouches per kg        to 4 dp
+```
+
+So an order taken as "a lakh pouches at six-fifty" is keyed in exactly that way
+and reaches the arithmetic above as kilograms and rupees per kilogram. Four
+decimals on the rate because a pouch is often under ten rupees, and two would
+round a half-paisa negotiation away.
+
+`cost per pouch` is what the customer's document prints under the per-kilogram
+rate on any pouch job. The per-pouch pair is still computed and still stored,
+and a line genuinely quoted `PER_POUCH` — one written before the form settled on
+kilograms — still prices and prints from it.
 
 ### 5.2 Document totals
 

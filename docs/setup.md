@@ -273,12 +273,20 @@ and it is the only part the office repeats.
    the repeat are suggested from the size and can be overridden — and a repeat
    order on an existing design is quoted with no cylinder charge at all.
 
-5. **The quantities.** One, two or three, in kilograms or in pouches. Three
-   quantities is how a customer sees what a bigger order is worth.
+5. **The quantities.** One, two or three. Each one has **both units side by
+   side** — `500 kg = 21,565 pouches` — so an order taken as "five hundred kilos"
+   and one taken as "a lakh pouches" are both typed in as they were said, and the
+   other half fills itself in. Three quantities is how a customer sees what a
+   bigger order is worth.
 
 6. **The rate arrives on its own.** No button to press. Change the film or the
    quantity and it moves with them. Type over it and what you typed stays until
    something genuinely changes the cost.
+
+   The rate is a pair too — `Rs. 281.24 per kg = Rs. 6.5208 per pouch` — so a
+   customer haggling in the unit they buy ("make it six-fifty and we'll take
+   it") is answered by typing six-fifty. Underneath sits what the order comes to
+   and what one pouch weighs.
 
 7. **Check the working, then send.** The ⓘ beside the rate opens the full
    calculation — every ply, every machine's minutes, the chain from material cost
