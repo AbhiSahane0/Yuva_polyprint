@@ -328,7 +328,7 @@ Table material_rates {
   entered_by text [not null, default: `'Office'`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '227 row(s) at time of generation'
+  Note: '241 row(s) at time of generation'
 }
 
 Table materials {
@@ -405,6 +405,20 @@ Table quotation_emails {
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   whatsapp_to text[] [not null, default: `ARRAY[]::text[]`]
   whatsapp_sent_at timestamp
+
+  Note: '0 row(s) at time of generation'
+}
+
+Table quotation_item_colours {
+  id text [pk]
+  item_id text [unique, not null]
+  position integer [unique, not null]
+  material_id text
+  name text [not null]
+  kind InkKind [not null]
+  laydown_gsm decimal(6,3) [not null]
+  solids_percent decimal(6,3) [not null]
+  rate_per_kg decimal(12,2) [not null]
 
   Note: '0 row(s) at time of generation'
 }
@@ -642,3 +656,5 @@ Ref: cylinders.job_id > jobs.id [delete: restrict]
 Ref: cylinder_events.cylinder_id > cylinders.id [delete: cascade]
 Ref: job_artwork.job_id > jobs.id [delete: cascade]
 Ref: job_artwork.replaces_id > job_artwork.id [delete: restrict]
+Ref: quotation_item_colours.item_id > quotation_items.id [delete: cascade]
+Ref: quotation_item_colours.material_id > materials.id [delete: set null]

@@ -289,7 +289,13 @@ and it is the only part the office repeats.
 3. **The structure.** Choose each ply from the film list and give its thickness.
    The rate and density come with the film; nothing is typed twice.
 
-4. **Colours and cylinders.** How many stations the job occupies — see
+4. **Colours and cylinders.** Which inks the job prints — the four process
+   colours to start with, each a toggle, plus a **Special colour** chip for every
+   station carrying something else. A special is priced at the dearest ink on the
+   rates list, because which colour it is gets settled at artwork long after the
+   price was given.
+
+   The colour count is the cylinder count and the station count — see
    [`stations.md`](./stations.md). The lanes and the repeat are suggested from
    the size and can be overridden, and a repeat order on an existing design is
    quoted with no cylinder charge at all.

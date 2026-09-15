@@ -539,6 +539,48 @@ RATE PER KG = base rate + station surcharge + pouch making
 
 Estimation `G57` + `G59` + `G60` + `G62` = `G63`.
 
+### 6.9a Which colours, and what an unknown one costs
+
+The line names the inks it prints. A new one starts with the four process
+colours and the office takes away what the job does not run — plenty of packs
+are one colour, and four cylinders and four stations on a single-colour job is
+money and press time that were never spent.
+
+```
+colours      = the inks named on the line
+cylinders    = colours                    both ways — typing a bigger count
+stations     = the cylinder count         adds specials, a smaller one removes
+special      = the dearest COSTABLE ink on the rates list, of any kind
+```
+
+The count and the colour list are one fact told twice, so they move together:
+typing 7 against a CMYK job adds three specials, and typing 2 takes the specials
+off and then the process colours from the end. One colour is the floor.
+
+**A special is priced at the dearest ink** because which colour it is gets
+settled at artwork, weeks after the price was given. Every costable ink is in
+the running, process and spot alike — preferring the spot colours would be the
+more sophisticated rule and the wrong one. Quote the cheapest and the
+works loses the difference on every job where it guessed low, on a document
+already sent. Its laydown and solids come from that same ink, so the assumption
+is one whole ink rather than the worst figure from each.
+
+An ink with **no laydown** is not costable however dear — the blends are Rs 800
+and Rs 400 a kilogram and would win every "dearest" contest, but they are a rate
+for a whole laydown rather than a colour with one.
+
+**The colours decide how the ink is costed:**
+
+| the line      | ink method                                              | why                                        |
+| ------------- | ------------------------------------------------------- | ------------------------------------------ |
+| names colours | `PER_COLOUR` — each on its own laydown, solids and rate | the Costing sheet's way                    |
+| names none    | `FLAT_GSM` — the blended rate over the flat ink GSM     | there is nothing to price colour by colour |
+
+The method follows the data rather than a setting, which is also what keeps
+every quotation written before colours existed reading exactly as it did: none
+of them carries a colour list, so none of them moves. The seven verified 2022
+quotations are among them.
+
 ### 6.10a What making a pouch costs
 
 **Per pouch, not per kilogram**, which is what the works' own pouch workbook

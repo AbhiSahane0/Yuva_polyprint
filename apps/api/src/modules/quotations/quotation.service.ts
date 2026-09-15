@@ -9,6 +9,7 @@ import {
   type Quotation,
   type QuotationItem,
   type QuotationItemInput,
+  type QuotationItemColour,
   type QuotationItemLayer,
   type QuotationItemQuantity,
   type QuotationTier,
@@ -55,6 +56,7 @@ const QUOTATION_INCLUDE = {
     orderBy: { position: 'asc' },
     include: {
       layers: { orderBy: { position: 'asc' } },
+      colours: { orderBy: { position: 'asc' } },
       quantities: { orderBy: { position: 'asc' } },
     },
   },
@@ -62,6 +64,27 @@ const QUOTATION_INCLUDE = {
 
 type QuotationRow = Prisma.QuotationGetPayload<{ include: typeof QUOTATION_INCLUDE }>;
 type ItemRow = QuotationRow['items'][number];
+
+/**
+ * One ink, as it was priced.
+ *
+ * Every figure comes off the row rather than from the ink it names: a quotation
+ * has to say what it quoted, and the rate on the price list will have moved.
+ * The material link is there so somebody can still get back to the ink — and is
+ * null on a special, which names none.
+ */
+function toColour(row: ItemRow['colours'][number]): QuotationItemColour {
+  return {
+    id: row.id,
+    position: row.position,
+    materialId: row.materialId,
+    name: row.name,
+    kind: row.kind,
+    laydownGsm: toNumber(row.laydownGsm),
+    solidsPercent: toNumber(row.solidsPercent),
+    ratePerKg: toNumber(row.ratePerKg),
+  };
+}
 
 function toLayer(row: ItemRow['layers'][number]): QuotationItemLayer {
   return {
@@ -155,6 +178,7 @@ function toItem(row: ItemRow): QuotationItem {
     materialCostPerKg: row.materialCostPerKg === null ? null : Number(row.materialCostPerKg),
     compositeGsm: toNumber(row.compositeGsm),
     layers: row.layers.map(toLayer),
+    colours: row.colours.map(toColour),
     quantities: row.quantities.map(toQuantity),
   };
 }
@@ -771,6 +795,18 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
                 })),
               },
 
+              colours: {
+                create: (entry.input.colours ?? []).map((colour, index) => ({
+                  position: index + 1,
+                  materialId: colour.materialId,
+                  name: colour.name,
+                  kind: colour.kind,
+                  laydownGsm: colour.laydownGsm,
+                  solidsPercent: colour.solidsPercent,
+                  ratePerKg: colour.ratePerKg,
+                })),
+              },
+
               quantities: {
                 create: entry.quantities.map((quantity) => ({
                   position: quantity.position,
@@ -915,6 +951,20 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
        * patch that did not resend the lines.
        */
       pricingBasis: item.pricingBasis,
+      /*
+       * And the colours, for the same reason again. A PATCH that does not
+       * resend the lines must reprice on the inks the quotation was written
+       * with — re-reading them from the price list would quietly move the rate
+       * every time a rate changed, on a document already sent.
+       */
+      colours: item.colours.map((colour) => ({
+        name: colour.name,
+        kind: colour.kind,
+        materialId: colour.materialId,
+        laydownGsm: toNumber(colour.laydownGsm),
+        solidsPercent: toNumber(colour.solidsPercent),
+        ratePerKg: toNumber(colour.ratePerKg),
+      })),
       widthMm: toNumber(item.widthMm),
       heightMm: toNumber(item.heightMm),
       /*
@@ -1059,6 +1109,18 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
               ratePerKg: layer.ratePerKg,
               rateOverride: layer.rateOverride,
               gsm: layer.gsm,
+            })),
+          },
+
+          colours: {
+            create: (entry.input.colours ?? []).map((colour, index) => ({
+              position: index + 1,
+              materialId: colour.materialId,
+              name: colour.name,
+              kind: colour.kind,
+              laydownGsm: colour.laydownGsm,
+              solidsPercent: colour.solidsPercent,
+              ratePerKg: colour.ratePerKg,
             })),
           },
 
@@ -1228,6 +1290,19 @@ export async function createQuotationVersion(id: string): Promise<Quotation> {
                   density: layer.density,
                   ratePerKg: layer.ratePerKg,
                   gsm: layer.gsm,
+                })),
+              },
+              /* Carried across as it was priced, not re-read: a revision of a
+                 quotation has to say what the original said. */
+              colours: {
+                create: byPosition(item.colours).map((colour) => ({
+                  position: colour.position,
+                  materialId: colour.materialId,
+                  name: colour.name,
+                  kind: colour.kind,
+                  laydownGsm: colour.laydownGsm,
+                  solidsPercent: colour.solidsPercent,
+                  ratePerKg: colour.ratePerKg,
                 })),
               },
               quantities: {

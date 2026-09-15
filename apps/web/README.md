@@ -661,6 +661,55 @@ Every job on one quotation must be priced at the same number of quantities. They
 are columns on one document, and a job with three where another has two would
 leave a hole no total could describe.
 
+#### Colours
+
+Which inks the job prints. A new line starts with the four process colours, and
+each is a **toggle** — click to take it off, click to put it back:
+
+```
+COLOURS                                          Priced colour by colour
+[● Cyan] [● Magenta] [● Yellow] [● Black]  [+ Special colour]
+
+4 colours — so 4 cylinders and 4 stations.
+```
+
+**Toggles, not deletions.** Taking a colour off and putting it back is the same
+gesture, which is what somebody correcting a mistake expects; a delete with no
+way back would send them to the job list to start again. A colour that is off
+goes grey rather than disappearing, so the line still says what it does not
+print.
+
+**A special colour is anonymous, and there may be several.** Which one it is —
+the brand's red, a metallic, a white base coat — is settled at artwork, weeks
+after the price was given. So the office adds one chip per special station
+rather than naming anything, and every special is priced at **the dearest ink on
+the rates list**: quote the cheapest and the works loses the difference on every
+job where it guessed low, on a document already sent. Where the works stocks
+real specials, the dearest of those is used instead of a process ink standing in
+for one.
+
+**The strip says what it costs**, because otherwise adding a colour is a change
+with an invisible consequence three fields away:
+
+> **5 colours** — so 5 cylinders and 5 stations. A special is priced at
+> **Rs. 235.00/kg**, the dearest ink on the rates list, because which colour it
+> is gets settled at artwork.
+
+That count is real money. A cylinder is around Rs 9,000, and the sixth and
+seventh stations add Rs 5.50 and Rs 7.50 a kilogram.
+
+**The colours price the ink, and only the ink.** A line that names its colours
+is costed the Costing sheet's way — each colour on its own laydown, solids and
+rate. A line that names none is costed at the works' blended ink rate over the
+flat ink GSM, which is the only thing it can be priced at. The method follows
+the data rather than a setting, and that is also what keeps every quotation
+written before colours existed reading exactly as it did: none of them has a
+colour list, so none of them moves.
+
+> A colour the works cannot price is left out of the palette rather than offered
+> at zero. A colour costing nothing is worse than a colour missing, because the
+> rate still looks plausible.
+
 #### Cylinders
 
 **The section appears only for a new design.** Pick a saved job and it goes
@@ -671,6 +720,12 @@ away entirely, replaced by a line saying so:
 
 Choose **— New design —** and it comes back, with repeat width and height, the
 number of cylinders, and transport.
+
+**The cylinder count follows the colours** — one each — and stays editable. The
+works' own sheets count seven stations on a job that prices four inks, because a
+station is occupied whether or not its ink is costed, so the figure has to stay
+theirs to set. Type in it and the hint changes to _"Yours — no longer following
+the colours"_, with a **Follow the colours again** link to hand it back.
 
 **The repeats are suggested from the size**, and stay editable. The cylinder's
 circumference is the film's height times the repeat around, so the repeat is

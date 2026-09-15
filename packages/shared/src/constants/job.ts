@@ -66,6 +66,20 @@ export const LAYER_STRUCTURE: Record<number, string[]> = {
 export const PRICING_BASES = ['PER_KG', 'PER_POUCH'] as const;
 export type PricingBasis = (typeof PRICING_BASES)[number];
 
+/**
+ * Process or special, for an ink.
+ *
+ * Cyan, magenta, yellow and black are the four every press carries and any job
+ * may use. Everything else is a job's own decision — a white base coat, a
+ * brand's Pantone, a metallic — and belongs to the works only once somebody has
+ * bought a tin of it.
+ *
+ * Named here rather than written inline in three places, which is what it was
+ * before a quotation needed to store which kind each of its colours is.
+ */
+export const INK_KINDS = ['PROCESS', 'SPECIAL'] as const;
+export type InkKind = (typeof INK_KINDS)[number];
+
 /** The styles the trade prices by the piece. */
 const PER_POUCH_STYLES: readonly PouchType[] = ['STANDUP', 'STANDUP_ZIPPER'];
 

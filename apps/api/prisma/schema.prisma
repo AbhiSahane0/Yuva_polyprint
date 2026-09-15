@@ -452,6 +452,7 @@ model QuotationItem {
   compositeGsm      Decimal  @default(0) @map("composite_gsm") @db.Decimal(10, 3)
 
   layers     QuotationItemLayer[]
+  colours    QuotationItemColour[]
   quantities QuotationItemQuantity[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -470,6 +471,53 @@ model QuotationItem {
 /// Everything is snapshotted alongside the material link, because a quotation
 /// is a document: the rate it was costed against must not move when the rate
 /// screen is updated tomorrow, and retiring a material must not erase history.
+/// Which ink a printing station carries on this line.
+///
+/// A line starts with the four process colours, and the office takes away the
+/// ones the job does not print — plenty of jobs are one colour — and adds a
+/// SPECIAL for each station that will carry something else. What that something
+/// is nobody knows while quoting: the brand's red, a metallic, a white base
+/// coat. It is decided at artwork, long after the price has been given.
+///
+/// So a special is priced at the **dearest ink on the rates list**, which is
+/// the only honest assumption available: quote the cheapest and the works loses
+/// the difference on every job where it guessed low.
+///
+/// Snapshotted like a ply, and for the same reason. The rate, laydown and
+/// solids are what they were the day the quotation was written, so reopening it
+/// in a year shows what was quoted rather than what it would cost now.
+model QuotationItemColour {
+  id String @id @default(cuid())
+
+  itemId String        @map("item_id")
+  item   QuotationItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  /// Order on the screen. Not the station it runs on — that is the press's
+  /// business and the office does not choose it here.
+  position Int
+
+  /// The ink, where one was named. Null on a SPECIAL, which names no ink by
+  /// definition, and on a process colour whose material was later deleted.
+  materialId String?   @map("material_id")
+  material   Material? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+
+  /// 'Cyan', or 'Special colour'. What the quotation says it printed.
+  name String
+
+  /// PROCESS or SPECIAL. Stored rather than read from the name, because a works
+  /// may well call its own spot colour "Cyan (Pantone 2995)".
+  kind InkKind
+
+  /// What it was priced at, as it stood that day.
+  laydownGsm    Decimal @map("laydown_gsm") @db.Decimal(6, 3)
+  solidsPercent Decimal @map("solids_percent") @db.Decimal(6, 3)
+  ratePerKg     Decimal @map("rate_per_kg") @db.Decimal(12, 2)
+
+  @@unique([itemId, position])
+  @@index([materialId])
+  @@map("quotation_item_colours")
+}
+
 model QuotationItemLayer {
   id String @id @default(cuid())
 
@@ -648,6 +696,7 @@ model Material {
   /// Plies quoted against this material. The link is nullable on that side, so
   /// retiring a material leaves old quotations readable.
   quotationItemLayers QuotationItemLayer[]
+  quotationItemColours QuotationItemColour[]
   stockBatches        StockBatch[]
   stockMovements      StockMovement[]
   purchaseOrderLines  PurchaseOrderLine[]

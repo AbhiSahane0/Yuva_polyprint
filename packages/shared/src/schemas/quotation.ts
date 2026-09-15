@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { partialWithoutDefaults } from './partial-update.js';
-import { JOB_KINDS, POUCH_TYPES, PRICING_BASES, pricingBasisFor } from '../constants/job.js';
+import {
+  INK_KINDS,
+  JOB_KINDS,
+  POUCH_TYPES,
+  PRICING_BASES,
+  pricingBasisFor,
+} from '../constants/job.js';
 import { paginationQuerySchema } from './common.js';
 import { isMobile, normaliseMobile } from '../lib/phone.js';
 
@@ -70,6 +76,23 @@ export const quotationQuantitySchema = z.object({
   ratePerPouch: zeroOrMore('Rate').default(0),
 });
 
+/**
+ * One ink on a line, snapshotted.
+ *
+ * The figures travel with the quotation rather than being looked up when it is
+ * read, for the same reason a ply's rate does: reopening a document in a year
+ * has to show what was quoted, not what it would cost now.
+ */
+export const quotationColourSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  kind: z.enum(INK_KINDS),
+  /** Null on a special, which by definition names no ink. */
+  materialId: z.string().min(1).nullable().default(null),
+  laydownGsm: zeroOrMore('Laydown'),
+  solidsPercent: zeroOrMore('Solids'),
+  ratePerKg: zeroOrMore('Rate'),
+});
+
 export const quotationItemSchema = z
   .object({
     /** Present when editing a line that already exists. */
@@ -122,6 +145,18 @@ export const quotationItemSchema = z
       .array(quotationLayerSchema)
       .min(2, 'A laminate needs at least two plies')
       .max(4, 'More than four plies is not something this works produces'),
+
+    /**
+     * Which inks the line prints, in the order they are shown.
+     *
+     * Empty on every line written before colours were chosen at all, and those
+     * are priced the way they always were — at the works' blended ink rate over
+     * a flat ink GSM. A line that names its colours is priced on them.
+     *
+     * Eight is the press. A ninth colour is not a job this works can run, so
+     * accepting one would only let a quotation describe something undeliverable.
+     */
+    colours: z.array(quotationColourSchema).max(8, 'The press carries eight stations').default([]),
 
     /** One to three quantities, smallest first. */
     quantities: z

@@ -30,6 +30,7 @@ export * from './types/gstin.js';
 
 export * from './lib/quotation-math.js';
 export * from './lib/pouch-making.js';
+export * from './lib/job-colours.js';
 export * from './lib/material-cost.js';
 export * from './lib/phone.js';
 export * from './lib/inventory.js';

@@ -95,6 +95,13 @@ erDiagram
     text id PK
     text quotation_id FK
   }
+  quotation_item_colours {
+    text id PK
+    text item_id FK
+    integer position
+    text material_id FK
+    decimal rate_per_kg
+  }
   quotation_item_layers {
     text id PK
     text item_id FK
@@ -186,6 +193,8 @@ erDiagram
   cylinders ||--|{ cylinder_events : "cylinder_id"
   jobs ||--|{ job_artwork : "job_id"
   job_artwork ||--o{ job_artwork : "replaces_id"
+  quotation_items ||--|{ quotation_item_colours : "item_id"
+  materials ||--o{ quotation_item_colours : "material_id"
 ```
 
 ## Tables
@@ -202,12 +211,13 @@ erDiagram
 | `job_artwork` | 17 | 0 |  |
 | `jobs` | 55 | 421 | Products and their full engineering specification. |
 | `login_events` | 7 | 45 |  |
-| `material_rates` | 6 | 227 |  |
+| `material_rates` | 6 | 241 |  |
 | `materials` | 13 | 14 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
 | `purchase_receipts` | 11 | 1 |  |
 | `quotation_emails` | 10 | 0 |  |
+| `quotation_item_colours` | 9 | 0 |  |
 | `quotation_item_layers` | 10 | 36 |  |
 | `quotation_item_quantities` | 13 | 20 |  |
 | `quotation_items` | 31 | 18 | One priced line on a quotation. |
@@ -252,6 +262,8 @@ erDiagram
 | `cylinder_events.cylinder_id` | `cylinders.id` | CASCADE |  |
 | `job_artwork.job_id` | `jobs.id` | CASCADE |  |
 | `job_artwork.replaces_id` | `job_artwork.id` | RESTRICT |  |
+| `quotation_item_colours.item_id` | `quotation_items.id` | CASCADE |  |
+| `quotation_item_colours.material_id` | `materials.id` | SET NULL |  |
 
 ## Enums
 
@@ -566,6 +578,20 @@ erDiagram
 | `created_at` | `timestamp` |  |  |
 | `whatsapp_to` | `text[]` |  |  |
 | `whatsapp_sent_at` | `timestamp` | ✓ |  |
+
+### `quotation_item_colours`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `item_id` | `text` |  | FK → `quotation_items.id` |
+| `position` | `integer` |  | unique |
+| `material_id` | `text` | ✓ | FK → `materials.id` |
+| `name` | `text` |  |  |
+| `kind` | `InkKind` (enum) |  |  |
+| `laydown_gsm` | `decimal(6,3)` |  |  |
+| `solids_percent` | `decimal(6,3)` |  |  |
+| `rate_per_kg` | `decimal(12,2)` |  |  |
 
 ### `quotation_item_layers`
 

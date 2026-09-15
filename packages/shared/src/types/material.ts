@@ -1,3 +1,4 @@
+import type { InkKind } from '../constants/job.js';
 import type { MaterialCategory } from '../schemas/material.js';
 
 /** A material with the rate that currently applies. */
@@ -18,7 +19,7 @@ export interface Material {
    * Process or special, for inks. Null on anything that is not an ink, and
    * treated as special — a colour nobody has called one of the four is one.
    */
-  inkKind: 'PROCESS' | 'SPECIAL' | null;
+  inkKind: InkKind | null;
   isActive: boolean;
   sortOrder: number;
 
