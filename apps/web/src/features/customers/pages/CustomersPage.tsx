@@ -35,6 +35,8 @@ export default function CustomersPage() {
   const [editing, setEditing] = useState<Customer | null>(null);
   const [deleting, setDeleting] = useState<Customer | null>(null);
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Typing shouldn't fire a request per keystroke.
   const debouncedSearch = useDebounce(search, 300);
 
@@ -95,6 +97,10 @@ export default function CustomersPage() {
   };
 
   const exportAllCustomersToExcel = async () => {
+    if (isExporting) return;
+
+    setIsExporting(true);
+
     try {
       const pageSize = 100;
       let currentPage = 1;
@@ -112,11 +118,9 @@ export default function CustomersPage() {
         });
 
         const pageCustomers = response.items ?? [];
-
         allCustomers = [...allCustomers, ...pageCustomers];
 
         totalPages = response.pagination?.totalPages ?? 1;
-
         currentPage++;
       } while (currentPage <= totalPages);
 
@@ -125,14 +129,14 @@ export default function CustomersPage() {
         return;
       }
 
-      // Use your existing Excel function
       exportCustomersToExcel(allCustomers);
     } catch (error) {
       console.error('Failed to export customers:', error);
       alert('Failed to export customers.');
+    } finally {
+      setIsExporting(false);
     }
   };
-
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -149,15 +153,26 @@ export default function CustomersPage() {
             )}
           </p>
         </div>
-        <Button type="button" variant="secondary" onClick={exportAllCustomersToExcel}>
-          <FileSpreadsheet className="size-4" />
-          Export Excel
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="secondary" onClick={exportAllCustomersToExcel} disabled={isExporting}>
+            {isExporting ? (
+              <>
+                <Spinner size="sm" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <FileSpreadsheet className="size-4" />
+                Export Excel
+              </>
+            )}
+          </Button>
 
-        <Button onClick={openCreate}>
-          <Plus className="size-4" />
-          Add customer
-        </Button>
+          <Button onClick={openCreate}>
+            <Plus className="size-4" />
+            Add customer
+          </Button>
+        </div>
       </header>
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
