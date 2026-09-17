@@ -51,5 +51,8 @@
     "*.{json,md,css,yml,yaml}": [
       "prettier --write"
     ]
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
   }
 }

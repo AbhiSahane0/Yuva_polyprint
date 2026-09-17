@@ -11,7 +11,10 @@ import { useCustomers, type CustomerListParams } from '../api/customer-api';
 import { CustomerTable } from '../components/CustomerTable';
 import { CustomerFormModal } from '../components/CustomerFormModal';
 import { DeleteCustomerDialog } from '../components/DeleteCustomerDialog';
-
+import * as XLSX from 'xlsx';
+import { FileSpreadsheet } from 'lucide-react';
+import { request } from '@/lib/api-client';
+import type { Paginated } from '@yuva/shared';
 type Filter = 'all' | 'needsReview' | 'fromBrand';
 
 const PAGE_SIZE = 25;
@@ -68,6 +71,68 @@ export default function CustomersPage() {
     setFormOpen(true);
   }
 
+  const exportCustomersToExcel = (customers: Customer[]) => {
+    const data = customers.map((customer) => ({
+      Company: customer.companyName,
+      Brand: customer.brandName,
+      Mobile: customer.mobile,
+      City: customer.city,
+      Address: customer.address,
+      Jobs: customer.jobCount,
+      Status: customer.isVerified ? 'Confirmed' : 'Needs review',
+      Source: customer.source === 'BRAND_INFERRED' ? 'From brand' : '',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Customers');
+
+    XLSX.writeFile(
+      workbook,
+      `Yuva_Polyprint_Customers_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
+  };
+
+  const exportAllCustomersToExcel = async () => {
+    try {
+      const pageSize = 100;
+      let currentPage = 1;
+      let allCustomers: Customer[] = [];
+      let totalPages = 1;
+
+      do {
+        const response = await request<Paginated<Customer>>({
+          url: '/customers',
+          method: 'GET',
+          params: {
+            page: currentPage,
+            pageSize,
+          },
+        });
+
+        const pageCustomers = response.items ?? [];
+
+        allCustomers = [...allCustomers, ...pageCustomers];
+
+        totalPages = response.pagination?.totalPages ?? 1;
+
+        currentPage++;
+      } while (currentPage <= totalPages);
+
+      if (allCustomers.length === 0) {
+        alert('No customers found to export.');
+        return;
+      }
+
+      // Use your existing Excel function
+      exportCustomersToExcel(allCustomers);
+    } catch (error) {
+      console.error('Failed to export customers:', error);
+      alert('Failed to export customers.');
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -84,6 +149,11 @@ export default function CustomersPage() {
             )}
           </p>
         </div>
+        <Button type="button" variant="secondary" onClick={exportAllCustomersToExcel}>
+          <FileSpreadsheet className="size-4" />
+          Export Excel
+        </Button>
+
         <Button onClick={openCreate}>
           <Plus className="size-4" />
           Add customer

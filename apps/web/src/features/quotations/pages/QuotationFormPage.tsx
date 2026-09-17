@@ -2049,7 +2049,7 @@ function JobCard({
                   </Field>
                 </div>
                 <div className="sm:col-span-3">
-                  <Field label="Cylinders" htmlFor={`items.${index}.cylinderCount`}>
+                  <Field label="Total No. of Cylinders" htmlFor={`items.${index}.cylinderCount`}>
                     <NumberInput
                       id={`items.${index}.cylinderCount`}
                       {...register(`items.${index}.cylinderCount`)}
