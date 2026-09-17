@@ -1,6 +1,6 @@
 import { formatNumber, formatRs, type Quotation } from '@yuva/shared';
 import { BASE_CSS } from '../quotation-letterhead.js';
-import { FAMILY_CSS, factsFor, foot, masthead, terms } from './family.js';
+import { docBand, FAMILY_CSS, foot, letterhead, terms } from './family.js';
 import {
   chargesCylinders,
   coloursOf,
@@ -8,73 +8,96 @@ import {
   quantityOf,
   quotedTier,
   structureOf,
+  styleOf,
   transportTotal,
 } from './shared.js';
 
 /**
- * **Statement** — the answer first, the jobs underneath as evidence.
+ * **Statement** — the answer first, the jobs beneath it as a schedule.
  *
- * Every other layout here builds to the total: jobs, then arithmetic, then the
- * figure at the bottom. That is how the quotation was *calculated*, and it is
- * the reverse of how it is *read*. The customer opens it to find out what this
- * costs, scrolls past everything to the bottom right, and only then goes back
- * up to see what they are getting.
+ * Every other layout builds to the total: jobs, then arithmetic, then the
+ * figure at the bottom. That is the order the price was *calculated* in and the
+ * reverse of the order it is *read* in — the customer opens the document to
+ * find out what this costs, goes straight to the bottom right, and only then
+ * comes back up to see what they are getting.
  *
- * So this puts the number where the eye already goes — first, alone, in the
- * company's orange — with the build-up laid out beside it as four plain chips
- * rather than a table to decode. The jobs follow as cards, because once the
- * price is known the next question is "for what", and each answers it with the
- * same labelled facts *Folio* uses.
+ * So the total sits at the top with its build-up in cells beside it, and the
+ * jobs follow as a schedule: one ruled row each, the same six columns every
+ * time. That makes this the document for a quotation with four or six jobs on
+ * it, where *Folio* would run to a second page and a buyer could not compare
+ * two rates without turning back and forth.
  *
- * It is the least confusing of the family and the least conventional. A works
- * whose customers query prices will like it; one whose customers expect an
- * invoice-shaped document may not, which is why it is a choice and not the
- * only template.
+ * The total is set at the same size as the largest figure anywhere else on the
+ * page. It is first, in the company's orange, and alone in its cell — which is
+ * already every kind of emphasis a number needs.
  */
 export function renderStatement(quotation: Quotation): string {
   const tier = quotedTier(quotation);
   const position = tier?.position ?? 1;
   const gst = formatNumber(quotation.gstPercent);
   const cylinders = chargesCylinders(quotation);
+  const transport = transportTotal(quotation);
 
   const materialGst = (tier?.materialWithGst ?? 0) - (tier?.materialSubtotal ?? 0);
   const cylinderGst = (tier?.cylinderWithGst ?? 0) - (tier?.cylinderSubtotal ?? 0);
 
-  const chips = [
-    ['Packaging material', tier?.materialSubtotal ?? 0],
-    [`GST ${gst}%`, materialGst],
+  /*
+   * The labels stay on one line each. A cell whose name wrapped pushed its
+   * figure down a row, and five figures meant to be read across then sat at
+   * three different heights — which is the opposite of what a band of cells is
+   * for. Anything the label cannot carry goes under the figure as a note.
+   */
+  const parts: [string, number, string][] = [
+    ['Material', tier?.materialSubtotal ?? 0, 'before GST'],
+    [`GST ${gst}%`, materialGst, 'on the material'],
     ...(cylinders
       ? ([
-          ['Cylinders, one time', tier?.cylinderSubtotal ?? 0],
-          [`GST ${gst}%`, cylinderGst],
-        ] as [string, number][])
+          [
+            'Cylinders',
+            tier?.cylinderSubtotal ?? 0,
+            transport > 0
+              ? `charged once, includes ${formatRs(transport)} transport`
+              : 'charged once',
+          ],
+          [`GST ${gst}%`, cylinderGst, 'on the cylinders'],
+        ] as [string, number, string][])
       : []),
-  ] as [string, number][];
+  ];
 
-  const cards = quotation.items
+  const rows = quotation.items
     .map((item, index) => {
       const q = quantityOf(item, position);
       const pouches = item.jobKind !== 'ROLL';
-      const facts = factsFor(item, quotation, position, structureOf(item), coloursOf(item));
+      const perPouch = q?.costPerPouch ?? 0;
 
       return `
-      <article class="card">
-        <header>
-          <div>
-            <div class="eyebrow">Job ${index + 1} of ${quotation.items.length}</div>
-            <h3>${esc(item.jobName)}</h3>
-          </div>
-          <div class="money">
-            <div class="amt num">${formatRs(q?.totalAmount ?? 0)}</div>
-            <div class="rate num">${formatRs(q?.ratePerKg ?? 0, 2)}/kg${
-              pouches && (q?.costPerPouch ?? 0) > 0
-                ? ` &nbsp;·&nbsp; ${formatRs(q?.costPerPouch ?? 0, 2)}/pouch`
-                : ''
-            }</div>
-          </div>
-        </header>
-        <dl class="facts">${facts.join('')}</dl>
-      </article>`;
+        <tr>
+          <td class="no num">${String(index + 1).padStart(2, '0')}</td>
+          <td class="job">
+            <b>${esc(item.jobName)}</b>
+            <span class="sub">${esc(styleOf(item))} &nbsp;·&nbsp; ${formatNumber(item.widthMm, 0)} × ${formatNumber(
+              item.heightMm,
+              0,
+            )} mm &nbsp;·&nbsp; ${esc(structureOf(item))} &nbsp;·&nbsp; ${formatNumber(item.micron, 0)} micron</span>
+          </td>
+          <td class="print">${
+            esc(coloursOf(item)) ||
+            `${item.cylinderCount} colour${item.cylinderCount === 1 ? '' : 's'}`
+          }<span class="sub">${item.cylinderCount} cylinder${item.cylinderCount === 1 ? '' : 's'}${
+            item.chargeCylinders && item.totalCylinderCost > 0
+              ? ` at ${formatRs(item.costPerCylinder)}`
+              : ', already with us'
+          }</span></td>
+          <td class="r num">${formatNumber(q?.quantityKg ?? 0, 2)} kg${
+            pouches ? `<span class="sub">${formatNumber(q?.totalPouches ?? 0)} pouches</span>` : ''
+          }</td>
+          <td class="r num rate">${formatRs(q?.ratePerKg ?? 0, 2)}${
+            pouches && perPouch > 0
+              ? `<span class="sub">${formatRs(perPouch, 2)} a pouch</span>`
+              : ''
+          }</td>
+          <td class="r num amt">${formatRs(q?.totalAmount ?? 0)}</td>
+        </tr>`;
     })
     .join('');
 
@@ -85,86 +108,104 @@ export function renderStatement(quotation: Quotation): string {
 ${BASE_CSS}
 ${FAMILY_CSS}
 
-  /* --- the answer, first ---------------------------------------------- */
-  .headline { display: flex; gap: 8mm; align-items: flex-start;
-              border: 0.6pt solid var(--hair); border-radius: 2.5mm;
-              padding: 5mm 5.5mm; margin-bottom: 5mm; }
-  .headline .total { flex: none; }
-  .headline .total .big { font-size: 30pt; font-weight: 700; color: var(--orange);
-                          line-height: .95; letter-spacing: -.015em;
-                          font-variant-numeric: tabular-nums; }
-  .headline .total .under { font-size: 8.8pt; color: var(--muted); margin-top: 1.6mm; }
-  .headline .total .under b { color: var(--ink); }
+  /* --- the answer, first ------------------------------------------------ */
+  .headline { display: flex; align-items: stretch; border: 0.5pt solid var(--hair);
+              border-radius: 2mm; overflow: hidden; margin-bottom: 5mm; }
+  .headline .part { flex: 1; padding: 2.8mm 4mm; border-right: 0.5pt solid var(--hair);
+                    min-width: 0; }
+  .headline .part dt { font-size: var(--t-label); letter-spacing: .09em; text-transform: uppercase;
+                       color: var(--muted); font-weight: 700; white-space: nowrap; }
+  .headline .part dd { margin: .6mm 0 0; font-size: var(--t-value); color: var(--ink);
+                       font-weight: 700; font-variant-numeric: tabular-nums; }
+  .headline .part .note { display: block; font-size: var(--t-label); letter-spacing: .03em;
+                          text-transform: none; font-weight: 400; color: var(--muted);
+                          margin-top: .3mm; }
+  .headline .sum { flex: none; width: 56mm; background: var(--wash); border-right: 0;
+                   padding: 2.8mm 4mm; }
+  .headline .sum dd { font-size: var(--t-lead); color: var(--orange); line-height: 1.15; }
+  .headline .sum .note { color: var(--muted); }
 
-  /* The build-up as four plain chips, not a table to decode. */
-  .breakdown { flex: 1; display: grid; grid-template-columns: repeat(2, 1fr);
-               gap: 2.4mm 5mm; align-content: start; padding-left: 6mm;
-               border-left: 0.5pt solid var(--hair); }
-  .breakdown .chip dt { font-size: 7.4pt; letter-spacing: .07em;
-                        text-transform: uppercase; color: var(--muted); }
-  .breakdown .chip dd { margin: .3mm 0 0; font-size: 10.5pt; color: var(--ink);
-                        font-weight: 700; font-variant-numeric: tabular-nums; }
+  /* --- the jobs, as a schedule ------------------------------------------ */
+  .schedule { width: 100%; border-collapse: collapse; margin-bottom: 4mm; }
+  .schedule thead th { font-size: var(--t-label); letter-spacing: .1em; text-transform: uppercase;
+                       color: var(--muted); font-weight: 700; text-align: left;
+                       padding: 0 2.5mm 1.4mm; border-bottom: 1pt solid var(--indigo); }
+  .schedule thead th.r { text-align: right; }
+  .schedule td { padding: 2.2mm 2.5mm; vertical-align: top; font-size: var(--t-value);
+                 color: var(--ink); border-bottom: 0.5pt solid var(--hair); }
+  .schedule tr:last-child td { border-bottom: 0.5pt solid var(--hair); }
+  .schedule .no { color: var(--indigo); font-size: var(--t-label); font-weight: 700;
+                  padding-top: 2.7mm; width: 8mm; }
+  .schedule .job { width: 62mm; }
+  .schedule .job b { display: block; line-height: 1.25; }
+  .schedule .print { width: 36mm; }
+  .schedule .rate { width: 24mm; font-weight: 700; color: var(--indigo); }
+  .schedule .amt { width: 26mm; font-weight: 700; }
+  /* Every second line of a row is a smaller fact about the line above it, and
+     each one carries its own unit — so a column stays readable without a
+     second header. */
+  .schedule .sub { display: block; font-size: var(--t-fine); color: var(--muted);
+                   font-weight: 400; line-height: 1.35; margin-top: .4mm; }
 
-  /* --- the jobs, as evidence ------------------------------------------- */
-  .what { margin-bottom: 2.4mm; }
-  .card { border: 0.6pt solid var(--hair); border-radius: 2mm;
-          margin-bottom: 3.5mm; break-inside: avoid; overflow: hidden; }
-  .card > header { display: flex; justify-content: space-between; align-items: flex-start;
-                   gap: 6mm; padding: 3mm 4mm 2.6mm; background: var(--wash);
-                   border-bottom: 0.6pt solid var(--hair); }
-  .card h3 { margin: .6mm 0 0; font-size: 13pt; color: var(--ink);
-             font-weight: 700; line-height: 1.15; }
-  .card .money { text-align: right; flex: none; }
-  .card .money .amt { font-size: 14pt; font-weight: 700; color: var(--ink); line-height: 1; }
-  .card .money .rate { font-size: 8.6pt; color: var(--muted); margin-top: 1mm; }
-
-  .facts { display: grid; grid-template-columns: repeat(4, 1fr);
-           gap: 2.6mm 4mm; margin: 0; padding: 3.2mm 4mm; }
-
-  .settle { margin-top: 5mm; display: flex; gap: 8mm; align-items: flex-start; }
-  .settle .terms { flex: 1; }
-  .settle .due { width: 70mm; flex: none; border: 0.6pt solid var(--hair);
-                 border-radius: 2mm; padding: 3.4mm 4mm; }
-  .settle .due .eyebrow { margin-bottom: 1mm; }
-  .settle .due .fig { font-size: 15pt; font-weight: 700; color: var(--ink);
-                      font-variant-numeric: tabular-nums; }
-  .settle .due .note { font-size: 8.2pt; color: var(--muted); margin-top: 1mm; }
+  .settle { display: flex; gap: 8mm; align-items: flex-start; margin-top: 4mm; }
+  .settle .due { width: 78mm; flex: none; }
+  .settle .due .eyebrow { display: block; margin-bottom: 1.4mm; }
+  /* The total sits at the top of this page, so the panel down here carries the
+     one figure that has not been said yet: what is payable to start the job. */
+  .due .row.total { border-top: 1.2pt solid var(--indigo); border-bottom: 0; padding-top: 2mm; }
+  .due .row.total dt { flex: 1; width: auto; font-size: var(--t-value); color: var(--ink);
+                       font-weight: 700; text-transform: none; letter-spacing: 0; }
+  .due .row.total dd { flex: none; font-size: var(--t-lead); font-weight: 700;
+                       color: var(--ink); line-height: 1.1; }
+  .due .row.advance { border-bottom: 0; padding-top: 1.4mm; }
+  .due .row.advance dt { flex: 1; width: auto; font-size: var(--t-fine); color: var(--muted);
+                         font-weight: 400; text-transform: none; letter-spacing: 0;
+                         line-height: 1.4; }
+  .due .row.advance dd { display: none; }
 </style></head>
 <body>
 <div class="sheet">
-${masthead(quotation)}
+${letterhead()}
+${docBand(quotation)}
 
-  <section class="headline">
-    <div class="total">
-      <div class="eyebrow">Total payable</div>
-      <div class="big">${formatRs(tier?.grandWithGst ?? 0)}</div>
-      <div class="under">including GST at ${gst}%</div>
+  <dl class="headline">
+    ${parts
+      .map(
+        ([label, value, note]) =>
+          `<div class="part"><dt>${esc(label)}</dt><dd>${formatRs(value)}${
+            note ? `<span class="note">${esc(note)}</span>` : ''
+          }</dd></div>`,
+      )
+      .join('')}
+    <div class="part sum">
+      <dt>Total payable</dt>
+      <dd>${formatRs(tier?.grandWithGst ?? 0)}<span class="note">including GST at ${gst}%</span></dd>
     </div>
-    <dl class="breakdown">
-      ${chips
-        .map(
-          ([label, value]) =>
-            `<div class="chip"><dt>${esc(label)}</dt><dd>${formatRs(value)}</dd></div>`,
-        )
-        .join('')}
-    </dl>
-  </section>
+  </dl>
 
-  <div class="eyebrow what">What that covers</div>
-  ${cards}
+  <div class="band-title">What that covers</div>
+  <table class="schedule">
+    <thead>
+      <tr>
+        <th></th><th>Job</th><th>Printing</th>
+        <th class="r">Order</th><th class="r">Rate a kg</th><th class="r">Material</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
 
   <section class="settle">
-    <div class="terms">${terms(quotation, cylinders, transportTotal(quotation))}</div>
+    ${terms(quotation)}
     <div class="due">
       <div class="eyebrow">Advance with order</div>
-      <div class="fig">${formatRs(tier?.totalAdvance ?? 0)}</div>
-      <div class="note">
-        ${formatNumber(quotation.materialAdvancePercent)}% of the material${
+      <dl class="rows">
+        <div class="row total"><dt>Payable now</dt><dd class="num">${formatRs(tier?.totalAdvance ?? 0)}</dd></div>
+        <div class="row advance"><dt>${formatNumber(quotation.materialAdvancePercent)}% of the material${
           cylinders
             ? ` and ${formatNumber(quotation.cylinderAdvancePercent)}% of the cylinders`
             : ''
-        }. The balance falls due on delivery.
-      </div>
+        }. The balance falls due on delivery.</dt><dd></dd></div>
+      </dl>
     </div>
   </section>
 ${foot(quotation)}`;

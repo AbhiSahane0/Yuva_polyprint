@@ -29,14 +29,19 @@ const OUT = fileURLToPath(new URL('../../web/public/_dev/', import.meta.url));
 mkdirSync(OUT, { recursive: true });
 
 const TEMPLATES = [
-  ['folio', 'Folio', 'A card a job, with the facts in a grid.', renderFolio],
+  ['folio', 'Folio', 'A card a job: specification and order, side by side.', renderFolio],
   [
     'dossier',
     'Dossier',
-    'Specification down the left, money in a panel on the right.',
+    'The specification across the page, the money in a rail down the right.',
     renderDossier,
   ],
-  ['statement', 'Statement', 'The total first, the jobs underneath as evidence.', renderStatement],
+  [
+    'statement',
+    'Statement',
+    'The total first, the jobs under it as a ruled schedule.',
+    renderStatement,
+  ],
   ['current', 'Current', 'What the app sends today, for comparison.', renderQuotationHtml],
 ] as const;
 

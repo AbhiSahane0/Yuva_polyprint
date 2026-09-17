@@ -1,6 +1,7 @@
 import {
   formatNumber,
   formatRs,
+  POUCH_TYPE_LABELS,
   resolveSelectedQuantity,
   type Quotation,
   type QuotationItem,
@@ -128,4 +129,65 @@ export function transportTotal(quotation: Quotation): number {
 /** Whether any line on the document is charged for its cylinders. */
 export function chargesCylinders(quotation: Quotation): boolean {
   return quotation.items.some((item) => item.chargeCylinders && item.totalCylinderCost > 0);
+}
+
+/**
+ * A mobile as a person writes it: `+91 99999 99999`.
+ *
+ * The office types ten digits into the box and the document printed all ten in
+ * a row. That is a database field on a letterhead — nobody reads a phone number
+ * in one block, and a customer checking whether the number is theirs has to
+ * count digits. Anything that is not a plain Indian mobile is left exactly as
+ * typed: a landline with an STD code, a number with an extension, and a second
+ * number after a slash are all real things the office writes here, and none of
+ * them is improved by a guess.
+ */
+export function phone(value: string | null | undefined): string {
+  const raw = show(value).trim();
+  const digits = raw.replace(/\D/g, '');
+  if (/^[6-9]\d{9}$/.test(digits) && !/[a-zA-Z/,]/.test(raw)) {
+    return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
+  }
+  if (/^91[6-9]\d{9}$/.test(digits) && !/[a-zA-Z/,]/.test(raw)) {
+    return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
+  }
+  return raw;
+}
+
+/** `Standup zipper pouch` or `Printed roll` — what the line actually is. */
+export function styleOf(item: QuotationItem): string {
+  if (item.jobKind === 'ROLL') return 'Printed roll';
+  if (item.pouchType === 'OTHER') return show(item.pouchTypeNote) || 'Pouch';
+  if (!item.pouchType) return 'Pouch';
+  const label = POUCH_TYPE_LABELS[item.pouchType];
+  return /pouch/i.test(label) ? label : `${label} pouch`;
+}
+
+/**
+ * The terms, without the same sentence twice.
+ *
+ * The document has always carried its own cylinder sentence, because the
+ * one-time-charge rule is the single thing customers query and it deserves
+ * plain words. But the works also keeps a standing list of terms, and that list
+ * already says "Cylinder charges are one-time and reusable for repeat orders".
+ * Printing both puts two versions of one rule three lines apart, and a customer
+ * who reads them carefully starts looking for the difference between them.
+ *
+ * So the written-in sentence yields to the office's own wherever the office has
+ * covered it. The other direction never yields: when the cylinders are NOT
+ * charged, no standing term says so, and that is worth a line of its own.
+ */
+export function termLines(quotation: Quotation, cylinders: boolean): string[] {
+  const own = quotation.terms.map((term) => esc(term));
+  if (!cylinders) {
+    return [
+      '<b>No cylinder charge on this order.</b> The cylinders for this design are already with us from an earlier job.',
+      ...own,
+    ];
+  }
+  if (quotation.terms.some((term) => /cylinder/i.test(term))) return own;
+  return [
+    '<b>Cylinders are charged once.</b> They stay with us, and a repeat order of the same design carries no cylinder charge.',
+    ...own,
+  ];
 }

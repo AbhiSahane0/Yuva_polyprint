@@ -120,6 +120,25 @@ export const BASE_CSS = `
     --muted: ${BRAND.muted};
     --hair: ${BRAND.hair};
     --wash: ${BRAND.wash};
+
+    /*
+     * The scale, and the ceiling.
+     *
+     * A quotation is read at arm's length on a desk, not across a room, so
+     * nothing on it needs to be large — and a figure set large reads as a
+     * sales pitch rather than a price. The whole document sits inside 6.6pt
+     * to 12.4pt: six steps, and --t-lead is the biggest thing allowed on the
+     * page. Emphasis comes from weight, colour and the rule above a figure,
+     * which is quieter and holds up better in print than size does.
+     */
+    --t-label: 6.6pt;   /* uppercase, letterspaced: the name of a figure */
+    --t-fine: 7.8pt;    /* addresses, notes, the small print */
+    --t-body: 8.6pt;    /* terms, running text */
+    --t-value: 9.2pt;   /* every figure in a labelled pair */
+    --t-name: 11pt;     /* a job name, a customer name */
+    --t-lead: 12.4pt;   /* the total, and nothing else */
+
+    --gutter: 5mm;
   }
 
   /*
@@ -135,13 +154,12 @@ export const BASE_CSS = `
       padding: 12mm 11mm 10mm; background: #fff;
       box-shadow: 0 2px 14px rgb(29 27 42 / 0.13);
     }
-    .running-foot { display: none; }
   }
 
   body {
     margin: 0;
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    font-size: 9.4pt;
+    font-size: var(--t-body);
     line-height: 1.5;
     color: var(--body);
     -webkit-print-color-adjust: exact;
@@ -159,8 +177,19 @@ export const BASE_CSS = `
   strong, b { color: var(--ink); font-weight: 700; }
 
   .eyebrow {
-    font-size: 7.2pt; letter-spacing: .1em; text-transform: uppercase;
+    font-size: var(--t-label); letter-spacing: .12em; text-transform: uppercase;
     color: var(--muted); font-weight: 700;
+  }
+
+  /* A section's name, with a hairline carrying it to the edge of the block.
+     Cheaper than a heading and it says the same thing: a new part starts here. */
+  .band-title {
+    display: flex; align-items: center; gap: 3mm;
+    font-size: var(--t-label); letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted); font-weight: 700; margin-bottom: 2.2mm;
+  }
+  .band-title::after {
+    content: ''; flex: 1; height: 0; border-top: 0.5pt solid var(--hair);
   }
 
   /* Repeated on every page by Chromium, which is what the letterhead is for. */
@@ -169,7 +198,20 @@ export const BASE_CSS = `
     border-top: 0.5pt solid var(--hair);
     padding-top: 1.6mm;
     display: flex; justify-content: space-between; align-items: baseline;
-    font-size: 7pt; color: var(--muted);
+    font-size: var(--t-label); color: var(--muted);
+  }
+
+  /*
+   * And hidden on screen — after the rule that shows it, not before.
+   *
+   * The hide used to live in the @media screen block above, which sets the page
+   * geometry. Equal specificity, so the later plain rule's display:flex won
+   * and the foot was fixed to the bottom of the browser window, printing the
+   * company name across the middle of the bank details. In the PDF it was
+   * correct, which is the kind of difference nobody looks for.
+   */
+  @media screen {
+    .running-foot { display: none; }
   }
 `;
 
