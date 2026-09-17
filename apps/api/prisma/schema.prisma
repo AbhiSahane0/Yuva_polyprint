@@ -106,6 +106,9 @@ model Customer {
   jobs       Job[]
   quotations Quotation[]
 
+  /// Runs costed against this customer's designs.
+  jobSheets JobSheet[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -206,6 +209,8 @@ model Job {
   cylinders      Cylinder[]
   /// The files it prints from. See the JobArtwork model.
   artwork        JobArtwork[]
+  /// Every run of this design, and what each actually cost.
+  jobSheets      JobSheet[]
 
   sourceRow Int @map("source_row")
 
@@ -553,7 +558,7 @@ model QuotationItemLayer {
   rateOverride Decimal? @map("rate_override") @db.Decimal(12, 2)
 
   /// micron × density, stored so the printed breakdown needs no arithmetic.
-  gsm          Decimal  @db.Decimal(10, 3)
+  gsm Decimal @db.Decimal(10, 3)
 
   @@unique([itemId, position])
   @@index([materialId])
@@ -692,14 +697,17 @@ model Material {
   isActive  Boolean @default(true) @map("is_active")
   sortOrder Int     @default(0) @map("sort_order")
 
-  rates               MaterialRate[]
+  rates                MaterialRate[]
   /// Plies quoted against this material. The link is nullable on that side, so
   /// retiring a material leaves old quotations readable.
-  quotationItemLayers QuotationItemLayer[]
+  quotationItemLayers  QuotationItemLayer[]
   quotationItemColours QuotationItemColour[]
-  stockBatches        StockBatch[]
-  stockMovements      StockMovement[]
-  purchaseOrderLines  PurchaseOrderLine[]
+  stockBatches         StockBatch[]
+  stockMovements       StockMovement[]
+  purchaseOrderLines   PurchaseOrderLine[]
+
+  /// Every job sheet line priced from this material.
+  jobSheetLines JobSheetLine[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1560,4 +1568,292 @@ model CostingLabour {
 enum InkKind {
   PROCESS
   SPECIAL
+}
+
+// ---------------------------------------------------------------------------
+// Job sheets — what a run actually cost
+// ---------------------------------------------------------------------------
+
+/// Where a job sheet is in its life.
+///
+/// A sheet is OPEN for as long as the job is on the floor and figures are still
+/// coming in, which is most of a day. COSTED means the office has settled it
+/// and the cost per kilogram is the works' answer. CLOSED means the material it
+/// consumed has been taken off stock — the one irreversible step, and the
+/// reason it is a status rather than a flag on the same row.
+enum JobSheetStatus {
+  OPEN
+  COSTED
+  CLOSED
+}
+
+/// The five processes a day's electricity is shared out between.
+enum JobSheetStage {
+  PRINTING
+  LAMINATION_1
+  LAMINATION_2
+  SLITTING
+  POUCHING
+}
+
+/// Which half of the works a consumable was drawn for.
+enum JobSheetSection {
+  PRINTING
+  LAMINATION
+}
+
+/// What kind of thing a line is, so a sheet can be laid out without guessing
+/// from the name.
+enum JobSheetLineKind {
+  FILM
+  SOLVENT
+  INK
+  ADHESIVE
+  OTHER
+}
+
+/// One production run, and what it actually cost.
+///
+/// The works' September 2026 Job Sheet, which is a different document from a
+/// quotation and answers a different question. A quotation estimates a price
+/// from a design; this costs a run from what was issued to the floor and what
+/// came back. The office keeps both, because the gap between them is the only
+/// place an estimate is ever caught being wrong.
+///
+/// Every overhead rate is **stored on the sheet** rather than read from
+/// settings when it is displayed. A sheet is a record of what the works decided
+/// that week — electricity was Rs 4,000 a day in March and Rs 6,000 in
+/// September, on the works' own tabs — and a record that reprices itself when a
+/// setting changes is not a record.
+model JobSheet {
+  id String @id @default(cuid())
+
+  /// Sequential and human-facing: the "Sr. No." at the top of the paper sheet.
+  number Int @unique
+
+  /// The day the job ran, not the day the sheet was keyed in.
+  date DateTime @db.Date
+
+  status JobSheetStatus @default(OPEN)
+
+  /// The design. Nullable so retiring a job leaves its history readable, and
+  /// the name is snapshotted beside it for the same reason.
+  jobId   String? @map("job_id")
+  job     Job?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  jobName String  @default("") @map("job_name")
+
+  customerId String?   @map("customer_id")
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  operatorName String @default("") @map("operator_name")
+
+  // ---- The header of the paper sheet ---------------------------------------
+  filmType        String   @default("") @map("film_type")
+  webWidthMm      Decimal? @map("web_width_mm") @db.Decimal(10, 2)
+  micron          Decimal? @db.Decimal(10, 3)
+  circumferenceMm Decimal? @map("circumference_mm") @db.Decimal(10, 2)
+  cylinderCount   Int      @default(0) @map("cylinder_count")
+
+  /**
+   * The mixed drums, pooled across the stage.
+   * Nothing goes to the press as bought: a colour is mixed 40% pigment, 40%
+   * ethyl acetate and 20% toluene, and the sheet books each drum back to its
+   * ingredients. An ink line carries its own mix; the solvents draw from the
+   * pooled total, which is what these two hold. Lamination works the same way
+   * with adhesive, hardener and ethyl.
+   */
+  printMixIssuedKg   Decimal @default(0) @map("print_mix_issued_kg") @db.Decimal(14, 3)
+  printMixReturnedKg Decimal @default(0) @map("print_mix_returned_kg") @db.Decimal(14, 3)
+  lamMixIssuedKg     Decimal @default(0) @map("lam_mix_issued_kg") @db.Decimal(14, 3)
+  lamMixReturnedKg   Decimal @default(0) @map("lam_mix_returned_kg") @db.Decimal(14, 3)
+
+  // ---- Time on the floor ---------------------------------------------------
+  makeReadyDays  Decimal @default(0) @map("make_ready_days") @db.Decimal(8, 3)
+  /// What the wage bill, the EMI and the electricity are all charged against.
+  productionDays Decimal @default(0) @map("production_days") @db.Decimal(8, 3)
+
+  // ---- Output --------------------------------------------------------------
+  printedGrossKg  Decimal @default(0) @map("printed_gross_kg") @db.Decimal(14, 3)
+  printedCoreKg   Decimal @default(0) @map("printed_core_kg") @db.Decimal(14, 3)
+  producedGrossKg Decimal @default(0) @map("produced_gross_kg") @db.Decimal(14, 3)
+  producedCoreKg  Decimal @default(0) @map("produced_core_kg") @db.Decimal(14, 3)
+
+  /**
+   * What was finally packed — the figure the whole cost is divided by.
+   * Typed rather than derived. The works' own sheets run it at 96% of what came
+   * off the laminator on some jobs and 97% on others, because it is a weighed
+   * fact and not a yield assumption. The app offers the yield as a starting
+   * figure and then keeps whatever the office weighed.
+   */
+  finalOutputKg    Decimal @default(0) @map("final_output_kg") @db.Decimal(14, 3)
+  /// Zero on a roll job, which is what makes it a roll job.
+  pouchingWeightKg Decimal @default(0) @map("pouching_weight_kg") @db.Decimal(14, 3)
+
+  // ---- The overhead rates, as they stood the day this ran ------------------
+  electricityPerDay      Decimal @default(0) @map("electricity_per_day") @db.Decimal(12, 2)
+  transportPerKg         Decimal @default(0) @map("transport_per_kg") @db.Decimal(10, 4)
+  pouchingPerKg          Decimal @default(0) @map("pouching_per_kg") @db.Decimal(10, 4)
+  packagingCost          Decimal @default(0) @map("packaging_cost") @db.Decimal(12, 2)
+  emiPerDay              Decimal @default(0) @map("emi_per_day") @db.Decimal(12, 2)
+  /// Taken on the material alone, which is the works' own rule. See the costing.
+  profitPercent          Decimal @default(0) @map("profit_percent") @db.Decimal(6, 3)
+  expectedWastagePercent Decimal @default(5) @map("expected_wastage_percent") @db.Decimal(6, 3)
+
+  /**
+   * Overheads the office settled by hand.
+   * Null means the model's figure stands. Every one of the works' fourteen tabs
+   * types over at least one of these, and two of them type over the electricity
+   * outright — the office knows things the model does not, and a system that
+   * cannot be corrected gets corrected in a spreadsheet nobody can see.
+   */
+  electricityOverride Decimal? @map("electricity_override") @db.Decimal(12, 2)
+  salaryOverride      Decimal? @map("salary_override") @db.Decimal(12, 2)
+  transportOverride   Decimal? @map("transport_override") @db.Decimal(12, 2)
+  pouchingOverride    Decimal? @map("pouching_override") @db.Decimal(12, 2)
+  emiOverride         Decimal? @map("emi_override") @db.Decimal(12, 2)
+  profitOverride      Decimal? @map("profit_override") @db.Decimal(12, 2)
+
+  // ---- What it came to, stored so a sheet reads without recomputing --------
+  materialKg      Decimal @default(0) @map("material_kg") @db.Decimal(14, 3)
+  materialCost    Decimal @default(0) @map("material_cost") @db.Decimal(14, 2)
+  basicValuePerKg Decimal @default(0) @map("basic_value_per_kg") @db.Decimal(12, 2)
+
+  electricityCost Decimal @default(0) @map("electricity_cost") @db.Decimal(12, 2)
+  salaryCost      Decimal @default(0) @map("salary_cost") @db.Decimal(12, 2)
+  transportCost   Decimal @default(0) @map("transport_cost") @db.Decimal(12, 2)
+  pouchingCost    Decimal @default(0) @map("pouching_cost") @db.Decimal(12, 2)
+  emiCost         Decimal @default(0) @map("emi_cost") @db.Decimal(12, 2)
+  profit          Decimal @default(0) @db.Decimal(12, 2)
+  overheadCost    Decimal @default(0) @map("overhead_cost") @db.Decimal(14, 2)
+
+  effectivePrice Decimal @default(0) @map("effective_price") @db.Decimal(14, 2)
+  /// The answer the sheet exists to produce.
+  costPerKg      Decimal @default(0) @map("cost_per_kg") @db.Decimal(12, 2)
+
+  expectedWastageKg Decimal @default(0) @map("expected_wastage_kg") @db.Decimal(14, 3)
+  actualWastageKg   Decimal @default(0) @map("actual_wastage_kg") @db.Decimal(14, 3)
+  wastagePercent    Decimal @default(0) @map("wastage_percent") @db.Decimal(8, 3)
+  /// What the wastage over the allowance cost, at this job's own rate.
+  excessCost        Decimal @default(0) @map("excess_cost") @db.Decimal(14, 2)
+
+  /**
+   * When this sheet's consumption was taken off stock.
+   * Set once and never cleared. Posting writes real movements against real
+   * batches, and un-posting would mean reversing them — so a sheet that has
+   * been posted is closed to editing rather than quietly re-postable.
+   */
+  stockPostedAt DateTime? @map("stock_posted_at")
+
+  notes     String @default("")
+  enteredBy String @default("") @map("entered_by")
+
+  lines  JobSheetLine[]
+  labour JobSheetLabour[]
+  stages JobSheetStageUsage[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([date])
+  @@index([status, date])
+  @@index([jobId])
+  @@index([customerId])
+  @@map("job_sheets")
+}
+
+/// One consumable on one sheet: what went out, what came back, what it cost.
+model JobSheetLine {
+  id String @id @default(cuid())
+
+  sheetId String   @map("sheet_id")
+  sheet   JobSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  position Int
+  section  JobSheetSection
+  kind     JobSheetLineKind @default(OTHER)
+
+  /// The catalogue row this is priced from. Nullable because a sheet outlives a
+  /// material that is later retired, and the name and rate are snapshotted.
+  materialId String?   @map("material_id")
+  material   Material? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  name       String
+
+  issuedKg   Decimal @default(0) @map("issued_kg") @db.Decimal(14, 3)
+  returnedKg Decimal @default(0) @map("returned_kg") @db.Decimal(14, 3)
+
+  /**
+   * The mixed drum this line draws a share of, and how much of it is this.
+   * An ink carries its own mix here; a solvent carries the sheet's pooled
+   * total. Both are stored on the line so the arithmetic that produced the
+   * consumption can be read back off the row without recomputing the sheet.
+   */
+  mixIssuedKg     Decimal @default(0) @map("mix_issued_kg") @db.Decimal(14, 3)
+  mixReturnedKg   Decimal @default(0) @map("mix_returned_kg") @db.Decimal(14, 3)
+  mixSharePercent Decimal @default(0) @map("mix_share_percent") @db.Decimal(6, 3)
+
+  /// What the issue and return figures work out to.
+  computedKg         Decimal  @default(0) @map("computed_kg") @db.Decimal(14, 3)
+  /**
+   * What the office typed instead, when the computed figure was wrong.
+   * Two of the works' fourteen tabs carry one of these — White ink at 14.5
+   * where the arithmetic said 23.52, worth Rs 2,164.80 on a Rs 65,000 job. The
+   * computed figure is kept beside it so the correction is visible on the page
+   * rather than lost behind the number that replaced it.
+   */
+  consumedOverrideKg Decimal? @map("consumed_override_kg") @db.Decimal(14, 3)
+  /// The override where there is one, the computed figure where there is not.
+  consumedKg         Decimal  @default(0) @map("consumed_kg") @db.Decimal(14, 3)
+
+  /// Rupees a kilogram, as at the day of the run.
+  ratePerKg Decimal @default(0) @map("rate_per_kg") @db.Decimal(12, 4)
+  amount    Decimal @default(0) @db.Decimal(14, 2)
+
+  @@unique([sheetId, position])
+  @@index([materialId])
+  @@map("job_sheet_lines")
+}
+
+/// One role's wages for the run.
+model JobSheetLabour {
+  id String @id @default(cuid())
+
+  sheetId String   @map("sheet_id")
+  sheet   JobSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  position Int
+  role     String
+
+  headcount  Decimal @default(0) @db.Decimal(8, 2)
+  ratePerDay Decimal @default(0) @map("rate_per_day") @db.Decimal(10, 2)
+  /// Usually the run's production days, but a role can be part of it.
+  days       Decimal @default(0) @db.Decimal(8, 3)
+  amount     Decimal @default(0) @db.Decimal(12, 2)
+
+  @@unique([sheetId, position])
+  @@map("job_sheet_labour")
+}
+
+/// One process's share of the day's electricity.
+///
+/// The shares are what a machine draws while it is running — printing 60%,
+/// each lamination pass 20%, slitting 10%, pouching 10% — so they come to more
+/// than a whole day, which is correct: on a day when everything runs, the works
+/// draws more than one machine's worth. What keeps the bill honest is `days`:
+/// a stage that did not run is zero days and costs nothing.
+model JobSheetStageUsage {
+  id String @id @default(cuid())
+
+  sheetId String   @map("sheet_id")
+  sheet   JobSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  stage JobSheetStage
+
+  sharePercent Decimal @default(0) @map("share_percent") @db.Decimal(6, 3)
+  days         Decimal @default(0) @db.Decimal(8, 3)
+  /// Pouching routinely runs two, and the meter runs with it.
+  shifts       Decimal @default(1) @db.Decimal(6, 2)
+  amount       Decimal @default(0) @db.Decimal(12, 2)
+
+  @@unique([sheetId, stage])
+  @@map("job_sheet_stage_usage")
 }

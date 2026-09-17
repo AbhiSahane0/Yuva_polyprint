@@ -14,6 +14,7 @@ import {
   Users,
   X,
   Calculator,
+  ClipboardList,
 } from 'lucide-react';
 import type { AppModule } from '@yuva/shared';
 import { cn } from '@/lib/utils';
@@ -54,6 +55,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     group: 'Production',
     items: [
       { to: '/cylinders', label: 'Design & Cylinders', icon: Disc3, module: 'cylinders' },
+      { to: '/job-sheets', label: 'Job sheets', icon: ClipboardList, module: 'jobs' },
       { to: '/jobs', label: 'Jobs', icon: Boxes, module: 'jobs', disabled: true },
     ],
   },

@@ -365,6 +365,90 @@ export async function receiveStock(
   return toBatch(batch, rates.get(batch.materialId) ?? null);
 }
 
+/**
+ * Takes one material off stock, oldest batch first, inside a caller's transaction.
+ *
+ * A job sheet consumes twenty-one materials at once and the whole posting has
+ * to be one decision — either the run is off stock or it is not — so this takes
+ * the caller's transaction rather than opening its own. It still funnels
+ * through `record`, so there remains exactly one place a balance is computed.
+ *
+ * **Oldest first**, because film and adhesive have a shelf life and the works
+ * runs the oldest roll it can. It is also the only allocation anybody can
+ * check by eye against the ledger.
+ *
+ * A consumption of zero or less writes nothing. A negative one means a drum
+ * came back fuller than it went out, and booking that as a receipt would invent
+ * stock against a batch that did not supply it — the works reconciles those on
+ * the next count, not here.
+ */
+export async function issueMaterialFifo(
+  tx: Prisma.TransactionClient,
+  input: {
+    materialId: string;
+    quantity: number;
+    jobId?: string | null;
+    reference?: string;
+    notes?: string;
+    enteredBy: string;
+  },
+): Promise<{ batchId: string; batchCode: string; quantity: number }[]> {
+  if (!(input.quantity > 0)) return [];
+
+  const batches = await tx.stockBatch.findMany({
+    where: { materialId: input.materialId, quantity: { gt: 0 } },
+    orderBy: [{ receivedOn: 'asc' }, { createdAt: 'asc' }],
+    select: { id: true, batchCode: true, quantity: true, location: true },
+  });
+
+  const available = round(
+    batches.reduce((sum, batch) => sum + toNumber(batch.quantity), 0),
+    3,
+  );
+  if (input.quantity > available) {
+    const material = await tx.material.findUnique({
+      where: { id: input.materialId },
+      select: { name: true },
+    });
+    throw ApiError.badRequest(
+      `${material?.name ?? 'That material'} has ${available} on hand, which is less than the ${round(
+        input.quantity,
+        3,
+      )} this sheet consumed`,
+    );
+  }
+
+  const taken: { batchId: string; batchCode: string; quantity: number }[] = [];
+  let left = input.quantity;
+
+  for (const batch of batches) {
+    if (left <= 0) break;
+    const onHand = toNumber(batch.quantity);
+    const take = round(Math.min(onHand, left), 3);
+    if (take <= 0) continue;
+
+    // Through the same helper a single-batch issue uses, so there is still one
+    // place that takes the lock and one place that writes a movement.
+    await lockedBatch(tx, batch.id);
+    await record(tx, {
+      batchId: batch.id,
+      materialId: input.materialId,
+      kind: 'ISSUE',
+      quantity: signedQuantity('ISSUE', take),
+      jobId: input.jobId ?? null,
+      fromLocation: batch.location,
+      reference: input.reference ?? '',
+      notes: input.notes ?? '',
+      enteredBy: input.enteredBy,
+    });
+
+    taken.push({ batchId: batch.id, batchCode: batch.batchCode, quantity: take });
+    left = round(left - take, 3);
+  }
+
+  return taken;
+}
+
 /** Material went to the floor, or was scrapped. */
 export async function issueStock(
   input: IssueStockInput,

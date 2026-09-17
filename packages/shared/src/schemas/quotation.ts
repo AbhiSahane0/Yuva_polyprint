@@ -581,6 +581,48 @@ export const settingsSchema = z.object({
    * to match `defaultAdhesiveRatio` to split on whatever is chosen.
    */
   adhesiveSplitRatio: z.string().trim().max(20),
+
+  /*
+   * ---- Job sheets ---------------------------------------------------------
+   *
+   * What a NEW job sheet starts with. A sheet copies these onto itself the
+   * moment it is opened and then keeps its own copy, because a sheet is a
+   * record of what the works decided that week: electricity was Rs 4,000 a day
+   * on the March tabs of the works' own workbook and Rs 6,000 on the September
+   * ones. A record that repriced itself when a setting changed would not be one.
+   */
+
+  /** A day on the meter for the whole works, shared out by machine. */
+  jobSheetElectricityPerDay: z.coerce.number().min(0).max(1_000_000),
+  /**
+   * Rupees a kilogram of material brought IN — not of finished goods going out.
+   * The works' own sheets run it between 3.20 and 7.00 and type the figure per
+   * job; this is the one a new sheet starts at.
+   */
+  jobSheetTransportPerKg: z.coerce.number().min(0).max(1000),
+  /** What pouching costs a kilogram. Zero on a roll job, which is what makes it one. */
+  jobSheetPouchingPerKg: z.coerce.number().min(0).max(1000),
+  jobSheetEmiPerDay: z.coerce.number().min(0).max(1_000_000),
+  /**
+   * The margin, and what it is taken on.
+   *
+   * Ten per cent of the MATERIAL, which is the works' own rule and reads like
+   * an oversight until you see what the alternative does: charging it on the
+   * electricity and the wages as well takes a margin on the cost of being open,
+   * and on the works' fourteen September jobs that is 12% to 19% more profit
+   * than they believe they are making.
+   */
+  jobSheetProfitPercent: z.coerce.number().min(0).max(100),
+  /** What the works allows itself to lose between the laminator and the pack. */
+  jobSheetWastagePercent: z.coerce.number().min(0).max(100),
+  /**
+   * What a new sheet suggests as final output, as a percentage of good laminate.
+   *
+   * A suggestion only. The works' own sheets run 96% on some jobs and 97% on
+   * others because the packed weight is weighed, not assumed — so the app
+   * offers this and then keeps whatever the office actually put on the scale.
+   */
+  jobSheetOutputYieldPercent: z.coerce.number().min(0).max(100),
 });
 
 export type AppSettings = z.infer<typeof settingsSchema>;
@@ -649,6 +691,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ethylAcetatePercent: 50,
   defaultAdhesiveRatio: '100:146:15',
   adhesiveSplitRatio: '100:189:15',
+
+  /* Job sheets. Read off the works' September 2026 workbook. */
+  jobSheetElectricityPerDay: 6000,
+  jobSheetTransportPerKg: 6.8,
+  jobSheetPouchingPerKg: 10,
+  jobSheetEmiPerDay: 10000,
+  jobSheetProfitPercent: 10,
+  jobSheetWastagePercent: 5,
+  jobSheetOutputYieldPercent: 97,
 };
 
 /*
