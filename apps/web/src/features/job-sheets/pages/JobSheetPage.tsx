@@ -2,11 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, PackageMinus, Save } from 'lucide-react';
 import {
+  costJobSheet,
   formatNumber,
   formatRs,
   JOB_SHEET_STAGE_LABELS,
   JOB_SHEET_STATUS_LABELS,
+  mixDrumFor,
   type JobSheet,
+  type JobSheetCost,
   type JobSheetLine,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
@@ -38,6 +41,14 @@ import {
  * their head. And it can be **typed over** — the works' own spreadsheet does
  * exactly that on two of its fourteen tabs, and the figure it replaced stays
  * beside it so the correction is visible instead of lost.
+ *
+ * **Every figure on the page is live.** The whole sheet is re-costed in the
+ * browser on each keystroke, through the very same `costJobSheet` the server
+ * uses — one implementation, so the preview and the saved figure cannot
+ * disagree. Without it the money sat still while the weights moved, and a
+ * corrected line showed 30 kg at Rs 240 beside an amount of Rs 8,890 left over
+ * from the last save. A screen whose job is "type it in and see what it cost"
+ * has to answer while you are typing.
  */
 
 /** Everything on the sheet that the office can change. */
@@ -48,6 +59,15 @@ type Draft = Omit<JobSheet, 'lines' | 'labour' | 'stages'> & {
 };
 
 const cell = 'w-full rounded-md border border-ink-200 px-2 py-1 text-right text-sm tabular-nums';
+
+/*
+ * The consumed box shows the computed figure as its placeholder, because typing
+ * over it is what an override IS. But a placeholder at the browser's default
+ * grey reads as an empty box, and this is the column the office checks — so it
+ * is darkened to near body text. Still lighter than a typed figure, which is
+ * the distinction that matters.
+ */
+const consumedCell = `${cell} placeholder:text-ink-600`;
 
 /** A weight box. Signed, because a drum genuinely can come back fuller. */
 function Weight({
@@ -109,6 +129,56 @@ export default function JobSheetPage() {
           }
         : current,
     );
+
+  /**
+   * The sheet as it stands, costed here and now.
+   *
+   * The same function the server runs, so there is one costing and not two that
+   * have to be kept in step.
+   */
+  const live: JobSheetCost | null = useMemo(() => {
+    if (!draft) return null;
+    return costJobSheet({
+      lines: draft.lines.map((line) => {
+        const drum = mixDrumFor(line, draft);
+        return {
+          name: line.name,
+          issuedKg: line.issuedKg,
+          returnedKg: line.returnedKg,
+          mixIssuedKg: line.mixSharePercent > 0 ? drum.issued : 0,
+          mixReturnedKg: line.mixSharePercent > 0 ? drum.returned : 0,
+          mixSharePercent: line.mixSharePercent,
+          consumedOverrideKg: line.consumedOverrideKg,
+          ratePerKg: line.ratePerKg,
+        };
+      }),
+      electricityPerDay: draft.electricityPerDay,
+      stages: draft.stages,
+      labour: draft.labour,
+      transportPerKg: draft.transportPerKg,
+      pouchingPerKg: draft.pouchingPerKg,
+      pouchingWeightKg: draft.pouchingWeightKg,
+      packagingCost: draft.packagingCost,
+      emiPerDay: draft.emiPerDay,
+      emiDays: draft.productionDays,
+      profitPercent: draft.profitPercent,
+      overrides: {
+        electricity: draft.electricityOverride,
+        salary: draft.salaryOverride,
+        transport: draft.transportOverride,
+        pouching: draft.pouchingOverride,
+        emi: draft.emiOverride,
+        profit: draft.profitOverride,
+      },
+      producedKg: draft.producedGrossKg - draft.producedCoreKg,
+      finalOutputKg: draft.finalOutputKg,
+      expectedWastagePercent: draft.expectedWastagePercent,
+    });
+  }, [draft]);
+
+  /** A line's index in the sheet, so its costed twin can be found. */
+  const indexOf = (position: number) =>
+    draft?.lines.findIndex((line) => line.position === position) ?? -1;
 
   const printing = useMemo(
     () => draft?.lines.filter((line) => line.section === 'PRINTING') ?? [],
@@ -209,11 +279,12 @@ export default function JobSheetPage() {
     }
   }
 
-  if (isLoading || !draft) return <LoadingState />;
+  if (isLoading || !draft || !live) return <LoadingState />;
 
   const lineRows = (lines: JobSheetLine[]) =>
     lines.map((line) => {
       const corrected = line.consumedOverrideKg !== null;
+      const costed = live.lines[indexOf(line.position)];
       return (
         <tr key={line.id} className="border-ink-100 border-b last:border-b-0">
           <td className="text-ink-800 px-2 py-1.5 whitespace-nowrap">
@@ -290,19 +361,19 @@ export default function JobSheetPage() {
                   consumedOverrideKg: event.target.value === '' ? null : Number(event.target.value),
                 })
               }
-              placeholder={formatNumber(line.computedKg, 3)}
+              placeholder={formatNumber(costed?.computedKg ?? 0, 3)}
               className={
-                corrected ? `${cell} border-warning-400 bg-warning-50 font-semibold` : cell
+                corrected ? `${cell} border-warning-400 bg-warning-50 font-semibold` : consumedCell
               }
             />
             {corrected ? (
               <div className="text-warning-700 mt-0.5 text-right text-[11px] tabular-nums">
-                was {formatNumber(line.computedKg, 3)}
+                was {formatNumber(costed?.computedKg ?? 0, 3)}
               </div>
             ) : null}
           </td>
           <td className="text-ink-900 px-2 py-1.5 text-right font-medium tabular-nums">
-            {formatRs(line.amount)}
+            {formatRs(costed?.amount ?? 0)}
           </td>
         </tr>
       );
@@ -649,7 +720,7 @@ export default function JobSheetPage() {
                     </td>
                   ))}
                   <td className="text-ink-900 px-3 py-1.5 text-right tabular-nums">
-                    {formatRs(role.amount)}
+                    {formatRs(live.labour[draft.labour.indexOf(role)]?.amount ?? 0)}
                   </td>
                 </tr>
               ))}
@@ -717,7 +788,7 @@ export default function JobSheetPage() {
                     </td>
                   ))}
                   <td className="text-ink-900 px-3 py-1.5 text-right tabular-nums">
-                    {formatRs(stage.amount)}
+                    {formatRs(live.stages[draft.stages.indexOf(stage)]?.amount ?? 0)}
                   </td>
                 </tr>
               ))}
@@ -791,14 +862,14 @@ export default function JobSheetPage() {
           <dl className="text-sm">
             {(
               [
-                ['Material', draft.materialCost],
-                ['Electricity', draft.electricityCost],
-                ['Salary', draft.salaryCost],
-                ['Transport', draft.transportCost],
-                ['Pouching', draft.pouchingCost],
-                ['Packaging', draft.packagingCost],
-                ['Bank EMI', draft.emiCost],
-                ['Profit', draft.profit],
+                ['Material', live.materialCost],
+                ['Electricity', live.electricityCost],
+                ['Salary', live.salaryCost],
+                ['Transport', live.transportCost],
+                ['Pouching', live.pouchingCost],
+                ['Packaging', live.packagingCost],
+                ['Bank EMI', live.emiCost],
+                ['Profit', live.profit],
               ] as const
             ).map(([label, value]) => (
               <div key={label} className="border-ink-100 flex justify-between border-b py-1.5">
@@ -809,13 +880,13 @@ export default function JobSheetPage() {
             <div className="border-brand-600 flex justify-between border-t-2 pt-2.5 pb-1.5">
               <dt className="text-ink-900 font-semibold">Effective price</dt>
               <dd className="text-ink-900 font-semibold tabular-nums">
-                {formatRs(draft.effectivePrice)}
+                {formatRs(live.effectivePrice)}
               </dd>
             </div>
             <div className="bg-brand-50 mt-2 flex items-baseline justify-between rounded-md px-3 py-2">
               <dt className="text-ink-900 font-semibold">Cost a kilogram</dt>
               <dd className="text-brand-700 text-lg font-bold tabular-nums">
-                {formatRs(draft.costPerKg, 2)}
+                {formatRs(live.costPerKg, 2)}
               </dd>
             </div>
           </dl>
@@ -823,40 +894,40 @@ export default function JobSheetPage() {
           <dl className="text-ink-600 mt-3 space-y-1 text-sm">
             <div className="flex justify-between">
               <dt>Material consumed</dt>
-              <dd className="tabular-nums">{formatNumber(draft.materialKg, 3)} kg</dd>
+              <dd className="tabular-nums">{formatNumber(live.materialKg, 3)} kg</dd>
             </div>
             <div className="flex justify-between">
               <dt>Basic value a kilogram</dt>
-              <dd className="tabular-nums">{formatRs(draft.basicValuePerKg, 2)}</dd>
+              <dd className="tabular-nums">{formatRs(live.basicValuePerKg, 2)}</dd>
             </div>
             <div className="flex justify-between">
               <dt>Wastage allowed</dt>
-              <dd className="tabular-nums">{formatNumber(draft.expectedWastageKg, 3)} kg</dd>
+              <dd className="tabular-nums">{formatNumber(live.expectedWastageKg, 3)} kg</dd>
             </div>
             <div className="flex justify-between">
               <dt>Wastage actual</dt>
               <dd
                 className={
-                  draft.actualWastageKg > draft.expectedWastageKg
+                  live.actualWastageKg > live.expectedWastageKg
                     ? 'text-danger-700 font-semibold tabular-nums'
                     : 'tabular-nums'
                 }
               >
-                {formatNumber(draft.actualWastageKg, 3)} kg ({formatNumber(draft.wastagePercent, 2)}
+                {formatNumber(live.actualWastageKg, 3)} kg ({formatNumber(live.wastagePercent, 2)}
                 %)
               </dd>
             </div>
             {/* Negative when the job beat its allowance, which is worth seeing. */}
             <div className="flex justify-between">
-              <dt>{draft.excessCost >= 0 ? 'Excess wastage cost' : 'Under the allowance by'}</dt>
+              <dt>{live.excessCost >= 0 ? 'Excess wastage cost' : 'Under the allowance by'}</dt>
               <dd
                 className={
-                  draft.excessCost > 0
+                  live.excessCost > 0
                     ? 'text-danger-700 font-semibold tabular-nums'
                     : 'text-success-700 font-semibold tabular-nums'
                 }
               >
-                {formatRs(Math.abs(draft.excessCost))}
+                {formatRs(Math.abs(live.excessCost))}
               </dd>
             </div>
           </dl>
