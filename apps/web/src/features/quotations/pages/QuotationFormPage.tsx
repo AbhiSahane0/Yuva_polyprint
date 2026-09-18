@@ -659,14 +659,12 @@ export default function QuotationFormPage() {
           density: film?.density ?? null,
           /*
            * Shared, so the margin shown while a price is being chosen is the
-           * one the quotation is saved with. It also refuses to guess: a gauge
-           * off the price list with no rate yet costs nothing, so the line
-           * reads as uncostable rather than quietly borrowing the stocked
-           * gauge's price.
+           * one the quotation is saved with. A film is priced per kilogram at
+           * one rate for every gauge, so the micron above changes what the ply
+           * weighs and never what it costs.
            */
           ratePerKg: plyRatePerKg({
             materialName: film?.name ?? null,
-            micron: num(layer?.micron),
             stockRate: film?.currentRate ?? null,
             override: override > 0 ? override : null,
           }),

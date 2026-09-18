@@ -342,18 +342,14 @@ function priceQuotation(
         micron,
         density,
         /*
-         * The film's own rate, unless the office typed one over it — and
-         * nothing at all when the gauge quoted is off the price list and no
-         * rate was given.
+         * The film's own rate, unless the office agreed one for this job.
          *
-         * Shared with the form, so what was on screen is what gets stored. See
-         * `plyRatePerKg`: costing a 20µ PET at the 12µ price would be a
-         * confident wrong number, and a null here makes the line read as
-         * uncostable instead, exactly as an unpriced film does.
+         * Shared with the form, so what was on screen is what gets stored. The
+         * gauge does not enter into it: the works keeps one rate per film and
+         * pays it at every thickness. See `plyRatePerKg`.
          */
         ratePerKg: plyRatePerKg({
           materialName: material?.name ?? null,
-          micron,
           stockRate: costing.rateOfId(layer.materialId ?? null),
           override: layer.rateOverride ?? null,
         }),

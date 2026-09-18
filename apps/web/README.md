@@ -461,10 +461,11 @@ that was never charged for.
 
 #### The structure, ply by ply
 
-Each ply gets its own row: **choose a film, and that is the whole row.** Beside
-it sits that film's rate — `Rs. 210.00 / kg` — and nothing else. **2 layer /
-3 layer** adds or removes rows rather than swapping the form, so moving from two
-plies to three keeps everything already typed and only asks for the new one.
+Each ply gets its own row: **choose a film, a gauge, and the rate for this
+job.** Beside them sits what the price list says — `List Rs. 210.00 / kg` — and
+nothing else. **2 layer / 3 layer** adds or removes rows rather than swapping
+the form, so moving from two plies to three keeps everything already typed and
+only asks for the new one.
 
 > The row used to state the gauge, the density and the resulting GSM. All three
 > are inputs to the cost rather than facts anyone needs while choosing a film,
@@ -477,56 +478,78 @@ plies to three keeps everything already typed and only asks for the new one.
 > printed PET and the metallised ply assumed. The client could not read what he
 > was quoting off that control.
 
-**The gauge is typed, and the film fills it in.** Every film in the rates master
-is named with its gauge — `PET 12µm`, `PE 60µm`, `PVC / PETG 45µm` — because a
-12µ PET and a 19µ PET are bought, stocked and priced as two different materials.
-Choosing the film puts its gauge in the **Micron** box, so the two agree without
-anyone typing twice.
+**The gauge is typed, and the film fills it in.** Films in the rates master are
+named with a gauge — `PET 12µm`, `PE 60µm`, `PVC / PETG 45µm` — so choosing one
+puts that figure in the **Micron** box as a starting point, and the two agree
+without anyone typing twice.
 
-The box stays editable, because **the works quotes gauges the rates master does
-not stock.** A 20µ PET is a real enquiry; a dropdown of stocked films cannot
-offer a number nobody has priced, and for a while that meant such a job could
-not be quoted without a developer adding the film first.
+The box stays editable, and typing over it changes nothing but the weight.
+**A film has one rate, and it applies at every gauge.** The works pays near
+enough the same for a kilogram of PET whether the reel is 12 micron or 15, so it
+keeps one PET rate rather than one per thickness — and the same for MET PET, PE
+and the rest. A kilogram of PET is a kilogram of PET. What the gauge decides is
+how many metres that kilogram covers, which is the GSM and is already carried
+everywhere the cost needs it.
 
 #### The rate agreed for this job
 
-Every chosen film carries a rate box. Blank follows the price list; typed, that
-is what the ply costs on this quotation and nowhere else.
-
-It is offered on every ply because **a film's price is agreed job to job**. The
-works' own quotations carry PET at 185, 175 and 190 — every one at 12µ, every
-one written on 23 March 2022. The box used to appear only for a gauge the rates
-master does not stock, which covered the other reason to type a rate and missed
-this one entirely: a rate agreed at the film's own gauge was stored and then
-invisible, so reopening the quotation and pressing Save replaced what had been
-charged with the catalogue price. Silently, and on a document that had already
-gone out.
-
-It is stored now — `rate_override` on the ply — rather than deduced from the
-gauge. Plies saved before that column existed still read through the old
-inference, so nothing already on file moves.
-
-#### A gauge off the price list has to be priced
-
-The same box, with a different name and a harder rule behind it. Type a gauge
-the chosen film is not stocked at and it becomes the only price there is:
+Every chosen film carries a rate box, and **it arrives with the film's own rate
+already in it.**
 
 ```
-Layer 1   [ PET 12µm ▾ ]   Micron [ 20 ]   Rate for this gauge [ Rs. / kg ]
-                                            PET 12µm is priced at 12µ — Rs. 210.00/kg
+Layer 1   [ PET ▾ ]       Micron [ 12 ]   Rate for this job [ 185 ]
+                                           List Rs. 185.00 / kg
+
+Layer 2   [ MET PET ▾ ]   Micron [ 50 ]   Rate for this job [ 170 ]
+                                           List Rs. 180.00/kg — this job is
+                                           Rs. 10.00 below
 ```
 
-Neither the 12µ nor the 19µ rate is right for a 20µ PET, so the alternative to
-asking is costing the ply at whichever price happens to be on file — **a
-confident, wrong margin that nothing on screen contradicts.** The caption names
-the gauge the film _is_ priced at, so it is obvious that a 20 was typed where
-the list holds a 12, rather than reading as an unpriced film.
+It used to be a greyed hint instead — the rate shown through the box rather than
+in it, with blank meaning "follow the list". A hint reads as an empty field, and
+an empty field beside the word **rate** is the one thing on that row that looks
+like it still needs doing. The office kept asking why the figure was not filled
+in, which is the right question: the figure was known, and the screen was being
+coy about it.
 
-Until it is given, **the line does not cost itself.** The margin reads as a dash
-and the material cost is blank, exactly as for a film with no rate on record.
-Asking for the rate is only half the job: while the ply still fell back to the
-stocked gauge's price, a 20µ PET reported an 87.7% margin with an empty rate box
-beside it, and nothing on the screen said the figure was invented.
+It is a box at all because **a film's price is agreed job to job**. The works'
+own quotations carry PET at 185, 175 and 190 — every one at 12µ, every one
+written on 23 March 2022.
+
+**The column beside it stops repeating the rate and reports the distance
+instead.** Once the box is filled and editable, nothing else on the screen would
+catch a digit dropped in it: 190 where 210 was meant is a perfectly plausible
+number. So the column names the **list** rate, quietly while the two agree, and
+says how far apart they are when they do not.
+
+What is typed is used for this quotation and stored on it — `rate_override` on
+the ply. Plies saved before that column existed are read through the old
+inference from the gauge, so nothing already on file moves. A box left empty
+still falls back to the film's rate, which is what every quotation saved before
+the box was filled in does.
+
+#### A gauge off the price list is not a problem to be solved
+
+It used to be. Typing a gauge the chosen film's row does not name turned the box
+into the only price there was, renamed it **Rate for this gauge**, and refused
+to cost the ply until somebody filled it:
+
+```
+Layer 2   [ MET PET ▾ ]   Micron [ 50 ]   Rate for this gauge [ Rs. / kg ]
+                                           MET PET 12µm is priced at 12µ — Rs. 180.00/kg
+```
+
+That was built on reading the master as holding `PET 12µm` and `PET 19µm` as two
+materials at two prices, so a third gauge matched neither and had to be asked
+about. **The works does not price that way.** One rate covers the film at every
+thickness — which means the screen above was demanding a figure nobody had a
+reason to give, on a 50 micron sealant, which is not an exotic request but half
+of everything they laminate. Until it was given the line did not cost itself:
+the material cost was blank and the margin read as a dash.
+
+Now the film's rate applies and the ply costs. Nothing is asked, nothing is
+invented, and the box still sits there filled in for the job that was genuinely
+agreed at something else.
 
 **That rate is used for this quotation and stored on it. It does not reach the
 Rates master.** A figure keyed in the middle of quoting is a decision about one
@@ -534,19 +557,26 @@ document; letting it edit the price list would make every quotation a chance to
 change what every other quotation costs. Adding `PET 20µm` properly is a job for
 the Rates screen, where it gets a rate history like every other material.
 
-Swapping the film clears any rate typed for the previous one — 245 was the price
-of a 20µ PET and must not survive onto a `Foil 7µm` ply.
+**Swapping the film replaces the rate with the new film's own** — 245 was the
+price of a PET and must not survive onto a `Foil 7µm` ply.
 
-Reopening a saved quotation puts the rate back in the box. Nothing records that
-an override happened and nothing needs to: the ply keeps the film's name, and a
-name stating a gauge different from the one quoted **is** the override. That
-rule lives in `@yuva/shared` because the server reads it too — it carries the
-rate through when repricing from storage, and if the two disagreed a quotation
-would display one rate and be repriced at another.
+**Correcting the gauge leaves the rate alone**, because the gauge no longer
+decides the price and there is nothing for it to invalidate. The one exception
+is a gauge that moves the ply onto a different row of the same family, where the
+box follows that row only if it still holds the previous one's figure untouched:
+that one was put there by the form and means no more than "the list", where
+anything else in the box was typed by somebody and is theirs.
+
+Reopening a saved quotation puts the stored rate back in the box. For plies
+saved before that column existed it is deduced — the ply keeps the film's name,
+and a name stating a gauge different from the one quoted **was** the override.
+That rule lives in `@yuva/shared` because the server reads it too: it carries
+the rate through when repricing from storage, and if the two disagreed a
+quotation would display one rate and be repriced at another.
 
 The one film named without a gauge, `PP Woven`, is specified by GSM rather than
-thickness. Its rate applies at whatever micron is typed, so it is never asked
-about.
+thickness — which, now that gauge and price have nothing to do with each other,
+makes it no different from any other row.
 
 Only two and three plies are offered, which is what the works produces. The
 engine and the schema handle four, so a foil laminate can be quoted the day it

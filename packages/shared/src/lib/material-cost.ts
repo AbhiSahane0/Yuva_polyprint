@@ -193,17 +193,21 @@ export function filmFamily(name: string): string {
 /**
  * The stocked film a family and a gauge name between them.
  *
- * An exact gauge match first, because that is a real material with its own
- * price: choosing PET and typing 19 must find `PET 19µm` and cost the ply at
- * its rate, not ask for one. Asking would be worse than pointless — the same
- * film would end up quoted at two different prices on two quotations.
+ * The works keeps one rate per film and uses it at every gauge, so this is no
+ * longer choosing between prices — every row in a family carries the same
+ * figure. What it is choosing is a **row**: a density, a name, and the rate
+ * that goes with them.
  *
- * With no exact match — a 20µ PET, which the works quotes and the master does
- * not stock — the nearest gauge in the family is returned instead. That is not
- * a price: `plyRatePerKg` sees the name state a different gauge and refuses to
- * cost it until the office gives a rate. It is there for the **density**, which
- * is a property of the polymer rather than of the gauge (every PET in the
- * master is 1.4, every PE 0.94), and for a name to show on the line.
+ * An exact gauge match first, so a master that does still hold `PET 12µm` and
+ * `PET 19µm` separately picks the one the office actually named. Then a row
+ * whose name states no gauge at all, which is a family stocked at whatever
+ * thickness is typed. Failing both, the nearest gauge in the family — which
+ * costs the ply at that row's rate, because that rate is the film's rate.
+ *
+ * The density is the reason the fallback has to return something rather than
+ * nothing: it is a property of the polymer and not of the gauge (every PET in
+ * the master is 1.4, every PE 0.94), and without it a micron figure cannot be
+ * turned into weight at all.
  *
  * Undefined when the family holds nothing at all.
  */
@@ -232,56 +236,58 @@ export function resolveFilm<T extends { name: string }>(
 }
 
 /**
- * What one ply costs per kilogram, once the gauge and the film are both known.
+ * What one ply costs per kilogram.
  *
- * Three cases, and the third is the one worth stating:
+ * **A film has one rate, and it applies at every gauge.** The works buys PET
+ * at a rupee figure a kilogram and pays near enough the same whether the reel
+ * is 12 micron or 15, so it keeps one rate per film rather than one per gauge —
+ * and the same for MET PET, PE and the rest. A kilogram of PET is a kilogram of
+ * PET; the thickness decides how many metres that kilogram covers, which the
+ * GSM already carries, not what the kilogram costs.
  *
- * - The gauge the film is stocked at: the film's own rate.
- * - A gauge off the price list, with a rate typed: that rate.
- * - **A gauge off the price list with no rate: null, which makes the whole line
- *   uncostable.**
+ * So two cases, not three:
  *
- * Falling back to the film's rate in that third case is the failure this exists
- * to prevent. `PET 12µm` at 20 microns would be costed at the 12µ price and
- * report a margin of 87.7% — a confident figure, wrong, and contradicted by
- * nothing on screen. Asking for the rate is only half the job; refusing to
- * invent one until it arrives is the other half.
+ * - A rate typed for this job: that rate.
+ * - Otherwise the film's own rate, whatever gauge was quoted.
  *
- * Null is how the engine already says "cannot be costed", so this needs no new
- * handling downstream: the margin reads as a dash until the rate is given, the
- * same as for a film with no rate on record.
+ * This used to refuse to cost a ply whose gauge was not the one named in the
+ * film's row — `PET 12µm` quoted at 20µ came back null and the line read as
+ * uncostable until somebody typed a price. That was built on the premise that
+ * the master holds `PET 12µm` and `PET 19µm` as two materials at two prices.
+ * The works does not price that way, so the refusal asked for a figure nobody
+ * had a reason to give and left the margin reading as a dash until they made
+ * one up.
+ *
+ * Null still means "cannot be costed", and still happens: no film chosen, or a
+ * film with no rate on record.
  */
 export function plyRatePerKg(ply: {
   /** Null when no film has been chosen at all. */
   materialName: string | null;
-  micron: number;
   /** The chosen film's current rate, or null when it has none on record. */
   stockRate: number | null;
-  /** What the office typed, when it was asked for. */
+  /** What the office agreed for this job, when it differs from the list. */
   override: number | null;
 }): number | null {
   if (ply.override !== null && ply.override > 0) return ply.override;
   if (ply.materialName === null) return null;
-
-  const stocked = micronFromFilmName(ply.materialName);
-  // A film named without a gauge — PP Woven, priced by GSM — is sold at its
-  // rate whatever thickness is quoted, so there is nothing to disagree with.
-  if (stocked === null) return ply.stockRate;
-
-  // The gauge quoted is not the gauge priced, and nobody has said what it costs.
-  if (ply.micron > 0 && ply.micron !== stocked) return null;
-
   return ply.stockRate;
 }
 
 /**
- * The rate on a stored ply, when the office typed it rather than the film supplying it.
+ * The rate on a ply stored before there was a column to store it in.
  *
- * The rates master prices a film at the gauge it is stocked in — `PET 12µm` and
- * `PET 19µm` are two materials at two prices — so quoting a 20µ PET means
- * neither rate applies and the office is asked for one. Nothing records that
- * this happened, and nothing needs to: the ply keeps the film's name, so a name
- * stating a gauge different from the one quoted **is** the override.
+ * **For old rows only.** There was a period when the rates master was read as
+ * pricing a film at the gauge it was stocked in — `PET 12µm` and `PET 19µm` as
+ * two materials at two prices — so a 20µ PET matched neither and the office was
+ * asked for a figure. Nothing recorded that it had been asked: the ply kept the
+ * film's name, so a name stating a gauge different from the one quoted **was**
+ * the override, and reading it back meant inferring it.
+ *
+ * Rows written since carry `rateOverride` themselves and never reach this. It
+ * survives so that quotations saved in that period reprice to exactly the
+ * figures they were sent at — which is the whole reason not to delete it, even
+ * though the premise underneath it is no longer how films are priced.
  *
  * Null in every ordinary case, which leaves repricing free to pick up the
  * material's current rate as it always has.

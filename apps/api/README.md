@@ -1175,12 +1175,20 @@ release.
 > their stored figures; the migration reconstructed their plies from the
 > structure that was assumed.
 
-**The thickness is the film's, not a separate figure.** Every film in the rates
-master is named with its gauge — `PET 12µm`, `PE 60µm` — because a 12µ PET and a
-19µ PET are two different materials at two different prices. The web form reads
-the micron off the chosen film's name (`micronFromFilmName` in `@yuva/shared`)
-rather than asking for it a second time, so the two cannot disagree; quotation
-#123 carries a "PET 19µm" ply recorded at 60 microns from when they could.
+**The thickness starts as the film's, and is then the office's.** Films in the
+rates master are named with a gauge — `PET 12µm`, `PE 60µm` — so choosing one
+fills the micron in from its name (`micronFromFilmName` in `@yuva/shared`)
+rather than asking for it a second time; quotation #123 carries a "PET 19µm" ply
+recorded at 60 microns from before that was so.
+
+**The gauge does not decide the price.** The works keeps one rate per film and
+pays it at every thickness — a kilogram of PET costs what a kilogram of PET
+costs — so `plyRatePerKg` takes the film's rate whatever micron is quoted, and
+the gauge reaches the cost only through the GSM, which is what it genuinely
+governs. It briefly did the opposite: a ply whose gauge was not the one named in
+its film's row was refused a price and left the whole line uncostable, on the
+reading that `PET 12µm` and `PET 19µm` were two materials at two prices. They
+are not, and a 50µ sealant is an ordinary request rather than an exotic one.
 
 The API is unchanged by this: `micron` is still per-ply on the request and still
 what is stored and costed. Deriving it is a decision the form makes, so an
