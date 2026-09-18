@@ -749,6 +749,23 @@ Five rules worth repeating here:
   been generated before renders as nothing at all: no gap, a border falling back
   to black. It cost two false bug reports before it was understood. If a change
   does not appear, restart `npm run dev -w apps/web` before believing the screen.
+- **A quotation's rate barely moved with the order size, and now it does.**
+  Everything in the works' Estimation-sheet method scales with the kilograms, so
+  the only fixed cost on a job was Rs 250 of sundries and doubling the order
+  moved the rate by twenty paise. The `rateModel` setting switches to charging
+  the whole crew and the bank by the day, where the make-ready is the same
+  whatever the order — about Rs 9.50 a kilogram between 1,000 and 2,000 kg. It
+  lifts the level too, roughly Rs 27 a kilogram at 1,000 kg and much more on a
+  small order, which says the small jobs were being quoted under cost.
+- **Two of the figures that model rests on are fitted, not given.** Rs 20,000
+  for a day of the works and 0.75 days of make-ready came from the works' own
+  fourteen job sheets, not from the works. Both are on the Costing screen, and
+  nothing is precise until they recognise them.
+- **Laminator 2 is a copy of Laminator 1.** Its real speed, horsepower, loaded
+  rate and setup time are recorded nowhere — the job-sheet workbook names
+  "Lamination 1" and "Lamination 2" only as two lamination _passes_, gives both
+  the same 20% share of the day, and has never run the second. The two machines
+  therefore price identically until somebody says how they differ.
 - **The works' job-sheet spreadsheet splits a day's electricity 60 / 20 / 20 /
   10 / 10, which comes to 120.** Every job costed that way carried a sixth more
   electricity than the day cost. The works confirmed 100 is what was meant; the

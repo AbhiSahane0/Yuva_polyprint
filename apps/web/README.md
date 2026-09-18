@@ -1756,6 +1756,38 @@ in the app can know, so the works sets it; 100% is the default.
 
 Retire rather than delete, as rates do: quotations were costed against it.
 
+#### The switch that decides whether a big order is cheaper
+
+**The works' own time is charged** picks between billing an operator for the
+minutes of the machine they stand at, and billing the whole crew and the bank
+for the days the job occupies the works. Only the second makes 2,000 kg cheaper
+a kilogram than 1,000 — by the minute, nothing on a job is fixed, and the rate
+falls by twenty paise where the works says it should fall by about ten rupees.
+
+Four figures go with it:
+
+| Field                 | What it is                                                                              |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| A day of the works    | The whole crew and the bank. Not electricity, which is charged per machine              |
+| Make-ready, days      | The same whatever the order — this is what makes a big order cheaper                    |
+| Machine minutes a day | Printing, lamination and slitting run at once, so a day absorbs several machines' worth |
+| Kilograms a day       | Only for a line with no costed structure to find metres in                              |
+
+The reasoning, the fit against the works' fourteen job sheets, and what the
+change is worth at each quantity are in
+[the API README](../api/README.md#why-a-bigger-order-has-to-come-out-cheaper).
+
+**Changing any of these dates the change**, so quotations already written keep
+the figures they were written on — including the model switch itself.
+
+#### Two laminators
+
+The works runs two, and a job runs on one of them. Sort order decides which,
+until a quotation names one: put the machine the works normally uses first, or
+retire the other. Laminator 2 starts as a copy of Laminator 1 because its real
+speed and rate are not recorded anywhere yet — so the two price identically
+until somebody says how they differ.
+
 ### Rates — `/rates`
 
 Today's raw material prices, grouped by Films / Ink / Adhesive / Solvents.
