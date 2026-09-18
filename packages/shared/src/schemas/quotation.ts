@@ -495,6 +495,29 @@ export const settingsSchema = z.object({
    * time alone; charging the setup as well is truer but does not tie out.
    */
   emiBasis: z.enum(['RUN_TIME', 'OCCUPIED']),
+
+  /**
+   * **How the works' own time is recovered.**
+   *
+   * `PER_MINUTE` bills each operator for the minutes of the machine they stand
+   * at. Everything in it scales with the kilograms, so a job's only fixed cost
+   * is `otherPerJob` — and between 1,000 kg and 2,000 kg the rate falls by
+   * twenty paise where the works says it should fall by about ten rupees.
+   *
+   * `PER_DAY` bills the whole crew and the bank for the days the job occupies
+   * the works: `makeReadyDays + kg / kgPerDay`. The make-ready is the same
+   * whatever the order, and spreading it is the entire effect.
+   *
+   * Default `PER_MINUTE`, and settings read as at the quotation's own date —
+   * so switching this today leaves every quotation already written alone.
+   */
+  rateModel: z.enum(['PER_MINUTE', 'PER_DAY']),
+  /** One day of the works: the whole crew and the bank. Not electricity. */
+  worksDayCost: z.coerce.number().min(0).max(10_000_000),
+  /** Days before the job makes anything sellable. The same whatever the order. */
+  makeReadyDays: z.coerce.number().min(0).max(30),
+  /** Kilograms a day once it is running. */
+  kgPerDay: z.coerce.number().min(1).max(1_000_000),
   /**
    * Making one pouch — forming, sealing and cutting. **Per pouch, not per
    * kilogram**: the same charge reads between Rs 11 and Rs 64 a kilogram across
@@ -657,6 +680,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
   emiPerMonth: 4166.66,
   emiHoursPerMonth: 24,
   emiBasis: 'RUN_TIME',
+  /*
+   * PER_MINUTE is what the works held until they asked for the day model, and
+   * a default is what an undated quotation falls back to. Switching it on the
+   * Costing screen dates the change, so nothing already quoted moves.
+   */
+  rateModel: 'PER_MINUTE',
+  /*
+   * Fitted against the works' own fourteen September 2026 job sheets:
+   * days = 0.751 + kg / 1,945, and a day of crew plus bank is about Rs 20,000.
+   * All three are theirs to change on the Costing screen.
+   */
+  worksDayCost: 20000,
+  makeReadyDays: 0.75,
+  kgPerDay: 1945,
   /*
    * Read off the works' pouch workbook and confirmed with them: a standup is
    * 0.25 to make, a D punch 0.60 flat, and the zipper 3.60 a metre. The

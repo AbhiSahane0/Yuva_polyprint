@@ -1,5 +1,6 @@
 import { DEFAULT_SETTINGS, settingsSchema, type AppSettings } from '@yuva/shared';
 import { prisma } from '../../lib/prisma.js';
+import { valuesAsAt } from './setting-history.js';
 
 /** Midnight UTC on a yyyy-mm-dd, which is how dated rows are stored. */
 function asDate(iso: string): Date {
@@ -28,25 +29,21 @@ function today(): string {
  */
 export async function getSettings(onDate?: string): Promise<AppSettings> {
   const rows = await prisma.appSetting.findMany();
-  const stored = Object.fromEntries(rows.map((row) => [row.key, row.value]));
+  let stored: Record<string, string> = Object.fromEntries(rows.map((row) => [row.key, row.value]));
 
   if (onDate && onDate < today()) {
-    /*
-     * Newest first, so the first value seen for a key is the one in force on
-     * that day. A key with no entry on or before it never changed by then, and
-     * keeps whatever the current row says.
-     */
     const history = await prisma.appSettingHistory.findMany({
-      where: { effectiveDate: { lte: asDate(onDate) } },
-      orderBy: { effectiveDate: 'desc' },
-      select: { key: true, value: true },
+      select: { key: true, value: true, effectiveDate: true },
     });
-    const seen = new Set<string>();
-    for (const row of history) {
-      if (seen.has(row.key)) continue;
-      seen.add(row.key);
-      stored[row.key] = row.value;
-    }
+    stored = valuesAsAt(
+      stored,
+      history.map((row) => ({
+        key: row.key,
+        value: row.value,
+        effectiveDate: row.effectiveDate.toISOString().slice(0, 10),
+      })),
+      onDate,
+    );
   }
 
   const merged: Record<string, unknown> = { ...DEFAULT_SETTINGS };

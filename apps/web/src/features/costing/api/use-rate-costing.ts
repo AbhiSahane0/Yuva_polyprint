@@ -237,6 +237,11 @@ export function useRateCosting(
         emiPerMonth: settings.emiPerMonth,
         emiHoursPerMonth: settings.emiHoursPerMonth,
         emiBasis: settings.emiBasis,
+        /* How the works' own time is recovered, and what a day of it costs. */
+        rateModel: settings.rateModel,
+        worksDayCost: settings.worksDayCost,
+        makeReadyDays: settings.makeReadyDays,
+        kgPerDay: settings.kgPerDay,
         pouchMaking: {
           makingPerPouch: settings.pouchMakingPerPouch,
           dPunchPerPouch: settings.dPunchPerPouch,
