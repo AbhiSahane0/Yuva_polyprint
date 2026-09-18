@@ -84,6 +84,9 @@ for ws in wv.worksheets:
         'actualPerKg': n(ws['J99'].value),
         'actualMaterial': g('G109'),
         'actualWastagePct': n(ws['M103'].value),
+        'sheetPetRate': n(ws['E87'].value),
+        'sheetMetRate': n(ws['E104'].value),
+        'sheetPolyRate': n(ws['E105'].value),
     })
 print(json.dumps(out))
 `;
@@ -105,7 +108,24 @@ interface Tab {
   actualPerKg: number;
   actualMaterial: number;
   actualWastagePct: number;
+  sheetPetRate: number;
+  sheetMetRate: number;
+  sheetPolyRate: number;
 }
+
+/**
+ * Jobs left out of the summary, and why.
+ *
+ * Not hidden — they still print, marked. A run genuinely can waste a quarter of
+ * its film, and the works says so; what such a run cannot do is tell you
+ * anything about whether the RATE is close, because its cost is dominated by
+ * something no quotation could have predicted. Leaving it in the average buries
+ * the signal everything else carries.
+ */
+const SET_ASIDE: Record<string, string> = {
+  'Lokraja Atta 5kg': 'ran at 26% wastage against an allowance of 7',
+  'Copy of Lokraja Atta 5kg': 'ran at 26% wastage against an allowance of 7',
+};
 
 /** Densities the catalogue holds. They cancel out of the micron round trip. */
 const PET_DENSITY = 1.4;
@@ -117,6 +137,15 @@ const tabs = JSON.parse(
 ) as Tab[];
 
 const write = process.argv.includes('--write');
+/*
+ * Price the film at what the works paid that week rather than at the catalogue.
+ *
+ * The catalogue is what a real quotation uses, so it is the default. But it
+ * carries PET at 185 where the works' own tabs paid 125 to 172, and a rate list
+ * that far out swamps everything the costing does — with this flag the
+ * comparison measures the METHOD instead of the rate list.
+ */
+const sheetRates = process.argv.includes('--sheet-rates');
 const settings = await getSettings();
 
 const materials = await prisma.material.findMany({
@@ -216,13 +245,17 @@ function inputFor(t: Tab): { input: CostingInput; polyMicron: number; metMicron:
   /* What the works actually charged for pouching, per kilogram of output. */
   const pouchingPerKg = pouched ? (t.pouchedKg * settings.jobSheetPouchingPerKg) / t.outputKg : 0;
 
+  const petRate = sheetRates && t.sheetPetRate > 0 ? t.sheetPetRate : priceOf(PET);
+  const metRate = sheetRates && t.sheetMetRate > 0 ? t.sheetMetRate : priceOf(MET);
+  const polyRate = sheetRates && t.sheetPolyRate > 0 ? t.sheetPolyRate : priceOf(POLY);
+
   const layers = [
-    { name: PET, micron: t.petMicron, density: PET_DENSITY, ratePerKg: priceOf(PET) },
+    { name: PET, micron: t.petMicron, density: PET_DENSITY, ratePerKg: petRate },
     ...(metMicron > 0
-      ? [{ name: MET, micron: metMicron, density: MET_DENSITY, ratePerKg: priceOf(MET) }]
+      ? [{ name: MET, micron: metMicron, density: MET_DENSITY, ratePerKg: metRate }]
       : []),
     ...(polyMicron > 0
-      ? [{ name: POLY, micron: polyMicron, density: POLY_DENSITY, ratePerKg: priceOf(POLY) }]
+      ? [{ name: POLY, micron: polyMicron, density: POLY_DENSITY, ratePerKg: polyRate }]
       : []),
   ];
 
@@ -294,8 +327,9 @@ function inputFor(t: Tab): { input: CostingInput; polyMicron: number; metMicron:
 }
 
 console.log(
-  `\n${tabs.length} of the works' own jobs, quoted at today's catalogue and set beside what they cost` +
-    `${write ? '' : ' — nothing is written'}\n`,
+  `\n${tabs.length} of the works' own jobs, quoted at ` +
+    `${sheetRates ? 'the film rates the sheet itself used' : "today's catalogue"} ` +
+    `and set beside what they cost${write ? '' : ' — nothing is written'}\n`,
 );
 console.log(
   `${'job'.padEnd(26)} ${'kg'.padStart(7)} ${'quoted'.padStart(8)} ${'cost'.padStart(8)} ` +
@@ -316,8 +350,11 @@ for (const t of tabs.sort((a, b) => a.outputKg - b.outputKg)) {
 
   const over = r.ratePerKg - t.actualPerKg;
   const pct = t.actualPerKg > 0 ? (over / t.actualPerKg) * 100 : 0;
-  if (over >= 0) covered += 1;
-  gaps.push(pct);
+  const aside = SET_ASIDE[t.tab];
+  if (!aside) {
+    if (over >= 0) covered += 1;
+    gaps.push(pct);
+  }
 
   const plies = input.job.layers.length;
   console.log(
@@ -325,7 +362,8 @@ for (const t of tabs.sort((a, b) => a.outputKg - b.outputKg)) {
       `${r.ratePerKg.toFixed(2).padStart(8)} ${t.actualPerKg.toFixed(2).padStart(8)} ` +
       `${(over >= 0 ? '+' : '') + over.toFixed(2)}`.padStart(8) +
       ` ${pct.toFixed(1).padStart(6)}   ${String(plies).padStart(3)} ${String(t.colours).padStart(3)}  ` +
-      `${input.job.wastagePercent.toFixed(0)}% / ${t.actualWastagePct.toFixed(1)}%`,
+      `${input.job.wastagePercent.toFixed(0)}% / ${t.actualWastagePct.toFixed(1)}%` +
+      (aside ? '   set aside' : ''),
   );
 
   if (write) {
@@ -393,10 +431,20 @@ for (const t of tabs.sort((a, b) => a.outputKg - b.outputKg)) {
 
 console.log('-'.repeat(96));
 const mean = gaps.reduce((s, g) => s + g, 0) / (gaps.length || 1);
+const worst = gaps.length > 0 ? Math.min(...gaps) : 0;
 console.log(
-  `\n${covered} of ${tabs.length} quoted at or above what the job cost.` +
-    `  Mean gap ${mean >= 0 ? '+' : ''}${mean.toFixed(1)}%.`,
+  `\n${covered} of ${gaps.length} quoted at or above what the job cost.` +
+    `  Mean gap ${mean >= 0 ? '+' : ''}${mean.toFixed(1)}%, worst ${worst.toFixed(1)}%.`,
 );
+for (const [tab, why] of Object.entries(SET_ASIDE)) {
+  if (tabs.some((t) => t.tab === tab)) console.log(`  set aside: ${tab} — ${why}`);
+}
+if (!sheetRates) {
+  console.log(
+    `\nRun with --sheet-rates to price the film at what the works paid that week.` +
+      ` The catalogue carries PET at ${priceOf(PET)} where their tabs paid 125 to 172.`,
+  );
+}
 console.log(`
 The two are not meant to agree to the paisa. The quotation prices film at the
 catalogue and carries the works' wastage ALLOWANCE; the job sheet was costed at
