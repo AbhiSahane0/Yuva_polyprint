@@ -45,6 +45,14 @@ export interface RateCostingLine {
    */
   pouchType: PouchType | null;
   pouchWidthMm: number;
+  /**
+   * The inks the line prints, already priced from the rates list.
+   *
+   * Empty on a line written before colours were chosen at all, and that is what
+   * keeps it on the works' blended ink rate — there is nothing to price colour
+   * by colour without colours.
+   */
+  colours: CostingColour[];
   /** The quantities being priced, in kilograms. */
   quantitiesKg: number[];
   /**
@@ -104,40 +112,31 @@ export function useRateCosting(
   /*
    * Which colours the job prints.
    *
-   * Taken from the catalogue rather than chosen, because under the works' own
-   * settings the choice never mattered: ink is the Estimation sheet's flat GSM
-   * at one blended rate, and the same job came to Rs 233.76/kg on CMYK, on
-   * CMYK + Gold and on CMYK + White alike. There was a picker here for it, and
-   * it was removed — a control that moves nothing teaches the office something
-   * false about their own quotations.
+   * **Chosen on the line now.** There was a picker here once, taken out because
+   * under the works' own settings the choice moved nothing: ink was the
+   * Estimation sheet's flat GSM at one blended rate, and the same job came to
+   * Rs 233.76/kg on CMYK, on CMYK + Gold and on CMYK + White alike. A control
+   * that moves nothing teaches the office something false about their own
+   * quotations.
    *
-   * The process colours come first because every press carries them, and a
-   * job's own spot colours follow. The engine needs at least one to price the
-   * ink at all under PER_COLOUR, which is the method where this list does
-   * decide the answer.
+   * What changed is that the colours now decide the ink as well as the
+   * cylinders, so the list is the office's and not a guess off the catalogue —
+   * and a line that names none is still priced the old way, because there is
+   * nothing to price colour by colour without colours.
    */
-  const colourNames = [
-    ...inks.filter((ink) => ink.inkKind === 'PROCESS'),
-    ...inks.filter((ink) => ink.inkKind !== 'PROCESS'),
-  ]
-    .slice(0, Math.max(1, line.colourCount))
-    .map((ink) => ink.name);
   /* A stable dependency: the array is rebuilt every render, its contents are not. */
-  const colourKey = colourNames.join('|');
+  const colourKey = line.colours.map((colour) => `${colour.name}:${colour.ratePerKg}`).join('|');
 
-  const rate = (name: string): number =>
-    materials.find((material) => material.name === name)?.currentRate ?? 0;
-
-  /*
-   * Whether the colours chosen are actually costed.
+  /**
+   * Whether this line's ink is priced on what it prints.
    *
-   * Under FLAT_GSM — the works' Estimation method, and the default — ink is
-   * the structure's stated GSM times one blended rate, and which colours are
-   * ticked does not enter the arithmetic anywhere. Under PER_COLOUR it is the
-   * Costing sheet's method and each colour is priced on its own laydown,
-   * solids and rate.
+   * The method follows the data rather than a setting. A line that names its
+   * colours is costed the Costing sheet's way — each colour on its own laydown,
+   * solids and rate. One that names none has only the works' blended figure to
+   * be priced at, which is also what every quotation written before colours
+   * existed was priced at, so those do not move.
    */
-  const perColourInk = settings?.inkCostModel === 'PER_COLOUR';
+  const perColourInk = line.colours.length > 0;
 
   /*
    * Colours chosen but not priced.
@@ -146,22 +145,11 @@ export function useRateCosting(
    * number: a job printing white would quote at a twelfth of its real ink and
    * read perfectly normal. The same rule the unpriced film gauge follows —
    * refuse, and say which.
-   *
-   * Only where the colours are costed, though. Blocking a quotation over an
-   * unpriced Gold that the flat method never reads is a refusal with no
-   * arithmetic behind it — the rate would be identical either way.
    */
-  const unpriced = unpricedColours(
-    colourNames
-      .map((name) => inks.find((candidate) => candidate.name === name))
-      .filter((ink): ink is Material => Boolean(ink))
-      .map((ink) => ({
-        name: ink.name,
-        laydownGsm: ink.laydownGsm ?? 0,
-        solidsPercent: ink.solidsPercent ?? 100,
-        ratePerKg: ink.currentRate ?? 0,
-      })),
-  );
+  const unpriced = unpricedColours(line.colours);
+
+  const rate = (name: string): number =>
+    materials.find((material) => material.name === name)?.currentRate ?? 0;
 
   /** Stable across renders, so the memo below does not rerun on every keystroke. */
   const overrideKey = [
@@ -179,18 +167,6 @@ export function useRateCosting(
     if (!settings || !master) return null;
     if (line.layers.length === 0) return null;
 
-    const colours: CostingColour[] = colourNames
-      .map((name) => inks.find((ink) => ink.name === name))
-      .filter((ink): ink is Material => Boolean(ink))
-      .map((ink) => ({
-        name: ink.name,
-        laydownGsm: ink.laydownGsm ?? 0,
-        solidsPercent: ink.solidsPercent ?? 100,
-        ratePerKg: ink.currentRate ?? 0,
-      }));
-
-    if (colours.length === 0) return null;
-
     return {
       job: {
         orderQtyKg: 0, // set per quantity below
@@ -205,7 +181,7 @@ export function useRateCosting(
         ups: line.ups,
         trimMm: settings.defaultTrimMm,
         layers: line.layers,
-        colours,
+        colours: line.colours,
         /* The Estimation sheet's blended figure, not a purchase rate. */
         flatInk: { ratePerKg: rate(settings.defaultFlatInkMaterial) },
         adhesive: {
@@ -261,6 +237,12 @@ export function useRateCosting(
         emiPerMonth: settings.emiPerMonth,
         emiHoursPerMonth: settings.emiHoursPerMonth,
         emiBasis: settings.emiBasis,
+        /* How the works' own time is recovered, and what a day of it costs. */
+        rateModel: settings.rateModel,
+        worksDayCost: settings.worksDayCost,
+        makeReadyDays: settings.makeReadyDays,
+        machineMinutesPerDay: settings.machineMinutesPerDay,
+        kgPerDay: settings.kgPerDay,
         pouchMaking: {
           makingPerPouch: settings.pouchMakingPerPouch,
           dPunchPerPouch: settings.dPunchPerPouch,
@@ -278,7 +260,13 @@ export function useRateCosting(
         ],
         marginPercent: pick(overrides.marginPercent, settings.defaultMarginPercent),
         marginBasis: settings.marginBasis,
-        inkCostModel: settings.inkCostModel,
+        /*
+         * The method follows the data: a line that names its colours is priced
+         * on them, one that names none on the works' blended figure. That is
+         * also what keeps every quotation written before colours existed
+         * reading exactly as it did.
+         */
+        inkCostModel: perColourInk ? 'PER_COLOUR' : settings.inkCostModel,
         adhesiveCostModel: settings.adhesiveCostModel,
       },
     };

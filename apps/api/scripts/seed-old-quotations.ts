@@ -267,6 +267,13 @@ async function main() {
         otherPerJob: settings.otherPerJob,
         emiPerMonth: settings.emiPerMonth,
         emiHoursPerMonth: settings.emiHoursPerMonth,
+        /* As at the quotation's own date — PER_MINUTE in 2022, whatever the
+           works has switched to since. */
+        rateModel: settings.rateModel,
+        worksDayCost: settings.worksDayCost,
+        makeReadyDays: settings.makeReadyDays,
+        machineMinutesPerDay: settings.machineMinutesPerDay,
+        kgPerDay: settings.kgPerDay,
         emiBasis: settings.emiBasis,
         stationSurcharges: [
           settings.stationSurcharge6,

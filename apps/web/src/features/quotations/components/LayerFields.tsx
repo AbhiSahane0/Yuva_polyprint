@@ -29,15 +29,18 @@ import { cn } from '@/lib/utils';
  * moving 2 → 3 keeps everything already typed and only asks for the new ply.
  *
  * **The film and the gauge are two questions, asked once each.** The dropdown
- * offers families — PET, PE, MET PET — and the gauge is typed beside it. The
- * rates master holds `PET 12µm` and `PET 19µm` as separate rows because they
- * are bought at separate prices, but they are one film to anybody at the
- * machine, and listing both asked the same question twice.
+ * offers families — PET, PE, MET PET — and the gauge is typed beside it.
  *
- * Family plus gauge names a stocked film, and that film's rate is used: PET at
- * 19 finds `PET 19µm` and costs the ply at its price without asking anybody
- * anything. Only a gauge the master does not stock — a 20µ PET — has no price
- * to find, and that is the one case the line asks about. See `resolveFilm`.
+ * **One rate per film, used at every gauge.** The works pays near enough the
+ * same for a kilogram of PET whether the reel is 12 micron or 15, so it keeps
+ * one PET rate rather than one per thickness, and the same for every other
+ * film. The gauge decides how many metres that kilogram covers — which is the
+ * GSM, and is already carried — never what the kilogram costs.
+ *
+ * So no ply is ever unpriced for being quoted at an unusual thickness. The rate
+ * box is filled with the film's own figure the moment a film is picked, and is
+ * there to be typed over when this job was agreed at something else. See
+ * `plyRatePerKg`.
  */
 
 /**
@@ -121,43 +124,65 @@ export function LayerFields({
   }
 
   /**
-   * Picking a family fills the gauge in, and clears any rate typed for the old one.
+   * Picking a family fills the gauge in, and puts that film's rate in the box.
    *
-   * The rate is cleared because it belonged to the previous film: a figure
-   * entered for a 20µ PET must not survive a switch to Foil and go on costing
-   * it. Leaving it would be a wrong price that nobody typed.
+   * The rate is written rather than shown as a greyed hint. A hint reads as an
+   * empty field, and an empty field beside the word "rate" is the one thing on
+   * this row that looks like it still needs doing — the office kept asking why
+   * the figure was not filled in. It is the film's own rate, it is right, and
+   * it is now sitting there to be typed over on the job where it was agreed at
+   * something else.
+   *
+   * It is written on every switch of film, never carried across: a figure
+   * agreed for PET must not survive a change to Foil and go on costing it.
    *
    * The gauge is only filled in when the box is empty or the family cannot hold
    * what is in it. Overwriting a typed gauge would undo the office's own figure
    * the moment they corrected the film beside it.
    */
   function chooseFamily(index: number, family: string) {
-    setValue(`items.${itemIndex}.layers.${index}.rateOverride`, '' as never, {
+    const typed = Number(layers[index]?.micron ?? 0);
+    const film = point(index, family, typed);
+
+    setValue(`items.${itemIndex}.layers.${index}.rateOverride`, rateText(film) as never, {
       shouldDirty: true,
     });
 
-    const typed = Number(layers[index]?.micron ?? 0);
-    const film = point(index, family, typed);
     if (!film || typed > 0) return;
 
     const micron = micronFromFilmName(film.name);
     if (micron === null) return;
 
-    // As a string: the form holds these while they are being typed, and the
-    // schema coerces on submit. Writing a raw number leaves react-hook-form
-    // and the input element disagreeing about the field's type.
     setValue(`items.${itemIndex}.layers.${index}.micron`, String(micron) as never, {
       shouldDirty: true,
       shouldValidate: true,
     });
   }
 
-  /** Retyping the gauge can move the ply onto a different stocked film. */
+  /**
+   * Retyping the gauge can move the ply onto a different row of the same family.
+   *
+   * It no longer wipes the rate. The gauge does not decide the price — one rate
+   * covers the film at every thickness — so a corrected micron is no reason to
+   * throw away a figure the office typed beside it.
+   *
+   * When the move does land on a different row, the box follows that row's rate
+   * only if it still holds the previous one's, untouched. That is the case
+   * where the figure was put there by this form and means nothing more than
+   * "the list"; anything else in the box was typed by somebody, and is theirs.
+   */
   function changeMicron(index: number, raw: string) {
     const family = currentFamily(index);
     if (!family) return;
-    point(index, family, Number(raw));
-    setValue(`items.${itemIndex}.layers.${index}.rateOverride`, '' as never, {
+
+    const before = filmOf(index);
+    const film = point(index, family, Number(raw));
+    if (!film || !before || film.id === before.id) return;
+
+    const box = String(layers[index]?.rateOverride ?? '').trim();
+    if (box !== rateText(before)) return;
+
+    setValue(`items.${itemIndex}.layers.${index}.rateOverride`, rateText(film) as never, {
       shouldDirty: true,
     });
   }
@@ -167,6 +192,22 @@ export function LayerFields({
     const id = (layers[index]?.materialId ?? null) as string | null;
     const film = id ? filmById.get(id) : undefined;
     return film ? filmFamily(film.name) : '';
+  }
+
+  /** The film a ply currently points at, or undefined while none is chosen. */
+  function filmOf(index: number): Film | undefined {
+    const id = (layers[index]?.materialId ?? null) as string | null;
+    return id ? filmById.get(id) : undefined;
+  }
+
+  /**
+   * A film's rate as the form holds it: a string, because that is what an input
+   * carries while it is being typed, and the schema coerces on submit. Writing
+   * a raw number leaves react-hook-form and the element disagreeing about the
+   * field's type. Empty for a film with no rate on record.
+   */
+  function rateText(film: Film | undefined): string {
+    return (film?.currentRate ?? '').toString();
   }
 
   return (
@@ -204,20 +245,17 @@ export function LayerFields({
           const film = filmId ? filmById.get(filmId) : undefined;
 
           /*
-           * The gauge the film is stocked and priced at, or null when its name
-           * states none — `PP Woven`, which is specified by GSM.
-           */
-          const stocked = film ? micronFromFilmName(film.name) : null;
-          const typed = Number(layer?.micron ?? 0);
-
-          /*
-           * A gauge this film is not priced at, so its rate cannot be used.
+           * What this job is being charged against what the film costs today.
            *
-           * Only once both are known and the typed figure is a real number: an
-           * empty box mid-edit is not an override, and asking for a rate the
-           * moment a digit is deleted would make the row flicker.
+           * The box holds the rate, so the column beside it can no longer just
+           * repeat it. What it says instead is whether this job has moved off
+           * the list — which is the thing nobody can see once the figure is
+           * editable and pre-filled.
            */
-          const offStock = Boolean(film) && stocked !== null && typed > 0 && typed !== stocked;
+          const listRate = film?.currentRate ?? null;
+          const typedRate = Number(layer?.rateOverride ?? 0);
+          const offList =
+            listRate !== null && typedRate > 0 && Math.abs(typedRate - listRate) >= 0.005;
 
           return (
             <div key={field.id} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-12">
@@ -266,36 +304,30 @@ export function LayerFields({
               </div>
 
               {/*
-               * The rate agreed for this job's film.
+               * The rate this job's film is charged at.
                *
-               * Offered on every ply, because a film price is agreed job to
-               * job: the works' own sheets carry PET at 185, 175 and 190 — all
-               * at 12µ, all written on the same day. It used to appear only
-               * when the gauge quoted was one the rates master does not stock,
-               * which covered the other reason to type a rate and missed this
-               * one entirely.
+               * Filled with the film's own rate when the film is picked, and
+               * editable, because a film price is agreed job to job: the works'
+               * own sheets carry PET at 185, 175 and 190 — all at 12µ, all
+               * written on the same day.
                *
-               * Blank follows the film's own rate. Typed, it is used for this
-               * quotation and stored on it; the rates master is never touched,
-               * because a figure keyed while quoting should not change what
-               * every other quotation costs.
+               * What is typed here is used for this quotation and stored on it.
+               * The rates master is never touched, because a figure keyed while
+               * quoting should not change what every other quotation costs.
+               *
+               * Left empty it falls back to the film's rate, which is what
+               * every quotation saved before the box was pre-filled does.
                */}
               {film ? (
                 <div className="col-span-1 sm:col-span-3">
                   <Field
-                    label={offStock ? 'Rate for this gauge' : 'Rate for this job'}
+                    label="Rate for this job"
                     htmlFor={`items.${itemIndex}.layers.${index}.rateOverride`}
                     error={errors?.[index]?.rateOverride?.message}
                   >
                     <NumberInput
                       id={`items.${itemIndex}.layers.${index}.rateOverride`}
-                      placeholder={
-                        offStock
-                          ? 'Rs. / kg'
-                          : film.currentRate === null
-                            ? 'Rs. / kg'
-                            : formatNumber(film.currentRate, 2)
-                      }
+                      placeholder={listRate === null ? 'Rs. / kg' : formatNumber(listRate, 2)}
                       invalid={Boolean(errors?.[index]?.rateOverride)}
                       {...register(`items.${itemIndex}.layers.${index}.rateOverride`)}
                     />
@@ -304,15 +336,21 @@ export function LayerFields({
               ) : null}
 
               {/*
-               * The film's rate, and nothing else.
+               * What the list says, so a job priced away from it shows.
                *
                * This column used to state the gauge, the density and the
                * resulting GSM. Every one of those is an input to the cost
                * rather than a fact the office needs while choosing a film, and
-               * three figures per ply on a six-ply screen read as noise. The
-               * rate is the one that answers the question actually being asked
-               * here — what does this film cost today — and it is the reason a
-               * ply gets swapped.
+               * three figures per ply on a six-ply screen read as noise.
+               *
+               * It then showed the film's current rate — which was the answer
+               * to "what does this film cost today" while the box beside it was
+               * empty. Now that the box carries that figure, repeating it says
+               * nothing. So it names it as the LIST rate, quietly while the two
+               * agree, and says how far apart they are when they do not: a
+               * hundred typed where 185 was meant is otherwise a plausible
+               * number in an editable box, and nothing else on the screen would
+               * catch it.
                *
                * "No rate" is said out loud rather than left blank, because a
                * film without one makes the whole line uncostable: the material
@@ -325,23 +363,18 @@ export function LayerFields({
                   film ? 'col-span-2 sm:col-span-3' : 'col-span-1 sm:col-span-6',
                 )}
               >
-                {!film ? null : offStock ? (
-                  /*
-                   * Which rate is on file and why it is not being used. Saying
-                   * only "enter a rate" leaves the office wondering whether the
-                   * film is unpriced; naming the stocked gauge makes it obvious
-                   * that a 20 was typed where the list holds a 12.
-                   */
-                  <span className="text-warning-700">
-                    {film.name} is priced at {stocked}µ
-                    {film.currentRate === null ? '' : ` — ${formatRs(film.currentRate, 2)}/kg`}
-                  </span>
-                ) : film.currentRate === null ? (
+                {!film ? null : listRate === null ? (
                   <span className="text-warning-600">No rate on record</span>
+                ) : offList ? (
+                  <span className="text-warning-700">
+                    List {formatRs(listRate, 2)}/kg — this job is{' '}
+                    {formatRs(Math.abs(typedRate - listRate), 2)}{' '}
+                    {typedRate > listRate ? 'above' : 'below'}
+                  </span>
                 ) : (
-                  <span className="text-ink-800 font-medium tabular-nums">
-                    {formatRs(film.currentRate, 2)}
-                    <span className="text-ink-400 font-normal"> / kg</span>
+                  <span className="tabular-nums">
+                    List {formatRs(listRate, 2)}
+                    <span className="text-ink-400"> / kg</span>
                   </span>
                 )}
               </div>

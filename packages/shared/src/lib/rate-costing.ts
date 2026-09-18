@@ -129,6 +129,66 @@ export interface CostingOverheads {
   emiBasis: 'RUN_TIME' | 'OCCUPIED';
 
   /**
+   * **How the works' own time is recovered — and the reason a big order gets
+   * cheaper.**
+   *
+   * `PER_MINUTE` is the works' Estimation sheet: each operator is billed for
+   * the minutes of the machine they stand at, and the bank EMI for the minutes
+   * the machine runs. It has one flaw, and it is fatal to quoting. Everything
+   * in it scales with the kilograms, so the only genuinely fixed cost on a job
+   * is `otherPerJob` — Rs 250. Between 1,000 kg and 2,000 kg of the same job the
+   * rate falls by **twenty paise**, and the works says it should fall by about
+   * ten rupees.
+   *
+   * `PER_DAY` is their job card. The works is open, the whole crew is paid and
+   * the bank is paid, for as many days as the job occupies it — and a job does
+   * NOT occupy it in proportion to its size, because the make-ready is the same
+   * whatever the order. Their own fourteen job sheets fit
+   * `days = 0.75 + kg / 1,945`, and the three-quarters of a day at the front is
+   * the whole effect: spread over 2,000 kg it costs half what it costs over
+   * 1,000.
+   *
+   * Machine electricity is NOT folded in. It stays per machine, which is what
+   * lets two laminators of different cost produce two different rates —
+   * `powerRatePerHpHour` is already a loaded rate rather than a tariff, as the
+   * works' own figures show (printing 9, lamination 35, slitting 60).
+   *
+   * The default is `PER_MINUTE` because that is what the works held until they
+   * asked for this, and settings are read **as at the quotation's own date** —
+   * so their 2022 quotations still reproduce the sheets they were written from.
+   */
+  rateModel?: 'PER_MINUTE' | 'PER_DAY';
+  /**
+   * What one day of the works costs: the whole crew, and the bank. Not
+   * electricity, which is charged per machine.
+   */
+  worksDayCost?: number;
+  /** Make-ready — the days a job takes before it makes anything sellable. */
+  makeReadyDays?: number;
+  /**
+   * **Machine minutes the works gets through in a day.**
+   *
+   * Not minutes in a shift. Printing, lamination and slitting run at the same
+   * time, so a day of elapsed time absorbs several machines' worth of minutes —
+   * the works' own fourteen sheets fit about 1,600, which is a 480-minute shift
+   * roughly three times over.
+   *
+   * Driving the days off MINUTES rather than kilograms is what makes the
+   * estimate follow the job instead of its weight. Their Amruta Family Tea ran
+   * three days for 3,313 kg while Malpani Lime ran two for 3,285 — the same
+   * weight, and not remotely the same job: a 750 mm web instead of 990 is half
+   * again the metres, three plies instead of two laminates the whole web twice,
+   * and eight colours is eight cylinders to register rather than one. On
+   * kilograms alone the two are indistinguishable and one of them is wrong.
+   */
+  machineMinutesPerDay?: number;
+  /**
+   * Kilograms a day, used only where a line has no costed structure to work
+   * metres out of. A fallback, not the model.
+   */
+  kgPerDay?: number;
+
+  /**
    * What making one pouch costs — see `pouchExpense`.
    *
    * Per POUCH, because that is how the works' own pouch workbook charges it and
@@ -328,6 +388,13 @@ export interface CostingJob {
   stationCount?: number | null;
 
   /**
+   * Which machine this job runs on, by name, where the works has more than one
+   * of a kind. Anything not named falls to the first of its kind on the list,
+   * which is the works' own order.
+   */
+  machineChoice?: Partial<Record<MachineKind, string>> | null;
+
+  /**
    * Ink GSM the STRUCTURE is weighed with, when it is stated rather than
    * derived.
    *
@@ -440,6 +507,13 @@ export interface CostingBreakdown {
   /* --- effort ----------------------------------------------------------- */
   processes: ProcessCost[];
   totalMachineMinutes: number;
+  /**
+   * Days the job occupies the works: make-ready plus running.
+   * Zero under `PER_MINUTE`, which does not think in days.
+   */
+  occupiedDays: number;
+  /** What those days cost — crew and bank. Zero under `PER_MINUTE`. */
+  worksDayCost: number;
   electricityCost: number;
   labourCost: number;
   transportCost: number;
@@ -795,8 +869,36 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
    */
   const laminationPasses = Math.max(0, layers.length - 1);
 
+  /**
+   * **One machine of each kind, not all of them.**
+   *
+   * The works runs two laminators. The loop below charges a machine for the
+   * metres its KIND has to run, so passing both would bill the job for two
+   * lamination passes it never made — quietly, and on every quotation, because
+   * nothing about the total says which machine it came from.
+   *
+   * So a job runs on one of each kind: the one it names, or the first on the
+   * list, which is the works' own sortOrder.
+   */
+  const chosenMachines = (() => {
+    const byKind = new Map<MachineKind, CostingMachine>();
+    for (const machine of machines) {
+      const named = job.machineChoice?.[machine.kind];
+      if (named && machine.name === named) {
+        byKind.set(machine.kind, machine);
+        continue;
+      }
+      if (!byKind.has(machine.kind)) byKind.set(machine.kind, machine);
+    }
+    /* A named machine must win even when it is not first on the list. */
+    for (const machine of machines) {
+      if (job.machineChoice?.[machine.kind] === machine.name) byKind.set(machine.kind, machine);
+    }
+    return [...byKind.values()];
+  })();
+
   const processes: ProcessCost[] = [];
-  for (const machine of machines) {
+  for (const machine of chosenMachines) {
     if (machine.kind === 'POUCHING') continue;
 
     let metres = 0;
@@ -876,9 +978,52 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
     overheads.emiBasis === 'OCCUPIED'
       ? totalMachineMinutes
       : round(sum(processes.map((process) => process.runMinutes)), 2);
-  const emiCost = round(emiPerMinute * emiMinutes, 2);
+  const perMinuteEmiCost = round(emiPerMinute * emiMinutes, 2);
 
-  const overheadCost = round(labourCost + transportCost + packingCost + otherCost + emiCost, 2);
+  /*
+   * --- the works' own time ------------------------------------------------
+   *
+   * Under PER_DAY the crew and the bank are paid by the day rather than by the
+   * minute, and the days are make-ready plus running. Make-ready is the same
+   * whatever the order is, which is the entire reason a bigger order comes out
+   * cheaper — and it is the thing the works' own job card records in a box and
+   * then charges nothing for.
+   *
+   * Machine electricity is untouched either way. That is what keeps one
+   * laminator distinguishable from another.
+   */
+  const perDay = overheads.rateModel === 'PER_DAY';
+
+  /*
+   * Running time comes from the machines: the metres each one has to cover at
+   * the speed the works recorded for it, plus its setup. That is already
+   * `totalMachineMinutes`, and it is why a three-ply job takes longer than a
+   * two-ply one of the same weight, and why a slower laminator costs more.
+   *
+   * Kilograms are the fallback for a line with no costed structure — a figure
+   * typed straight onto a quotation, where there are no metres to work from.
+   */
+  const minutesPerDay = overheads.machineMinutesPerDay ?? 0;
+  const kgPerDay = overheads.kgPerDay ?? 0;
+  const runningDays =
+    totalMachineMinutes > 0 && minutesPerDay > 0
+      ? totalMachineMinutes / minutesPerDay
+      : kgPerDay > 0
+        ? job.orderQtyKg / kgPerDay
+        : 0;
+
+  const occupiedDays = perDay ? round((overheads.makeReadyDays ?? 0) + runningDays, 4) : 0;
+  const worksDayCost = perDay ? round(occupiedDays * (overheads.worksDayCost ?? 0), 2) : 0;
+
+  /* Under PER_DAY the day charge REPLACES the per-minute crew and EMI; it does
+     not sit on top of them, which would bill the same people twice. */
+  const chargedLabourCost = perDay ? 0 : labourCost;
+  const emiCost = perDay ? 0 : perMinuteEmiCost;
+
+  const overheadCost = round(
+    chargedLabourCost + worksDayCost + transportCost + packingCost + otherCost + emiCost,
+    2,
+  );
 
   /* --- margin ------------------------------------------------------------ */
   const costBeforeMargin = round(materialCost + overheadCost + electricityCost, 2);
@@ -972,8 +1117,11 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
 
     processes,
     totalMachineMinutes,
+    occupiedDays,
+    worksDayCost,
     electricityCost,
-    labourCost,
+    /* What was actually billed — zero under PER_DAY, where the day covers it. */
+    labourCost: chargedLabourCost,
     transportCost,
     packingCost,
     otherCost,

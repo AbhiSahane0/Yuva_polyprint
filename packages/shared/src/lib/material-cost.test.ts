@@ -134,13 +134,17 @@ describe('computeMargin', () => {
 });
 
 /**
- * Whether a stored ply was priced by its film or by hand.
+ * Whether a ply stored before there was a column for it was priced by hand.
  *
- * There is no column recording it, so this is inferred — which makes it worth
- * pinning. The server carries the rate through when repricing from storage and
- * the form puts it back in the box on reopening; both read it from here, and if
- * they ever disagreed a quotation would display one rate and be repriced at
- * another.
+ * For old rows only: there was no column recording it, so it had to be
+ * inferred from the ply quoting a gauge the film's name does not state. Rows
+ * written since carry the figure themselves and never reach this.
+ *
+ * Pinned rather than deleted because quotations saved in that period must
+ * reprice to exactly the figures they were sent at. The server carries the rate
+ * through when repricing from storage and the form puts it back in the box on
+ * reopening; both read it from here, and if they ever disagreed a quotation
+ * would display one rate and be repriced at another.
  */
 describe('overriddenRate', () => {
   it('is null when the gauge quoted is the gauge the film is stocked at', () => {
@@ -175,59 +179,63 @@ describe('overriddenRate', () => {
 /**
  * What a ply costs, and when it refuses to cost at all.
  *
- * The third case is the point. Asking for a rate when a gauge off the price
- * list is quoted does nothing if the line goes on costing itself from the
- * stocked gauge's price meanwhile — it reported an 87.7% margin on a 20µ PET
- * priced as a 12µ one, with an empty rate box beside it and nothing to say the
- * figure was invented.
+ * **A film has one rate and it applies at every gauge**, because that is how
+ * the works buys: a kilogram of PET costs what a kilogram of PET costs, and
+ * they do not keep a separate figure for 12 micron and 15. The thickness
+ * decides how many metres the kilogram covers, which is the GSM, and is carried
+ * elsewhere.
+ *
+ * This used to return null when the gauge quoted was not the one named in the
+ * film's row, on the reading that `PET 12µm` and `PET 19µm` were two materials
+ * at two prices. They are not. The refusal asked the office for a figure they
+ * had no reason to give and left the margin reading as a dash — on a 50µ MET
+ * PET, which is an ordinary sealant, not an exotic request — until somebody
+ * typed something to make the screen work again.
  */
 describe('plyRatePerKg', () => {
-  it('uses the film’s rate at the gauge it is stocked at', () => {
-    expect(
-      plyRatePerKg({ materialName: 'PET 12µm', micron: 12, stockRate: 210, override: null }),
-    ).toBe(210);
+  it('uses the film’s rate', () => {
+    expect(plyRatePerKg({ materialName: 'PET 12µm', stockRate: 210, override: null })).toBe(210);
   });
 
-  it('refuses to cost a gauge off the price list until a rate is given', () => {
+  it('costs a gauge the master does not stock, through the film it resolves to', () => {
+    /*
+     * The whole point, and the only level at which it can still be asserted —
+     * the gauge does not reach `plyRatePerKg` any more, which IS the fix.
+     *
+     * A 50µ MET PET against a master holding one MET PET row at 12µ. It used to
+     * come back null and take the margin with it.
+     */
+    const films = [{ name: 'MET PET 12µm', currentRate: 180 }];
+    const film = resolveFilm('MET PET', 50, films);
+    expect(film?.name).toBe('MET PET 12µm');
     expect(
-      plyRatePerKg({ materialName: 'PET 12µm', micron: 20, stockRate: 210, override: null }),
-    ).toBeNull();
+      plyRatePerKg({
+        materialName: film?.name ?? null,
+        stockRate: film?.currentRate ?? null,
+        override: null,
+      }),
+    ).toBe(180);
   });
 
-  it('uses the typed rate once it arrives', () => {
-    expect(
-      plyRatePerKg({ materialName: 'PET 12µm', micron: 20, stockRate: 210, override: 245 }),
-    ).toBe(245);
+  it('uses the rate agreed for this job over the film’s own', () => {
+    expect(plyRatePerKg({ materialName: 'PET 12µm', stockRate: 210, override: 245 })).toBe(245);
   });
 
   it('prices a film named without a gauge at whatever thickness is typed', () => {
-    // PP Woven is specified by GSM, so there is no stocked gauge to disagree with.
-    expect(
-      plyRatePerKg({ materialName: 'PP Woven', micron: 90, stockRate: 150, override: null }),
-    ).toBe(150);
+    expect(plyRatePerKg({ materialName: 'PP Woven', stockRate: 150, override: null })).toBe(150);
   });
 
   it('is null when no film has been chosen', () => {
-    expect(
-      plyRatePerKg({ materialName: null, micron: 12, stockRate: null, override: null }),
-    ).toBeNull();
+    expect(plyRatePerKg({ materialName: null, stockRate: null, override: null })).toBeNull();
   });
 
   it('is null when the film itself has no rate on record', () => {
-    expect(
-      plyRatePerKg({ materialName: 'PET 12µm', micron: 12, stockRate: null, override: null }),
-    ).toBeNull();
-  });
-
-  it('does not refuse while the micron box is empty mid-edit', () => {
-    // Zero is "not typed yet", not "a gauge off the list". Treating it as the
-    // latter would blank the margin on every keystroke that clears the box.
-    expect(
-      plyRatePerKg({ materialName: 'PET 12µm', micron: 0, stockRate: 210, override: null }),
-    ).toBe(210);
+    expect(plyRatePerKg({ materialName: 'PET 12µm', stockRate: null, override: null })).toBeNull();
   });
 
   it('leaves the whole line uncostable, which is how the margin reads as a dash', () => {
+    // Still reachable, and still the right answer — for a film carrying no rate
+    // at all, which is the one thing nobody can price around.
     const cost = computeMaterialCostPerKg({
       layers: [
         { name: 'PET 12µm', micron: 20, density: 1.4, ratePerKg: null },
@@ -246,10 +254,10 @@ describe('plyRatePerKg', () => {
 /**
  * Families, and the film a family plus a gauge names between them.
  *
- * The rates master holds `PET 12µm` and `PET 19µm` as separate rows because
- * they are bought at separate prices, but they are one film to anybody at the
- * machine. The gauge is typed on the line, so listing both asked the same
- * question twice and let the two answers disagree.
+ * A master may hold `PET 12µm` and `PET 19µm` as separate rows, but they are
+ * one film to anybody at the machine and are bought at one rate. The gauge is
+ * typed on the line, so listing both asked the same question twice and let the
+ * two answers disagree.
  */
 describe('filmFamily', () => {
   it.each([

@@ -461,10 +461,11 @@ that was never charged for.
 
 #### The structure, ply by ply
 
-Each ply gets its own row: **choose a film, and that is the whole row.** Beside
-it sits that film's rate — `Rs. 210.00 / kg` — and nothing else. **2 layer /
-3 layer** adds or removes rows rather than swapping the form, so moving from two
-plies to three keeps everything already typed and only asks for the new one.
+Each ply gets its own row: **choose a film, a gauge, and the rate for this
+job.** Beside them sits what the price list says — `List Rs. 210.00 / kg` — and
+nothing else. **2 layer / 3 layer** adds or removes rows rather than swapping
+the form, so moving from two plies to three keeps everything already typed and
+only asks for the new one.
 
 > The row used to state the gauge, the density and the resulting GSM. All three
 > are inputs to the cost rather than facts anyone needs while choosing a film,
@@ -477,56 +478,78 @@ plies to three keeps everything already typed and only asks for the new one.
 > printed PET and the metallised ply assumed. The client could not read what he
 > was quoting off that control.
 
-**The gauge is typed, and the film fills it in.** Every film in the rates master
-is named with its gauge — `PET 12µm`, `PE 60µm`, `PVC / PETG 45µm` — because a
-12µ PET and a 19µ PET are bought, stocked and priced as two different materials.
-Choosing the film puts its gauge in the **Micron** box, so the two agree without
-anyone typing twice.
+**The gauge is typed, and the film fills it in.** Films in the rates master are
+named with a gauge — `PET 12µm`, `PE 60µm`, `PVC / PETG 45µm` — so choosing one
+puts that figure in the **Micron** box as a starting point, and the two agree
+without anyone typing twice.
 
-The box stays editable, because **the works quotes gauges the rates master does
-not stock.** A 20µ PET is a real enquiry; a dropdown of stocked films cannot
-offer a number nobody has priced, and for a while that meant such a job could
-not be quoted without a developer adding the film first.
+The box stays editable, and typing over it changes nothing but the weight.
+**A film has one rate, and it applies at every gauge.** The works pays near
+enough the same for a kilogram of PET whether the reel is 12 micron or 15, so it
+keeps one PET rate rather than one per thickness — and the same for MET PET, PE
+and the rest. A kilogram of PET is a kilogram of PET. What the gauge decides is
+how many metres that kilogram covers, which is the GSM and is already carried
+everywhere the cost needs it.
 
 #### The rate agreed for this job
 
-Every chosen film carries a rate box. Blank follows the price list; typed, that
-is what the ply costs on this quotation and nowhere else.
-
-It is offered on every ply because **a film's price is agreed job to job**. The
-works' own quotations carry PET at 185, 175 and 190 — every one at 12µ, every
-one written on 23 March 2022. The box used to appear only for a gauge the rates
-master does not stock, which covered the other reason to type a rate and missed
-this one entirely: a rate agreed at the film's own gauge was stored and then
-invisible, so reopening the quotation and pressing Save replaced what had been
-charged with the catalogue price. Silently, and on a document that had already
-gone out.
-
-It is stored now — `rate_override` on the ply — rather than deduced from the
-gauge. Plies saved before that column existed still read through the old
-inference, so nothing already on file moves.
-
-#### A gauge off the price list has to be priced
-
-The same box, with a different name and a harder rule behind it. Type a gauge
-the chosen film is not stocked at and it becomes the only price there is:
+Every chosen film carries a rate box, and **it arrives with the film's own rate
+already in it.**
 
 ```
-Layer 1   [ PET 12µm ▾ ]   Micron [ 20 ]   Rate for this gauge [ Rs. / kg ]
-                                            PET 12µm is priced at 12µ — Rs. 210.00/kg
+Layer 1   [ PET ▾ ]       Micron [ 12 ]   Rate for this job [ 185 ]
+                                           List Rs. 185.00 / kg
+
+Layer 2   [ MET PET ▾ ]   Micron [ 50 ]   Rate for this job [ 170 ]
+                                           List Rs. 180.00/kg — this job is
+                                           Rs. 10.00 below
 ```
 
-Neither the 12µ nor the 19µ rate is right for a 20µ PET, so the alternative to
-asking is costing the ply at whichever price happens to be on file — **a
-confident, wrong margin that nothing on screen contradicts.** The caption names
-the gauge the film _is_ priced at, so it is obvious that a 20 was typed where
-the list holds a 12, rather than reading as an unpriced film.
+It used to be a greyed hint instead — the rate shown through the box rather than
+in it, with blank meaning "follow the list". A hint reads as an empty field, and
+an empty field beside the word **rate** is the one thing on that row that looks
+like it still needs doing. The office kept asking why the figure was not filled
+in, which is the right question: the figure was known, and the screen was being
+coy about it.
 
-Until it is given, **the line does not cost itself.** The margin reads as a dash
-and the material cost is blank, exactly as for a film with no rate on record.
-Asking for the rate is only half the job: while the ply still fell back to the
-stocked gauge's price, a 20µ PET reported an 87.7% margin with an empty rate box
-beside it, and nothing on the screen said the figure was invented.
+It is a box at all because **a film's price is agreed job to job**. The works'
+own quotations carry PET at 185, 175 and 190 — every one at 12µ, every one
+written on 23 March 2022.
+
+**The column beside it stops repeating the rate and reports the distance
+instead.** Once the box is filled and editable, nothing else on the screen would
+catch a digit dropped in it: 190 where 210 was meant is a perfectly plausible
+number. So the column names the **list** rate, quietly while the two agree, and
+says how far apart they are when they do not.
+
+What is typed is used for this quotation and stored on it — `rate_override` on
+the ply. Plies saved before that column existed are read through the old
+inference from the gauge, so nothing already on file moves. A box left empty
+still falls back to the film's rate, which is what every quotation saved before
+the box was filled in does.
+
+#### A gauge off the price list is not a problem to be solved
+
+It used to be. Typing a gauge the chosen film's row does not name turned the box
+into the only price there was, renamed it **Rate for this gauge**, and refused
+to cost the ply until somebody filled it:
+
+```
+Layer 2   [ MET PET ▾ ]   Micron [ 50 ]   Rate for this gauge [ Rs. / kg ]
+                                           MET PET 12µm is priced at 12µ — Rs. 180.00/kg
+```
+
+That was built on reading the master as holding `PET 12µm` and `PET 19µm` as two
+materials at two prices, so a third gauge matched neither and had to be asked
+about. **The works does not price that way.** One rate covers the film at every
+thickness — which means the screen above was demanding a figure nobody had a
+reason to give, on a 50 micron sealant, which is not an exotic request but half
+of everything they laminate. Until it was given the line did not cost itself:
+the material cost was blank and the margin read as a dash.
+
+Now the film's rate applies and the ply costs. Nothing is asked, nothing is
+invented, and the box still sits there filled in for the job that was genuinely
+agreed at something else.
 
 **That rate is used for this quotation and stored on it. It does not reach the
 Rates master.** A figure keyed in the middle of quoting is a decision about one
@@ -534,19 +557,26 @@ document; letting it edit the price list would make every quotation a chance to
 change what every other quotation costs. Adding `PET 20µm` properly is a job for
 the Rates screen, where it gets a rate history like every other material.
 
-Swapping the film clears any rate typed for the previous one — 245 was the price
-of a 20µ PET and must not survive onto a `Foil 7µm` ply.
+**Swapping the film replaces the rate with the new film's own** — 245 was the
+price of a PET and must not survive onto a `Foil 7µm` ply.
 
-Reopening a saved quotation puts the rate back in the box. Nothing records that
-an override happened and nothing needs to: the ply keeps the film's name, and a
-name stating a gauge different from the one quoted **is** the override. That
-rule lives in `@yuva/shared` because the server reads it too — it carries the
-rate through when repricing from storage, and if the two disagreed a quotation
-would display one rate and be repriced at another.
+**Correcting the gauge leaves the rate alone**, because the gauge no longer
+decides the price and there is nothing for it to invalidate. The one exception
+is a gauge that moves the ply onto a different row of the same family, where the
+box follows that row only if it still holds the previous one's figure untouched:
+that one was put there by the form and means no more than "the list", where
+anything else in the box was typed by somebody and is theirs.
+
+Reopening a saved quotation puts the stored rate back in the box. For plies
+saved before that column existed it is deduced — the ply keeps the film's name,
+and a name stating a gauge different from the one quoted **was** the override.
+That rule lives in `@yuva/shared` because the server reads it too: it carries
+the rate through when repricing from storage, and if the two disagreed a
+quotation would display one rate and be repriced at another.
 
 The one film named without a gauge, `PP Woven`, is specified by GSM rather than
-thickness. Its rate applies at whatever micron is typed, so it is never asked
-about.
+thickness — which, now that gauge and price have nothing to do with each other,
+makes it no different from any other row.
 
 Only two and three plies are offered, which is what the works produces. The
 engine and the schema handle four, so a foil laminate can be quoted the day it
@@ -661,6 +691,84 @@ Every job on one quotation must be priced at the same number of quantities. They
 are columns on one document, and a job with three where another has two would
 leave a hole no total could describe.
 
+#### Colours
+
+Which inks the job prints. A new line starts with the four process colours, and
+each is a **toggle** — click to take it off, click to put it back:
+
+```
+COLOURS                                          Priced colour by colour
+[● Cyan] [● Magenta] [● Yellow] [● Black]  [+ Special colour]
+
+4 colours — so 4 cylinders and 4 stations.
+```
+
+**Toggles, not deletions.** Taking a colour off and putting it back is the same
+gesture, which is what somebody correcting a mistake expects; a delete with no
+way back would send them to the job list to start again. A colour that is off
+goes grey rather than disappearing, so the line still says what it does not
+print.
+
+**A special colour is anonymous, and there may be several.** Which one it is —
+the brand's red, a metallic, a white base coat — is settled at artwork, weeks
+after the price was given. So the office adds one chip per special station
+rather than naming anything, and every special is priced at **the dearest ink on
+the rates list**: quote the cheapest and the works loses the difference on every
+job where it guessed low, on a document already sent. Where the works stocks
+real specials, the dearest of those is used instead of a process ink standing in
+for one.
+
+**The strip says what it costs**, because otherwise adding a colour is a change
+with an invisible consequence three fields away:
+
+> **5 colours** — so 5 cylinders and 5 stations. A special is priced at
+> **Rs. 235.00/kg**, the dearest ink on the rates list, because which colour it
+> is gets settled at artwork.
+
+That count is real money. A cylinder is around Rs 9,000, and the sixth and
+seventh stations add Rs 5.50 and Rs 7.50 a kilogram.
+
+**Typing a bigger cylinder count fills the process colours first.** The works
+fills a press in one order — the four colours it always carries, then whatever
+the artwork turns out to need — so typing 7 means CMYK and three specials, not
+seven specials.
+
+That reading is not obvious from the code that used to do it, which only ever
+appended specials. From a line already showing CMYK it came out right; from a
+line showing anything else it came out wrong, and silently. A line with no
+process colours read **"7 colours — so 7 cylinders and 7 stations"** with all
+seven chips saying _Special colour_ and CMYK sitting unselected beside them, and
+every one of those stations priced at the dearest ink on the list — because that
+is what an unnamed colour costs. The count was right, the cylinders were right,
+only the ink was wrong, and nothing on the screen said so.
+
+There are two ways to arrive at a line with no process colours, and the second
+is the one that bites:
+
+- the office takes them off, chip by chip; or
+- the count is typed **before the rates list has arrived** to price them from.
+  The seeding that would put CMYK there then sees a non-empty strip and never
+  runs, so the line stays that way for good.
+
+**The cost of the fix: a deliberately deleted process colour comes back if the
+count is then raised.** That is the right trade. Typing a number is a coarse
+instruction about stations; taking a chip off is a precise one about ink. So the
+precise action stays on the chip, and the coarse one restores the works' normal
+order. Shrinking is unchanged — specials go first, newest first, then process
+colours off the end.
+
+**The colours price the ink, and only the ink.** A line that names its colours
+is costed the Costing sheet's way — each colour on its own laydown, solids and
+rate. A line that names none is costed at the works' blended ink rate over the
+flat ink GSM, which is the only thing it can be priced at. The method follows
+the data rather than a setting, and that is also what keeps every quotation
+written before colours existed reading exactly as it did: none of them has a
+colour list, so none of them moves.
+
+> A colour the works cannot price is left out of the palette rather than offered
+> at zero. A colour costing nothing is worse than a colour missing, because the
+> rate still looks plausible.
+
 #### Cylinders
 
 **The section appears only for a new design.** Pick a saved job and it goes
@@ -671,6 +779,12 @@ away entirely, replaced by a line saying so:
 
 Choose **— New design —** and it comes back, with repeat width and height, the
 number of cylinders, and transport.
+
+**The cylinder count follows the colours** — one each — and stays editable. The
+works' own sheets count seven stations on a job that prices four inks, because a
+station is occupied whether or not its ink is costed, so the figure has to stay
+theirs to set. Type in it and the hint changes to _"Yours — no longer following
+the colours"_, with a **Follow the colours again** link to hand it back.
 
 **The repeats are suggested from the size**, and stay editable. The cylinder's
 circumference is the film's height times the repeat around, so the repeat is
@@ -986,6 +1100,71 @@ ones on screen, and superseded versions are deliberately not there.
 Nothing is repriced when a revision is created. It copies plies, quantities,
 tiers and totals verbatim, because pressing the button should not silently move
 a figure the customer has already been quoted; it reprices on the first save.
+
+### Job sheets — `/job-sheets`, `/job-sheets/:id`
+
+What a run actually consumed, and what it cost a kilogram. The formulas and the
+reasoning are in
+[the API README](../api/README.md#job-sheets--what-a-run-actually-cost); this is
+what the screen does with them.
+
+The list leads with the cost a kilogram, because that is the one figure anybody
+comes here for — it is what the office prices repeat work from, and the reason
+the sheet is filled in at all. Wastage over the allowance shows red, which is
+how a 26% run announces itself without anybody opening it.
+
+#### The sheet is laid out like the paper one
+
+Twenty-one rows in the works' own order, always there, a row the job does not
+use sitting at zero. The columns are the ones on the paper: issued, returned,
+the mix drum, the rate, consumed, amount. Someone standing at a machine with a
+drum in front of them is reading down a printed form they have used for years,
+and a form whose shape changes with the job is one they have to read before they
+can fill it in.
+
+The **mix out / mix back** boxes appear on an ink's own row, because each colour
+is mixed separately. For the solvents they sit at the top of the section, on the
+pooled drum, and the row shows an em dash — the figure is not theirs to type.
+
+#### Everything is live
+
+The whole sheet re-costs on every keystroke, through the very same
+`costJobSheet` the server runs. Type a corrected consumption and the line
+amount, the material total, transport (which follows the kilograms), the margin
+and the cost a kilogram all move together.
+
+This was wrong at first and it showed the moment anybody used it: the money only
+recomputed on save, so a corrected 30 kg on a line rated Rs 240 sat beside an
+amount of Rs 8,890 left over from the last save. A screen whose whole job is
+"type it in and see what it cost" has to answer while you are typing.
+
+#### The consumed column
+
+It holds the computed figure as its **placeholder**, which is what makes typing
+over it an override. Do that and the box turns amber and says "was 37.040"
+underneath, so a correction is visible on the page rather than lost behind the
+number that replaced it.
+
+The placeholder is darkened from the browser's default grey. At that grey it
+read as an empty box, and this is the column the office checks.
+
+#### Amber "no catalogue rate"
+
+A line with no material behind it. It still costs at whatever rate is typed, but
+it has no link to stock, so **posting would skip it**. `seed:job-sheet-materials`
+adds the ten the works was missing; until a line resolves, the flag says so
+rather than the screen pretending.
+
+#### Two buttons that mean different things
+
+**Cost this sheet** settles it: the cost a kilogram is now the works' answer. It
+refuses a sheet with no final output weight, because that is the figure
+everything is divided by.
+
+**Take off stock** is the irreversible one, and it asks first. It issues every
+line with a catalogue material from the oldest batch, against this job, in one
+transaction — then closes the sheet to editing and says so in a green strip.
+Correcting it afterwards is a stock adjustment, not an edit.
 
 ### Inventory — `/inventory`
 
@@ -1636,6 +1815,38 @@ in the app can know, so the works sets it; 100% is the default.
 
 Retire rather than delete, as rates do: quotations were costed against it.
 
+#### The switch that decides whether a big order is cheaper
+
+**The works' own time is charged** picks between billing an operator for the
+minutes of the machine they stand at, and billing the whole crew and the bank
+for the days the job occupies the works. Only the second makes 2,000 kg cheaper
+a kilogram than 1,000 — by the minute, nothing on a job is fixed, and the rate
+falls by twenty paise where the works says it should fall by about ten rupees.
+
+Four figures go with it:
+
+| Field                 | What it is                                                                              |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| A day of the works    | The whole crew and the bank. Not electricity, which is charged per machine              |
+| Make-ready, days      | The same whatever the order — this is what makes a big order cheaper                    |
+| Machine minutes a day | Printing, lamination and slitting run at once, so a day absorbs several machines' worth |
+| Kilograms a day       | Only for a line with no costed structure to find metres in                              |
+
+The reasoning, the fit against the works' fourteen job sheets, and what the
+change is worth at each quantity are in
+[the API README](../api/README.md#why-a-bigger-order-has-to-come-out-cheaper).
+
+**Changing any of these dates the change**, so quotations already written keep
+the figures they were written on — including the model switch itself.
+
+#### Two laminators
+
+The works runs two, and a job runs on one of them. Sort order decides which,
+until a quotation names one: put the machine the works normally uses first, or
+retire the other. Laminator 2 starts as a copy of Laminator 1 because its real
+speed and rate are not recorded anywhere yet — so the two price identically
+until somebody says how they differ.
+
 ### Rates — `/rates`
 
 Today's raw material prices, grouped by Films / Ink / Adhesive / Solvents.
@@ -1816,17 +2027,21 @@ store that does not exist yet.
 The browser recomputes the same figures the server does, using **the same code**
 — `@yuva/shared` is imported by both. Nothing is duplicated or reimplemented.
 
-| Where                 | What is previewed                                          |
-| --------------------- | ---------------------------------------------------------- |
-| Customer job editor   | Composite GSM, pouches per kg                              |
-| Quotation form line   | Total pouches and weight, cylinder size and cost, margin   |
-| Quotation form totals | Material and cylinder subtotals, GST, grand total, advance |
-| Receive material      | What a delivery converts to in the stocked unit            |
-| Rates screen          | The change % a typed rate would produce                    |
+| Where                 | What is previewed                                           |
+| --------------------- | ----------------------------------------------------------- |
+| Customer job editor   | Composite GSM, pouches per kg                               |
+| Quotation form line   | Total pouches and weight, cylinder size and cost, margin    |
+| Quotation form totals | Material and cylinder subtotals, GST, grand total, advance  |
+| Receive material      | What a delivery converts to in the stocked unit             |
+| Rates screen          | The change % a typed rate would produce                     |
+| Job sheet             | The whole sheet — every line, every overhead, the cost a kg |
 
 **The server always recalculates on save and its value wins.** The browser
 figure exists so the effect of a change is visible before committing to it —
-it is feedback, not the source of truth. Formulas and worked examples are
+it is feedback, not the source of truth. The job sheet is the one place where
+the preview covers the whole document rather than a line of it, and it agrees
+with the server to the paisa for the same reason as everything else here: it is
+not a second implementation. Formulas and worked examples are
 documented in [the API README](../api/README.md#calculations).
 
 ---

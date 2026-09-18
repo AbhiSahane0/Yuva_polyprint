@@ -7,6 +7,7 @@ import cylinderRoutes from '../modules/cylinders/cylinder.routes.js';
 import gstinRoutes from '../modules/gstin/gstin.routes.js';
 import inventoryRoutes from '../modules/inventory/inventory.routes.js';
 import jobRoutes from '../modules/jobs/job.routes.js';
+import jobSheetRoutes from '../modules/job-sheets/job-sheet.routes.js';
 import materialRoutes from '../modules/materials/material.routes.js';
 import monitorRoutes from '../modules/monitor/monitor.routes.js';
 import purchaseRoutes from '../modules/purchase/purchase.routes.js';
@@ -41,6 +42,15 @@ router.use('/quotations', authenticate, requireModule('quotations'), quotationRo
  * rather than on whichever screen happens to be open.
  */
 router.use('/jobs', authenticate, requireModule('customers'), jobRoutes);
+
+/*
+ * Job sheets — what a run actually cost, as opposed to what it was quoted at.
+ * Readable by anyone signed in, because the figure a finished sheet produces is
+ * what the office prices repeat work from. Writing needs the jobs module, and
+ * taking the material off stock needs inventory as well; both guards are in the
+ * module's own routes, next to the endpoints they protect.
+ */
+router.use('/job-sheets', authenticate, jobSheetRoutes);
 
 /*
  * Rates are readable by anyone signed in, because quotation costing depends on

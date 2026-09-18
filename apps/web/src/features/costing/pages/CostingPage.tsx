@@ -389,6 +389,20 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
     ['otherPerJob', 'Sundries, Rs/job', 'A flat sum the works does not itemise'],
     ['emiPerMonth', 'Bank EMI, Rs/month', 'Recovered across machine time'],
     ['emiHoursPerMonth', 'Machine hours a month', 'What the EMI is spread over'],
+    /* The three the day model rests on. Fitted against the works' own fourteen
+       job sheets, and theirs to change the moment they disagree. */
+    ['worksDayCost', 'A day of the works, Rs', 'The whole crew and the bank. Not electricity'],
+    [
+      'makeReadyDays',
+      'Make-ready, days',
+      'The same whatever the order — this is what makes a big order cheaper',
+    ],
+    [
+      'machineMinutesPerDay',
+      'Machine minutes a day',
+      'Printing, lamination and slitting run at once, so a day absorbs several machines’ worth',
+    ],
+    ['kgPerDay', 'Kilograms a day', 'Only for a line with no costed structure'],
     ['pouchMakingPerPouch', 'Pouch making, Rs/pouch', 'Forming, sealing and cutting one'],
     ['dPunchPerPouch', 'D punch, Rs/pouch', 'What one costs to make instead'],
     ['dPunchLargePerPouch', 'D punch, wide, Rs/pouch', 'The punch is made across the top'],
@@ -541,6 +555,21 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
                   ['OCCUPIED', 'Running and setup time'],
                 ],
                 'The machine is tied up during setup either way',
+              ],
+              /*
+               * The one that decides whether a big order is cheaper. By the
+               * minute, nothing on a job is fixed, so 2,000 kg costs what
+               * 1,000 kg costs. By the day, the make-ready is the same whatever
+               * the order and spreading it is the whole effect.
+               */
+              [
+                'rateModel',
+                'The works’ own time is charged',
+                [
+                  ['PER_MINUTE', 'By the machine minute (workbook)'],
+                  ['PER_DAY', 'By the day the job occupies the works'],
+                ],
+                'By the day is what makes a bigger order cheaper a kilogram',
               ],
               [
                 'marginBasis',

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '@yuva/shared';
+import { valuesAsAt, type SettingChange } from './setting-history.js';
 
 /**
  * **A quotation written for an older day must be costed on that day's figures.**
@@ -66,5 +67,56 @@ describe('reading a setting as at a date', () => {
     expect(asAt({}, [], '2022-03-23', TODAY).emiPerMonth).toBeUndefined();
     /* Which is what makes the service fill it from here. */
     expect(DEFAULT_SETTINGS.emiPerMonth).toBe(4166.66);
+  });
+});
+
+/**
+ * **Adding a setting must not rewrite history.**
+ *
+ * These call the service's own `valuesAsAt` rather than a copy of it. The tests
+ * above resolve the dates themselves, which is how the hole below survived
+ * being "covered" — the shadow implementation had the same one.
+ */
+describe('a setting that did not exist yet', () => {
+  const HISTORY: SettingChange[] = [
+    { key: 'emiPerMonth', value: '4166.66', effectiveDate: '2022-03-23' },
+    { key: 'emiPerMonth', value: '10000', effectiveDate: '2022-07-10' },
+    /* Switched on today, long after the 2022 quotations were written. */
+    { key: 'rateModel', value: 'PER_DAY', effectiveDate: '2026-09-18' },
+  ];
+  const CURRENT = { emiPerMonth: '10000', rateModel: 'PER_DAY', gstPercent: '18' };
+
+  /*
+   * The bug this exists for. `rateModel` has no row on or before 2022, so the
+   * old loop left it at today's value and every 2022 quotation silently read
+   * PER_DAY — moving seven quotations that reproduce the works' own sheets.
+   */
+  it('is dropped for a date before it was ever set, so the default stands', () => {
+    const then = valuesAsAt(CURRENT, HISTORY, '2022-03-23');
+    expect(then['rateModel']).toBeUndefined();
+  });
+
+  it('keeps a key that has never been edited at all', () => {
+    // gstPercent has no history: today's value has always been its value.
+    const then = valuesAsAt(CURRENT, HISTORY, '2022-03-23');
+    expect(then['gstPercent']).toBe('18');
+  });
+
+  it('still reads the value in force where one was recorded', () => {
+    expect(valuesAsAt(CURRENT, HISTORY, '2022-03-23')['emiPerMonth']).toBe('4166.66');
+    expect(valuesAsAt(CURRENT, HISTORY, '2022-07-10')['emiPerMonth']).toBe('10000');
+    expect(valuesAsAt(CURRENT, HISTORY, '2022-06-30')['emiPerMonth']).toBe('4166.66');
+  });
+
+  it('reads today’s value once the date is past the change', () => {
+    expect(valuesAsAt(CURRENT, HISTORY, '2026-09-18')['rateModel']).toBe('PER_DAY');
+  });
+
+  /* Order of the rows is the database's business, not a rule to depend on. */
+  it('does not depend on the order the changes arrive in', () => {
+    const shuffled = [HISTORY[2]!, HISTORY[0]!, HISTORY[1]!];
+    expect(valuesAsAt(CURRENT, shuffled, '2022-03-23')).toEqual(
+      valuesAsAt(CURRENT, HISTORY, '2022-03-23'),
+    );
   });
 });

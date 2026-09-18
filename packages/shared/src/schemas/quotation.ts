@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { partialWithoutDefaults } from './partial-update.js';
-import { JOB_KINDS, POUCH_TYPES, PRICING_BASES, pricingBasisFor } from '../constants/job.js';
+import {
+  INK_KINDS,
+  JOB_KINDS,
+  POUCH_TYPES,
+  PRICING_BASES,
+  pricingBasisFor,
+} from '../constants/job.js';
 import { paginationQuerySchema } from './common.js';
 import { isMobile, normaliseMobile } from '../lib/phone.js';
 
@@ -70,6 +76,23 @@ export const quotationQuantitySchema = z.object({
   ratePerPouch: zeroOrMore('Rate').default(0),
 });
 
+/**
+ * One ink on a line, snapshotted.
+ *
+ * The figures travel with the quotation rather than being looked up when it is
+ * read, for the same reason a ply's rate does: reopening a document in a year
+ * has to show what was quoted, not what it would cost now.
+ */
+export const quotationColourSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  kind: z.enum(INK_KINDS),
+  /** Null on a special, which by definition names no ink. */
+  materialId: z.string().min(1).nullable().default(null),
+  laydownGsm: zeroOrMore('Laydown'),
+  solidsPercent: zeroOrMore('Solids'),
+  ratePerKg: zeroOrMore('Rate'),
+});
+
 export const quotationItemSchema = z
   .object({
     /** Present when editing a line that already exists. */
@@ -122,6 +145,18 @@ export const quotationItemSchema = z
       .array(quotationLayerSchema)
       .min(2, 'A laminate needs at least two plies')
       .max(4, 'More than four plies is not something this works produces'),
+
+    /**
+     * Which inks the line prints, in the order they are shown.
+     *
+     * Empty on every line written before colours were chosen at all, and those
+     * are priced the way they always were — at the works' blended ink rate over
+     * a flat ink GSM. A line that names its colours is priced on them.
+     *
+     * Eight is the press. A ninth colour is not a job this works can run, so
+     * accepting one would only let a quotation describe something undeliverable.
+     */
+    colours: z.array(quotationColourSchema).max(8, 'The press carries eight stations').default([]),
 
     /** One to three quantities, smallest first. */
     quantities: z
@@ -460,6 +495,37 @@ export const settingsSchema = z.object({
    * time alone; charging the setup as well is truer but does not tie out.
    */
   emiBasis: z.enum(['RUN_TIME', 'OCCUPIED']),
+
+  /**
+   * **How the works' own time is recovered.**
+   *
+   * `PER_MINUTE` bills each operator for the minutes of the machine they stand
+   * at. Everything in it scales with the kilograms, so a job's only fixed cost
+   * is `otherPerJob` — and between 1,000 kg and 2,000 kg the rate falls by
+   * twenty paise where the works says it should fall by about ten rupees.
+   *
+   * `PER_DAY` bills the whole crew and the bank for the days the job occupies
+   * the works: `makeReadyDays + kg / kgPerDay`. The make-ready is the same
+   * whatever the order, and spreading it is the entire effect.
+   *
+   * Default `PER_MINUTE`, and settings read as at the quotation's own date —
+   * so switching this today leaves every quotation already written alone.
+   */
+  rateModel: z.enum(['PER_MINUTE', 'PER_DAY']),
+  /** One day of the works: the whole crew and the bank. Not electricity. */
+  worksDayCost: z.coerce.number().min(0).max(10_000_000),
+  /** Days before the job makes anything sellable. The same whatever the order. */
+  makeReadyDays: z.coerce.number().min(0).max(30),
+  /**
+   * Machine minutes the works gets through in an elapsed day.
+   *
+   * Not minutes in a shift — printing, lamination and slitting run at once, so
+   * a day absorbs several machines' worth. The works' own sheets fit about
+   * 1,600, which is a 480-minute shift roughly three times over.
+   */
+  machineMinutesPerDay: z.coerce.number().min(1).max(100_000),
+  /** Kilograms a day, for a line with no costed structure. A fallback only. */
+  kgPerDay: z.coerce.number().min(1).max(1_000_000),
   /**
    * Making one pouch — forming, sealing and cutting. **Per pouch, not per
    * kilogram**: the same charge reads between Rs 11 and Rs 64 a kilogram across
@@ -546,6 +612,48 @@ export const settingsSchema = z.object({
    * to match `defaultAdhesiveRatio` to split on whatever is chosen.
    */
   adhesiveSplitRatio: z.string().trim().max(20),
+
+  /*
+   * ---- Job sheets ---------------------------------------------------------
+   *
+   * What a NEW job sheet starts with. A sheet copies these onto itself the
+   * moment it is opened and then keeps its own copy, because a sheet is a
+   * record of what the works decided that week: electricity was Rs 4,000 a day
+   * on the March tabs of the works' own workbook and Rs 6,000 on the September
+   * ones. A record that repriced itself when a setting changed would not be one.
+   */
+
+  /** A day on the meter for the whole works, shared out by machine. */
+  jobSheetElectricityPerDay: z.coerce.number().min(0).max(1_000_000),
+  /**
+   * Rupees a kilogram of material brought IN — not of finished goods going out.
+   * The works' own sheets run it between 3.20 and 7.00 and type the figure per
+   * job; this is the one a new sheet starts at.
+   */
+  jobSheetTransportPerKg: z.coerce.number().min(0).max(1000),
+  /** What pouching costs a kilogram. Zero on a roll job, which is what makes it one. */
+  jobSheetPouchingPerKg: z.coerce.number().min(0).max(1000),
+  jobSheetEmiPerDay: z.coerce.number().min(0).max(1_000_000),
+  /**
+   * The margin, and what it is taken on.
+   *
+   * Ten per cent of the MATERIAL, which is the works' own rule and reads like
+   * an oversight until you see what the alternative does: charging it on the
+   * electricity and the wages as well takes a margin on the cost of being open,
+   * and on the works' fourteen September jobs that is 12% to 19% more profit
+   * than they believe they are making.
+   */
+  jobSheetProfitPercent: z.coerce.number().min(0).max(100),
+  /** What the works allows itself to lose between the laminator and the pack. */
+  jobSheetWastagePercent: z.coerce.number().min(0).max(100),
+  /**
+   * What a new sheet suggests as final output, as a percentage of good laminate.
+   *
+   * A suggestion only. The works' own sheets run 96% on some jobs and 97% on
+   * others because the packed weight is weighed, not assumed — so the app
+   * offers this and then keeps whatever the office actually put on the scale.
+   */
+  jobSheetOutputYieldPercent: z.coerce.number().min(0).max(100),
 });
 
 export type AppSettings = z.infer<typeof settingsSchema>;
@@ -581,6 +689,27 @@ export const DEFAULT_SETTINGS: AppSettings = {
   emiHoursPerMonth: 24,
   emiBasis: 'RUN_TIME',
   /*
+   * PER_MINUTE is what the works held until they asked for the day model, and
+   * a default is what an undated quotation falls back to. Switching it on the
+   * Costing screen dates the change, so nothing already quoted moves.
+   */
+  rateModel: 'PER_MINUTE',
+  /*
+   * Fitted against the works' own fourteen September 2026 job sheets:
+   * days = 0.751 + kg / 1,945, and a day of crew plus bank is about Rs 20,000.
+   * All three are theirs to change on the Costing screen.
+   */
+  worksDayCost: 20000,
+  makeReadyDays: 0.75,
+  /*
+   * Fitted against the works' own fourteen job sheets: their recorded days
+   * against the machine minutes their metres and passes demand, at the speeds
+   * on their Costing screen. R2 0.95, and it puts Amruta Family Tea at three
+   * days where kilograms alone said two.
+   */
+  machineMinutesPerDay: 1606,
+  kgPerDay: 1945,
+  /*
    * Read off the works' pouch workbook and confirmed with them: a standup is
    * 0.25 to make, a D punch 0.60 flat, and the zipper 3.60 a metre. The
    * workbook shows 3.80 on one of its two zipper sheets; 3.60 is the rate.
@@ -614,6 +743,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ethylAcetatePercent: 50,
   defaultAdhesiveRatio: '100:146:15',
   adhesiveSplitRatio: '100:189:15',
+
+  /* Job sheets. Read off the works' September 2026 workbook. */
+  jobSheetElectricityPerDay: 6000,
+  jobSheetTransportPerKg: 6.8,
+  jobSheetPouchingPerKg: 10,
+  jobSheetEmiPerDay: 10000,
+  jobSheetProfitPercent: 10,
+  jobSheetWastagePercent: 5,
+  jobSheetOutputYieldPercent: 97,
 };
 
 /*

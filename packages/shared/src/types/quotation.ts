@@ -1,5 +1,18 @@
-import type { JobKind, PouchType, PricingBasis } from '../constants/job.js';
+import type { InkKind, JobKind, PouchType, PricingBasis } from '../constants/job.js';
 import type { QuotationStatus } from '../schemas/quotation.js';
+
+/** One ink a line prints, as it was priced the day the quotation was written. */
+export interface QuotationItemColour {
+  id: string;
+  position: number;
+  /** Null on a special, and on a process ink later deleted from the list. */
+  materialId: string | null;
+  name: string;
+  kind: InkKind;
+  laydownGsm: number;
+  solidsPercent: number;
+  ratePerKg: number;
+}
 
 /** One ply of a line's laminate, as the API returns it. */
 export interface QuotationItemLayer {
@@ -82,6 +95,7 @@ export interface QuotationItem {
   compositeGsm: number;
 
   layers: QuotationItemLayer[];
+  colours: QuotationItemColour[];
   /** One per quoted quantity, ordered smallest first. */
   quantities: QuotationItemQuantity[];
 }

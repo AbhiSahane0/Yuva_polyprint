@@ -8,20 +8,24 @@ import { LayerFields } from './LayerFields';
  * The film and the gauge are two questions, asked once each.
  *
  * The dropdown offers families — PET, PE — and the gauge is typed beside it.
- * The rates master holds `PET 12µm` and `PET 19µm` separately because they are
- * bought at separate prices, but they are one film at the machine, and listing
- * both asked the same question twice.
  *
- * Family plus gauge names a stocked film and uses its rate. Only a gauge the
- * master does not stock has no price to find, and that is the one case the row
- * asks about — costing it silently at the neighbouring gauge's price is the
- * failure guarded here, because it produces a confident wrong margin that
- * nothing on screen contradicts.
+ * **A film has one rate and it applies at every gauge.** The works pays near
+ * enough the same for a kilogram of PET whether the reel is 12 micron or 15, so
+ * it keeps one PET rate rather than one per thickness. The gauge decides how
+ * many metres that kilogram covers, never what the kilogram costs.
+ *
+ * The failure guarded here is the one that came of reading the master the other
+ * way: a ply quoted at a gauge no row named was refused a price, so an ordinary
+ * 50µ sealant left the whole line uncostable and the margin reading as a dash
+ * until somebody typed a figure to make the screen work again.
  */
 
 const FILMS = [
   { id: 'pet12', name: 'PET 12µm', density: 1.4, currentRate: 210 },
   { id: 'pet19', name: 'PET 19µm', density: 1.4, currentRate: 218 },
+  // One row, at 12µ, and the works laminates it at 50 — which is the structure
+  // the bug below was reported on.
+  { id: 'met12', name: 'MET PET 12µm', density: 1.4, currentRate: 180 },
   { id: 'pe50', name: 'PE 50µm', density: 0.92, currentRate: 185 },
   // Specified by GSM, so its name states no gauge and its rate applies at any
   // thickness the office types.
@@ -63,6 +67,10 @@ const pick = (family: string, n = 0) =>
   fireEvent.change(filmSelect(n), { target: { value: family } });
 const type = (micron: string, n = 0) =>
   fireEvent.change(micronBox(n), { target: { value: micron } });
+const typeRate = (rate: string, n = 0) =>
+  fireEvent.change(rateBox(n)!, { target: { value: rate } });
+/** The whole row as somebody reads it, so a sentence split across spans matches. */
+const onScreen = () => document.body.textContent ?? '';
 
 describe('LayerFields', () => {
   it('asks for the micron on every ply, chosen film or not', () => {
@@ -103,58 +111,73 @@ describe('LayerFields', () => {
    * **A film's price is agreed job to job.**
    *
    * The works' own quotations carry PET at 185, 175 and 190 — every one at 12µ,
-   * every one written on 23 March 2022. The box used to appear only for a gauge
-   * the rates master does not stock, which covered the other reason to type a
-   * rate and missed this one completely: a rate agreed at the film's own gauge
-   * was stored and then invisible, so reopening the quotation and pressing Save
-   * replaced what was charged with the catalogue price.
+   * every one written on 23 March 2022. So the rate is asked on every ply, and
+   * it is asked by being filled in rather than hinted at: a greyed placeholder
+   * reads as an empty field, and an empty field beside the word "rate" is the
+   * one thing on the row that looks like it still needs doing.
    */
-  it('offers a rate on a film stocked at the gauge typed, and shows the list price', () => {
+  it('fills the rate box with the film’s own rate, and names it as the list', () => {
     render(<Host />);
     pick('PET');
-    type('19');
-    // PET 19µm is a real material at Rs. 218 — offered as the placeholder, so
-    // leaving the box alone follows the list.
-    expect(rateBox(0)).toBeTruthy();
-    expect(rateBox(0)!.placeholder).toBe('218.00');
-    expect(screen.getByText(/218\.00/)).toBeTruthy();
+    expect(rateBox(0)?.value).toBe('210');
+    expect(onScreen()).toContain('List Rs. 210.00');
   });
 
-  it('calls it the rate for this job at the stocked gauge', () => {
+  it('calls it the rate for this job, whatever the gauge', () => {
     render(<Host />);
     pick('PET');
-    expect(rateBox(0)).toBeTruthy();
+    type('50');
     expect(screen.getByText('Rate for this job')).toBeTruthy();
     expect(screen.queryByText('Rate for this gauge')).toBeNull();
-    expect(screen.getByText(/210\.00/)).toBeTruthy();
   });
 
-  it('asks for a rate once a gauge off the price list is typed', () => {
+  it('costs a gauge the master does not stock instead of refusing to', () => {
     render(<Host />);
-    pick('PET');
-    type('20');
+    pick('MET PET');
+    type('50');
 
-    expect(rateBox(0)).toBeTruthy();
     /*
-     * And names the nearest gauge the master does stock, so it is obvious that
-     * a 20 was typed against a list holding 12 and 19 — rather than reading as
-     * an unpriced film. The nearest is also the ply's density carrier: density
-     * is a property of the polymer, not the gauge, so any PET answers for it.
+     * The bug this replaces: the master holds one MET PET row, at 12µ, and 50µ
+     * is an ordinary sealant. The row used to answer "MET PET 12µm is priced at
+     * 12µ — Rs. 180.00/kg" with an empty box, and the line stayed uncostable
+     * until a figure was invented.
      */
-    expect(screen.getByText(/PET 19µm is priced at 19µ/)).toBeTruthy();
+    expect(rateBox(0)?.value).toBe('180');
+    expect(onScreen()).not.toContain('is priced at');
   });
 
-  it('changes what it calls the box when the gauge goes off the list and back', () => {
+  it('follows the other row’s rate when the gauge moves the ply onto it', () => {
     render(<Host />);
     pick('PET');
-    type('20');
-    // Off the list the film's own rate cannot apply, so the box is the only
-    // price there is — and the label says which gauge it is for.
-    expect(screen.getByText('Rate for this gauge')).toBeTruthy();
+    expect(rateBox(0)?.value).toBe('210');
 
-    type('12');
-    expect(screen.getByText('Rate for this job')).toBeTruthy();
-    expect(screen.queryByText('Rate for this gauge')).toBeNull();
+    type('19');
+    // The box held PET 12µm's rate untouched, so it was this form's figure
+    // rather than anybody's, and PET 19µm's own rate replaces it.
+    expect(rateBox(0)?.value).toBe('218');
+  });
+
+  it('keeps a rate the office typed when the gauge is corrected', () => {
+    render(<Host />);
+    pick('PET');
+    typeRate('245');
+    type('19');
+    // 245 is theirs. A corrected micron is not a reason to throw it away, and
+    // wiping it is what the row used to do on every keystroke in that box.
+    expect(rateBox(0)?.value).toBe('245');
+  });
+
+  it('says how far this job is from the list when the two differ', () => {
+    render(<Host />);
+    pick('PET');
+    typeRate('190');
+    /*
+     * Once the box is filled and editable, nothing else on the screen would
+     * catch a digit dropped in it — 190 where 210 was meant is a plausible
+     * number. So the column stops repeating the rate and reports the distance.
+     */
+    expect(onScreen()).toContain('List Rs. 210.00');
+    expect(onScreen()).toContain('Rs. 20.00 below');
   });
 
   it('offers a rate for a film whose name states no gauge', () => {
@@ -163,7 +186,7 @@ describe('LayerFields', () => {
     type('90');
     // PP Woven is priced by GSM, so its rate applies at any thickness — but the
     // works may still have agreed a different price for this job.
-    expect(rateBox(0)).toBeTruthy();
+    expect(rateBox(0)?.value).toBe('150');
     expect(screen.getByText('Rate for this job')).toBeTruthy();
   });
 
@@ -173,17 +196,15 @@ describe('LayerFields', () => {
     expect(rateBox(0)).toBeNull();
   });
 
-  it('clears a typed rate when the film is swapped', () => {
+  it('replaces a typed rate with the new film’s when the film is swapped', () => {
     render(<Host />);
     pick('PET');
-    type('20');
-    fireEvent.change(rateBox(0)!, { target: { value: '245' } });
+    typeRate('245');
 
     pick('PE');
-    type('20');
 
-    // 245 was the price of a 20µ PET. Carrying it onto a polythene ply would
-    // cost that ply at a rate nobody entered for it.
-    expect(rateBox(0)?.value).toBe('');
+    // 245 was the price of a PET. Carrying it onto a polythene ply would cost
+    // that ply at a rate nobody entered for it.
+    expect(rateBox(0)?.value).toBe('185');
   });
 });

@@ -9,7 +9,16 @@ import {
   type UseFormSetValue,
 } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, ArrowRight, Building2, Check, Plus, Trash2, UserPlus } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Building2,
+  Check,
+  Palette,
+  Plus,
+  Trash2,
+  UserPlus,
+} from 'lucide-react';
 import {
   type CreateQuotationFormValues,
   type CreateQuotationInput,
@@ -24,11 +33,15 @@ import {
   JOB_KIND_LABELS,
   POUCH_TYPES,
   POUCH_TYPE_LABELS,
+  type JobColour,
   type PouchType,
   type PricingBasis,
   computeItemGeometry,
   cylinderWarnings,
+  defaultJobColours,
   inkGsmFor,
+  resizeColours,
+  specialColourFrom,
   structureGsm,
   adhesiveGsmFor,
   computeMargin,
@@ -94,6 +107,7 @@ import {
   type RateCostingLine,
   type RateCostingOverrides,
 } from '@/features/costing/api/use-rate-costing';
+import { ColourFields } from '../components/ColourFields';
 import { LayerFields } from '../components/LayerFields';
 import { QuantityFields, type QuantityResult } from '../components/QuantityFields';
 import { StepIndicator, type Step } from '../components/StepIndicator';
@@ -172,6 +186,9 @@ const BLANK_DESIGN = {
   repeatWidth: 1,
   repeatHeight: 1,
   cylinderCount: 4,
+  /* Seeded with the four process colours once the rates list has loaded —
+     see `JobCard`. Empty here because this constant cannot know them. */
+  colours: [] as JobColour[],
   transportCost: 0,
   chargeCylinders: true,
 } as const;
@@ -642,14 +659,12 @@ export default function QuotationFormPage() {
           density: film?.density ?? null,
           /*
            * Shared, so the margin shown while a price is being chosen is the
-           * one the quotation is saved with. It also refuses to guess: a gauge
-           * off the price list with no rate yet costs nothing, so the line
-           * reads as uncostable rather than quietly borrowing the stocked
-           * gauge's price.
+           * one the quotation is saved with. A film is priced per kilogram at
+           * one rate for every gauge, so the micron above changes what the ply
+           * weighs and never what it costs.
            */
           ratePerKg: plyRatePerKg({
             materialName: film?.name ?? null,
-            micron: num(layer?.micron),
             stockRate: film?.currentRate ?? null,
             override: override > 0 ? override : null,
           }),
@@ -1341,6 +1356,7 @@ export default function QuotationFormPage() {
                 setValue={setValue}
                 films={films}
                 materials={materials ?? []}
+                isEdit={isEdit}
                 customerName={watched.customerName ?? ''}
                 quotationNumber={existing?.number ?? null}
                 jobs={chosenCustomer?.jobs ?? []}
@@ -1478,6 +1494,7 @@ function JobCard({
   setValue,
   films,
   materials,
+  isEdit,
   customerName,
   quotationNumber,
   jobs,
@@ -1497,6 +1514,13 @@ function JobCard({
   films: Film[];
   /** The full rate catalogue — the costing panel needs inks and solvents too. */
   materials: Material[];
+  /**
+   * Whether this is an existing quotation.
+   *
+   * Only so a NEW line can be seeded with the four process colours. An existing
+   * one is left exactly as it was stored, colours or none.
+   */
+  isEdit: boolean;
   /** Only for naming the downloaded costing sheet. */
   customerName: string;
   quotationNumber: number | null;
@@ -1528,6 +1552,68 @@ function JobCard({
    * size is touched, which is worse than not suggesting at all.
    */
   const [repeatsTaken, setRepeatsTaken] = useState(false);
+
+  /** The inks the works can price, and what a colour chip costs from them. */
+  const inkOptions = useMemo(
+    () =>
+      materials
+        .filter((material) => material.category === 'INK')
+        .map((material) => ({
+          id: material.id,
+          name: material.name,
+          inkKind: material.inkKind,
+          laydownGsm: material.laydownGsm,
+          solidsPercent: material.solidsPercent,
+          currentRate: material.currentRate,
+        })),
+    [materials],
+  );
+
+  const processPalette = useMemo(() => defaultJobColours(inkOptions), [inkOptions]);
+  const special = useMemo(() => specialColourFrom(inkOptions), [inkOptions]);
+  const colours = useMemo(() => (item?.colours ?? []) as JobColour[], [item?.colours]);
+
+  /*
+   * A NEW line starts with the four process colours, once the rates list has
+   * arrived to price them from.
+   *
+   * Only a new one. A quotation written before colours were chosen at all has
+   * none stored, and seeding it on open would silently reprice a document that
+   * has already gone to a customer — it would move off the works' blended ink
+   * rate and onto whatever its inks cost today. Those keep the method they were
+   * priced with until somebody chooses colours deliberately.
+   */
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current || isEdit) return;
+    if (colours.length > 0 || processPalette.length === 0) return;
+    seeded.current = true;
+    setValue(`items.${index}.colours`, processPalette as never, { shouldDirty: false });
+    setNumber(setValue, `items.${index}.cylinderCount`, processPalette.length);
+  }, [isEdit, colours.length, processPalette, index, setValue]);
+
+  /*
+   * The colour strip and the Cylinders box are one fact told twice, so they move
+   * together in BOTH directions.
+   *
+   * Taking a colour off drops a cylinder. Typing 7 fills the four process
+   * colours first and then adds three specials — the order the works fills a
+   * press in — because a station carrying something nobody has named yet is
+   * exactly what a special is, and it is what the office means when they type a
+   * bigger number than the colours they have listed.
+   */
+  const setColours = (next: JobColour[]) => {
+    setValue(`items.${index}.colours`, next as never, { shouldDirty: true });
+    setNumber(setValue, `items.${index}.cylinderCount`, next.length);
+  };
+
+  const setCylinderCount = (count: number) => {
+    const next = resizeColours(colours, count, special, processPalette);
+    setValue(`items.${index}.colours`, next as never, { shouldDirty: true });
+    /* Resizing floors at one, so the box is corrected to what actually applies
+       rather than left showing a figure nothing was done with. */
+    if (next.length !== count) setNumber(setValue, `items.${index}.cylinderCount`, next.length);
+  };
 
   /** False on a repeat order, whose cylinders already exist. */
   const charged = item?.chargeCylinders !== false;
@@ -1567,6 +1653,12 @@ function JobCard({
       ups: Math.max(1, num(item?.repeatWidth) || 1),
       /* One cylinder per colour, which is what the line is charged for. */
       colourCount: Math.max(1, num(item?.cylinderCount) || 1),
+      /*
+       * The inks this line prints, which price the ink and nothing else — the
+       * stations and the cylinders come off the count above, because a station
+       * can be occupied by an ink nobody costed.
+       */
+      colours,
       makesPouches: jobKind !== 'ROLL',
       /* The style decides what making one costs, and the FINISHED width is what
          a zipper crosses — the film width includes the side gussets. */
@@ -1576,7 +1668,7 @@ function JobCard({
       /* The document's own count, so the suggestion and the line agree. */
       piecesPerKg: cost?.geometry.pouchesPerKg ?? 0,
     }),
-    [item, films, filmWidthMm, filmHeightMm, jobKind, pouchType, cost],
+    [item, films, filmWidthMm, filmHeightMm, jobKind, pouchType, colours, cost],
   );
 
   /*
@@ -1987,6 +2079,35 @@ function JobCard({
         </div>
 
         {/*
+          The colours sit under the structure and above the cylinders, which is
+          the order the decisions are made in: what it is made of, what is
+          printed on it, and therefore how many cylinders have to be cut.
+        */}
+        <div className="col-span-2 sm:col-span-12">
+          <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <span className="text-ink-500 flex items-center gap-2 text-xs font-semibold tracking-wide uppercase">
+                <Palette className="size-3.5" aria-hidden />
+                Colours
+              </span>
+              {colours.length > 0 ? (
+                <span className="text-ink-400 text-xs">Priced colour by colour</span>
+              ) : (
+                <span className="text-warning-700 text-xs">
+                  Priced at the works&rsquo; blended ink
+                </span>
+              )}
+            </div>
+            <ColourFields
+              colours={colours}
+              processPalette={processPalette}
+              special={special}
+              onChange={setColours}
+            />
+          </div>
+        </div>
+
+        {/*
           A repeat shows no cylinder panel at all. It used to explain itself in
           a dashed box above the costing — true, and one more line between the
           office and the price.
@@ -2049,10 +2170,24 @@ function JobCard({
                   </Field>
                 </div>
                 <div className="sm:col-span-3">
-                  <Field label="Total No. of Cylinders" htmlFor={`items.${index}.cylinderCount`}>
+                  {/*
+                    One per colour, both ways. Typing a bigger number adds
+                    specials — a station carrying something nobody has named yet
+                    — and a smaller one takes colours off, newest first.
+                  */}
+                  <Field
+                    label="Total No. of Cylinders"
+                    htmlFor={`items.${index}.cylinderCount`}
+                    hint={colours.length > 0 ? 'One per colour' : undefined}
+                  >
                     <NumberInput
                       id={`items.${index}.cylinderCount`}
-                      {...register(`items.${index}.cylinderCount`)}
+                      {...register(`items.${index}.cylinderCount`, {
+                        onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+                          const typed = Number(event.target.value);
+                          if (Number.isFinite(typed) && typed > 0) setCylinderCount(typed);
+                        },
+                      })}
                     />
                   </Field>
                 </div>

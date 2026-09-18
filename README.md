@@ -310,15 +310,18 @@ Run from the repository root.
 
 Workspace scripts worth knowing:
 
-| Script                                   | Does                                                        |
-| ---------------------------------------- | ----------------------------------------------------------- |
-| `npm run seed:admin -w @yuva/api`        | create the first administrator (refuses if one exists)      |
-| `npm run seed:materials -w @yuva/api`    | seed the material catalogue                                 |
-| `npm run seed:costing -w @yuva/api`      | machines, wages and ink figures for the rate costing        |
-| `npm run seed:excel-rates -w @yuva/api`  | bring rates and master data to the client's own workbook    |
-| `npm run schema:docs -w @yuva/api`       | regenerate `docs/database-schema.md` from the live database |
-| `npm run db:copy-to-remote -w @yuva/api` | copy local data up to Neon                                  |
-| `npm run import:legacy -w @yuva/api`     | import the legacy spreadsheet                               |
+| Script                                          | Does                                                                   |
+| ----------------------------------------------- | ---------------------------------------------------------------------- |
+| `npm run seed:admin -w @yuva/api`               | create the first administrator (refuses if one exists)                 |
+| `npm run seed:materials -w @yuva/api`           | seed the material catalogue                                            |
+| `npm run seed:costing -w @yuva/api`             | machines, wages and ink figures for the rate costing                   |
+| `npm run seed:excel-rates -w @yuva/api`         | bring rates and master data to the client's own workbook               |
+| `npm run schema:docs -w @yuva/api`              | regenerate `docs/database-schema.md` from the live database            |
+| `npm run db:copy-to-remote -w @yuva/api`        | copy local data up to Neon                                             |
+| `npm run import:legacy -w @yuva/api`            | import the legacy spreadsheet                                          |
+| `npm run check:job-sheets -w @yuva/api`         | cost the works' job-sheet workbook and check all fourteen              |
+| `npm run seed:job-sheet-materials -w @yuva/api` | the ten materials the job sheet needs                                  |
+| `npm run quote:job-sheets -w @yuva/api`         | quote the works' own finished jobs and check the quote covers the cost |
 
 ---
 
@@ -374,7 +377,7 @@ Each app documents itself, next to the code it describes:
 
 | Document                                                       | Covers                                                                                                                                                                       |
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`apps/api/README.md`](./apps/api/README.md)                   | Every endpoint, the request/response envelope, **all the calculations with worked examples**, the data model, and the scripts                                                |
+| [`apps/api/README.md`](./apps/api/README.md)                   | Every endpoint, the request/response envelope, **all the calculations with worked examples**, the job sheet and what a run actually cost, the data model, and the scripts    |
 | [`apps/web/README.md`](./apps/web/README.md)                   | Every screen and what it does, how server state is handled, which figures are previewed in the browser, and the UI components                                                |
 | [`docs/old-quotation-check.md`](./docs/old-quotation-check.md) | **Seven of the works' own 2022 quotations, rebuilt here and matched to the paisa** — what was entered on each, what came out, and the two figures that changed over time     |
 | [`docs/stations.md`](./docs/stations.md)                       | **Printing stations** — what one is, what decides how many a job has when there is no artwork yet, and what each one adds to the rate and the cylinder bill                  |
@@ -747,6 +750,63 @@ Five rules worth repeating here:
   been generated before renders as nothing at all: no gap, a border falling back
   to black. It cost two false bug reports before it was understood. If a change
   does not appear, restart `npm run dev -w apps/web` before believing the screen.
+- **Ten of the works' twelve comparable finished jobs would have been quoted at
+  or above what they actually cost**, mean gap +8.0%, worst −6.6% —
+  `npm run quote:job-sheets`. The two Lokraja Atta tabs are **set aside** from
+  that summary rather than dropped: they ran at **26.2% wastage against an
+  allowance of 7**, so their cost says nothing about whether the rate was close,
+  and averaging them in buries what every other job is telling you. They still
+  print, marked, with the reason. The check is not expected to agree to the
+  paisa — a quotation prices film at the catalogue and carries the allowance,
+  where a job sheet uses the week's purchase rates and what was actually lost —
+  so what it reports is the **sign**.
+- **Two costing settings were four years stale, and the gap was mostly them.**
+  Transport stood at Rs 10 a kilogram where the works' own tabs median 6.80, and
+  packing at Rs 5 where they median 1.22 — four times out. Correcting both, on a
+  date so nothing already quoted moved, took the mean gap from +10.8% to +8.0%.
+  Pricing the film at what the works paid that week instead (`--sheet-rates`)
+  moves it to +7.7%, which says the rate list was never the problem. The 8%
+  wastage allowance is left alone on purpose: it is commercial protection, not a
+  forecast, and Lokraja is why.
+- **A quotation's rate barely moved with the order size, and now it does.**
+  Everything in the works' Estimation-sheet method scales with the kilograms, so
+  the only fixed cost on a job was Rs 250 of sundries and doubling the order
+  moved the rate by twenty paise. The `rateModel` setting switches to charging
+  the whole crew and the bank by the day, where the make-ready is the same
+  whatever the order — about Rs 9.50 a kilogram between 1,000 and 2,000 kg. It
+  lifts the level too, roughly Rs 27 a kilogram at 1,000 kg and much more on a
+  small order, which says the small jobs were being quoted under cost.
+- **Two of the figures that model rests on are fitted, not given.** Rs 20,000
+  for a day of the works and 0.75 days of make-ready came from the works' own
+  fourteen job sheets, not from the works. Both are on the Costing screen, and
+  nothing is precise until they recognise them.
+- **Laminator 2 is a copy of Laminator 1.** Its real speed, horsepower, loaded
+  rate and setup time are recorded nowhere — the job-sheet workbook names
+  "Lamination 1" and "Lamination 2" only as two lamination _passes_, gives both
+  the same 20% share of the day, and has never run the second. The two machines
+  therefore price identically until somebody says how they differ.
+- **The works' job-sheet spreadsheet splits a day's electricity 60 / 20 / 20 /
+  10 / 10, which comes to 120.** Every job costed that way carried a sixth more
+  electricity than the day cost. The works confirmed 100 is what was meant; the
+  app's defaults are that same weighting rescaled, and
+  `restate:stage-shares` corrects sheets already entered. The six older tabs
+  charge a flat `days × 5000` instead, which is a separate question — that rate
+  may no longer be what a day costs now they have set it at Rs 6,000.
+- **One tab of that workbook has an empty profit row.**
+  `Copy of Radhey Bhadan 200g` was costed with no margin at all — Rs 303.28 a
+  kilogram where the usual ten per cent makes it Rs 323.14. The app follows the
+  sheet rather than correcting it and reports the gap, because the sheet is the
+  record of what was charged.
+- **The eight spot inks carry no laydown or solids, deliberately.** A quotation
+  prices an unnamed "special colour" at the dearest ink having all three of
+  laydown, solids and a rate — Magenta at Rs 235. Give Gold a laydown and every
+  quotation raised afterwards prices its special colours at Rs 510, more than
+  double, with nobody having chosen it. LDPE carries no density for the same
+  reason and cannot yet be used as a quotation ply.
+- **None of the three new quotation designs is wired to the Download PDF
+  button.** Folio, Dossier and Statement render from real data through
+  `preview:quotations`; the button still sends the original document until the
+  works picks one.
 - **The letterhead artwork is 762 KB of PNG**, which becomes ~1 MB of base64 in
   the HTML and ~670 KB of the finished 787 KB PDF. Resampling the header and
   footer to around 800px wide would take the PDF to roughly 200 KB with no code

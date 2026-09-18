@@ -22,6 +22,8 @@ const MaterialStockPage = lazy(() => import('@/features/inventory/pages/Material
 const PurchasePage = lazy(() => import('@/features/purchase/pages/PurchasePage'));
 const PurchaseOrderPage = lazy(() => import('@/features/purchase/pages/PurchaseOrderPage'));
 const CylindersPage = lazy(() => import('@/features/cylinders/pages/CylindersPage'));
+const JobSheetsPage = lazy(() => import('@/features/job-sheets/pages/JobSheetsPage'));
+const JobSheetPage = lazy(() => import('@/features/job-sheets/pages/JobSheetPage'));
 const DesignPage = lazy(() => import('@/features/cylinders/pages/DesignPage'));
 const QuotationFormPage = lazy(() => import('@/features/quotations/pages/QuotationFormPage'));
 const UsersPage = lazy(() => import('@/features/users/pages/UsersPage'));
@@ -190,6 +192,28 @@ function AppRoutes() {
             element={
               <RequireModule module="cylinders">
                 <DesignPage />
+              </RequireModule>
+            }
+          />
+          {/*
+            Job sheets are guarded on `jobs`, the module that owns production.
+            Reading is open on the API because the cost a finished sheet
+            produces is what the office quotes repeat work from — but a screen
+            is a place to type, so the page itself asks for the write module.
+          */}
+          <Route
+            path="/job-sheets"
+            element={
+              <RequireModule module="jobs">
+                <JobSheetsPage />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="/job-sheets/:id"
+            element={
+              <RequireModule module="jobs">
+                <JobSheetPage />
               </RequireModule>
             }
           />

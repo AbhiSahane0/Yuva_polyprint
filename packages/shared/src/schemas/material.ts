@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { partialWithoutDefaults } from './partial-update.js';
+import { INK_KINDS } from '../constants/job.js';
 
 export const materialCategorySchema = z.enum(['FILM', 'INK', 'ADHESIVE', 'SOLVENT', 'CONSUMABLE']);
 export type MaterialCategory = z.infer<typeof materialCategorySchema>;
@@ -30,7 +31,7 @@ export const createMaterialSchema = z.object({
   /** Dry g/m² this colour lays. A white base coat is an order heavier. */
   laydownGsm: z.coerce.number().min(0).max(50).nullable().optional(),
   /** Process or special, for inks. Null on anything that is not an ink. */
-  inkKind: z.enum(['PROCESS', 'SPECIAL']).nullable().optional(),
+  inkKind: z.enum(INK_KINDS).nullable().optional(),
   isActive: z.boolean().default(true),
   sortOrder: z.coerce.number().int().min(0).default(0),
 });
