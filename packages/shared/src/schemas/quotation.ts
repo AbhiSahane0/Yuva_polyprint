@@ -516,7 +516,15 @@ export const settingsSchema = z.object({
   worksDayCost: z.coerce.number().min(0).max(10_000_000),
   /** Days before the job makes anything sellable. The same whatever the order. */
   makeReadyDays: z.coerce.number().min(0).max(30),
-  /** Kilograms a day once it is running. */
+  /**
+   * Machine minutes the works gets through in an elapsed day.
+   *
+   * Not minutes in a shift — printing, lamination and slitting run at once, so
+   * a day absorbs several machines' worth. The works' own sheets fit about
+   * 1,600, which is a 480-minute shift roughly three times over.
+   */
+  machineMinutesPerDay: z.coerce.number().min(1).max(100_000),
+  /** Kilograms a day, for a line with no costed structure. A fallback only. */
   kgPerDay: z.coerce.number().min(1).max(1_000_000),
   /**
    * Making one pouch — forming, sealing and cutting. **Per pouch, not per
@@ -693,6 +701,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
    */
   worksDayCost: 20000,
   makeReadyDays: 0.75,
+  /*
+   * Fitted against the works' own fourteen job sheets: their recorded days
+   * against the machine minutes their metres and passes demand, at the speeds
+   * on their Costing screen. R2 0.95, and it puts Amruta Family Tea at three
+   * days where kilograms alone said two.
+   */
+  machineMinutesPerDay: 1606,
   kgPerDay: 1945,
   /*
    * Read off the works' pouch workbook and confirmed with them: a standup is

@@ -241,6 +241,7 @@ export function useRateCosting(
         rateModel: settings.rateModel,
         worksDayCost: settings.worksDayCost,
         makeReadyDays: settings.makeReadyDays,
+        machineMinutesPerDay: settings.machineMinutesPerDay,
         kgPerDay: settings.kgPerDay,
         pouchMaking: {
           makingPerPouch: settings.pouchMakingPerPouch,

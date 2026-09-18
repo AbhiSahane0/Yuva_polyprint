@@ -165,7 +165,27 @@ export interface CostingOverheads {
   worksDayCost?: number;
   /** Make-ready — the days a job takes before it makes anything sellable. */
   makeReadyDays?: number;
-  /** Kilograms a day once it is running. */
+  /**
+   * **Machine minutes the works gets through in a day.**
+   *
+   * Not minutes in a shift. Printing, lamination and slitting run at the same
+   * time, so a day of elapsed time absorbs several machines' worth of minutes —
+   * the works' own fourteen sheets fit about 1,600, which is a 480-minute shift
+   * roughly three times over.
+   *
+   * Driving the days off MINUTES rather than kilograms is what makes the
+   * estimate follow the job instead of its weight. Their Amruta Family Tea ran
+   * three days for 3,313 kg while Malpani Lime ran two for 3,285 — the same
+   * weight, and not remotely the same job: a 750 mm web instead of 990 is half
+   * again the metres, three plies instead of two laminates the whole web twice,
+   * and eight colours is eight cylinders to register rather than one. On
+   * kilograms alone the two are indistinguishable and one of them is wrong.
+   */
+  machineMinutesPerDay?: number;
+  /**
+   * Kilograms a day, used only where a line has no costed structure to work
+   * metres out of. A fallback, not the model.
+   */
   kgPerDay?: number;
 
   /**
@@ -973,10 +993,26 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
    * laminator distinguishable from another.
    */
   const perDay = overheads.rateModel === 'PER_DAY';
+
+  /*
+   * Running time comes from the machines: the metres each one has to cover at
+   * the speed the works recorded for it, plus its setup. That is already
+   * `totalMachineMinutes`, and it is why a three-ply job takes longer than a
+   * two-ply one of the same weight, and why a slower laminator costs more.
+   *
+   * Kilograms are the fallback for a line with no costed structure — a figure
+   * typed straight onto a quotation, where there are no metres to work from.
+   */
+  const minutesPerDay = overheads.machineMinutesPerDay ?? 0;
   const kgPerDay = overheads.kgPerDay ?? 0;
-  const occupiedDays = perDay
-    ? round((overheads.makeReadyDays ?? 0) + (kgPerDay > 0 ? job.orderQtyKg / kgPerDay : 0), 4)
-    : 0;
+  const runningDays =
+    totalMachineMinutes > 0 && minutesPerDay > 0
+      ? totalMachineMinutes / minutesPerDay
+      : kgPerDay > 0
+        ? job.orderQtyKg / kgPerDay
+        : 0;
+
+  const occupiedDays = perDay ? round((overheads.makeReadyDays ?? 0) + runningDays, 4) : 0;
   const worksDayCost = perDay ? round(occupiedDays * (overheads.worksDayCost ?? 0), 2) : 0;
 
   /* Under PER_DAY the day charge REPLACES the per-minute crew and EMI; it does

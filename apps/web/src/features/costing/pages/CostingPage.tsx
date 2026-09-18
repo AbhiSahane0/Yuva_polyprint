@@ -397,7 +397,12 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
       'Make-ready, days',
       'The same whatever the order — this is what makes a big order cheaper',
     ],
-    ['kgPerDay', 'Kilograms a day', 'Once it is running'],
+    [
+      'machineMinutesPerDay',
+      'Machine minutes a day',
+      'Printing, lamination and slitting run at once, so a day absorbs several machines’ worth',
+    ],
+    ['kgPerDay', 'Kilograms a day', 'Only for a line with no costed structure'],
     ['pouchMakingPerPouch', 'Pouch making, Rs/pouch', 'Forming, sealing and cutting one'],
     ['dPunchPerPouch', 'D punch, Rs/pouch', 'What one costs to make instead'],
     ['dPunchLargePerPouch', 'D punch, wide, Rs/pouch', 'The punch is made across the top'],

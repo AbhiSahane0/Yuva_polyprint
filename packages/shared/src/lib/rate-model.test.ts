@@ -109,6 +109,7 @@ const DAY = {
   rateModel: 'PER_DAY' as const,
   worksDayCost: 20000,
   makeReadyDays: 0.75,
+  machineMinutesPerDay: 1606,
   kgPerDay: 1945,
 };
 
@@ -144,21 +145,42 @@ describe('the works’ complaint', () => {
 });
 
 describe('the days a job occupies the works', () => {
-  it('are make-ready plus running', () => {
-    expect(at(1945, true).occupiedDays).toBeCloseTo(1.75, 3);
-    expect(at(3890, true).occupiedDays).toBeCloseTo(2.75, 3);
+  /*
+   * Doubling the order does NOT double the days, and the gap between the two is
+   * the whole reason a bigger order is cheaper a kilogram. Two things stay put:
+   * the make-ready, and the machines' own setup — threading the press takes the
+   * same hour either way. Only the metres double.
+   */
+  it('are make-ready, then setup, then the metres', () => {
+    const one = at(1000, true);
+    const two = at(2000, true);
+
+    expect(one.occupiedDays).toBeGreaterThan(0.75);
+    /* More days for more metres, but less than twice as many. */
+    expect(two.occupiedDays).toBeGreaterThan(one.occupiedDays);
+    expect(two.occupiedDays).toBeLessThan(one.occupiedDays * 2);
+
+    /* What grew is exactly the extra running time, at the works' own rate. */
+    const extraMinutes = two.totalMachineMinutes - one.totalMachineMinutes;
+    expect(two.occupiedDays - one.occupiedDays).toBeCloseTo(
+      extraMinutes / DAY.machineMinutesPerDay,
+      3,
+    );
   });
 
   /**
-   * The make-ready is the entire effect.
+   * Take the make-ready away and what is left is the machines' own setup.
    *
-   * Take it away and the days scale with the kilograms exactly, and what is
-   * left of the curve is precisely the old `otherPerJob` — Rs 250 over 1,000 kg
-   * against Rs 250 over 2,000, which is 12.5 paise. That residual is a compact
-   * statement of what was wrong with the per-minute model: Rs 250 was the only
-   * thing in it that a second kilogram did not bring more of.
+   * Which is the right answer rather than a flat line: threading the press and
+   * mounting the cylinders takes the same 120 minutes whether the order is
+   * 1,000 kg or 2,000, so it is genuinely fixed and genuinely spreads. What
+   * does NOT remain is anything proportional — the running minutes double with
+   * the metres exactly as they should.
+   *
+   * The residual is therefore the old Rs 250 sundries plus that setup, and the
+   * two together are what a second kilogram does not bring more of.
    */
-  it('flatten to nothing but the old Rs 250 when the make-ready is zero', () => {
+  it('flatten to the machines’ setup when the make-ready is zero', () => {
     const flat = (kg: number) =>
       costRate({
         ...JOB,
@@ -167,9 +189,13 @@ describe('the days a job occupies the works', () => {
       })!.ratePerKg;
 
     const residual = flat(1000) - flat(2000);
-    const fromOtherPerJob = JOB.overheads.otherPerJob / 1000 - JOB.overheads.otherPerJob / 2000;
-    expect(residual).toBeCloseTo(fromOtherPerJob, 2);
-    expect(residual).toBeLessThan(0.15);
+    const setupMinutes = JOB.machines.reduce((sum, m) => sum + m.setupMinutes, 0);
+    const fromSetup = ((setupMinutes / DAY.machineMinutesPerDay) * DAY.worksDayCost) / 2000;
+    const fromSundries = JOB.overheads.otherPerJob / 1000 - JOB.overheads.otherPerJob / 2000;
+
+    expect(residual).toBeCloseTo(fromSetup + fromSundries, 1);
+    /* Far smaller than the Rs 9-odd the make-ready is worth. */
+    expect(residual).toBeLessThan(1);
   });
 
   it('are not counted at all under the per-minute model', () => {
@@ -255,19 +281,33 @@ describe('the settings the works turns', () => {
     );
   });
 
-  it('cheapens a job when the works runs more kilograms a day', () => {
-    const faster = costRate({
+  /*
+   * Kilograms a day is the fallback and nothing more. A line the app can work
+   * metres out of must ignore it entirely — otherwise two settings would both
+   * claim to decide the days and the office could never tell which had won.
+   */
+  it('ignores kilograms a day on a line it can measure', () => {
+    const changed = costRate({
       ...JOB,
       overheads: { ...JOB.overheads, ...DAY, kgPerDay: 4000 },
+    })!.ratePerKg;
+    expect(changed).toBe(at(1000, true).ratePerKg);
+  });
+
+  it('cheapens a job when the works gets through more machine minutes a day', () => {
+    const faster = costRate({
+      ...JOB,
+      overheads: { ...JOB.overheads, ...DAY, machineMinutesPerDay: 3200 },
     })!.ratePerKg;
     expect(faster).toBeLessThan(at(1000, true).ratePerKg);
   });
 
   /* Nothing may divide by zero on a half-filled Costing screen. */
-  it('survives a works that runs no kilograms a day', () => {
+  it('survives a works that says it does nothing in a day', () => {
     const broken = costRate({
       ...JOB,
-      overheads: { ...JOB.overheads, ...DAY, kgPerDay: 0 },
+      machines: [],
+      overheads: { ...JOB.overheads, ...DAY, machineMinutesPerDay: 0, kgPerDay: 0 },
     })!;
     expect(Number.isFinite(broken.ratePerKg)).toBe(true);
     expect(broken.occupiedDays).toBeCloseTo(0.75, 3);
@@ -337,5 +377,134 @@ describe('a works with two laminators', () => {
       job: { ...both.job, machineChoice: { LAMINATION: 'Laminator 9' } },
     })!.processes.find((p) => p.kind === 'LAMINATION');
     expect(used!.machine).toBe('Laminator 1');
+  });
+});
+
+/**
+ * **The same weight can be two completely different jobs.**
+ *
+ * This is why the days come from metres and passes rather than kilograms, and
+ * the works' own workbook is the proof. Amruta Family Tea ran **three days for
+ * 3,313 kg**; Malpani Lime ran **two for 3,285**. On weight they are the same
+ * job. They are not:
+ *
+ * | | Amruta | Lime |
+ * | --- | --- | --- |
+ * | web | 750 mm | 990 mm |
+ * | printed metres | 85,794 | 57,852 |
+ * | plies | 3, so two lamination passes | 2, so one |
+ * | lamination metres | 171,587 | 57,852 |
+ * | colours | 8 | 1 |
+ *
+ * Nearly half again the metres through the press, three times the lamination,
+ * and eight cylinders to register instead of one. A model that reads only the
+ * kilograms cannot tell them apart, so it must be wrong about one of them — and
+ * it was: it put Amruta at Rs 14.81 a kilogram of the works' time where their
+ * sheet charged Rs 26.14.
+ */
+describe('two jobs of the same weight', () => {
+  /** A 2-ply job on a wide web, like Lime. */
+  const wide: CostingInput = {
+    ...JOB,
+    job: { ...JOB.job, orderQtyKg: 3285, filmWidthMm: 990, stationCount: 1 },
+    overheads: { ...JOB.overheads, ...DAY },
+  };
+
+  /** The same weight, narrower, three plies and eight colours, like Amruta. */
+  const narrow: CostingInput = {
+    ...wide,
+    job: {
+      ...wide.job,
+      orderQtyKg: 3313,
+      filmWidthMm: 750,
+      stationCount: 8,
+      layers: [
+        { name: 'Pet', micron: 12, density: 1.4, ratePerKg: 185 },
+        { name: 'Met Pet', micron: 12, density: 1.4, ratePerKg: 180 },
+        { name: 'W/O Poly', micron: 110, density: 0.94, ratePerKg: 163 },
+      ],
+    },
+  };
+
+  it('occupies the works for longer when it is narrower and has more plies', () => {
+    expect(costRate(narrow)!.occupiedDays).toBeGreaterThan(costRate(wide)!.occupiedDays);
+  });
+
+  /*
+   * The three-ply job laminates the whole web twice. The lamination metres are
+   * what the second pass costs, and they are the largest single reason the day
+   * count moves.
+   */
+  it('laminates twice for three plies and once for two', () => {
+    const passes = (input: CostingInput) =>
+      costRate(input)!.processes.find((p) => p.kind === 'LAMINATION')!.metres;
+    expect(passes(narrow) / passes(wide)).toBeGreaterThan(2);
+  });
+
+  it('charges the works’ own time by the day it occupies, not by the weight', () => {
+    const a = costRate(narrow)!;
+    const b = costRate(wide)!;
+    /* Within 1% on weight, and nowhere near it on what the works spends. */
+    expect(Math.abs(a.orderQtyKg - b.orderQtyKg) / b.orderQtyKg).toBeLessThan(0.01);
+    /* The works' own pair ran 3 days against 2, a ratio of 1.5. */
+    expect(a.worksDayCost).toBeGreaterThan(b.worksDayCost * 1.2);
+  });
+
+  /* Weight alone cannot see any of it. That is the whole point. */
+  it('would be indistinguishable on kilograms alone', () => {
+    const onWeight = (input: CostingInput) =>
+      costRate({
+        ...input,
+        /* No machines, so the fallback has nothing but the weight to go on. */
+        machines: [],
+        overheads: { ...input.overheads, machineMinutesPerDay: 0 },
+      })!.occupiedDays;
+    expect(Math.abs(onWeight(narrow) - onWeight(wide))).toBeLessThan(0.02);
+  });
+});
+
+describe('where the running days come from', () => {
+  it('follows the machines’ own minutes', () => {
+    const slow = costRate({
+      ...JOB,
+      machines: JOB.machines.map((m) => (m.kind === 'LAMINATION' ? { ...m, speedMPerMin: 35 } : m)),
+      overheads: { ...JOB.overheads, ...DAY },
+    })!;
+    const quick = costRate({ ...JOB, overheads: { ...JOB.overheads, ...DAY } })!;
+    expect(slow.occupiedDays).toBeGreaterThan(quick.occupiedDays);
+  });
+
+  /* A works that gets through more machine minutes a day finishes sooner. */
+  it('shortens when the works runs more machines at once', () => {
+    const busier = costRate({
+      ...JOB,
+      overheads: { ...JOB.overheads, ...DAY, machineMinutesPerDay: 3200 },
+    })!;
+    const base = costRate({ ...JOB, overheads: { ...JOB.overheads, ...DAY } })!;
+    expect(busier.occupiedDays).toBeLessThan(base.occupiedDays);
+  });
+
+  /*
+   * A line typed straight onto a quotation has no plies and no metres. The
+   * weight is all there is, so the weight is what it falls back to rather than
+   * costing the works nothing at all.
+   */
+  it('falls back to the weight when there are no machine minutes', () => {
+    const bare = costRate({
+      ...JOB,
+      machines: [],
+      overheads: { ...JOB.overheads, ...DAY },
+    })!;
+    expect(bare.occupiedDays).toBeCloseTo(0.75 + 1000 / 1945, 3);
+  });
+
+  it('still never divides by a works that does nothing', () => {
+    const stuck = costRate({
+      ...JOB,
+      machines: [],
+      overheads: { ...JOB.overheads, ...DAY, machineMinutesPerDay: 0, kgPerDay: 0 },
+    })!;
+    expect(stuck.occupiedDays).toBeCloseTo(0.75, 3);
+    expect(Number.isFinite(stuck.ratePerKg)).toBe(true);
   });
 });
