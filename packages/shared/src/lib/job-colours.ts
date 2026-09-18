@@ -144,14 +144,50 @@ export function resizeColours(
   colours: JobColour[],
   count: number,
   special: JobColour | null,
+  processPalette: JobColour[] = [],
 ): JobColour[] {
   const wanted = Math.max(1, Math.floor(count));
   if (!Number.isFinite(wanted) || wanted === colours.length) return colours;
 
   if (wanted > colours.length) {
-    if (!special) return colours;
-    const added = Array.from({ length: wanted - colours.length }, () => ({ ...special }));
-    return [...colours, ...added];
+    /*
+     * **Process colours first, then specials.**
+     *
+     * Typing 7 means seven stations, and the works fills a press in one order:
+     * the four it always carries, then whatever the artwork turns out to need.
+     * So 7 is CMYK and three specials.
+     *
+     * It used to append specials to whatever was already there, which is right
+     * from a CMYK line and wrong from any other. On a line with no process
+     * colours — one where the office had taken them off, or one where the
+     * count was typed before the rates list had arrived to price them from —
+     * typing 7 gave SEVEN specials, every one of them charged at the dearest
+     * ink on the list. A seven-colour job priced as seven unknowns.
+     *
+     * The cost of doing it this way: a deliberately deleted process colour
+     * comes back if the count is then raised. That is the right trade — typing
+     * a number is a coarse instruction about stations, and removing one colour
+     * is a precise one about ink, so the precise action stays available on the
+     * chip while the coarse one restores the works' normal order.
+     */
+    const named = new Set(
+      colours.filter((colour) => colour.kind === 'PROCESS').map((colour) => colour.name),
+    );
+    const missing = processPalette.filter(
+      (colour) => colour.kind === 'PROCESS' && !named.has(colour.name),
+    );
+
+    const process = [
+      ...colours.filter((colour) => colour.kind === 'PROCESS'),
+      ...missing.map((colour) => ({ ...colour })),
+    ].slice(0, wanted);
+
+    const specials = colours.filter((colour) => colour.kind === 'SPECIAL');
+    const next = [...process, ...specials].slice(0, wanted);
+
+    if (!special) return next.length > colours.length ? next : colours;
+    while (next.length < wanted) next.push({ ...special });
+    return next;
   }
 
   /* Specials go first, newest first, then process colours off the end. */

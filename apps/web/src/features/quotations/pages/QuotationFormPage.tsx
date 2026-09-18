@@ -1598,10 +1598,11 @@ function JobCard({
    * The colour strip and the Cylinders box are one fact told twice, so they move
    * together in BOTH directions.
    *
-   * Taking a colour off drops a cylinder. Typing 7 against a CMYK job adds three
-   * specials, because a station carrying something nobody has named yet is
-   * exactly what a special is — and it is what the office means when they type
-   * a bigger number than the colours they have listed.
+   * Taking a colour off drops a cylinder. Typing 7 fills the four process
+   * colours first and then adds three specials — the order the works fills a
+   * press in — because a station carrying something nobody has named yet is
+   * exactly what a special is, and it is what the office means when they type a
+   * bigger number than the colours they have listed.
    */
   const setColours = (next: JobColour[]) => {
     setValue(`items.${index}.colours`, next as never, { shouldDirty: true });
@@ -1609,7 +1610,7 @@ function JobCard({
   };
 
   const setCylinderCount = (count: number) => {
-    const next = resizeColours(colours, count, special);
+    const next = resizeColours(colours, count, special, processPalette);
     setValue(`items.${index}.colours`, next as never, { shouldDirty: true });
     /* Resizing floors at one, so the box is corrected to what actually applies
        rather than left showing a figure nothing was done with. */

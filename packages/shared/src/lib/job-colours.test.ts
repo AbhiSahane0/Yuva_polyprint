@@ -256,3 +256,88 @@ describe('resizing the colours to a typed cylinder count', () => {
     expect(resizeColours(only, 5, null)).toHaveLength(1);
   });
 });
+
+/**
+ * **Typing 7 means CMYK and three specials — never seven specials.**
+ *
+ * The works fills a press in one order: the four colours it always carries,
+ * then whatever the artwork turns out to need. So a count typed into the
+ * Cylinders box fills the process colours first.
+ *
+ * It used to append specials to whatever was already on the line, which is
+ * right from a CMYK job and wrong from every other. On a line with no process
+ * colours — one where the office had taken them off, or one where the count was
+ * typed before the rates list arrived to price them from — typing 7 produced
+ * SEVEN specials, every one charged at the dearest ink on the list. The strip
+ * read "7 colours, so 7 cylinders and 7 stations" and the price was a
+ * seven-colour job costed as seven unknowns.
+ */
+describe('typing a cylinder count', () => {
+  const CMYK = defaultJobColours(CATALOGUE);
+  const SPECIAL = specialColourFrom(CATALOGUE)!;
+  const names = (cs: JobColour[]) => cs.map((c) => c.name);
+
+  it('fills the process colours first from an empty line', () => {
+    const next = resizeColours([], 7, SPECIAL, CMYK);
+    expect(next).toHaveLength(7);
+    expect(names(next).slice(0, 4)).toEqual(['Cyan', 'Magenta', 'Yellow', 'Black']);
+    expect(next.slice(4).every((c) => c.kind === 'SPECIAL')).toBe(true);
+  });
+
+  /* The bug, stated as the thing it must never do again. */
+  it('never makes every station a special when process colours exist to use', () => {
+    const next = resizeColours([], 7, SPECIAL, CMYK);
+    expect(next.filter((c) => c.kind === 'SPECIAL')).toHaveLength(3);
+  });
+
+  it('still adds only specials once the four are already there', () => {
+    const next = resizeColours(CMYK, 7, SPECIAL, CMYK);
+    expect(names(next).slice(0, 4)).toEqual(['Cyan', 'Magenta', 'Yellow', 'Black']);
+    expect(next.filter((c) => c.kind === 'SPECIAL')).toHaveLength(3);
+  });
+
+  it('tops up a part-filled line before reaching for a special', () => {
+    const cyanOnly = [CMYK[0]!];
+    expect(names(resizeColours(cyanOnly, 4, SPECIAL, CMYK))).toEqual([
+      'Cyan',
+      'Magenta',
+      'Yellow',
+      'Black',
+    ]);
+  });
+
+  /* Below four, it takes what the press carries in the works' own order. */
+  it('gives two cylinders the first two process colours', () => {
+    expect(names(resizeColours([], 2, SPECIAL, CMYK))).toEqual(['Cyan', 'Magenta']);
+  });
+
+  /* Specials already on the line are kept; the process colours join in front. */
+  it('keeps the specials it already had and puts the process colours first', () => {
+    const three = [{ ...SPECIAL }, { ...SPECIAL }, { ...SPECIAL }];
+    const next = resizeColours(three, 7, SPECIAL, CMYK);
+    expect(names(next).slice(0, 4)).toEqual(['Cyan', 'Magenta', 'Yellow', 'Black']);
+    expect(next.filter((c) => c.kind === 'SPECIAL')).toHaveLength(3);
+  });
+
+  /*
+   * With no palette to draw on there is nothing to fill with but specials,
+   * which is the old behaviour and the right fallback — a works whose rates
+   * list prices no ink at all still has stations.
+   */
+  it('falls back to specials when the palette is empty', () => {
+    const next = resizeColours([], 3, SPECIAL, []);
+    expect(next).toHaveLength(3);
+    expect(next.every((c) => c.kind === 'SPECIAL')).toBe(true);
+  });
+
+  /* Shrinking is unchanged: specials go first, newest first. */
+  it('still drops specials before process colours on the way down', () => {
+    const seven = resizeColours([], 7, SPECIAL, CMYK);
+    expect(names(resizeColours(seven, 4, SPECIAL, CMYK))).toEqual([
+      'Cyan',
+      'Magenta',
+      'Yellow',
+      'Black',
+    ]);
+  });
+});
