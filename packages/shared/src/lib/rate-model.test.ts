@@ -273,3 +273,69 @@ describe('the settings the works turns', () => {
     expect(broken.occupiedDays).toBeCloseTo(0.75, 3);
   });
 });
+
+/**
+ * **Two laminators, and the job runs on one of them.**
+ *
+ * The works has a second and the costing charges a machine for the metres its
+ * KIND must run — so simply adding it to the list would bill every job for two
+ * lamination passes it never made. Quietly: nothing in the total says which
+ * machine it came from, and both entries look perfectly reasonable on the
+ * Costing screen.
+ */
+describe('a works with two laminators', () => {
+  const second = {
+    name: 'Laminator 2',
+    kind: 'LAMINATION' as const,
+    horsepower: 6,
+    powerRatePerHpHour: 35,
+    speedMPerMin: 70,
+    setupMinutes: 30,
+    setupPowerFactor: 0,
+  };
+  const both = { ...JOB, machines: [...JOB.machines, second] };
+
+  it('does not charge the job twice for lamination', () => {
+    expect(costRate(both)!.ratePerKg).toBe(costRate(JOB)!.ratePerKg);
+  });
+
+  it('runs on one of each kind, whatever is on the list', () => {
+    const kinds = costRate(both)!.processes.map((p) => p.kind);
+    expect(new Set(kinds).size).toBe(kinds.length);
+  });
+
+  /* Unnamed, the job takes the first of its kind — the works' own order. */
+  it('takes the first laminator when the job names none', () => {
+    const used = costRate(both)!.processes.find((p) => p.kind === 'LAMINATION');
+    expect(used!.machine).toBe('Laminator 1');
+  });
+
+  it('takes the one the job names, wherever it sits on the list', () => {
+    const chosen = costRate({
+      ...both,
+      job: { ...both.job, machineChoice: { LAMINATION: 'Laminator 2' } },
+    })!;
+    expect(chosen.processes.find((p) => p.kind === 'LAMINATION')!.machine).toBe('Laminator 2');
+  });
+
+  /* The whole point of naming one: when they differ, the rate differs. */
+  it('prices the dearer machine dearer once it actually differs', () => {
+    const dearer = { ...second, powerRatePerHpHour: 90 };
+    const list = { ...JOB, machines: [...JOB.machines, dearer] };
+    const onFirst = costRate(list)!.ratePerKg;
+    const onSecond = costRate({
+      ...list,
+      job: { ...list.job, machineChoice: { LAMINATION: 'Laminator 2' } },
+    })!.ratePerKg;
+    expect(onSecond).toBeGreaterThan(onFirst);
+  });
+
+  /* A name nobody recognises is a typo, not an instruction to charge nothing. */
+  it('falls back to the first when the named machine is not there', () => {
+    const used = costRate({
+      ...both,
+      job: { ...both.job, machineChoice: { LAMINATION: 'Laminator 9' } },
+    })!.processes.find((p) => p.kind === 'LAMINATION');
+    expect(used!.machine).toBe('Laminator 1');
+  });
+});

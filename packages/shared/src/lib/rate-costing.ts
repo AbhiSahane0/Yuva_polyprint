@@ -368,6 +368,13 @@ export interface CostingJob {
   stationCount?: number | null;
 
   /**
+   * Which machine this job runs on, by name, where the works has more than one
+   * of a kind. Anything not named falls to the first of its kind on the list,
+   * which is the works' own order.
+   */
+  machineChoice?: Partial<Record<MachineKind, string>> | null;
+
+  /**
    * Ink GSM the STRUCTURE is weighed with, when it is stated rather than
    * derived.
    *
@@ -842,8 +849,36 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
    */
   const laminationPasses = Math.max(0, layers.length - 1);
 
+  /**
+   * **One machine of each kind, not all of them.**
+   *
+   * The works runs two laminators. The loop below charges a machine for the
+   * metres its KIND has to run, so passing both would bill the job for two
+   * lamination passes it never made — quietly, and on every quotation, because
+   * nothing about the total says which machine it came from.
+   *
+   * So a job runs on one of each kind: the one it names, or the first on the
+   * list, which is the works' own sortOrder.
+   */
+  const chosenMachines = (() => {
+    const byKind = new Map<MachineKind, CostingMachine>();
+    for (const machine of machines) {
+      const named = job.machineChoice?.[machine.kind];
+      if (named && machine.name === named) {
+        byKind.set(machine.kind, machine);
+        continue;
+      }
+      if (!byKind.has(machine.kind)) byKind.set(machine.kind, machine);
+    }
+    /* A named machine must win even when it is not first on the list. */
+    for (const machine of machines) {
+      if (job.machineChoice?.[machine.kind] === machine.name) byKind.set(machine.kind, machine);
+    }
+    return [...byKind.values()];
+  })();
+
   const processes: ProcessCost[] = [];
-  for (const machine of machines) {
+  for (const machine of chosenMachines) {
     if (machine.kind === 'POUCHING') continue;
 
     let metres = 0;

@@ -30,7 +30,8 @@
     "preview:quotations": "tsx scripts/preview-quotations.ts",
     "check:job-sheets": "tsx scripts/check-job-sheets.ts",
     "seed:job-sheet-materials": "tsx scripts/seed-job-sheet-materials.ts",
-    "restate:stage-shares": "tsx scripts/restate-stage-shares.ts"
+    "restate:stage-shares": "tsx scripts/restate-stage-shares.ts",
+    "seed:second-laminator": "tsx scripts/seed-second-laminator.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",
