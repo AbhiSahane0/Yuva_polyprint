@@ -83,11 +83,10 @@ export const JOB_SHEET_LINES: readonly JobSheetLineTemplate[] = [
     materialName: 'Solvent — Toluene',
   },
   /*
-   * MIBK, the eight spot colours and LDPE are not in the works' catalogue yet.
-   * They resolve to no material and a rate of zero, which is the honest state:
-   * the line is on the sheet because the form has it, and the office either
-   * picks a material or types the rate. Inventing a catalogue row with a made-up
-   * rate would put a number on a quotation that nobody at the works had agreed.
+   * Every one of these resolves to a catalogue row, MIBK and the eight spot
+   * colours included — `seed:job-sheet-materials` adds them at the works' own
+   * rates. A line that still finds nothing carries no rate and says so on the
+   * screen rather than pricing at a figure nobody agreed.
    */
   {
     key: 'mibk',
@@ -139,7 +138,7 @@ export const JOB_SHEET_LINES: readonly JobSheetLineTemplate[] = [
     kind: 'FILM',
     mixSource: 'NONE',
     mixSharePercent: 0,
-    materialName: '',
+    materialName: 'LDPE Milky / Natural',
   },
   {
     key: 'adhesive',
