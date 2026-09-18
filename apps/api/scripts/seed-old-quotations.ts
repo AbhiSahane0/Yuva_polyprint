@@ -272,6 +272,7 @@ async function main() {
         rateModel: settings.rateModel,
         worksDayCost: settings.worksDayCost,
         makeReadyDays: settings.makeReadyDays,
+        machineMinutesPerDay: settings.machineMinutesPerDay,
         kgPerDay: settings.kgPerDay,
         emiBasis: settings.emiBasis,
         stationSurcharges: [
