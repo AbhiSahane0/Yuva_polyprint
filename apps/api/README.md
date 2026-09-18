@@ -2125,6 +2125,71 @@ sheet is the record of what was charged.
 golden master, extracted from the workbook rather than typed. A 1% error in the
 mix share fails 57 of its 101 tests.
 
+### Would the quote have covered the cost?
+
+The question the rate model exists to answer, and the only one that matters
+commercially. A job sheet says what a run cost once it was over; a quotation has
+to say it beforehand, from nothing but the design and the order size.
+
+```bash
+npm run quote:job-sheets -w @yuva/api            # compare only
+npm run quote:job-sheets -w @yuva/api -- --write # also create the quotations
+```
+
+Every tab of the workbook is turned back into the quotation the office would
+have written, priced at today's catalogue, and set beside the cost the works
+actually recorded. **Ten of fourteen quote at or above what the job cost, mean
+gap +7.0%.**
+
+| Job                    | Order    | Quoted | Cost   |            |
+| ---------------------- | -------- | ------ | ------ | ---------- |
+| Radhey Bhadang         | 199 kg   | 363.10 | 303.28 | +19.7%     |
+| Kothmire               | 261 kg   | 366.58 | 334.63 | +9.5%      |
+| Kothmire, the copy     | 261 kg   | 366.58 | 367.90 | **−0.4%**  |
+| Lokraja Atta           | 417 kg   | 301.94 | 378.10 | **−20.1%** |
+| Lokraja Atta, the copy | 417 kg   | 307.08 | 343.33 | **−10.6%** |
+| Swaraj Green Peas      | 478 kg   | 299.20 | 312.50 | **−4.3%**  |
+| Radhey Murmura         | 1,027 kg | 285.60 | 261.43 | +9.2%      |
+| Lime                   | 3,285 kg | 265.63 | 236.17 | +12.5%     |
+| Amruta Family Tea      | 3,313 kg | 301.26 | 289.30 | +4.1%      |
+| Lime                   | 5,000 kg | 263.87 | 234.06 | +12.7%     |
+
+**The four misses are worth more than the ten hits.** Lokraja Atta ran at
+**26.2% wastage against an allowance of 7** — that job lost money on waste, not
+on the price, and no quotation could have known. Kothmire's copy came in at
+−0.4% where its twin cleared +9.5%, because the two tabs cost the same job at
+different film rates. Only Swaraj, at −4.3%, is a quote that was genuinely thin.
+
+**The two are not meant to agree to the paisa**, and four things differ by
+nature: the quotation prices film at the **catalogue** where the sheet used that
+week's purchase rates; it carries the wastage **allowance** where the sheet
+carries what was actually lost; it works ink and solvent out from the laydown
+where the sheet weighs the drums; and the quoted rate carries a margin. What
+matters is the sign — a job quoted under its cost is one the works loses money
+on.
+
+#### The structure is recovered, not assumed
+
+A job sheet records no poly micron; the floor does not need it. So the printed
+length comes from the PET's weight at its own GSM across the web, and every
+other ply's GSM is its weight over that same length:
+
+```
+metres   = PET kg × 1e6 ÷ (PET GSM × web mm)
+ply GSM  = ply kg × 1e6 ÷ (metres × web mm)
+micron   = GSM ÷ density
+```
+
+The density cancels out of the round trip — the costing multiplies it straight
+back — so what is rebuilt is the GSM the sheet implies rather than a guess.
+Kothmire comes back as `PET 12µ + MET PET 10µ + W/O Poly 30µ`.
+
+**Design sizes come from the job master**, matched on the name, because a job
+sheet records the WEB and never the size of the thing being made. Twelve of the
+fourteen found a design; the other two say so in their own notes rather than
+printing an invented height as though it were real. Mobile and email are
+placeholders for the same reason — a job sheet has no customer.
+
 ### Restating a sheet
 
 ```bash
@@ -2514,6 +2579,7 @@ Your `.env` stays pointed at Docker throughout.
 | `npm run check:job-sheets`           | Costs all fourteen tabs of the works' job-sheet workbook and checks every one  |
 | `npm run restate:stage-shares`       | Rescales sheets costed at stage shares totalling more than one day             |
 | `npm run seed:second-laminator`      | Adds the works' second laminator, as a copy of the first. Idempotent.          |
+| `npm run quote:job-sheets`           | Quotes the works' own finished jobs and asks whether the quote covers the cost |
 | `npm run import:legacy -- --dry-run` | Parse the legacy sheet, write nothing                                          |
 | `npm run import:legacy [-- --fresh]` | Import it; `--fresh` replaces existing rows                                    |
 | `npm run schema:docs`                | Regenerate the database documentation                                          |

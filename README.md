@@ -310,17 +310,18 @@ Run from the repository root.
 
 Workspace scripts worth knowing:
 
-| Script                                          | Does                                                        |
-| ----------------------------------------------- | ----------------------------------------------------------- |
-| `npm run seed:admin -w @yuva/api`               | create the first administrator (refuses if one exists)      |
-| `npm run seed:materials -w @yuva/api`           | seed the material catalogue                                 |
-| `npm run seed:costing -w @yuva/api`             | machines, wages and ink figures for the rate costing        |
-| `npm run seed:excel-rates -w @yuva/api`         | bring rates and master data to the client's own workbook    |
-| `npm run schema:docs -w @yuva/api`              | regenerate `docs/database-schema.md` from the live database |
-| `npm run db:copy-to-remote -w @yuva/api`        | copy local data up to Neon                                  |
-| `npm run import:legacy -w @yuva/api`            | import the legacy spreadsheet                               |
-| `npm run check:job-sheets -w @yuva/api`         | cost the works' job-sheet workbook and check all fourteen   |
-| `npm run seed:job-sheet-materials -w @yuva/api` | the ten materials the job sheet needs                       |
+| Script                                          | Does                                                                   |
+| ----------------------------------------------- | ---------------------------------------------------------------------- |
+| `npm run seed:admin -w @yuva/api`               | create the first administrator (refuses if one exists)                 |
+| `npm run seed:materials -w @yuva/api`           | seed the material catalogue                                            |
+| `npm run seed:costing -w @yuva/api`             | machines, wages and ink figures for the rate costing                   |
+| `npm run seed:excel-rates -w @yuva/api`         | bring rates and master data to the client's own workbook               |
+| `npm run schema:docs -w @yuva/api`              | regenerate `docs/database-schema.md` from the live database            |
+| `npm run db:copy-to-remote -w @yuva/api`        | copy local data up to Neon                                             |
+| `npm run import:legacy -w @yuva/api`            | import the legacy spreadsheet                                          |
+| `npm run check:job-sheets -w @yuva/api`         | cost the works' job-sheet workbook and check all fourteen              |
+| `npm run seed:job-sheet-materials -w @yuva/api` | the ten materials the job sheet needs                                  |
+| `npm run quote:job-sheets -w @yuva/api`         | quote the works' own finished jobs and check the quote covers the cost |
 
 ---
 
@@ -749,6 +750,14 @@ Five rules worth repeating here:
   been generated before renders as nothing at all: no gap, a border falling back
   to black. It cost two false bug reports before it was understood. If a change
   does not appear, restart `npm run dev -w apps/web` before believing the screen.
+- **Ten of the works' fourteen finished jobs would have been quoted at or above
+  what they actually cost**, mean gap +7.0% — `npm run quote:job-sheets`. The
+  four that would not are the useful ones: Lokraja Atta ran at **26.2% wastage
+  against an allowance of 7** and lost roughly Rs 47,000 across two runs, which
+  is a floor problem rather than a pricing one. The check is not expected to
+  agree to the paisa — a quotation prices film at the catalogue and carries the
+  allowance, where a job sheet uses the week's purchase rates and what was
+  actually lost — so what it reports is the **sign**.
 - **A quotation's rate barely moved with the order size, and now it does.**
   Everything in the works' Estimation-sheet method scales with the kilograms, so
   the only fixed cost on a job was Rs 250 of sundries and doubling the order
