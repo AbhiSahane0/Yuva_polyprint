@@ -698,6 +698,35 @@ with an invisible consequence three fields away:
 That count is real money. A cylinder is around Rs 9,000, and the sixth and
 seventh stations add Rs 5.50 and Rs 7.50 a kilogram.
 
+**Typing a bigger cylinder count fills the process colours first.** The works
+fills a press in one order — the four colours it always carries, then whatever
+the artwork turns out to need — so typing 7 means CMYK and three specials, not
+seven specials.
+
+That reading is not obvious from the code that used to do it, which only ever
+appended specials. From a line already showing CMYK it came out right; from a
+line showing anything else it came out wrong, and silently. A line with no
+process colours read **"7 colours — so 7 cylinders and 7 stations"** with all
+seven chips saying _Special colour_ and CMYK sitting unselected beside them, and
+every one of those stations priced at the dearest ink on the list — because that
+is what an unnamed colour costs. The count was right, the cylinders were right,
+only the ink was wrong, and nothing on the screen said so.
+
+There are two ways to arrive at a line with no process colours, and the second
+is the one that bites:
+
+- the office takes them off, chip by chip; or
+- the count is typed **before the rates list has arrived** to price them from.
+  The seeding that would put CMYK there then sees a non-empty strip and never
+  runs, so the line stays that way for good.
+
+**The cost of the fix: a deliberately deleted process colour comes back if the
+count is then raised.** That is the right trade. Typing a number is a coarse
+instruction about stations; taking a chip off is a precise one about ink. So the
+precise action stays on the chip, and the coarse one restores the works' normal
+order. Shrinking is unchanged — specials go first, newest first, then process
+colours off the end.
+
 **The colours price the ink, and only the ink.** A line that names its colours
 is costed the Costing sheet's way — each colour on its own laydown, solids and
 rate. A line that names none is costed at the works' blended ink rate over the

@@ -750,14 +750,24 @@ Five rules worth repeating here:
   been generated before renders as nothing at all: no gap, a border falling back
   to black. It cost two false bug reports before it was understood. If a change
   does not appear, restart `npm run dev -w apps/web` before believing the screen.
-- **Ten of the works' fourteen finished jobs would have been quoted at or above
-  what they actually cost**, mean gap +7.0% — `npm run quote:job-sheets`. The
-  four that would not are the useful ones: Lokraja Atta ran at **26.2% wastage
-  against an allowance of 7** and lost roughly Rs 47,000 across two runs, which
-  is a floor problem rather than a pricing one. The check is not expected to
-  agree to the paisa — a quotation prices film at the catalogue and carries the
-  allowance, where a job sheet uses the week's purchase rates and what was
-  actually lost — so what it reports is the **sign**.
+- **Ten of the works' twelve comparable finished jobs would have been quoted at
+  or above what they actually cost**, mean gap +8.0%, worst −6.6% —
+  `npm run quote:job-sheets`. The two Lokraja Atta tabs are **set aside** from
+  that summary rather than dropped: they ran at **26.2% wastage against an
+  allowance of 7**, so their cost says nothing about whether the rate was close,
+  and averaging them in buries what every other job is telling you. They still
+  print, marked, with the reason. The check is not expected to agree to the
+  paisa — a quotation prices film at the catalogue and carries the allowance,
+  where a job sheet uses the week's purchase rates and what was actually lost —
+  so what it reports is the **sign**.
+- **Two costing settings were four years stale, and the gap was mostly them.**
+  Transport stood at Rs 10 a kilogram where the works' own tabs median 6.80, and
+  packing at Rs 5 where they median 1.22 — four times out. Correcting both, on a
+  date so nothing already quoted moved, took the mean gap from +10.8% to +8.0%.
+  Pricing the film at what the works paid that week instead (`--sheet-rates`)
+  moves it to +7.7%, which says the rate list was never the problem. The 8%
+  wastage allowance is left alone on purpose: it is commercial protection, not a
+  forecast, and Lokraja is why.
 - **A quotation's rate barely moved with the order size, and now it does.**
   Everything in the works' Estimation-sheet method scales with the kilograms, so
   the only fixed cost on a job was Rs 250 of sundries and doubling the order

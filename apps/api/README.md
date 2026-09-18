@@ -2138,27 +2138,77 @@ npm run quote:job-sheets -w @yuva/api -- --write # also create the quotations
 
 Every tab of the workbook is turned back into the quotation the office would
 have written, priced at today's catalogue, and set beside the cost the works
-actually recorded. **Ten of fourteen quote at or above what the job cost, mean
-gap +7.0%.**
+actually recorded. **Ten of twelve quote at or above what the job cost, mean gap
++8.0%, worst −6.6%.**
 
-| Job                    | Order    | Quoted | Cost   |            |
-| ---------------------- | -------- | ------ | ------ | ---------- |
-| Radhey Bhadang         | 199 kg   | 363.10 | 303.28 | +19.7%     |
-| Kothmire               | 261 kg   | 366.58 | 334.63 | +9.5%      |
-| Kothmire, the copy     | 261 kg   | 366.58 | 367.90 | **−0.4%**  |
-| Lokraja Atta           | 417 kg   | 301.94 | 378.10 | **−20.1%** |
-| Lokraja Atta, the copy | 417 kg   | 307.08 | 343.33 | **−10.6%** |
-| Swaraj Green Peas      | 478 kg   | 299.20 | 312.50 | **−4.3%**  |
-| Radhey Murmura         | 1,027 kg | 285.60 | 261.43 | +9.2%      |
-| Lime                   | 3,285 kg | 265.63 | 236.17 | +12.5%     |
-| Amruta Family Tea      | 3,313 kg | 301.26 | 289.30 | +4.1%      |
-| Lime                   | 5,000 kg | 263.87 | 234.06 | +12.7%     |
+| Job                      | Order    | Quoted | Cost   |            |            |
+| ------------------------ | -------- | ------ | ------ | ---------- | ---------- |
+| Radhey Bhadang           | 199 kg   | 355.56 | 303.28 | +17.2%     |            |
+| Kothmire                 | 261 kg   | 359.04 | 334.63 | +7.3%      |            |
+| Kothmire, the copy       | 261 kg   | 359.04 | 367.90 | **−2.4%**  |            |
+| Sau Shital Paneer        | 271 kg   | 321.16 | 319.34 | +0.6%      |            |
+| Lokraja Atta             | 417 kg   | 294.47 | 378.10 | **−22.1%** | set aside  |
+| Lokraja Atta, the copy   | 417 kg   | 299.61 | 343.33 | **−12.7%** | set aside  |
+| Swaraj Green Peas        | 478 kg   | 291.73 | 312.50 | **−6.6%**  |            |
+| Samartha Atta            | 478 kg   | 276.81 | 228.15 | +21.3%     |            |
+| Radhey Murmura           | 1,027 kg | 278.06 | 226.61 | +22.7%     |            |
+| Radhey Murmura, the copy | 1,027 kg | 278.06 | 261.43 | +6.4%      |            |
+| Lime                     | 3,285 kg | 258.10 | 236.17 | +9.3%      | twice over |
+| Amruta Family Tea        | 3,313 kg | 293.73 | 289.30 | +1.5%      |            |
+| Lime                     | 5,000 kg | 256.33 | 234.06 | +9.5%      |            |
 
-**The four misses are worth more than the ten hits.** Lokraja Atta ran at
-**26.2% wastage against an allowance of 7** — that job lost money on waste, not
-on the price, and no quotation could have known. Kothmire's copy came in at
-−0.4% where its twin cleared +9.5%, because the two tabs cost the same job at
-different film rates. Only Swaraj, at −4.3%, is a quote that was genuinely thin.
+#### A job that tells you nothing is set aside
+
+Both Lokraja tabs are left out of the summary. They still print, marked, with
+the reason beside them.
+
+A run genuinely can waste a quarter of its film, and the works is clear that
+this is not a fault to be policed — it happens. But a run like that cannot tell
+you whether the **rate** was close either, because its cost is dominated by
+something no quotation could have predicted. Averaging it in buries the signal
+every other job carries. Setting it aside is not hiding it: the line is still
+there, still showing −22.1%, still saying 26.2% against an allowance of 7.
+
+#### Where the gap actually came from
+
+```bash
+npm run quote:job-sheets -w @yuva/api -- --sheet-rates
+```
+
+`--sheet-rates` prices the film at what the works paid that week instead of at
+the catalogue. It exists to answer one question — how much of the gap is the
+**rate list** rather than the **method** — and the answer is almost none: +7.7%
+against +8.0%. Worth knowing, because it ruled out the obvious suspect and
+pointed at the real ones.
+
+Decomposing the 3,285 kg Lime tab to the rupee a kilogram found them:
+
+```
+material           223.42 vs 192.89    +30.53
+packing              5.40 vs   1.22     +4.18
+transport           10.80 vs   7.45     +3.35
+works day           14.34 vs  12.03     +2.31
+electricity          2.78 vs   3.29     -0.51
+```
+
+Two settings were simply out of date against the works' own spending, on every
+tab rather than on that one:
+
+| Setting   | Was         | Their tabs                                     |
+| --------- | ----------- | ---------------------------------------------- |
+| Transport | Rs 10.00/kg | median **6.80**, and never above 7.00          |
+| Packing   | Rs 5.00/kg  | median **1.22**, and never above 1.95 — 4× out |
+
+Both corrected on the Costing screen and **dated**, so nothing already quoted
+moves: all seven of the works' old quotations still reproduce exactly. That took
+the mean gap from +10.8% to **+8.0%**.
+
+**The wastage allowance is deliberately not touched**, though the tabs run
+around 3.1% against the 8% assumed. An allowance is commercial protection, not
+an estimate of what a job will lose, and Lokraja is the proof it is needed: drop
+it to what a typical job wastes and the first bad run is quoted under its cost.
+That is the works' decision to make, not a figure to tune towards a smaller
+average.
 
 **The two are not meant to agree to the paisa**, and four things differ by
 nature: the quotation prices film at the **catalogue** where the sheet used that
