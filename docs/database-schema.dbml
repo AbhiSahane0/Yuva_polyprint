@@ -64,6 +64,33 @@ Enum JobKind {
   POUCH
 }
 
+Enum JobSheetLineKind {
+  FILM
+  SOLVENT
+  INK
+  ADHESIVE
+  OTHER
+}
+
+Enum JobSheetSection {
+  PRINTING
+  LAMINATION
+}
+
+Enum JobSheetStage {
+  PRINTING
+  LAMINATION_1
+  LAMINATION_2
+  SLITTING
+  POUCHING
+}
+
+Enum JobSheetStatus {
+  OPEN
+  COSTED
+  CLOSED
+}
+
 Enum MachineKind {
   PRINTING
   LAMINATION
@@ -248,6 +275,117 @@ Table job_artwork {
   Note: '0 row(s) at time of generation'
 }
 
+Table job_sheet_labour {
+  id text [pk]
+  sheet_id text [unique, not null]
+  position integer [unique, not null]
+  role text [not null]
+  headcount decimal(8,2) [not null, default: `0`]
+  rate_per_day decimal(10,2) [not null, default: `0`]
+  days decimal(8,3) [not null, default: `0`]
+  amount decimal(12,2) [not null, default: `0`]
+
+  Note: '112 row(s) at time of generation'
+}
+
+Table job_sheet_lines {
+  id text [pk]
+  sheet_id text [unique, not null]
+  position integer [unique, not null]
+  section JobSheetSection [not null]
+  kind JobSheetLineKind [not null, default: `'OTHER'::"JobSheetLineKind"`]
+  material_id text
+  name text [not null]
+  issued_kg decimal(14,3) [not null, default: `0`]
+  returned_kg decimal(14,3) [not null, default: `0`]
+  mix_issued_kg decimal(14,3) [not null, default: `0`]
+  mix_returned_kg decimal(14,3) [not null, default: `0`]
+  mix_share_percent decimal(6,3) [not null, default: `0`]
+  computed_kg decimal(14,3) [not null, default: `0`]
+  consumed_override_kg decimal(14,3)
+  consumed_kg decimal(14,3) [not null, default: `0`]
+  rate_per_kg decimal(12,4) [not null, default: `0`]
+  amount decimal(14,2) [not null, default: `0`]
+
+  Note: '294 row(s) at time of generation'
+}
+
+Table job_sheet_stage_usage {
+  id text [pk]
+  sheet_id text [unique, not null]
+  stage JobSheetStage [unique, not null]
+  share_percent decimal(6,3) [not null, default: `0`]
+  days decimal(8,3) [not null, default: `0`]
+  shifts decimal(6,2) [not null, default: `1`]
+  amount decimal(12,2) [not null, default: `0`]
+
+  Note: '70 row(s) at time of generation'
+}
+
+Table job_sheets {
+  id text [pk]
+  number integer [unique, not null]
+  date date [not null]
+  status JobSheetStatus [not null, default: `'OPEN'::"JobSheetStatus"`]
+  job_id text
+  job_name text [not null, default: `''`]
+  customer_id text
+  operator_name text [not null, default: `''`]
+  film_type text [not null, default: `''`]
+  web_width_mm decimal(10,2)
+  micron decimal(10,3)
+  circumference_mm decimal(10,2)
+  cylinder_count integer [not null, default: `0`]
+  print_mix_issued_kg decimal(14,3) [not null, default: `0`]
+  print_mix_returned_kg decimal(14,3) [not null, default: `0`]
+  lam_mix_issued_kg decimal(14,3) [not null, default: `0`]
+  lam_mix_returned_kg decimal(14,3) [not null, default: `0`]
+  make_ready_days decimal(8,3) [not null, default: `0`]
+  production_days decimal(8,3) [not null, default: `0`]
+  printed_gross_kg decimal(14,3) [not null, default: `0`]
+  printed_core_kg decimal(14,3) [not null, default: `0`]
+  produced_gross_kg decimal(14,3) [not null, default: `0`]
+  produced_core_kg decimal(14,3) [not null, default: `0`]
+  final_output_kg decimal(14,3) [not null, default: `0`]
+  pouching_weight_kg decimal(14,3) [not null, default: `0`]
+  electricity_per_day decimal(12,2) [not null, default: `0`]
+  transport_per_kg decimal(10,4) [not null, default: `0`]
+  pouching_per_kg decimal(10,4) [not null, default: `0`]
+  packaging_cost decimal(12,2) [not null, default: `0`]
+  emi_per_day decimal(12,2) [not null, default: `0`]
+  profit_percent decimal(6,3) [not null, default: `0`]
+  expected_wastage_percent decimal(6,3) [not null, default: `5`]
+  electricity_override decimal(12,2)
+  salary_override decimal(12,2)
+  transport_override decimal(12,2)
+  pouching_override decimal(12,2)
+  emi_override decimal(12,2)
+  profit_override decimal(12,2)
+  material_kg decimal(14,3) [not null, default: `0`]
+  material_cost decimal(14,2) [not null, default: `0`]
+  basic_value_per_kg decimal(12,2) [not null, default: `0`]
+  electricity_cost decimal(12,2) [not null, default: `0`]
+  salary_cost decimal(12,2) [not null, default: `0`]
+  transport_cost decimal(12,2) [not null, default: `0`]
+  pouching_cost decimal(12,2) [not null, default: `0`]
+  emi_cost decimal(12,2) [not null, default: `0`]
+  profit decimal(12,2) [not null, default: `0`]
+  overhead_cost decimal(14,2) [not null, default: `0`]
+  effective_price decimal(14,2) [not null, default: `0`]
+  cost_per_kg decimal(12,2) [not null, default: `0`]
+  expected_wastage_kg decimal(14,3) [not null, default: `0`]
+  actual_wastage_kg decimal(14,3) [not null, default: `0`]
+  wastage_percent decimal(8,3) [not null, default: `0`]
+  excess_cost decimal(14,2) [not null, default: `0`]
+  stock_posted_at timestamp
+  notes text [not null, default: `''`]
+  entered_by text [not null, default: `''`]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+
+  Note: '14 row(s) at time of generation'
+}
+
 Table jobs {
   id text [pk]
   job_code text [not null, default: `'NA'`]
@@ -317,7 +455,7 @@ Table login_events {
   user_agent text
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '45 row(s) at time of generation'
+  Note: '47 row(s) at time of generation'
 }
 
 Table material_rates {
@@ -328,7 +466,7 @@ Table material_rates {
   entered_by text [not null, default: `'Office'`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '241 row(s) at time of generation'
+  Note: '251 row(s) at time of generation'
 }
 
 Table materials {
@@ -346,7 +484,7 @@ Table materials {
   solids_percent decimal(6,3)
   ink_kind InkKind
 
-  Note: '14 row(s) at time of generation'
+  Note: '24 row(s) at time of generation'
 }
 
 Table purchase_order_lines {
@@ -658,3 +796,9 @@ Ref: job_artwork.job_id > jobs.id [delete: cascade]
 Ref: job_artwork.replaces_id > job_artwork.id [delete: restrict]
 Ref: quotation_item_colours.item_id > quotation_items.id [delete: cascade]
 Ref: quotation_item_colours.material_id > materials.id [delete: set null]
+Ref: job_sheets.job_id > jobs.id [delete: set null]
+Ref: job_sheets.customer_id > customers.id [delete: set null]
+Ref: job_sheet_lines.sheet_id > job_sheets.id [delete: cascade]
+Ref: job_sheet_lines.material_id > materials.id [delete: set null]
+Ref: job_sheet_labour.sheet_id > job_sheets.id [delete: cascade]
+Ref: job_sheet_stage_usage.sheet_id > job_sheets.id [delete: cascade]

@@ -10,6 +10,7 @@ One folder per business feature, mirroring the API modules. Built so far:
 | `users`      | User management (admins only)                       |
 | `customers`  | Customer list, edit modal, job specification editor |
 | `quotations` | Quotation list, wizard, PDF preview, sending        |
+| `job-sheets` | The production job sheet — what a run actually cost |
 | `rates`      | Daily material rates                                |
 | `inventory`  | Stock, batches, the movement ledger                 |
 | `purchase`   | Suppliers, orders, receiving into stock             |
@@ -55,6 +56,7 @@ features/<feature>/
    | `customers`  | `gstin/components`   | The same field, the same rules        |
    | `inventory`  | `rates/api`          | Valuing stock                         |
    | `purchase`   | `inventory/api`      | Receiving creates stock               |
+   | `job-sheets` | `inventory/api`      | Posting a sheet moves stock           |
    | `purchase`   | `rates/api`          | Pricing an order line                 |
    | `cylinders`  | `artwork/components` | The design files panel                |
    | anything     | `auth/auth-store`    | Who is signed in, and what they reach |

@@ -1042,6 +1042,71 @@ Nothing is repriced when a revision is created. It copies plies, quantities,
 tiers and totals verbatim, because pressing the button should not silently move
 a figure the customer has already been quoted; it reprices on the first save.
 
+### Job sheets — `/job-sheets`, `/job-sheets/:id`
+
+What a run actually consumed, and what it cost a kilogram. The formulas and the
+reasoning are in
+[the API README](../api/README.md#job-sheets--what-a-run-actually-cost); this is
+what the screen does with them.
+
+The list leads with the cost a kilogram, because that is the one figure anybody
+comes here for — it is what the office prices repeat work from, and the reason
+the sheet is filled in at all. Wastage over the allowance shows red, which is
+how a 26% run announces itself without anybody opening it.
+
+#### The sheet is laid out like the paper one
+
+Twenty-one rows in the works' own order, always there, a row the job does not
+use sitting at zero. The columns are the ones on the paper: issued, returned,
+the mix drum, the rate, consumed, amount. Someone standing at a machine with a
+drum in front of them is reading down a printed form they have used for years,
+and a form whose shape changes with the job is one they have to read before they
+can fill it in.
+
+The **mix out / mix back** boxes appear on an ink's own row, because each colour
+is mixed separately. For the solvents they sit at the top of the section, on the
+pooled drum, and the row shows an em dash — the figure is not theirs to type.
+
+#### Everything is live
+
+The whole sheet re-costs on every keystroke, through the very same
+`costJobSheet` the server runs. Type a corrected consumption and the line
+amount, the material total, transport (which follows the kilograms), the margin
+and the cost a kilogram all move together.
+
+This was wrong at first and it showed the moment anybody used it: the money only
+recomputed on save, so a corrected 30 kg on a line rated Rs 240 sat beside an
+amount of Rs 8,890 left over from the last save. A screen whose whole job is
+"type it in and see what it cost" has to answer while you are typing.
+
+#### The consumed column
+
+It holds the computed figure as its **placeholder**, which is what makes typing
+over it an override. Do that and the box turns amber and says "was 37.040"
+underneath, so a correction is visible on the page rather than lost behind the
+number that replaced it.
+
+The placeholder is darkened from the browser's default grey. At that grey it
+read as an empty box, and this is the column the office checks.
+
+#### Amber "no catalogue rate"
+
+A line with no material behind it. It still costs at whatever rate is typed, but
+it has no link to stock, so **posting would skip it**. `seed:job-sheet-materials`
+adds the ten the works was missing; until a line resolves, the flag says so
+rather than the screen pretending.
+
+#### Two buttons that mean different things
+
+**Cost this sheet** settles it: the cost a kilogram is now the works' answer. It
+refuses a sheet with no final output weight, because that is the figure
+everything is divided by.
+
+**Take off stock** is the irreversible one, and it asks first. It issues every
+line with a catalogue material from the oldest batch, against this job, in one
+transaction — then closes the sheet to editing and says so in a green strip.
+Correcting it afterwards is a stock adjustment, not an edit.
+
 ### Inventory — `/inventory`
 
 What the works holds, what it is worth, and what is running out.
@@ -1871,17 +1936,21 @@ store that does not exist yet.
 The browser recomputes the same figures the server does, using **the same code**
 — `@yuva/shared` is imported by both. Nothing is duplicated or reimplemented.
 
-| Where                 | What is previewed                                          |
-| --------------------- | ---------------------------------------------------------- |
-| Customer job editor   | Composite GSM, pouches per kg                              |
-| Quotation form line   | Total pouches and weight, cylinder size and cost, margin   |
-| Quotation form totals | Material and cylinder subtotals, GST, grand total, advance |
-| Receive material      | What a delivery converts to in the stocked unit            |
-| Rates screen          | The change % a typed rate would produce                    |
+| Where                 | What is previewed                                           |
+| --------------------- | ----------------------------------------------------------- |
+| Customer job editor   | Composite GSM, pouches per kg                               |
+| Quotation form line   | Total pouches and weight, cylinder size and cost, margin    |
+| Quotation form totals | Material and cylinder subtotals, GST, grand total, advance  |
+| Receive material      | What a delivery converts to in the stocked unit             |
+| Rates screen          | The change % a typed rate would produce                     |
+| Job sheet             | The whole sheet — every line, every overhead, the cost a kg |
 
 **The server always recalculates on save and its value wins.** The browser
 figure exists so the effect of a change is visible before committing to it —
-it is feedback, not the source of truth. Formulas and worked examples are
+it is feedback, not the source of truth. The job sheet is the one place where
+the preview covers the whole document rather than a line of it, and it agrees
+with the server to the paisa for the same reason as everything else here: it is
+not a second implementation. Formulas and worked examples are
 documented in [the API README](../api/README.md#calculations).
 
 ---

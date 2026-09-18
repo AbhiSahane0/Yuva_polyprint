@@ -310,15 +310,17 @@ Run from the repository root.
 
 Workspace scripts worth knowing:
 
-| Script                                   | Does                                                        |
-| ---------------------------------------- | ----------------------------------------------------------- |
-| `npm run seed:admin -w @yuva/api`        | create the first administrator (refuses if one exists)      |
-| `npm run seed:materials -w @yuva/api`    | seed the material catalogue                                 |
-| `npm run seed:costing -w @yuva/api`      | machines, wages and ink figures for the rate costing        |
-| `npm run seed:excel-rates -w @yuva/api`  | bring rates and master data to the client's own workbook    |
-| `npm run schema:docs -w @yuva/api`       | regenerate `docs/database-schema.md` from the live database |
-| `npm run db:copy-to-remote -w @yuva/api` | copy local data up to Neon                                  |
-| `npm run import:legacy -w @yuva/api`     | import the legacy spreadsheet                               |
+| Script                                          | Does                                                        |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| `npm run seed:admin -w @yuva/api`               | create the first administrator (refuses if one exists)      |
+| `npm run seed:materials -w @yuva/api`           | seed the material catalogue                                 |
+| `npm run seed:costing -w @yuva/api`             | machines, wages and ink figures for the rate costing        |
+| `npm run seed:excel-rates -w @yuva/api`         | bring rates and master data to the client's own workbook    |
+| `npm run schema:docs -w @yuva/api`              | regenerate `docs/database-schema.md` from the live database |
+| `npm run db:copy-to-remote -w @yuva/api`        | copy local data up to Neon                                  |
+| `npm run import:legacy -w @yuva/api`            | import the legacy spreadsheet                               |
+| `npm run check:job-sheets -w @yuva/api`         | cost the works' job-sheet workbook and check all fourteen   |
+| `npm run seed:job-sheet-materials -w @yuva/api` | the ten materials the job sheet needs                       |
 
 ---
 
@@ -374,7 +376,7 @@ Each app documents itself, next to the code it describes:
 
 | Document                                                       | Covers                                                                                                                                                                       |
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`apps/api/README.md`](./apps/api/README.md)                   | Every endpoint, the request/response envelope, **all the calculations with worked examples**, the data model, and the scripts                                                |
+| [`apps/api/README.md`](./apps/api/README.md)                   | Every endpoint, the request/response envelope, **all the calculations with worked examples**, the job sheet and what a run actually cost, the data model, and the scripts    |
 | [`apps/web/README.md`](./apps/web/README.md)                   | Every screen and what it does, how server state is handled, which figures are previewed in the browser, and the UI components                                                |
 | [`docs/old-quotation-check.md`](./docs/old-quotation-check.md) | **Seven of the works' own 2022 quotations, rebuilt here and matched to the paisa** — what was entered on each, what came out, and the two figures that changed over time     |
 | [`docs/stations.md`](./docs/stations.md)                       | **Printing stations** — what one is, what decides how many a job has when there is no artwork yet, and what each one adds to the rate and the cylinder bill                  |
@@ -747,6 +749,28 @@ Five rules worth repeating here:
   been generated before renders as nothing at all: no gap, a border falling back
   to black. It cost two false bug reports before it was understood. If a change
   does not appear, restart `npm run dev -w apps/web` before believing the screen.
+- **The works' job-sheet spreadsheet splits a day's electricity 60 / 20 / 20 /
+  10 / 10, which comes to 120.** Every job costed that way carried a sixth more
+  electricity than the day cost. The works confirmed 100 is what was meant; the
+  app's defaults are that same weighting rescaled, and
+  `restate:stage-shares` corrects sheets already entered. The six older tabs
+  charge a flat `days × 5000` instead, which is a separate question — that rate
+  may no longer be what a day costs now they have set it at Rs 6,000.
+- **One tab of that workbook has an empty profit row.**
+  `Copy of Radhey Bhadan 200g` was costed with no margin at all — Rs 303.28 a
+  kilogram where the usual ten per cent makes it Rs 323.14. The app follows the
+  sheet rather than correcting it and reports the gap, because the sheet is the
+  record of what was charged.
+- **The eight spot inks carry no laydown or solids, deliberately.** A quotation
+  prices an unnamed "special colour" at the dearest ink having all three of
+  laydown, solids and a rate — Magenta at Rs 235. Give Gold a laydown and every
+  quotation raised afterwards prices its special colours at Rs 510, more than
+  double, with nobody having chosen it. LDPE carries no density for the same
+  reason and cannot yet be used as a quotation ply.
+- **None of the three new quotation designs is wired to the Download PDF
+  button.** Folio, Dossier and Statement render from real data through
+  `preview:quotations`; the button still sends the original document until the
+  works picks one.
 - **The letterhead artwork is 762 KB of PNG**, which becomes ~1 MB of base64 in
   the HTML and ~670 KB of the finished 787 KB PDF. Resampling the header and
   footer to around 800px wide would take the PDF to roughly 200 KB with no code

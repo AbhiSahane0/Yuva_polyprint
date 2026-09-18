@@ -53,6 +53,31 @@ erDiagram
     ArtworkStatus status
     text replaces_id FK
   }
+  job_sheet_labour {
+    text id PK
+    text sheet_id FK
+    integer position
+  }
+  job_sheet_lines {
+    text id PK
+    text sheet_id FK
+    integer position
+    text material_id FK
+    decimal rate_per_kg
+  }
+  job_sheet_stage_usage {
+    text id PK
+    text sheet_id FK
+  }
+  job_sheets {
+    text id PK
+    integer number
+    date date
+    JobSheetStatus status
+    text job_id FK
+    text job_name
+    text customer_id FK
+  }
   jobs {
     text id PK
     text job_code
@@ -195,6 +220,12 @@ erDiagram
   job_artwork ||--o{ job_artwork : "replaces_id"
   quotation_items ||--|{ quotation_item_colours : "item_id"
   materials ||--o{ quotation_item_colours : "material_id"
+  jobs ||--o{ job_sheets : "job_id"
+  customers ||--o{ job_sheets : "customer_id"
+  job_sheets ||--|{ job_sheet_lines : "sheet_id"
+  materials ||--o{ job_sheet_lines : "material_id"
+  job_sheets ||--|{ job_sheet_labour : "sheet_id"
+  job_sheets ||--|{ job_sheet_stage_usage : "sheet_id"
 ```
 
 ## Tables
@@ -209,10 +240,14 @@ erDiagram
 | `cylinder_events` | 11 | 0 |  |
 | `cylinders` | 16 | 0 |  |
 | `job_artwork` | 17 | 0 |  |
+| `job_sheet_labour` | 8 | 112 |  |
+| `job_sheet_lines` | 17 | 294 |  |
+| `job_sheet_stage_usage` | 7 | 70 |  |
+| `job_sheets` | 59 | 14 |  |
 | `jobs` | 55 | 421 | Products and their full engineering specification. |
-| `login_events` | 7 | 45 |  |
-| `material_rates` | 6 | 241 |  |
-| `materials` | 13 | 14 |  |
+| `login_events` | 7 | 47 |  |
+| `material_rates` | 6 | 251 |  |
+| `materials` | 13 | 24 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
 | `purchase_receipts` | 11 | 1 |  |
@@ -264,6 +299,12 @@ erDiagram
 | `job_artwork.replaces_id` | `job_artwork.id` | RESTRICT |  |
 | `quotation_item_colours.item_id` | `quotation_items.id` | CASCADE |  |
 | `quotation_item_colours.material_id` | `materials.id` | SET NULL |  |
+| `job_sheets.job_id` | `jobs.id` | SET NULL |  |
+| `job_sheets.customer_id` | `customers.id` | SET NULL |  |
+| `job_sheet_lines.sheet_id` | `job_sheets.id` | CASCADE |  |
+| `job_sheet_lines.material_id` | `materials.id` | SET NULL |  |
+| `job_sheet_labour.sheet_id` | `job_sheets.id` | CASCADE |  |
+| `job_sheet_stage_usage.sheet_id` | `job_sheets.id` | CASCADE |  |
 
 ## Enums
 
@@ -278,6 +319,10 @@ erDiagram
 | `InkKind` | `PROCESS`, `SPECIAL` |
 | `JobCustomerSource` | `EXPLICIT`, `INFERRED`, `NONE` |
 | `JobKind` | `ROLL`, `POUCH` |
+| `JobSheetLineKind` | `FILM`, `SOLVENT`, `INK`, `ADHESIVE`, `OTHER` |
+| `JobSheetSection` | `PRINTING`, `LAMINATION` |
+| `JobSheetStage` | `PRINTING`, `LAMINATION_1`, `LAMINATION_2`, `SLITTING`, `POUCHING` |
+| `JobSheetStatus` | `OPEN`, `COSTED`, `CLOSED` |
 | `MachineKind` | `PRINTING`, `LAMINATION`, `SLITTING`, `POUCHING` |
 | `MaterialCategory` | `FILM`, `INK`, `ADHESIVE`, `SOLVENT`, `CONSUMABLE` |
 | `PouchType` | `STANDUP`, `STANDUP_ZIPPER`, `ZIPPER`, `D_PUNCH`, `SPOUT`, `CENTRE_SEAL`, `THREE_SIDE_SEAL`, `OTHER` |
@@ -417,6 +462,117 @@ erDiagram
 | `updated_at` | `timestamp` |  |  |
 | `deleted_at` | `timestamp` | ✓ |  |
 | `deleted_by` | `text` | ✓ |  |
+
+### `job_sheet_labour`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `sheet_id` | `text` |  | FK → `job_sheets.id` |
+| `position` | `integer` |  | unique |
+| `role` | `text` |  |  |
+| `headcount` | `decimal(8,2)` |  |  |
+| `rate_per_day` | `decimal(10,2)` |  |  |
+| `days` | `decimal(8,3)` |  |  |
+| `amount` | `decimal(12,2)` |  |  |
+
+### `job_sheet_lines`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `sheet_id` | `text` |  | FK → `job_sheets.id` |
+| `position` | `integer` |  | unique |
+| `section` | `JobSheetSection` (enum) |  |  |
+| `kind` | `JobSheetLineKind` (enum) |  |  |
+| `material_id` | `text` | ✓ | FK → `materials.id` |
+| `name` | `text` |  |  |
+| `issued_kg` | `decimal(14,3)` |  |  |
+| `returned_kg` | `decimal(14,3)` |  |  |
+| `mix_issued_kg` | `decimal(14,3)` |  |  |
+| `mix_returned_kg` | `decimal(14,3)` |  |  |
+| `mix_share_percent` | `decimal(6,3)` |  |  |
+| `computed_kg` | `decimal(14,3)` |  |  |
+| `consumed_override_kg` | `decimal(14,3)` | ✓ |  |
+| `consumed_kg` | `decimal(14,3)` |  |  |
+| `rate_per_kg` | `decimal(12,4)` |  |  |
+| `amount` | `decimal(14,2)` |  |  |
+
+### `job_sheet_stage_usage`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `sheet_id` | `text` |  | FK → `job_sheets.id` |
+| `stage` | `JobSheetStage` (enum) |  | unique |
+| `share_percent` | `decimal(6,3)` |  |  |
+| `days` | `decimal(8,3)` |  |  |
+| `shifts` | `decimal(6,2)` |  |  |
+| `amount` | `decimal(12,2)` |  |  |
+
+### `job_sheets`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `number` | `integer` |  | unique |
+| `date` | `date` |  |  |
+| `status` | `JobSheetStatus` (enum) |  |  |
+| `job_id` | `text` | ✓ | FK → `jobs.id` |
+| `job_name` | `text` |  |  |
+| `customer_id` | `text` | ✓ | FK → `customers.id` |
+| `operator_name` | `text` |  |  |
+| `film_type` | `text` |  |  |
+| `web_width_mm` | `decimal(10,2)` | ✓ |  |
+| `micron` | `decimal(10,3)` | ✓ |  |
+| `circumference_mm` | `decimal(10,2)` | ✓ |  |
+| `cylinder_count` | `integer` |  |  |
+| `print_mix_issued_kg` | `decimal(14,3)` |  |  |
+| `print_mix_returned_kg` | `decimal(14,3)` |  |  |
+| `lam_mix_issued_kg` | `decimal(14,3)` |  |  |
+| `lam_mix_returned_kg` | `decimal(14,3)` |  |  |
+| `make_ready_days` | `decimal(8,3)` |  |  |
+| `production_days` | `decimal(8,3)` |  |  |
+| `printed_gross_kg` | `decimal(14,3)` |  |  |
+| `printed_core_kg` | `decimal(14,3)` |  |  |
+| `produced_gross_kg` | `decimal(14,3)` |  |  |
+| `produced_core_kg` | `decimal(14,3)` |  |  |
+| `final_output_kg` | `decimal(14,3)` |  |  |
+| `pouching_weight_kg` | `decimal(14,3)` |  |  |
+| `electricity_per_day` | `decimal(12,2)` |  |  |
+| `transport_per_kg` | `decimal(10,4)` |  |  |
+| `pouching_per_kg` | `decimal(10,4)` |  |  |
+| `packaging_cost` | `decimal(12,2)` |  |  |
+| `emi_per_day` | `decimal(12,2)` |  |  |
+| `profit_percent` | `decimal(6,3)` |  |  |
+| `expected_wastage_percent` | `decimal(6,3)` |  |  |
+| `electricity_override` | `decimal(12,2)` | ✓ |  |
+| `salary_override` | `decimal(12,2)` | ✓ |  |
+| `transport_override` | `decimal(12,2)` | ✓ |  |
+| `pouching_override` | `decimal(12,2)` | ✓ |  |
+| `emi_override` | `decimal(12,2)` | ✓ |  |
+| `profit_override` | `decimal(12,2)` | ✓ |  |
+| `material_kg` | `decimal(14,3)` |  |  |
+| `material_cost` | `decimal(14,2)` |  |  |
+| `basic_value_per_kg` | `decimal(12,2)` |  |  |
+| `electricity_cost` | `decimal(12,2)` |  |  |
+| `salary_cost` | `decimal(12,2)` |  |  |
+| `transport_cost` | `decimal(12,2)` |  |  |
+| `pouching_cost` | `decimal(12,2)` |  |  |
+| `emi_cost` | `decimal(12,2)` |  |  |
+| `profit` | `decimal(12,2)` |  |  |
+| `overhead_cost` | `decimal(14,2)` |  |  |
+| `effective_price` | `decimal(14,2)` |  |  |
+| `cost_per_kg` | `decimal(12,2)` |  |  |
+| `expected_wastage_kg` | `decimal(14,3)` |  |  |
+| `actual_wastage_kg` | `decimal(14,3)` |  |  |
+| `wastage_percent` | `decimal(8,3)` |  |  |
+| `excess_cost` | `decimal(14,2)` |  |  |
+| `stock_posted_at` | `timestamp` | ✓ |  |
+| `notes` | `text` |  |  |
+| `entered_by` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
 
 ### `jobs`
 

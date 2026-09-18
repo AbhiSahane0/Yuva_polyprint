@@ -15,6 +15,7 @@ quotation PDFs.
   - [Versions](#versions)
   - [Reading a printed quotation](#reading-a-printed-quotation)
   - [What is frozen, and what moves](#what-is-frozen-and-what-moves)
+- [Job sheets — what a run actually cost](#job-sheets--what-a-run-actually-cost)
 - [Data model](#data-model)
 - [Sending quotations by email](#sending-quotations-by-email)
 - [Winning and losing](#winning-and-losing)
@@ -978,6 +979,17 @@ sent.
 | `defaultFlatInkMaterial`      | `Ink — Blended (Estimation)`      | What the FLAT method prices the whole ink laydown at — a blended rate, Rs 800 on the sheet |
 | `defaultFlatAdhesiveMaterial` | `Adhesive — Blended (Estimation)` | The same for adhesive — Rs 400, the made-up batch rather than the drum                     |
 | `cylinderMountingMm`          | 80                                | Cylinder face beyond the web, which the engraver charges for                               |
+| `jobSheetElectricityPerDay`   | 6000                              | A day on the meter for the whole works, shared out by machine                              |
+| `jobSheetTransportPerKg`      | 6.8                               | Rupees a kilogram of material brought **in**, not of finished goods                        |
+| `jobSheetPouchingPerKg`       | 10                                | What pouching costs a kilogram. Zero on a roll job                                         |
+| `jobSheetEmiPerDay`           | 10000                             | Bank EMI charged against the run's production days                                         |
+| `jobSheetProfitPercent`       | 10                                | The margin — taken on the **material**, which is the works' own rule                       |
+| `jobSheetWastagePercent`      | 5                                 | What the works allows itself between the laminator and the pack                            |
+| `jobSheetOutputYieldPercent`  | 97                                | What a new sheet suggests as final output. A suggestion; the pack is weighed               |
+
+The seven `jobSheet*` settings are what a **new** sheet starts with. A sheet then
+keeps its own copy and never reads these again — see
+[Job sheets](#job-sheets--what-a-run-actually-cost).
 
 The two `Flat*` settings are deliberately not the purchase rates above them. See
 **Two sheets, reconciled** below: the same drum has one price on the invoice and
@@ -1776,37 +1788,265 @@ relabelling would not undo it.
 > creates inside the transaction and reads back outside it for exactly this
 > reason.
 
+## Job sheets — what a run actually cost
+
+A quotation estimates a price from a design. A job sheet costs a **run** from
+what was issued to the floor and what came back. The office keeps both, because
+the gap between them is the only place an estimate is ever caught being wrong.
+
+This is the works' own September 2026 Job Sheet, a document they already fill in
+by hand for every job. The arithmetic below is theirs; what the app adds is that
+it is done as you type, that it links to stock, and that it cannot be silently
+wrong in the way a spreadsheet can.
+
+| Method | Path                            | Notes                                                    |
+| ------ | ------------------------------- | -------------------------------------------------------- |
+| GET    | `/job-sheets`                   | Newest first; filter by `search`, `status`, `from`, `to` |
+| GET    | `/job-sheets/next-number`       | The next Sr. No.                                         |
+| GET    | `/job-sheets/:id`               | One sheet, with its lines, crew and stages               |
+| POST   | `/job-sheets`                   | Opens a blank sheet with the works' 21 rows on it        |
+| PATCH  | `/job-sheets/:id`               | Saves and re-costs                                       |
+| POST   | `/job-sheets/:id/cost`          | Settles it — the cost a kilogram is now the answer       |
+| POST   | `/job-sheets/:id/post-to-stock` | Takes the consumption off stock. Once, and irreversible  |
+| DELETE | `/job-sheets/:id`               | Only a sheet nobody has posted                           |
+
+Reading is open to anyone signed in, because the figure a finished sheet
+produces is what the office prices repeat work from. Writing needs `jobs`;
+posting to stock needs `inventory` as well, since it writes real movements
+against real batches and should not be reachable through a second door.
+
+### The sheet is a fixed form, not a list
+
+Twenty-one rows, named as the works names them, in the works' order — PET,
+three solvents, twelve colours, then the lamination films, adhesive, hardener
+and solvent. A row the job does not use stays at zero rather than disappearing.
+
+The person filling this in is standing at a machine with a drum in front of
+them, reading down a printed form they have used for years. A form whose shape
+changes with the job is a form somebody has to read before they can fill it in.
+
+### The mix drums
+
+Neither ink nor adhesive goes to the press as bought. Both are mixed, and the
+works books the mixed drum back to its ingredients at a fixed recipe:
+
+| Printing mix      | Lamination mix     |
+| ----------------- | ------------------ |
+| 40% pigment       | 40% adhesive (NCO) |
+| 40% ethyl acetate | 5% hardener (OH)   |
+| 20% toluene       | 60% ethyl acetate  |
+
+So a line's consumption is **what it drew neat plus its share of the drum**:
+
+```
+consumed = (issued − returned) + share% × (mix issued − mix returned)
+```
+
+Which drum it draws from is the distinction that is easy to get backwards.
+**An ink carries its own**: each colour is mixed separately, so Cyan takes 40%
+of the Cyan drum and nothing of anybody else's. **A solvent draws from the
+pool**: the ethyl acetate that went into every drum that day is booked back as
+one share of the total. Reverse them and a seven-colour job books seven times
+the solvent. `mixDrumFor()` is the one place that decides, and it has tests.
+
+The printing recipe comes to 100% and the lamination one to 105%. Both are the
+works' own figures and both are left exactly as they are — a recipe is a fact
+about a process, not an identity that has to sum.
+
+### A consumption can be typed over
+
+Two of the works' fourteen tabs carry a number sitting on top of a formula:
+White ink at 14.5 where the arithmetic said 23.52, worth **Rs 2,164.80** on a
+Rs 65,000 job. The person who typed it was holding the drum; the formula was
+not.
+
+So consumption is computed and any line may be overridden. The computed figure
+stays beside it — shown on the page as "was 23.520" against an amber box — so
+the correction is visible rather than lost behind the number that replaced it.
+A system that cannot be corrected by the person holding the drum gets corrected
+somewhere else, in a spreadsheet nobody can see.
+
+### Negative is a real figure
+
+A drum that comes back fuller than it went out, because it was topped up from an
+earlier job's leftovers. The works' September sheets carry several — Dark Green
+at −3.2 kg on one of them. It is a correction to the earlier job's cost, and
+flooring it at zero would charge this job for ink it gave back. The schema
+allows it; posting to stock skips it rather than inventing a receipt.
+
+### What sits on top of the material
+
+| Overhead    | How                                                                 |
+| ----------- | ------------------------------------------------------------------- |
+| Electricity | A day's bill, shared out by machine — see below                     |
+| Salary      | Σ over the crew of rate a day × heads × days                        |
+| Transport   | Rupees a kilogram of material **brought in**, not of finished goods |
+| Pouching    | Pouched kilograms × a rate. Zero on a roll job                      |
+| Packaging   | A lump the office types: cartons, tape, stretch film                |
+| Bank EMI    | Production days × a daily figure                                    |
+| Profit      | A percentage of the **material** — see below                        |
+
+```
+effective price = material + every overhead above
+cost a kilogram = effective price ÷ final output kg
+```
+
+Every one of the seven may be settled by hand. The works' own tabs type over at
+least one on every sheet, and two type the electricity outright — the office
+knows things the model does not.
+
+#### The margin is taken on the material alone
+
+It reads like an oversight in the works' spreadsheet and it is not one. Every
+other figure is a cost they can point at, and the margin is taken on what was
+bought and converted. Charging the ten per cent on the electricity and the
+wages as well would take a margin on the cost of being open — on their fourteen
+September jobs, **12% to 19% more profit than they believe they are making**.
+
+#### Electricity divides one day, not a fifth more
+
+A day's bill is one figure for the whole works, split between the machines:
+printing 50%, each lamination pass 16.667%, slitting 8.333%, pouching 8.333%.
+
+The works' spreadsheet splits it 60 / 20 / 20 / 10 / 10, which comes to **120** —
+so every job costed that way carries a sixth more electricity than the day cost.
+On a one-day Radhey Murmura run that is Rs 900 of a Rs 2.68 lakh job. The works
+confirmed the total should be 100, and the defaults are that same weighting
+rescaled rather than a new split: which machine draws what is their knowledge
+and was never in question, only the total was.
+
+```
+stage amount = a day's bill × share% × days × shifts
+```
+
+`days` is what keeps it honest — a stage that did not run is zero days and costs
+nothing, which is what pouching is on a roll job. **Shifts sit outside the 100**:
+a second shift is a second day's running on that machine, and the shares divide
+one day between machines rather than capping what a job can use. Pouching
+routinely runs two.
+
+Four tests hold the total, the relative weighting, the shifts and the coverage,
+because a share is exactly the kind of number somebody nudges one day for one
+job.
+
+### The wastage check, which is why the sheet is filled in
+
+```
+allowed  = good laminate off the machine × 5%
+actual   = good laminate − what was packed
+excess   = (actual − allowed) × this job's own cost a kilogram
+```
+
+Negative when the job beat its allowance, which is worth seeing. The works'
+Lokraja Atta sheets run **26%** against a 5% allowance; their Samarth Atta sheet
+runs **−0.65%**, meaning more was packed than came off the laminator, so one of
+the two weights is wrong.
+
+### A sheet keeps its own copy of everything
+
+Rates, overhead figures, stage shares. It does not read settings when it is
+displayed. A sheet is the record of what the works decided that week —
+electricity was Rs 4,000 a day on the March tabs and Rs 6,000 on the September
+ones — and a record that reprices itself when somebody edits a setting is not a
+record of anything.
+
+Line rates come from the materials catalogue **as at the day of the run**, not
+as at today. The works' tabs show PET at 149 on one job and 170 two months
+later; pricing an August run at November's PET would make every old sheet
+disagree with the paper it was copied from.
+
+### Posting to stock
+
+Oldest batch first, in one transaction, once — and then the sheet is closed to
+editing. Un-posting would mean reversing real movements, and a sheet that could
+be posted twice would take the same material off twice. `issueMaterialFifo()`
+lives in `inventory`, so a job sheet and a manual issue leave the same kind of
+row in the ledger.
+
+A line with no catalogue material is **skipped and named in the result** rather
+than refused, so the gap is visible rather than silent.
+
+### Checked against the works' own workbook
+
+```bash
+npm run check:job-sheets -w @yuva/api            # check only, touches nothing
+npm run check:job-sheets -w @yuva/api -- --write # also create them in the app
+```
+
+Fourteen tabs, entered the way the office would enter them, compared to the cost
+a kilogram the spreadsheet printed. **Fourteen of fourteen exact**, on both the
+cost a kilogram and the material cost.
+
+The report says what it derived and what it accepted, so it never claims to have
+checked something it took as given: material, wastage, wages, transport,
+pouching, the margin and the final division are computed from the raw issue and
+return figures; electricity is computed on the eight tabs carrying the stage
+block and taken as typed on the six older ones, which state a flat figure with
+no workings.
+
+It also found something the works should see. **One tab has an empty profit
+row** — `Copy of Radhey Bhadan 200g` was costed with no margin at all, at
+Rs 303.28 a kilogram where the usual ten per cent makes it Rs 323.14. The check
+follows the sheet rather than correcting it and reports the gap, because the
+sheet is the record of what was charged.
+
+`packages/shared/src/lib/job-sheet-costing.test.ts` holds all fourteen as a
+golden master, extracted from the workbook rather than typed. A 1% error in the
+mix share fails 57 of its 101 tests.
+
+### Restating a sheet
+
+```bash
+npm run restate:stage-shares -w @yuva/api -- --write
+```
+
+Rescales the stage shares of any unposted sheet that does not divide one whole
+day, and re-costs it. Each sheet's own weighting is rescaled rather than
+replaced, and one already summing to 100 is skipped, so a second run is a no-op.
+Sheets whose electricity was typed are left alone and listed, because there is no
+120 in them to correct.
+
+Every restated sheet gets a line on its notes saying what moved and when. These
+are figures the office has already signed off, and a correction with no trail is
+indistinguishable from a bug.
+
+---
+
 ## Data model
 
 Full diagram and column reference: [`docs/database-schema.md`](../../docs/database-schema.md).
 Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 
-| Table                       | Holds                                                                                                                                                        |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `customers`                 | Companies that order. Text fields use `'NA'` where the imported sheet was blank.                                                                             |
-| `jobs`                      | Products and their full 55-column specification.                                                                                                             |
-| `quotations`                | Customer-facing documents. Totals frozen at save; carries its own date, margin, transport, pouch making and wastage; `lost_reason` says why a loss was lost. |
-| `quotation_items`           | One priced line: its design, its gazette, its geometry and its cylinders.                                                                                    |
-| `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted. `rate_override` is the price agreed for this job, when one was.       |
-| `quotation_item_quantities` | One line's figures at one quoted quantity.                                                                                                                   |
-| `quotation_tiers`           | One quoted quantity and the document totals at it.                                                                                                           |
-| `materials`                 | The rate catalogue, with density for films.                                                                                                                  |
-| `material_rates`            | One material's price on one date — one row per active material per day.                                                                                      |
-| `app_setting_history`       | One setting's value from one date — what the works held then, the way `material_rates` answers it for a price.                                               |
-| `stock_batches`             | One delivery of one material, and what is left of it. Unique batch code per material. Keeps the delivery note's own figure when it arrived in another unit.  |
-| `suppliers`                 | Who the works buys from. What they supply is derived from their orders, never stored.                                                                        |
-| `purchase_orders`           | One order to one supplier. Progress follows its receipts; delay is computed, not stored.                                                                     |
-| `purchase_order_lines`      | One material on an order, in the unit it was ordered in.                                                                                                     |
-| `purchase_receipts`         | One delivery against a line. Accepted stock names the batch it became; rejected stock names nothing.                                                         |
-| `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.                                                                            |
-| `job_artwork`               | A design file, held in R2 with only its description here. A revision supersedes rather than overwrites; erasing the file keeps the row that describes it.    |
-| `costing_machines`          | A machine and what a minute of it costs — load, tariff, speed, setup. Retired, never deleted: quotations were costed against it.                             |
-| `costing_labour`            | A wage, and which machine's minutes it is paid for. Monthly; the working month in settings turns it into a rate per minute.                                  |
-| `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.                                                                                |
-| `app_settings`              | Editable rates and costing defaults.                                                                                                                         |
-| `users`                     | Accounts, their password hash and which modules each may reach.                                                                                              |
-| `sessions`                  | Live sign-ins. Deleted on expiry, so this table is always "right now".                                                                                       |
-| `login_events`              | Every successful sign-in, kept permanently. Survives the account being deleted.                                                                              |
+| Table                       | Holds                                                                                                                                                          |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `customers`                 | Companies that order. Text fields use `'NA'` where the imported sheet was blank.                                                                               |
+| `jobs`                      | Products and their full 55-column specification.                                                                                                               |
+| `quotations`                | Customer-facing documents. Totals frozen at save; carries its own date, margin, transport, pouch making and wastage; `lost_reason` says why a loss was lost.   |
+| `quotation_items`           | One priced line: its design, its gazette, its geometry and its cylinders.                                                                                      |
+| `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted. `rate_override` is the price agreed for this job, when one was.         |
+| `quotation_item_quantities` | One line's figures at one quoted quantity.                                                                                                                     |
+| `quotation_tiers`           | One quoted quantity and the document totals at it.                                                                                                             |
+| `materials`                 | The rate catalogue, with density for films.                                                                                                                    |
+| `material_rates`            | One material's price on one date — one row per active material per day.                                                                                        |
+| `app_setting_history`       | One setting's value from one date — what the works held then, the way `material_rates` answers it for a price.                                                 |
+| `stock_batches`             | One delivery of one material, and what is left of it. Unique batch code per material. Keeps the delivery note's own figure when it arrived in another unit.    |
+| `suppliers`                 | Who the works buys from. What they supply is derived from their orders, never stored.                                                                          |
+| `purchase_orders`           | One order to one supplier. Progress follows its receipts; delay is computed, not stored.                                                                       |
+| `purchase_order_lines`      | One material on an order, in the unit it was ordered in.                                                                                                       |
+| `purchase_receipts`         | One delivery against a line. Accepted stock names the batch it became; rejected stock names nothing.                                                           |
+| `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.                                                                              |
+| `job_sheets`                | One production run and what it cost. Keeps its own copy of every overhead rate, so it reads as it was costed. `stock_posted_at` is set once and never cleared. |
+| `job_sheet_lines`           | One consumable on one sheet: issued, returned, its share of a mix drum, the computed consumption and the one the office typed over it.                         |
+| `job_sheet_labour`          | One role's wages for the run — rate a day, heads, days.                                                                                                        |
+| `job_sheet_stage_usage`     | One machine's share of the day's electricity, the days it ran and the shifts. The shares divide one day, so they total 100.                                    |
+| `job_artwork`               | A design file, held in R2 with only its description here. A revision supersedes rather than overwrites; erasing the file keeps the row that describes it.      |
+| `costing_machines`          | A machine and what a minute of it costs — load, tariff, speed, setup. Retired, never deleted: quotations were costed against it.                               |
+| `costing_labour`            | A wage, and which machine's minutes it is paid for. Monthly; the working month in settings turns it into a rate per minute.                                    |
+| `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.                                                                                  |
+| `app_settings`              | Editable rates and costing defaults.                                                                                                                           |
+| `users`                     | Accounts, their password hash and which modules each may reach.                                                                                                |
+| `sessions`                  | Live sign-ins. Deleted on expiry, so this table is always "right now".                                                                                         |
+| `login_events`              | Every successful sign-in, kept permanently. Survives the account being deleted.                                                                                |
 
 Two deliberate choices:
 
@@ -2139,6 +2379,9 @@ Your `.env` stays pointed at Docker throughout.
 | `npm run seed:costing`               | Machines, wages and ink figures. Never overwrites.                             |
 | `npm run seed:excel-rates`           | The workbook's own rates. DOES overwrite — see above.                          |
 | `npm run seed:old-quotations`        | Rebuilds seven of the works' 2022 quotations and checks each against its sheet |
+| `npm run seed:job-sheet-materials`   | The ten materials the job sheet needs, at the works' own rates. Idempotent.    |
+| `npm run check:job-sheets`           | Costs all fourteen tabs of the works' job-sheet workbook and checks every one  |
+| `npm run restate:stage-shares`       | Rescales sheets costed at stage shares totalling more than one day             |
 | `npm run import:legacy -- --dry-run` | Parse the legacy sheet, write nothing                                          |
 | `npm run import:legacy [-- --fresh]` | Import it; `--fresh` replaces existing rows                                    |
 | `npm run schema:docs`                | Regenerate the database documentation                                          |
@@ -2157,6 +2400,28 @@ instead.
 
 The header band repeats on every page (`position: fixed` in print), while the
 footer follows the content so it appears once, under the sign-off.
+
+#### Three designs waiting to be chosen
+
+`templates/folio.ts`, `dossier.ts` and `statement.ts` are alternatives to the
+document above — the same letterhead and the same spine (`templates/family.ts`),
+differing only in arrangement: a card a job, a specification with the money in a
+rail, or the total first with the jobs as a ruled schedule. **None is wired to
+the Download PDF button yet**; that waits on the works picking one.
+
+Everything sits inside a 6.6pt–12.4pt scale, and the total is the only thing
+that reaches the top of it — `templates.test.ts` fails the build if any template
+sets a size above the ceiling. Emphasis is weight, colour and the rule above a
+figure, because a price set large reads as a pitch rather than as a statement of
+account.
+
+```bash
+npm run preview:quotations -w @yuva/api
+```
+
+Renders each design from real quotations to `apps/web/public/_dev/`
+(git-ignored) and prints the URL. Open `/_dev/index.html` — the bare directory
+is swallowed by the app's own router.
 
 ## GSTIN lookup
 

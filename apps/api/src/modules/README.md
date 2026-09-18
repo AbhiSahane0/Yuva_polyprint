@@ -10,6 +10,7 @@ One folder per business module. Built so far:
 | `users`      | Administrators managing who can sign in and what they can open   |
 | `customers`  | Customers and their job specifications                           |
 | `jobs`       | One design at a time — created and edited from two screens       |
+| `job-sheets` | What a run actually consumed, and what it cost a kilogram        |
 | `quotations` | Quotations, their costing, and the generated PDF                 |
 | `materials`  | The rate catalogue and daily rates                               |
 | `inventory`  | Stock as a ledger — batches, movements, and what is running out  |
@@ -50,7 +51,9 @@ modules/<module>/
    directly into its tables — that boundary is what keeps this maintainable at
    20 modules. It applies to writes as much as reads, and the writes are where
    it earns its keep: `purchase` receives stock through `inventory`, so a
-   delivery lands in the ledger by the same path as everything else, and
+   delivery lands in the ledger by the same path as everything else;
+   `job-sheets` takes a run's consumption off stock through `inventory`, so a
+   sheet and a manual issue leave the same kind of movement behind; and
    `cylinders` erases a design's files through `artwork`, so there is only one
    piece of code that knows how to remove an object from R2 — and therefore
    only one that can forget to.
