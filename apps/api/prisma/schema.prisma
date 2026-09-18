@@ -1835,11 +1835,15 @@ model JobSheetLabour {
 
 /// One process's share of the day's electricity.
 ///
-/// The shares are what a machine draws while it is running — printing 60%,
-/// each lamination pass 20%, slitting 10%, pouching 10% — so they come to more
-/// than a whole day, which is correct: on a day when everything runs, the works
-/// draws more than one machine's worth. What keeps the bill honest is `days`:
-/// a stage that did not run is zero days and costs nothing.
+/// The shares divide ONE day's bill between the machines, so they add up to
+/// 100. The works' spreadsheet splits it 60 / 20 / 20 / 10 / 10, which comes to
+/// 120 and charges a job for electricity nobody bought; the works confirmed the
+/// total should be 100, and the defaults are that same weighting rescaled.
+///
+/// Stored per sheet rather than read from settings, so a sheet costed under the
+/// old split still reads as it was costed. What keeps the bill honest beyond
+/// the shares is `days`: a stage that did not run is zero days and costs
+/// nothing.
 model JobSheetStageUsage {
   id String @id @default(cuid())
 

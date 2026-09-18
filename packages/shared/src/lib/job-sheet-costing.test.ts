@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { JOB_SHEET_STAGE_DEFAULTS, JOB_SHEET_STAGE_SHARE_TOTAL } from '../constants/job-sheet.js';
 import {
   consumedKg,
   costJobSheet,
+  JOB_SHEET_STAGES,
   labourAmount,
   mixDrumFor,
   stageElectricity,
@@ -1065,14 +1067,18 @@ describe('a consumption the office corrected', () => {
 /**
  * **The meter, shared out by stage.**
  *
- * A day's electricity is one bill for the whole works, and the September sheets
- * split it: printing 60%, each lamination pass 20%, slitting 10%, pouching 10%.
- * That comes to 120% of a day, which is right rather than wrong — the shares
- * are what each machine draws while it is running, and on a day when everything
- * runs the works draws more than one machine's worth.
+ * A day's electricity is one bill for the whole works, divided between the
+ * machines — so the shares add up to 100. The works' own spreadsheet splits it
+ * 60 / 20 / 20 / 10 / 10, which comes to 120 and charges a job for a fifth more
+ * electricity than the day cost; the works confirmed 100 is what was meant.
  *
- * What keeps the bill honest is `days`: a stage that did not run is zero days
- * and costs nothing. On a roll job, pouching is exactly that.
+ * The engine takes whatever share it is given and does not police the total,
+ * which is what lets the tests below reproduce the works' own sheets at their
+ * own figures. The 100 is enforced where the decision lives — on the defaults a
+ * new sheet starts from.
+ *
+ * What keeps the bill honest beyond the shares is `days`: a stage that did not
+ * run is zero days and costs nothing. On a roll job, pouching is exactly that.
  */
 describe('electricity', () => {
   const perDay = 6000;
@@ -1096,8 +1102,12 @@ describe('electricity', () => {
     ).toBe(900);
   });
 
-  /* The works' Samarth Atta sheet: 2700 + 900 + 450 + 900 = 4950. */
-  it('adds up to the figure on the works’ own sheet', () => {
+  /*
+   * The works' Samarth Atta sheet: 2700 + 900 + 450 + 900 = 4950, at ITS shares
+   * rather than the app's. A sheet is costed at the shares stored on it, so a
+   * sheet entered before the total was corrected still reads as it was costed.
+   */
+  it('adds up to the figure on the works’ own sheet, at the works’ own shares', () => {
     const cost = costJobSheet({
       ...inputFor(SHEETS[0]!),
       lines: [],
@@ -1335,5 +1345,45 @@ describe('the drum a line draws from', () => {
         ratePerKg: 170,
       }),
     ).toBeCloseTo(297.55, 4);
+  });
+});
+
+/**
+ * **The shares a new sheet starts from add up to one day.**
+ *
+ * This is the assertion the works asked for. Their spreadsheet splits the meter
+ * 60 / 20 / 20 / 10 / 10 — 120 in total — which charges every job a fifth more
+ * electricity than the day actually cost. On the Radhey Murmura sheet that is
+ * Rs 900 of a Rs 2.68 lakh job, and it is in every job they have ever costed
+ * this way.
+ *
+ * The defaults are that same weighting rescaled rather than a new split: the
+ * relative draw of each machine is the works' own knowledge and was never in
+ * question, only the total. A test rather than a comment, because a share is
+ * exactly the kind of number somebody nudges one day for one job.
+ */
+describe('the stage shares a new sheet starts with', () => {
+  it('add up to one whole day, and no more', () => {
+    const total = JOB_SHEET_STAGE_DEFAULTS.reduce((sum, stage) => sum + stage.sharePercent, 0);
+    expect(Number(total.toFixed(3))).toBe(JOB_SHEET_STAGE_SHARE_TOTAL);
+  });
+
+  it('keeps the works’ own weighting between the machines', () => {
+    const share = (stage: string) =>
+      JOB_SHEET_STAGE_DEFAULTS.find((s) => s.stage === stage)!.sharePercent;
+    /* Printing draws three times a lamination pass, and six times slitting. */
+    expect(share('PRINTING') / share('LAMINATION_1')).toBeCloseTo(3, 3);
+    expect(share('PRINTING') / share('SLITTING')).toBeCloseTo(6, 3);
+    expect(share('LAMINATION_1')).toBe(share('LAMINATION_2'));
+  });
+
+  /* Pouching runs two shifts; the other four run one. */
+  it('runs pouching twice a day and nothing else', () => {
+    const twoShifts = JOB_SHEET_STAGE_DEFAULTS.filter((stage) => stage.shifts > 1);
+    expect(twoShifts.map((stage) => stage.stage)).toEqual(['POUCHING']);
+  });
+
+  it('covers every stage exactly once', () => {
+    expect(JOB_SHEET_STAGE_DEFAULTS.map((stage) => stage.stage)).toEqual([...JOB_SHEET_STAGES]);
   });
 });

@@ -195,19 +195,35 @@ export const JOB_SHEET_CREW: readonly JobSheetCrewRole[] = [
 ];
 
 /**
- * Each machine's share of a day on the meter, and how many shifts it runs.
+ * **Each machine's share of a day on the meter, and how many shifts it runs.**
  *
- * Pouching is the only one that routinely runs two shifts, which is why the
- * works' sheets multiply it and nothing else.
+ * The works' spreadsheet splits the day 60 / 20 / 20 / 10 / 10, which comes to
+ * 120 — and the works has confirmed it should come to 100. These are shares of
+ * one day's bill, so anything over 100 charges a job for electricity nobody
+ * bought.
+ *
+ * The figures below are that same split rescaled, not a new one invented to fit.
+ * Printing is still three times a lamination pass and six times slitting,
+ * because which machine draws what is the works' knowledge and none of it is in
+ * question — only the total was. Rescaling asserts nothing new; picking round
+ * numbers would have quietly claimed one of the five was the mis-stated one.
+ *
+ * Pouching is the only stage that routinely runs two shifts, which is why the
+ * works' sheets multiply it and nothing else. Shifts are deliberately outside
+ * the 100: a second shift is a second day's running on that machine, and the
+ * shares divide one day between machines rather than capping what a job can use.
  */
 export const JOB_SHEET_STAGE_DEFAULTS: readonly {
   stage: JobSheetStage;
   sharePercent: number;
   shifts: number;
 }[] = [
-  { stage: 'PRINTING', sharePercent: 60, shifts: 1 },
-  { stage: 'LAMINATION_1', sharePercent: 20, shifts: 1 },
-  { stage: 'LAMINATION_2', sharePercent: 20, shifts: 1 },
-  { stage: 'SLITTING', sharePercent: 10, shifts: 1 },
-  { stage: 'POUCHING', sharePercent: 10, shifts: 2 },
+  { stage: 'PRINTING', sharePercent: 50, shifts: 1 },
+  { stage: 'LAMINATION_1', sharePercent: 16.667, shifts: 1 },
+  { stage: 'LAMINATION_2', sharePercent: 16.667, shifts: 1 },
+  { stage: 'SLITTING', sharePercent: 8.333, shifts: 1 },
+  { stage: 'POUCHING', sharePercent: 8.333, shifts: 2 },
 ];
+
+/** What the shares must add up to: one day's bill, divided between machines. */
+export const JOB_SHEET_STAGE_SHARE_TOTAL = 100;
