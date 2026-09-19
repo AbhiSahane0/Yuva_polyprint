@@ -47,6 +47,7 @@ import {
   computeMargin,
   computeMaterialCostPerKg,
   plyRatePerKg,
+  pouchExpense,
   resolveSelectedQuantity,
   round,
   suggestRepeatHeight,
@@ -108,6 +109,11 @@ import {
   type RateCostingOverrides,
 } from '@/features/costing/api/use-rate-costing';
 import { ColourFields } from '../components/ColourFields';
+import {
+  CostingOverrides,
+  strippedCosting,
+  type CostingMasters,
+} from '../components/CostingOverrides';
 import { LayerFields } from '../components/LayerFields';
 import { QuantityFields, type QuantityResult } from '../components/QuantityFields';
 import { StepIndicator, type Step } from '../components/StepIndicator';
@@ -746,6 +752,69 @@ export default function QuotationFormPage() {
     });
   }, [watched.items, filmById, byName, settings, cylinderRate]);
 
+  /*
+   * What the works would charge for making, per kilogram, on this quotation.
+   *
+   * There is no such figure on the Costing screen and there cannot be: making
+   * is charged **per pouch**, and the same charge reads between Rs 11 and Rs 64
+   * a kilogram across the works' own nine costed pouches, on nothing but how
+   * big the pouch is. So it is worked out here, from the style and the size the
+   * office has actually typed — `perPouch × pouchesPerKg`, which is precisely
+   * what the rate carries.
+   *
+   * Null where no single figure applies: before a job has a size to derive one
+   * from, on a document whose jobs disagree, and on one that makes no pouches
+   * at all — a roll pays nothing for making and ignores the override entirely.
+   */
+  const pouchMakingMaster = useMemo(() => {
+    if (!settings) return null;
+    const rates = {
+      makingPerPouch: settings.pouchMakingPerPouch,
+      dPunchPerPouch: settings.dPunchPerPouch,
+      dPunchLargePerPouch: settings.dPunchLargePerPouch,
+      dPunchLargeAboveMm: settings.dPunchLargeAboveMm,
+      zipperRatePerMetre: settings.zipperRatePerMetre,
+    };
+
+    const figures: number[] = [];
+    for (const [index, item] of (watched.items ?? []).entries()) {
+      if ((item?.jobKind ?? 'POUCH') === 'ROLL') continue;
+
+      const perPouch = pouchExpense(
+        (item?.pouchType || null) as PouchType | null,
+        num(item?.widthMm),
+        rates,
+      ).perPouch;
+      const pouchesPerKg = costed[index]?.geometry.pouchesPerKg ?? 0;
+      if (perPouch <= 0 || pouchesPerKg <= 0) return null;
+
+      figures.push(Math.round(perPouch * pouchesPerKg * 100) / 100);
+    }
+
+    if (figures.length === 0) return null;
+    return figures.every((figure) => figure === figures[0]) ? (figures[0] ?? null) : null;
+  }, [watched.items, costed, settings]);
+
+  /*
+   * The works' own four, for the section that folds them away.
+   *
+   * Read for this quotation's date like everything else on the screen, so the
+   * figures it offers are the ones the server would price it at.
+   */
+  const costingMasters: CostingMasters = {
+    marginPercent: settings?.defaultMarginPercent ?? 9,
+    transportPerKg: settings?.transportPerKg ?? 10,
+    defaultWastagePercent: settings?.defaultWastagePercent ?? 8,
+    pouchWastagePercent: settings?.pouchWastagePercent ?? 7,
+    pouchMakingPerKg: pouchMakingMaster,
+  };
+
+  /* Which wastage applies is decided by the STYLE, job by job — so the section
+     can offer a figure only where every job on the document agrees. */
+  const pouchTypesOnThisQuotation = (watched.items ?? []).map(
+    (item) => (item?.pouchType || null) as PouchType | null,
+  );
+
   /** Totals per quantity column, for the review step. */
   const tierTotals = useMemo(() => {
     const columns = Math.max(1, ...costed.map((entry) => entry.quantities.length));
@@ -991,6 +1060,15 @@ export default function QuotationFormPage() {
       async (values) => {
         const payload = {
           ...values,
+          /*
+           * Anything still equal to the works' own figure goes blank.
+           *
+           * The costing section now opens with those figures filled in, so
+           * "the office read them and closed it again" would otherwise reach
+           * the server as four deliberate overrides and freeze this quotation
+           * against a Costing screen it never meant to leave.
+           */
+          ...strippedCosting(values, costingMasters, pouchTypesOnThisQuotation),
           saveAsCustomer: customerMode === 'new',
           brandName: values.brandName ?? '',
           customerId: customerMode === 'existing' ? values.customerId : null,
@@ -1272,81 +1350,6 @@ export default function QuotationFormPage() {
 
         {step === 2 ? (
           <div className="flex flex-col gap-5">
-            {/*
-              Three figures the works varies job to job.
-
-              Held on the Costing screen as the works' own, and overridden here
-              when a job is not the ordinary case — the client's own sheets set
-              all three by hand, with margins of 5%, 9% and 10% across seven
-              quotations and nothing charged for pouch making on the two sold as
-              reels. Left blank they follow the Costing screen, so a quotation
-              that never overrode one keeps up with it.
-            */}
-            <FieldSection
-              title="This quotation's costing"
-              description="Blank follows the works' own figures on the Costing screen."
-            >
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
-                <div className="sm:col-span-4">
-                  <Field label="Margin %" htmlFor="marginPercent">
-                    <NumberInput
-                      id="marginPercent"
-                      placeholder={String(settings?.defaultMarginPercent ?? 9)}
-                      {...register('marginPercent')}
-                    />
-                  </Field>
-                </div>
-                <div className="sm:col-span-4">
-                  <Field label="Transport, Rs/kg" htmlFor="transportPerKg">
-                    <NumberInput
-                      id="transportPerKg"
-                      placeholder={String(settings?.transportPerKg ?? 10)}
-                      {...register('transportPerKg')}
-                    />
-                  </Field>
-                </div>
-                <div className="sm:col-span-4">
-                  {/*
-                    Per KILOGRAM, where the works' figure is per pouch, and that
-                    is deliberate: this replaces the whole charge rather than
-                    any part of it. "Charge Rs 20 a kilo for making on this one,
-                    whatever the style says" is what the office actually means
-                    when it overrides, and it is the unit every quotation
-                    written before the charge became per pouch already carries.
-                  */}
-                  <Field
-                    label="Pouch making, Rs/kg"
-                    htmlFor="pouchMakingPerKg"
-                    hint="Blank follows the style; zero on a reel"
-                  >
-                    <NumberInput
-                      id="pouchMakingPerKg"
-                      placeholder="by style"
-                      {...register('pouchMakingPerKg')}
-                    />
-                  </Field>
-                </div>
-                <div className="sm:col-span-4">
-                  {/*
-                    The works has two: 7% on a pouch job, 8% on everything else,
-                    from two of its own documents. Blank takes whichever this
-                    line is — which is why the placeholder cannot name a figure.
-                  */}
-                  <Field
-                    label="Wastage %"
-                    htmlFor="wastagePercent"
-                    hint="Film spoiled setting up and running"
-                  >
-                    <NumberInput
-                      id="wastagePercent"
-                      placeholder="by job kind"
-                      {...register('wastagePercent')}
-                    />
-                  </Field>
-                </div>
-              </div>
-            </FieldSection>
-
             {items.fields.map((field, index) => (
               <JobCard
                 key={field.id}
@@ -1377,6 +1380,34 @@ export default function QuotationFormPage() {
                 }
               />
             ))}
+
+            {/*
+              Four figures the works varies job to job, folded away.
+
+              Held on the Costing screen as the works' own, and overridden here
+              when a job is not the ordinary case — the client's own sheets set
+              them by hand, with margins of 5%, 9% and 10% across seven
+              quotations and nothing charged for pouch making on the two sold as
+              reels. That is the rare job, so four empty boxes stood above every
+              ordinary one.
+
+              **Below the jobs**, not above them. It is the last thing read
+              rather than the first thing walked past: the office came here to
+              price a job, and the works' own figures are already right for it.
+              See `CostingOverrides`.
+            */}
+            <CostingOverrides
+              register={register}
+              setValue={setValue}
+              values={{
+                marginPercent: watched.marginPercent,
+                transportPerKg: watched.transportPerKg,
+                pouchMakingPerKg: watched.pouchMakingPerKg,
+                wastagePercent: watched.wastagePercent,
+              }}
+              masters={costingMasters}
+              pouchTypes={pouchTypesOnThisQuotation}
+            />
 
             <div>
               <Button variant="secondary" onClick={() => items.append(BLANK_ITEM)}>
