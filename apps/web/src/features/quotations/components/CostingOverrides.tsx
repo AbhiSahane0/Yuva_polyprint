@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { UseFormRegister, UseFormSetValue } from 'react-hook-form';
 import {
   formatRs,
@@ -37,6 +37,16 @@ export interface CostingMasters {
   transportPerKg: number;
   defaultWastagePercent: number;
   pouchWastagePercent: number;
+  /**
+   * Making, per kilogram, worked out for THIS quotation.
+   *
+   * Not a figure on the Costing screen — the works charges making per pouch,
+   * and what that comes to on a kilogram depends entirely on how big the pouch
+   * is. The page derives it from the style and the size that have been typed.
+   * Null where no single figure applies: before a job has a size, on a document
+   * whose jobs disagree, and on one that makes no pouches at all.
+   */
+  pouchMakingPerKg: number | null;
 }
 
 /** The four fields, as the form holds them: strings while they are being typed. */
@@ -74,11 +84,11 @@ function wastageMaster(
 /**
  * What the works' own figure is for each box, or '' where there is no single one.
  *
- * Pouch making has none, and cannot: the works charges it **per pouch**, and
- * the same charge reads between Rs 11 and Rs 64 a kilogram across its own nine
- * costed pouches depending on nothing but how big the pouch is. A per-kilogram
- * figure exists only once a job has a size, so there is nothing to put in a box
- * that sits above all the jobs. It keeps its "by style" hint.
+ * Two of the four are read straight off the Costing screen. The other two are
+ * worked out for this document — wastage from the styles on it, making from the
+ * style and size of each job — because neither is a number the works holds one
+ * of. Where that working cannot land on a single figure the box stays empty and
+ * says what decides it instead.
  */
 function mastersFor(
   masters: CostingMasters,
@@ -87,7 +97,7 @@ function mastersFor(
   return {
     marginPercent: String(masters.marginPercent),
     transportPerKg: String(masters.transportPerKg),
-    pouchMakingPerKg: '',
+    pouchMakingPerKg: masters.pouchMakingPerKg === null ? '' : String(masters.pouchMakingPerKg),
     wastagePercent: wastageMaster(masters, pouchTypes),
   };
 }
@@ -138,6 +148,10 @@ export function CostingOverrides({
   const [open, setOpen] = useState(false);
   const filled = FIELDS.some((field) => text(values[field]).trim() !== '');
 
+  /* What was last written into each box on the works' behalf, so a box still
+     holding it can be told apart from one somebody typed. */
+  const applied = useRef<Partial<Record<CostingField, string>>>({});
+
   /*
    * A saved quotation that overrode something opens with its figures showing,
    * because hiding a number this document is actually priced at would be worse
@@ -150,16 +164,40 @@ export function CostingOverrides({
 
   const own = mastersFor(masters, pouchTypes);
 
+  /*
+   * An open box goes on following the works' figure until somebody types in it.
+   *
+   * Two of the four are derived from the jobs — making from the style and size,
+   * wastage from the styles — so they move while the section is open and the
+   * office edits the job below it. Without this, a figure filled in before a
+   * pouch was resized would sit there looking like the works' own, no longer be
+   * equal to it, and so survive the strip on save as a deliberate override
+   * nobody made. It follows only a box still holding exactly what was last
+   * written into it; a typed figure is theirs and is left alone.
+   */
+  useEffect(() => {
+    if (!open) return;
+    for (const field of FIELDS) {
+      const was = applied.current[field];
+      if (was === undefined || own[field] === was) continue;
+      if (text(values[field]).trim() !== was) continue;
+      applied.current[field] = own[field];
+      setValue(field, own[field] as never, { shouldDirty: true });
+    }
+  });
+
   function toggle(next: boolean) {
     setOpen(next);
 
     if (!next) {
+      applied.current = {};
       for (const field of FIELDS) setValue(field, '' as never, { shouldDirty: true });
       return;
     }
 
     for (const field of FIELDS) {
       if (text(values[field]).trim() !== '' || own[field] === '') continue;
+      applied.current[field] = own[field];
       setValue(field, own[field] as never, { shouldDirty: true });
     }
   }
@@ -176,7 +214,9 @@ export function CostingOverrides({
     `Margin ${own.marginPercent}%`,
     `Transport ${formatRs(Number(own.transportPerKg), 2)}/kg`,
     `Wastage ${own.wastagePercent === '' ? 'by job kind' : `${own.wastagePercent}%`}`,
-    'Pouch making by style',
+    `Pouch making ${
+      own.pouchMakingPerKg === '' ? 'by style' : `${formatRs(Number(own.pouchMakingPerKg), 2)}/kg`
+    }`,
   ].join(' · ');
 
   return (
@@ -226,7 +266,7 @@ export function CostingOverrides({
             >
               <NumberInput
                 id="pouchMakingPerKg"
-                placeholder="by style"
+                placeholder={own.pouchMakingPerKg === '' ? 'by style' : own.pouchMakingPerKg}
                 {...register('pouchMakingPerKg')}
               />
             </Field>

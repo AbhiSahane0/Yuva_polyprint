@@ -1659,7 +1659,7 @@ it sits **below the jobs**, just above **Add another job**:
   ... the last job card ...
 
 THIS QUOTATION'S COSTING
-Margin 9% · Transport Rs. 6.80/kg · Wastage 7% · Pouch making by style
+Margin 9% · Transport Rs. 6.80/kg · Wastage 7% · Pouch making Rs. 122.55/kg
 
 [ ] Edit this quotation's costing
 
@@ -1692,14 +1692,30 @@ A quotation that already overrides something **opens showing it**, because
 hiding a number the document is actually priced at would be worse than the four
 empty boxes this replaces.
 
-**Two of the four have no single figure to fill in with.** Pouch making is
-charged per pouch, and the same charge reads between Rs 11 and Rs 64 a kilogram
-across the works' own nine costed pouches depending on nothing but the size — a
-per-kilogram figure exists only once a job has one, and this box sits above all
-the jobs. Wastage is decided by the **style**, job by job, so it can be offered
-only where every job on the document falls the same side of that line; mixed, it
-stays empty and says "by job kind", because one figure would be wrong for half
-of it.
+**Two of the four are not read off the Costing screen — they are worked out for
+this document**, because the works holds no single figure for either.
+
+Pouch making is charged **per pouch**, and the same charge reads between Rs 11
+and Rs 64 a kilogram across the works' own nine costed pouches depending on
+nothing but the size. So the box is filled from the style and size actually
+typed — `perPouch × pouchesPerKg`, which is precisely what the rate carries. A
+150 × 200 standup on PET + PE comes out at Rs 122.55 a kilogram; take it to
+300 mm tall and it is Rs 81.70, because a heavier pouch is fewer to the kilo.
+
+Wastage is decided by the **style**, job by job, so it can be offered only where
+every job on the document falls the same side of that line.
+
+Either can fail to land on one figure — before a job has a size, on a document
+whose jobs disagree, on one that makes no pouches at all — and then the box
+stays empty and names what decides it instead: "by style", "by job kind".
+
+**An open box goes on following the works' figure until somebody types in it.**
+Both of those are derived from the jobs, so they move while the section is open
+and the office edits the job below it. Without that, a figure filled in before a
+pouch was resized would sit there looking like the works' own, no longer be
+equal to it, and so survive the strip on save as a deliberate override nobody
+made. It follows only a box still holding exactly what was last written into it
+— a typed figure is theirs and is left alone.
 
 A blank box means "follow the works' figure", which is not the same as zero:
 `z.coerce.number()` turns an empty string into 0, and on a margin box that would

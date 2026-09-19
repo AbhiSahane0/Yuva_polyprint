@@ -20,7 +20,12 @@ const MASTERS: CostingMasters = {
   transportPerKg: 6.8,
   defaultWastagePercent: 8,
   pouchWastagePercent: 7,
+  /* Derived by the page from the style and the size, not read off a screen. */
+  pouchMakingPerKg: 11.04,
 };
+
+/** A document whose jobs have no size yet, so making cannot be worked out. */
+const NO_MAKING: CostingMasters = { ...MASTERS, pouchMakingPerKg: null };
 
 /** A standup is in the pouch workbook, at 7%; a reel is not, at 8%. */
 const STANDUP: PouchType = 'STANDUP';
@@ -28,9 +33,11 @@ const STANDUP: PouchType = 'STANDUP';
 function Host({
   defaults,
   pouchTypes = [STANDUP],
+  masters = MASTERS,
 }: {
   defaults?: Partial<CreateQuotationFormValues>;
   pouchTypes?: (PouchType | null)[];
+  masters?: CostingMasters;
 }) {
   const { control, register, setValue, watch } = useForm<CreateQuotationFormValues>({
     defaultValues: {
@@ -52,7 +59,7 @@ function Host({
         pouchMakingPerKg: watch('pouchMakingPerKg'),
         wastagePercent: watch('wastagePercent'),
       }}
-      masters={MASTERS}
+      masters={masters}
       pouchTypes={pouchTypes}
     />
   );
@@ -79,6 +86,12 @@ describe('CostingOverrides', () => {
     expect(onScreen()).toContain('Margin 9%');
     expect(onScreen()).toContain('Transport Rs. 6.80/kg');
     expect(onScreen()).toContain('Wastage 7%');
+    expect(onScreen()).toContain('Pouch making Rs. 11.04/kg');
+  });
+
+  it('says what decides making when it cannot be worked out', () => {
+    render(<Host masters={NO_MAKING} />);
+    expect(onScreen()).toContain('Pouch making by style');
   });
 
   it('opens the boxes filled in with the works’ own figures', () => {
@@ -90,17 +103,52 @@ describe('CostingOverrides', () => {
     expect(box('wastagePercent')?.value).toBe('7');
   });
 
-  it('leaves pouch making empty, because there is no one figure to fill it with', () => {
+  it('fills pouch making in with what the style and the size come to', () => {
     /*
-     * The works charges making PER POUCH, and the same charge reads between
-     * Rs 11 and Rs 64 a kilogram across its own nine costed pouches depending
-     * on nothing but how big the pouch is. A per-kilogram figure exists only
-     * once a job has a size, and this box sits above all the jobs.
+     * The works charges making PER POUCH, and there is no per-kilogram figure
+     * on the Costing screen to copy: the same charge reads between Rs 11 and
+     * Rs 64 a kilogram across its own nine costed pouches, on nothing but how
+     * big the pouch is. So the page derives it — `perPouch × pouchesPerKg`,
+     * which is exactly what the rate carries — and the box shows that.
      */
     render(<Host />);
     fireEvent.click(checkbox());
+    expect(box('pouchMakingPerKg')?.value).toBe('11.04');
+  });
+
+  it('leaves pouch making empty when no single figure applies', () => {
+    // Before a job has a size to derive one from, on a document whose jobs
+    // disagree, and on one that makes no pouches at all.
+    render(<Host masters={NO_MAKING} />);
+    fireEvent.click(checkbox());
     expect(box('pouchMakingPerKg')?.value).toBe('');
     expect(box('pouchMakingPerKg')?.placeholder).toBe('by style');
+  });
+
+  it('follows making down as the job it is derived from changes', () => {
+    const { rerender } = render(<Host />);
+    fireEvent.click(checkbox());
+    expect(box('pouchMakingPerKg')?.value).toBe('11.04');
+
+    rerender(<Host masters={{ ...MASTERS, pouchMakingPerKg: 15.2 }} />);
+
+    /*
+     * The pouch was resized under an open section. Left at 11.04 the box would
+     * look like the works' own figure, no longer BE it, and so survive the
+     * strip on save as a deliberate override nobody made.
+     */
+    expect(box('pouchMakingPerKg')?.value).toBe('15.2');
+  });
+
+  it('does not follow a figure the office typed', () => {
+    const { rerender } = render(<Host />);
+    fireEvent.click(checkbox());
+    fireEvent.change(box('pouchMakingPerKg')!, { target: { value: '20' } });
+
+    rerender(<Host masters={{ ...MASTERS, pouchMakingPerKg: 15.2 }} />);
+
+    // 20 is theirs. Resizing a pouch is not a reason to throw it away.
+    expect(box('pouchMakingPerKg')?.value).toBe('20');
   });
 
   it('cannot offer a wastage when the jobs disagree about it', () => {
@@ -136,7 +184,12 @@ describe('CostingOverrides', () => {
 describe('strippedCosting', () => {
   it('unsets anything still equal to the works’ own figure', () => {
     const out = strippedCosting(
-      { marginPercent: '9', transportPerKg: '6.8', wastagePercent: '7' },
+      {
+        marginPercent: '9',
+        transportPerKg: '6.8',
+        wastagePercent: '7',
+        pouchMakingPerKg: '11.04',
+      },
       MASTERS,
       [STANDUP],
     );
@@ -164,6 +217,14 @@ describe('strippedCosting', () => {
     // sold as reels say, and zero is not the same as "follow the style".
     expect(strippedCosting({ pouchMakingPerKg: '0' }, MASTERS, [STANDUP]).pouchMakingPerKg).toBe(
       '0',
+    );
+  });
+
+  it('keeps a making figure once the job it was derived from has moved', () => {
+    // The derived figure is 11.04 for THIS document. A box holding 9.80 is not
+    // the works' own whatever it once was, so it stands.
+    expect(strippedCosting({ pouchMakingPerKg: '9.80' }, MASTERS, [STANDUP]).pouchMakingPerKg).toBe(
+      '9.80',
     );
   });
 

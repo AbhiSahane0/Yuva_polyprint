@@ -47,6 +47,7 @@ import {
   computeMargin,
   computeMaterialCostPerKg,
   plyRatePerKg,
+  pouchExpense,
   resolveSelectedQuantity,
   round,
   suggestRepeatHeight,
@@ -390,25 +391,6 @@ export default function QuotationFormPage() {
   const pricingDate = (watched.date as string | undefined) || today();
   const { data: settings } = useSettings(pricingDate);
   const { data: materials } = useMaterials(pricingDate);
-
-  /*
-   * The works' own four, for the section that folds them away.
-   *
-   * Read for this quotation's date like everything else on the screen, so the
-   * figures it offers are the ones the server would price it at.
-   */
-  const costingMasters: CostingMasters = {
-    marginPercent: settings?.defaultMarginPercent ?? 9,
-    transportPerKg: settings?.transportPerKg ?? 10,
-    defaultWastagePercent: settings?.defaultWastagePercent ?? 8,
-    pouchWastagePercent: settings?.pouchWastagePercent ?? 7,
-  };
-
-  /* Which wastage applies is decided by the STYLE, job by job — so the section
-     can offer a figure only where every job on the document agrees. */
-  const pouchTypesOnThisQuotation = (watched.items ?? []).map(
-    (item) => (item?.pouchType || null) as PouchType | null,
-  );
 
   /*
    * Which quantity the customer is quoted, 1-based.
@@ -769,6 +751,69 @@ export default function QuotationFormPage() {
       return { basis, material, geometry, quantities };
     });
   }, [watched.items, filmById, byName, settings, cylinderRate]);
+
+  /*
+   * What the works would charge for making, per kilogram, on this quotation.
+   *
+   * There is no such figure on the Costing screen and there cannot be: making
+   * is charged **per pouch**, and the same charge reads between Rs 11 and Rs 64
+   * a kilogram across the works' own nine costed pouches, on nothing but how
+   * big the pouch is. So it is worked out here, from the style and the size the
+   * office has actually typed — `perPouch × pouchesPerKg`, which is precisely
+   * what the rate carries.
+   *
+   * Null where no single figure applies: before a job has a size to derive one
+   * from, on a document whose jobs disagree, and on one that makes no pouches
+   * at all — a roll pays nothing for making and ignores the override entirely.
+   */
+  const pouchMakingMaster = useMemo(() => {
+    if (!settings) return null;
+    const rates = {
+      makingPerPouch: settings.pouchMakingPerPouch,
+      dPunchPerPouch: settings.dPunchPerPouch,
+      dPunchLargePerPouch: settings.dPunchLargePerPouch,
+      dPunchLargeAboveMm: settings.dPunchLargeAboveMm,
+      zipperRatePerMetre: settings.zipperRatePerMetre,
+    };
+
+    const figures: number[] = [];
+    for (const [index, item] of (watched.items ?? []).entries()) {
+      if ((item?.jobKind ?? 'POUCH') === 'ROLL') continue;
+
+      const perPouch = pouchExpense(
+        (item?.pouchType || null) as PouchType | null,
+        num(item?.widthMm),
+        rates,
+      ).perPouch;
+      const pouchesPerKg = costed[index]?.geometry.pouchesPerKg ?? 0;
+      if (perPouch <= 0 || pouchesPerKg <= 0) return null;
+
+      figures.push(Math.round(perPouch * pouchesPerKg * 100) / 100);
+    }
+
+    if (figures.length === 0) return null;
+    return figures.every((figure) => figure === figures[0]) ? (figures[0] ?? null) : null;
+  }, [watched.items, costed, settings]);
+
+  /*
+   * The works' own four, for the section that folds them away.
+   *
+   * Read for this quotation's date like everything else on the screen, so the
+   * figures it offers are the ones the server would price it at.
+   */
+  const costingMasters: CostingMasters = {
+    marginPercent: settings?.defaultMarginPercent ?? 9,
+    transportPerKg: settings?.transportPerKg ?? 10,
+    defaultWastagePercent: settings?.defaultWastagePercent ?? 8,
+    pouchWastagePercent: settings?.pouchWastagePercent ?? 7,
+    pouchMakingPerKg: pouchMakingMaster,
+  };
+
+  /* Which wastage applies is decided by the STYLE, job by job — so the section
+     can offer a figure only where every job on the document agrees. */
+  const pouchTypesOnThisQuotation = (watched.items ?? []).map(
+    (item) => (item?.pouchType || null) as PouchType | null,
+  );
 
   /** Totals per quantity column, for the review step. */
   const tierTotals = useMemo(() => {
