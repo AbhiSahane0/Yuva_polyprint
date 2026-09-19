@@ -46,12 +46,12 @@ export const quotationLayerSchema = z.object({
   materialId: z.string().min(1).nullable().default(null),
   micron: positiveNumber('Thickness'),
   /**
-   * Rupees per kilogram the office typed, when the film's own rate cannot apply.
+   * Rupees per kilogram this job's film was agreed at.
    *
-   * The rates master prices a film at the gauge it is stocked in: `PET 12µm` and
-   * `PET 19µm` are two materials at two prices. Quote a 20µ PET and neither rate
-   * is the right one — so rather than silently cost it at the 12µ price, the
-   * line asks, and what is typed is used for this quotation and stored on it.
+   * A film's price is agreed job to job — the works' own quotations carry PET
+   * at 185, 175 and 190, every one at 12µ and every one written on the same day
+   * — so the line offers the film's rate and lets it be typed over. The gauge
+   * has nothing to do with it: one rate covers a film at every thickness.
    *
    * **It does not reach the rates master.** A figure keyed in the middle of
    * quoting is a decision about one document, and letting it edit the price list

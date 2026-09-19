@@ -1638,19 +1638,74 @@ since film is about four-fifths of a rate; the ink figure decides what a pouch
 **weighs**, so it moves the count per kilogram and therefore the price each.
 
 **Four figures are set on the quotation, not the works.** Margin %, transport
-per kg, pouch making per kg and wastage % sit at the top of the Jobs step; left blank each
-follows the Costing screen, so an ordinary job keeps up with the works' own
-figures as they change. Pouch making's box is still in **rupees per kilogram**
-even though the works' figure is per pouch — it replaces the whole charge rather
-than any part of it, which is what the office means by overriding it, and it is
-the unit every quotation written before this already carries. They are there because the client varies all three job
-to job — across seven of their own quotations, margins of 5%, 9% and 10%,
-transport at Rs 5 and Rs 10, and nothing charged for making a pouch on two of
-them, with **five of the seven written on the same day**.
+per kg, pouch making per kg and wastage %. They exist because the client varies
+them job to job — across seven of their own quotations, margins of 5%, 9% and
+10%, transport at Rs 5 and Rs 10, and nothing charged for making a pouch on two
+of them, with **five of the seven written on the same day**.
+
+Pouch making's box is in **rupees per kilogram** even though the works' figure
+is per pouch: it replaces the whole charge rather than any part of it, which is
+what the office means by overriding it, and it is the unit every quotation
+written before this already carries.
+
+#### They are folded away, because almost no job needs them
+
+They used to sit at the **top** of the Jobs step as four empty boxes, above the
+job the office had actually come to price. But varying one is the rare job. So
+the section is a line of what this quotation is priced at, and a checkbox — and
+it sits **below the jobs**, just above **Add another job**:
+
+```
+  ... the last job card ...
+
+THIS QUOTATION'S COSTING
+Margin 9% · Transport Rs. 6.80/kg · Wastage 7% · Pouch making by style
+
+[ ] Edit this quotation's costing
+
+  [ + Add another job ]
+```
+
+The position is the same argument as the fold. The office came to this step to
+price a job, and the works' own figures are already right for it; a row of boxes
+first is something to walk past, where the same row last is something to reach
+for. The checkbox stays at the bottom of its own section when the boxes open, so
+it does not move under the cursor that just ticked it.
+
+The summary line always reports the works' own figures, which is not a
+simplification: the section is open whenever any of the four is set, so a closed
+one has nothing else to report.
+
+Ticking it opens the boxes **already filled in with the works' own figures**. A
+blank box with the number greyed behind it reads as a field that still needs
+doing, and this is the second place where the figure was known and the screen
+was being coy about it — the film rate on the ply below was the first.
+
+**Untouched means the works' figure, not a copy of it.** Anything still equal to
+the master when the quotation is saved is sent blank (`strippedCosting`), so
+opening the section, reading the figures and closing it again leaves no trace.
+Without that, a quotation whose costing was so much as glanced at would be
+frozen against a Costing screen it never meant to leave. Unticking clears all
+four, which is how an override is taken back.
+
+A quotation that already overrides something **opens showing it**, because
+hiding a number the document is actually priced at would be worse than the four
+empty boxes this replaces.
+
+**Two of the four have no single figure to fill in with.** Pouch making is
+charged per pouch, and the same charge reads between Rs 11 and Rs 64 a kilogram
+across the works' own nine costed pouches depending on nothing but the size — a
+per-kilogram figure exists only once a job has one, and this box sits above all
+the jobs. Wastage is decided by the **style**, job by job, so it can be offered
+only where every job on the document falls the same side of that line; mixed, it
+stays empty and says "by job kind", because one figure would be wrong for half
+of it.
 
 A blank box means "follow the works' figure", which is not the same as zero:
 `z.coerce.number()` turns an empty string into 0, and on a margin box that would
-quote a job at cost and look like somebody meant it.
+quote a job at cost and look like somebody meant it. Zero typed deliberately
+survives the strip, which is exactly what the two quotations sold as reels say
+about pouch making.
 
 **The rate follows the costing.** Change the film, the colours or the quantity
 and the price changes with them — no notice to read, no button to press. A rate
