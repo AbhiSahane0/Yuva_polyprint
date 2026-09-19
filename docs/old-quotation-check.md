@@ -108,7 +108,11 @@ deleted.
 
 ## What the works held centrally
 
-Identical on all seven, read from the Costing screen and the rate list:
+Identical on all seven, read from the Costing screen and the rate list **as at
+2022** — several of these have since been corrected on a later date, which is
+precisely why these seven still reproduce. Packing, for instance, now stands at
+Rs 1.22 and transport at Rs 6.80; a quotation dated March 2022 still picks up the
+figures below, because a quotation is priced on its own date.
 
 | Figure                            | Value                                                                    |
 | --------------------------------- | ------------------------------------------------------------------------ |
