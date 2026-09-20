@@ -266,8 +266,31 @@ A works with no working days in the month has no arithmetic, not a smaller
 bill. If the intent is "stop charging the crew", that is the **rate model** in
 §4b or a wage retired in §3 — not a zero here.
 
-**The five method switches** are not figures either. They pick between two ways
-of doing the same thing, and there is no "off".
+### The controls that are not numbers
+
+"Set it to 0" answers the boxes. The screen has three other kinds of control and
+none of them takes a zero, because none of them is a charge.
+
+| Control                             | How to remove it                                                                                                                                   |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The five method switches** (§6)   | You cannot. They pick between two ways of doing the same thing — both produce a price, neither is "nothing", which is why there is no third option |
+| **Adhesive batch / Adhesive split** | Nothing to remove. They are not money: they say how one figure divides into three parts, and they only divide anything under the per-batch method  |
+| **Which material prices what** (§5) | "— none —" exists, and the box goes red to say the costing would use nothing. See the warning below                                                |
+
+**The adhesive split is the clearest case, and it is the one the office asked
+about.** It is inert on the works' current setting: with _Adhesive is costed_ on
+**By GSM × one rate**, the split is computed and thrown away, and moving it from
+`100:189:15` to `100:68:15` does not change the rate by a paisa. It becomes real
+the day somebody switches to **As a diluted batch** — which is why it is still
+on the screen. Both halves of that have a test.
+
+> **"— none —" on a material is not a delete, it is a quiet understatement.**
+> The costing does not refuse; it prices that material at nothing and carries
+> on, so the rate comes out low and still looks like a rate. The Costing screen
+> flags it in red where you choose it — but nothing says so again on the
+> quotation. If a material genuinely is not used, take away **what it is
+> multiplied by** instead: adhesive at 0 GSM costs nothing whatever it is
+> pointed at, and it is also the truth about the film.
 
 **To add a charge that is not on this list**, see §3a — that is what the works'
 own overheads are for, and those genuinely can be ended.

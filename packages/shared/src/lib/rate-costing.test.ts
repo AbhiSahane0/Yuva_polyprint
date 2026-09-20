@@ -1125,3 +1125,49 @@ describe('turning a fixed overhead off', () => {
     expect(off.marginAmount).toBe(0);
   });
 });
+
+/**
+ * **Not everything on the Costing screen is a charge, and the ones that are not
+ * cannot be deleted because they are not adding anything.**
+ *
+ * The office asked how to remove the adhesive split. The answer is that there
+ * is nothing there to remove: it is not money, it is how one figure is divided
+ * into three parts, and it only divides anything under the per-batch method.
+ * On the flat method — which is what the works runs — it is computed and
+ * thrown away.
+ *
+ * Worth pinning, because "it does nothing under this setting" is the kind of
+ * claim that is true until somebody moves a line.
+ */
+describe('the settings that are not charges', () => {
+  const withAdhesive = (model: 'FLAT_GSM' | 'BATCH', splitRatio: string | null): CostingInput => ({
+    ...input(),
+    job: { ...JOB, adhesiveSplitRatio: splitRatio },
+    overheads: { ...MASTER.overheads, adhesiveCostModel: model },
+  });
+
+  it('the adhesive split changes nothing on the flat method', () => {
+    const a = costRate(withAdhesive('FLAT_GSM', '100:189:15'))!;
+    const b = costRate(withAdhesive('FLAT_GSM', '100:68:15'))!;
+    const none = costRate(withAdhesive('FLAT_GSM', null))!;
+
+    expect(b.adhesiveCost).toBe(a.adhesiveCost);
+    expect(none.adhesiveCost).toBe(a.adhesiveCost);
+    expect(b.ratePerKg).toBe(a.ratePerKg);
+  });
+
+  it('and changes the price on the per-batch method, which is when it is real', () => {
+    /* The other half of the same claim: it is inert because of the METHOD, not
+       because it is ignored — so the answer changes the day somebody switches. */
+    const a = costRate(withAdhesive('BATCH', '100:189:15'))!;
+    const b = costRate(withAdhesive('BATCH', '100:68:15'))!;
+    expect(b.adhesiveCost).not.toBe(a.adhesiveCost);
+  });
+
+  it('a method switch has no off, because it picks between two ways', () => {
+    // Both produce a price. Neither is "nothing", which is why there is no
+    // third option and no way to delete one.
+    expect(costRate(withAdhesive('FLAT_GSM', null))!.adhesiveCost).toBeGreaterThan(0);
+    expect(costRate(withAdhesive('BATCH', null))!.adhesiveCost).toBeGreaterThan(0);
+  });
+});

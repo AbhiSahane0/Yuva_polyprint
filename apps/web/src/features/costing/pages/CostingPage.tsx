@@ -690,7 +690,9 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
         Everything else a rate is built from, and a starting point every quotation can override.{' '}
         <strong className="text-ink-700 font-medium">Set a charge to 0 to turn it off</strong> —
         that is how one of these is removed. The figures that will not take a zero are the ones
-        divided BY: working days, hours, machine minutes and kilograms a day.
+        divided BY: working days, hours, machine minutes and kilograms a day. The dropdowns are not
+        charges at all — a method has no &ldquo;off&rdquo;, and the adhesive batch and split only
+        divide anything when adhesive is costed as a batch.
       </p>
 
       <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4 shadow-[var(--shadow-card)] sm:p-5">
