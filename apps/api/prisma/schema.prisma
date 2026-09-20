@@ -277,6 +277,18 @@ model Quotation {
   /// issued against, even if the customer master is corrected later.
   gstNumber    String @default("NA") @map("gst_number")
 
+  /// Who sent this enquiry the works' way. Empty where nobody did.
+  ///
+  /// Business arrives through people and the works wants that on the record.
+  /// It is recorded and nothing else: not printed on the quotation, not
+  /// emailed, not searched. What it is eventually FOR is theirs to decide once
+  /// they have a year of it.
+  ///
+  /// On the QUOTATION rather than the customer because that is the finer grain
+  /// — two enquiries from one company can come through different people, and a
+  /// per-customer view can be derived from these later, but not the reverse.
+  referredBy String @default("") @map("referred_by")
+
   /// Which quantity the document is for, 1-based, among this quotation's tiers.
   ///
   /// The office may price a job at two or three quantities to see what volume

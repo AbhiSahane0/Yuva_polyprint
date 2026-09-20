@@ -169,6 +169,14 @@ export interface Quotation extends QuotationSummary {
   email: string;
   gstNumber: string;
 
+  /**
+   * Who sent this enquiry the works' way. Empty where nobody did.
+   *
+   * Recorded and nothing else — it is not printed on the quotation and not
+   * emailed. See the schema for why it has no more machinery than this.
+   */
+  referredBy: string;
+
   /** When the customer's answer was recorded. */
   decidedAt: string | null;
   /** Why they said no. Empty unless the quotation was lost. */

@@ -335,6 +335,21 @@ number, so without that filter repricing would grow a second row reading "121"
 with different totals — the confusion versioning exists to prevent. Earlier
 versions stay reachable through `GET /quotations/:id/versions`.
 
+**`referredBy` is stored and never printed.** Who sent the enquiry the works'
+way, free text, on the quotation rather than on the customer — two enquiries
+from one company can come through different people, and a per-customer view can
+be derived from these later but not the reverse. It is written by all three
+header paths (create, update, and the copy into a new version) and appears in
+none of `quotation-document.ts`, `quotation-letterhead.ts`, `quotation-email.ts`
+or `quotation-pdf.ts`. Both halves are held by `header-persistence.test.ts`,
+which reads the source rather than a rendered page: the failure it guards
+against is an omission, and a field nobody wrote cannot be observed by
+exercising the fields that were.
+
+> It has no suggestions, no search and no totals **on purpose**. What the works
+> eventually wants from a year of these — commissions, a referrer master — is
+> theirs to decide, and building that shape now would be guessing at it.
+
 **A new company is created with the quotation.** `POST /quotations` with
 `saveAsCustomer: true` and no `customerId` adds the company to the customer
 master in the _same transaction_ as the quotation — a customer created for a

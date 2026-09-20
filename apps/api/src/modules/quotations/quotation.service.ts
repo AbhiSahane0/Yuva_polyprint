@@ -279,6 +279,7 @@ function toQuotation(row: QuotationRow): Quotation {
     mobile: row.mobile,
     email: row.email,
     gstNumber: row.gstNumber,
+    referredBy: row.referredBy,
     decidedAt: row.decidedAt ? row.decidedAt.toISOString() : null,
     lostReason: row.lostReason,
     marginPercent: row.marginPercent === null ? null : toNumber(row.marginPercent),
@@ -736,6 +737,7 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
             mobile: input.mobile,
             email: input.email,
             gstNumber: input.gstNumber,
+            referredBy: input.referredBy,
             // Clamped against the quantities that actually arrived — see
             // `resolveSelectedQuantity`.
             selectedQuantity: resolveSelectedQuantity(input.selectedQuantity, tiers.length),
@@ -1050,6 +1052,7 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
         ...(input.mobile !== undefined ? { mobile: input.mobile } : {}),
         ...(input.email !== undefined ? { email: input.email } : {}),
         ...(input.gstNumber !== undefined ? { gstNumber: input.gstNumber } : {}),
+        ...(input.referredBy !== undefined ? { referredBy: input.referredBy } : {}),
         ...(input.terms ? { terms: input.terms } : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
         selectedQuantity: resolveSelectedQuantity(
@@ -1217,6 +1220,9 @@ export async function createQuotationVersion(id: string): Promise<Quotation> {
             mobile: source.mobile,
             email: source.email,
             gstNumber: source.gstNumber,
+            /* A revision is the same enquiry repriced, so whoever sent it comes
+               across with the rest of the customer block. */
+            referredBy: source.referredBy,
             cylinderRate: source.cylinderRate,
             gstPercent: source.gstPercent,
             materialAdvancePercent: source.materialAdvancePercent,

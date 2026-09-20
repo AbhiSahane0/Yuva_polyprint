@@ -147,7 +147,7 @@ const STEPS: Step[] = [
 
 /** Which fields each step owns, so Next checks that step and nothing else. */
 const STEP_FIELDS: (keyof CreateQuotationFormValues)[][] = [
-  ['customerName', 'date'],
+  ['customerName', 'date', 'referredBy'],
   ['addressLine1', 'addressLine2', 'addressLine3', 'mobile', 'email', 'gstNumber'],
   ['items'],
   [],
@@ -362,6 +362,7 @@ export default function QuotationFormPage() {
       pouchMakingPerKg: '',
       customerName: '',
       brandName: '',
+      referredBy: '',
       addressLine1: '',
       addressLine2: '',
       addressLine3: '',
@@ -546,6 +547,9 @@ export default function QuotationFormPage() {
        * loads. Starting undefined would leave the box uncontrolled for a beat.
        */
       brandName: '',
+      /* Unlike the brand, this IS snapshotted on the quotation — it belongs to
+         the enquiry rather than to the customer — so it comes straight back. */
+      referredBy: existing.referredBy,
       addressLine1: existing.addressLine1,
       addressLine2: existing.addressLine2,
       addressLine3: existing.addressLine3,
@@ -1261,6 +1265,32 @@ export default function QuotationFormPage() {
                   error={formState.errors.date?.message}
                 >
                   <Input id="date" type="date" {...register('date')} />
+                </Field>
+              </div>
+
+              {/*
+                Who sent this enquiry the works' way.
+
+                Recorded and nothing else: it is not printed on the quotation
+                and not emailed, which is why the hint says so on the screen
+                rather than leaving somebody to find out by sending one.
+
+                It belongs to the QUOTATION rather than to the customer, so it
+                survives switching between an existing company and a new one —
+                which is why it is not in `clearCustomerFields`. Two enquiries
+                from one company can come through different people.
+              */}
+              <div className="sm:col-span-5">
+                <Field
+                  label="Referred by"
+                  htmlFor="referredBy"
+                  hint="Kept on the record only — not printed or emailed"
+                >
+                  <Input
+                    id="referredBy"
+                    placeholder="Who sent this enquiry"
+                    {...register('referredBy')}
+                  />
                 </Field>
               </div>
             </div>
