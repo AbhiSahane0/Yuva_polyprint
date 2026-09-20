@@ -1012,9 +1012,17 @@ setup power factor.
 
 **Overheads and defaults** — working days a month, hours a day, transport per
 kg, packing per kg, sundries per job, bank EMI and the hours it spreads over,
-**pouch making per pouch, D punch per pouch, zipper per metre**, the 6th/7th/8th
-station surcharges, trim, **cylinder mounting**, **wastage % and wastage % on a
-pouch job**, **ink GSM and ink GSM on a pouch job**, margin %, solvent per 100 of ink, ethyl acetate %.
+**the rate model and the three day figures it rests on**, **pouch making per
+pouch, D punch per pouch and the width it steps at, zipper per metre**, the
+6th/7th/8th station surcharges, trim, **cylinder mounting**, **wastage % and
+wastage % on a pouch job**, **ink GSM on a pouch job**, margin %, solvent per
+100 of ink, ethyl acetate %.
+
+> **Not on that screen, though the rate depends on them:** ink GSM (1.8),
+> adhesive GSM, the adhesive coat and its 40µ step, the cylinder rate, GST and
+> the two advance percentages. The API accepts every one; there is no input
+> rendered. The last four are settable per quotation. See
+> [the Costing screen README](../apps/web/src/features/costing/README.md#8-what-is-not-on-this-screen).
 
 **Which material prices what** — the flat ink and flat adhesive blends, the
 per-batch adhesive, the hardener, ethyl acetate, toluene.
