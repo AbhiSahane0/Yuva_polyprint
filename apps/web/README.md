@@ -391,6 +391,23 @@ arrives from their record; for a new company it is typed, and set when the
 record is created. Searching matches company name **and** brand, so an enquiry
 naming a brand finds the firm behind it.
 
+**Referred by** sits beside the date. Business arrives through people and the
+works wants that on the record — but it is **recorded and nothing else**: not
+printed on the quotation, not emailed, not searched, not totalled. The hint
+under the box says so, because a field somebody assumes is printed is one they
+find out about by sending a document.
+
+It belongs to the **quotation** rather than to the customer, which is why it
+survives switching between an existing company and a new one, and why it is not
+in `clearCustomerFields`. Two enquiries from one company can come through
+different people, and a per-customer view can be derived from these later; the
+reverse cannot. A revision carries it across with the rest of the customer
+block, a revision being the same enquiry repriced.
+
+What it is eventually **for** — commissions, a referrer master, totals — is the
+works' decision once they have a year of it, and building that shape now would
+be guessing at it.
+
 **A new company becomes a customer when the quotation saves** — with its
 address, city and district kept apart rather than joined into one line, and with
 every design on the quotation recorded as a job against it. Saving twice does

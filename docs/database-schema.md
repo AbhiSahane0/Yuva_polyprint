@@ -232,33 +232,33 @@ erDiagram
 
 | Table | Columns | Rows | Purpose |
 | --- | ---: | ---: | --- |
-| `app_setting_history` | 4 | 3 |  |
-| `app_settings` | 3 | 39 | Editable rates: cylinder rate, GST %, advance %. |
+| `app_setting_history` | 4 | 6 |  |
+| `app_settings` | 3 | 40 | Editable rates: cylinder rate, GST %, advance %. |
 | `costing_labour` | 8 | 7 |  |
-| `costing_machines` | 14 | 3 |  |
-| `customers` | 17 | 72 | Companies that order from Yuva Polyprint. |
+| `costing_machines` | 14 | 4 |  |
+| `customers` | 17 | 70 | Companies that order from Yuva Polyprint. |
 | `cylinder_events` | 11 | 0 |  |
 | `cylinders` | 16 | 0 |  |
 | `job_artwork` | 17 | 0 |  |
-| `job_sheet_labour` | 8 | 112 |  |
-| `job_sheet_lines` | 17 | 294 |  |
-| `job_sheet_stage_usage` | 7 | 70 |  |
-| `job_sheets` | 59 | 14 |  |
-| `jobs` | 55 | 421 | Products and their full engineering specification. |
-| `login_events` | 7 | 47 |  |
-| `material_rates` | 6 | 251 |  |
+| `job_sheet_labour` | 8 | 120 |  |
+| `job_sheet_lines` | 17 | 315 |  |
+| `job_sheet_stage_usage` | 7 | 75 |  |
+| `job_sheets` | 59 | 15 |  |
+| `jobs` | 55 | 419 | Products and their full engineering specification. |
+| `login_events` | 7 | 49 |  |
+| `material_rates` | 6 | 381 |  |
 | `materials` | 13 | 24 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
 | `purchase_receipts` | 11 | 1 |  |
 | `quotation_emails` | 10 | 0 |  |
 | `quotation_item_colours` | 9 | 0 |  |
-| `quotation_item_layers` | 10 | 36 |  |
-| `quotation_item_quantities` | 13 | 20 |  |
-| `quotation_items` | 31 | 18 | One priced line on a quotation. |
-| `quotation_tiers` | 14 | 20 |  |
-| `quotations` | 32 | 18 | Customer-facing quotations, with totals frozen at save. |
-| `sessions` | 6 | 7 |  |
+| `quotation_item_layers` | 10 | 0 |  |
+| `quotation_item_quantities` | 13 | 0 |  |
+| `quotation_items` | 31 | 0 | One priced line on a quotation. |
+| `quotation_tiers` | 14 | 0 |  |
+| `quotations` | 33 | 0 | Customer-facing quotations, with totals frozen at save. |
+| `sessions` | 6 | 9 |  |
 | `stock_batches` | 14 | 1 |  |
 | `stock_movements` | 13 | 5 |  |
 | `suppliers` | 11 | 1 |  |
@@ -873,6 +873,7 @@ erDiagram
 | `transport_per_kg` | `decimal(10,2)` | ✓ |  |
 | `pouch_making_per_kg` | `decimal(10,2)` | ✓ |  |
 | `wastage_percent` | `decimal(5,2)` | ✓ |  |
+| `referred_by` | `text` |  |  |
 
 ### `sessions`
 

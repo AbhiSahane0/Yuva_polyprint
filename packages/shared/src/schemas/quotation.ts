@@ -303,6 +303,17 @@ const createQuotationBaseSchema = z.object({
    * a new company is created, and to correct it on an existing one.
    */
   brandName: z.string().trim().max(200).default(''),
+  /**
+   * Who sent this enquiry the works' way.
+   *
+   * Business arrives through people, and the works wants that on the record.
+   * Free text and nothing more: not printed on the quotation, not emailed, not
+   * searched, not totalled. What it is eventually FOR is the works' decision to
+   * make once they have a year of it, and guessing at that now — a referrer
+   * master, commission rates — would be building a shape nobody has asked for
+   * around data nobody has yet.
+   */
+  referredBy: z.string().trim().max(200).default(''),
   /* "Required" is untrue once a single character has been typed, which is what
    * this rule actually rejects — so the message says what to do instead. */
   customerName: z.string().trim().min(2, 'Enter the company name').max(200),

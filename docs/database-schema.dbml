@@ -151,7 +151,7 @@ Table app_setting_history {
   effective_date date [pk]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '3 row(s) at time of generation'
+  Note: '6 row(s) at time of generation'
 }
 
 Table app_settings {
@@ -159,7 +159,7 @@ Table app_settings {
   value text [not null]
   updated_at timestamp [not null]
 
-  Note: '39 row(s) at time of generation'
+  Note: '40 row(s) at time of generation'
 }
 
 Table costing_labour {
@@ -191,7 +191,7 @@ Table costing_machines {
   station_horsepower decimal(10,2) [not null, default: `0`]
   station_colour_steps text [not null, default: `''`]
 
-  Note: '3 row(s) at time of generation'
+  Note: '4 row(s) at time of generation'
 }
 
 Table customers {
@@ -213,7 +213,7 @@ Table customers {
   gst_number text [not null, default: `'NA'`]
   brand_name text [not null, default: `'NA'`]
 
-  Note: '72 row(s) at time of generation'
+  Note: '70 row(s) at time of generation'
 }
 
 Table cylinder_events {
@@ -285,7 +285,7 @@ Table job_sheet_labour {
   days decimal(8,3) [not null, default: `0`]
   amount decimal(12,2) [not null, default: `0`]
 
-  Note: '112 row(s) at time of generation'
+  Note: '120 row(s) at time of generation'
 }
 
 Table job_sheet_lines {
@@ -307,7 +307,7 @@ Table job_sheet_lines {
   rate_per_kg decimal(12,4) [not null, default: `0`]
   amount decimal(14,2) [not null, default: `0`]
 
-  Note: '294 row(s) at time of generation'
+  Note: '315 row(s) at time of generation'
 }
 
 Table job_sheet_stage_usage {
@@ -319,7 +319,7 @@ Table job_sheet_stage_usage {
   shifts decimal(6,2) [not null, default: `1`]
   amount decimal(12,2) [not null, default: `0`]
 
-  Note: '70 row(s) at time of generation'
+  Note: '75 row(s) at time of generation'
 }
 
 Table job_sheets {
@@ -383,7 +383,7 @@ Table job_sheets {
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
 
-  Note: '14 row(s) at time of generation'
+  Note: '15 row(s) at time of generation'
 }
 
 Table jobs {
@@ -443,7 +443,7 @@ Table jobs {
   customer_source JobCustomerSource [not null, default: `'NONE'::"JobCustomerSource"`]
   needs_customer boolean [not null, default: `false`]
 
-  Note: '421 row(s) at time of generation'
+  Note: '419 row(s) at time of generation'
 }
 
 Table login_events {
@@ -455,7 +455,7 @@ Table login_events {
   user_agent text
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '47 row(s) at time of generation'
+  Note: '49 row(s) at time of generation'
 }
 
 Table material_rates {
@@ -466,7 +466,7 @@ Table material_rates {
   entered_by text [not null, default: `'Office'`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '251 row(s) at time of generation'
+  Note: '381 row(s) at time of generation'
 }
 
 Table materials {
@@ -573,7 +573,7 @@ Table quotation_item_layers {
   gsm decimal(10,3) [not null]
   rate_override decimal(12,2)
 
-  Note: '36 row(s) at time of generation'
+  Note: '0 row(s) at time of generation'
 }
 
 Table quotation_item_quantities {
@@ -591,7 +591,7 @@ Table quotation_item_quantities {
   material_cost decimal(14,2)
   margin_percent decimal(6,2)
 
-  Note: '20 row(s) at time of generation'
+  Note: '0 row(s) at time of generation'
 }
 
 Table quotation_items {
@@ -627,7 +627,7 @@ Table quotation_items {
   film_width_mm decimal(10,2) [not null]
   film_height_mm decimal(10,2) [not null]
 
-  Note: '18 row(s) at time of generation'
+  Note: '0 row(s) at time of generation'
 }
 
 Table quotation_tiers {
@@ -646,7 +646,7 @@ Table quotation_tiers {
   total_quantity_kg decimal(14,3) [not null]
   total_pouches decimal(14,2) [not null]
 
-  Note: '20 row(s) at time of generation'
+  Note: '0 row(s) at time of generation'
 }
 
 Table quotations {
@@ -682,8 +682,9 @@ Table quotations {
   transport_per_kg decimal(10,2)
   pouch_making_per_kg decimal(10,2)
   wastage_percent decimal(5,2)
+  referred_by text [not null, default: `''`]
 
-  Note: '18 row(s) at time of generation'
+  Note: '0 row(s) at time of generation'
 }
 
 Table sessions {
@@ -694,7 +695,7 @@ Table sessions {
   last_seen_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '7 row(s) at time of generation'
+  Note: '9 row(s) at time of generation'
 }
 
 Table stock_batches {

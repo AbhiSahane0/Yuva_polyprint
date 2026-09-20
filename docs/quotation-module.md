@@ -37,16 +37,32 @@ compared — and they are. See §17.
 
 ### Step 1 — Customer
 
-| Input    | What it does                                       |
-| -------- | -------------------------------------------------- |
-| Company  | Picks an existing customer, or starts a new one    |
-| Brand    | Printed on the document                            |
-| **Date** | **Decides which rates and settings price the job** |
+| Input           | What it does                                                                    |
+| --------------- | ------------------------------------------------------------------------------- |
+| Company         | Picks an existing customer, or starts a new one                                 |
+| Brand           | Printed on the document                                                         |
+| **Referred by** | **Who sent this enquiry the works' way. Recorded and nothing else — see below** |
+| **Date**        | **Decides which rates and settings price the job**                              |
 
 > **The date is not decoration.** A quotation is costed on the rates and
 > overheads **in force on its own date**, not on today's. Open a quotation from
 > April and it re-prices at April's PET rate and April's blended ink. This is
 > what lets an old document still reconcile with the paper it was copied from.
+
+> **"Referred by" is internal.** Business arrives through people and the works
+> wants that on the record — but the customer reading the quotation has no
+> business seeing it, so it is **not printed on the document and not emailed**.
+> The screen says so under the box rather than leaving somebody to find out by
+> sending one.
+>
+> It belongs to the **quotation**, not to the customer, because that is the
+> finer grain: two enquiries from one company can come through different people,
+> and a per-customer view can be derived from these later but not the reverse. A
+> revision carries it across, since a revision is the same enquiry repriced.
+>
+> It is free text and deliberately has no more machinery than that — no
+> suggestions, no search, no totals. What it is eventually **for** is the works'
+> decision to make once they have a year of it.
 
 ### Step 2 — Details
 
