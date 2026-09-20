@@ -107,10 +107,15 @@ Every film the works buys, with its **density** and its price. Density is the
 figure people forget, and it is the one that decides how many pouches come out
 of a kilogram — a micron of PET weighs half as much again as a micron of poly.
 
-**Name the film with its gauge.** `PET 12µm` and `PET 19µm` are two materials at
-two prices, and the name is what the system reads the thickness from. A film
-named without one — `PP Woven`, sold by GSM — is priced at its rate whatever
-thickness is quoted.
+**Name the film with its gauge** — `PET 12µm`, `PE 60µm`. The name is what the
+micron box is filled in from when the film is picked, and it is a starting point
+the office can type over.
+
+**One rate per film, and it applies at every gauge.** The works pays near enough
+the same for a kilogram of PET whether the reel is 12 micron or 15, so one PET
+row is enough. The gauge decides how many metres that kilogram covers — never
+what the kilogram costs. A film named without a gauge, like `PP Woven` sold by
+GSM, is no different.
 
 | Film           | Density g/cm³ | Rs / kg | Where it sits                          |
 | -------------- | ------------: | ------: | -------------------------------------- |
@@ -204,8 +209,8 @@ move whatever has drifted.
 | Ink GSM on a pouch job  | 1.2             | The pouch workbook weighs with less than 1.8       |
 | Margin                  | 9%              | Added to cost — set per quotation too              |
 | Trim                    | 15 mm           | Added to the web width                             |
-| Transport               | Rs 10 / kg      | On the quantity consumed — per quotation too       |
-| Packing                 | Rs 5 / kg       | On the quantity consumed                           |
+| Transport               | Rs 6.80 / kg    | On the quantity consumed — per quotation too       |
+| Packing                 | Rs 1.22 / kg    | On the quantity consumed                           |
 | Sundries                | Rs 250 / job    | A flat sum the works does not itemise              |
 | Bank EMI                | Rs 4,166.66     | Spread over 24 machine hours a month               |
 | Pouch making            | Rs 0.25 / pouch | Forming, sealing and cutting one                   |
@@ -220,6 +225,11 @@ move whatever has drifted.
 | Cylinder mounting       | 80 mm           | Face beyond the web, also charged for              |
 | GST                     | 18%             | On material and cylinders alike                    |
 | Advance                 | 70% / 100%      | Material and cylinders, on the GST-inclusive value |
+| **Rate model**          | **Per day**     | How the works' own time is recovered — see below   |
+| **A day of the works**  | Rs 20,000       | Crew and bank, charged by the day                  |
+| **Make-ready**          | 0.75 days       | The same hours whatever the order size             |
+| **A machine-day**       | 1,606 minutes   | Turns machine minutes into running days            |
+| **Kilograms a day**     | 1,945           | Fallback only, for a line with no structure        |
 
 > **Pouch making is charged per POUCH, and the style decides what it costs.**
 > A standup pays making; a zipper pays making plus the zipper across its mouth,
@@ -233,19 +243,34 @@ move whatever has drifted.
 > and Rs 64 a kilogram, purely because a small pouch packs 130 to a kilo and a
 > big one 14.
 
+> **The works' own time is now charged by the DAY, which is the one place this
+> leaves the workbook.** Everything in the sheet's method scales with the
+> kilograms, so doubling an order moved the rate twenty paise — and the works'
+> own job card records a make-ready figure in a box that **no formula on any tab
+> ever charges**. Charging it makes 1,000 → 2,000 kg move about **Rs 9.50**, and
+> lifts a 1,000 kg job about **Rs 27 a kilogram**, which says the small jobs were
+> being quoted under cost. Machine electricity stays per-machine either way,
+> which is what keeps two laminators distinguishable.
+>
+> **Rs 20,000 a day and 0.75 days were fitted from the works' own fourteen job
+> sheets, not given by the works.** Nothing about this is precise until they
+> recognise those two numbers.
+
 > **Four of these are set per quotation when a job is not the ordinary case.**
-> Margin, transport, pouch making and wastage each have a box on the Jobs step;
-> left blank they follow the figures here. Pouch making's box is still in **rupees
-> per kilogram**, because it replaces the whole charge rather than any part of
-> it. The client's own seven old sheets set all three by hand — margins of 5%,
-> 9% and 10%, transport at Rs 5 and Rs 10, and nothing charged for pouch making
-> on the jobs sold as reels.
+> Margin, transport, pouch making and wastage, **folded away behind a checkbox**
+> at the bottom of the Jobs step under a line of what the quotation is priced at.
+> Ticking it opens them already filled in with the figures here; anything left
+> equal to them is saved blank, so the quotation goes on following this screen.
+> Pouch making's box is in **rupees per kilogram**, because it replaces the whole
+> charge rather than any part of it. The client's own seven old sheets set them
+> by hand — margins of 5%, 9% and 10%, transport at Rs 5 and Rs 10, and nothing
+> charged for pouch making on the jobs sold as reels.
 
 > **The margin is taken on materials only.** That is what the workbook does, and
 > it is why the margin per kilogram does not change between 500 kg and 5,000 kg —
-> material cost per kilogram is the same at any volume. Only the press setup gets
-> spread wider, which moves the rate about 38 paise. There is a setting to earn
-> margin on the whole cost instead, if that is ever wanted.
+> material cost per kilogram is the same at any volume. What moves with the order
+> size is the make-ready above. There is a setting to earn margin on the whole
+> cost instead, if that is ever wanted.
 
 ---
 
@@ -267,10 +292,21 @@ rate refuses and names it.
 
 ### The check that catches all of them
 
-Once everything is entered, price the works' own Anupriya job — **500 kg,
-700 × 600 mm, PET 12µ over W/O Poly 110µ, seven stations**. It should come out at
-**Rs 263.40 a kilogram** and **Rs 13.83 a pouch**. If it does, every figure above
-is in the right box.
+Once everything is entered, run the check the repo carries:
+
+```bash
+npm run seed:old-quotations -w @yuva/api
+```
+
+It rebuilds seven of the works' own 2022 quotations from their own sheets and
+compares. **Seven of seven exact** means every figure above is in the right box.
+
+> The works' Anupriya job — **500 kg, 700 × 600 mm, PET 12µ over W/O Poly 110µ,
+> seven stations** — reconciles at **Rs 263.40 a kilogram** and **Rs 13.83 a
+> pouch**. That is the **Estimation sheet's own frame**, with the rate model on
+> per-minute. With the rate model on **per day**, which is where it now ships,
+> the same job prices higher because make-ready is charged. Do not read the
+> difference as a misconfiguration.
 
 ---
 

@@ -9,7 +9,10 @@ can be checked against each other.
 
 For **what has to be entered before any of this can run**, see
 [`setup.md`](./setup.md). For **proof that this reproduces the works' own
-quotations**, see [`old-quotation-check.md`](./old-quotation-check.md).
+quotations**, see [`old-quotation-check.md`](./old-quotation-check.md). For the
+same ground **in plain words, without the cell references**, see
+[`quotation-module.md`](./quotation-module.md) — and
+[`job-sheet-module.md`](./job-sheet-module.md) for what a run actually cost.
 
 The reference throughout is **"3. Anupriya.xlsx"**, 5 kg atta packaging,
 23 March 2022 — the sheet the office reconciles against. It has two tabs,
@@ -451,6 +454,13 @@ Printing runs the first ply. Lamination runs one pass per bond. Slitting runs
 the printed length again. Pouch making is charged per pouch, not by the
 minute.
 
+**A job runs on one machine of each kind.** The works has two laminators, and
+the loop charges a machine for the metres its KIND has to run — so passing both
+would bill the job for a lamination pass it never made, quietly, on every
+quotation, because nothing about the total says which machine it came from. A
+job takes the machine it names in `machineChoice`, else the first of that kind
+by the works' own sort order.
+
 ```
 printing metres   = first ply's metres
 slitting metres   = first ply's metres
@@ -479,21 +489,72 @@ wage per minute = monthly salary ÷ (working days × hours per day × 60)
 
 Estimation `F42` — 25,000 ÷ 26 ÷ 8 ÷ 60 = Rs 2.0032 a minute.
 
-### 6.8 Everything else
+### 6.8 The works' own time — two models
+
+This is the one place the system deliberately leaves the Estimation sheet, and
+it is a setting: **`rateModel`**.
 
 ```
-transport = consumed kg × transport per kg          (Rs 10)
-packing   = consumed kg × packing per kg            (Rs 5)
+PER_MINUTE   the sheet: crew and bank charged per minute, make-ready not at all
+PER_DAY      crew and bank charged by the DAY, make-ready included   ← current
+```
+
+Under `PER_DAY`:
+
+```
+running days   = total machine minutes ÷ machineMinutesPerDay   (1,606)
+                 — or order kg ÷ kgPerDay (1,945) for a line with no structure
+occupied days  = makeReadyDays (0.75) + running days
+works day cost = occupied days × worksDayCost (Rs 20,000)
+```
+
+and the day charge **replaces** the per-minute crew and EMI rather than sitting
+on top of them, which would bill the same people twice.
+
+**Machine electricity is per-machine under both models.** That is what keeps one
+laminator distinguishable from another.
+
+> **Why this exists.** Everything in the sheet's method scales with the
+> kilograms, so the only genuinely fixed cost on a job was Rs 250 of sundries and
+> **doubling the order moved the rate twenty paise.** The works' own job card
+> records a make-ready figure in a box that **no formula on any tab ever
+> charges**. Restoring it makes 1,000 → 2,000 kg move about **Rs 9.50**, which is
+> the "almost 10 rupees" the client described — and lifts the level about
+> **Rs 27 a kilogram at 1,000 kg**, which says the small jobs were being quoted
+> under cost.
+
+> **Days come from the machines, not from the weight.** A kilogram-based fit
+> could not explain why Amruta Family Tea took three days: 1.48× the printed
+> metres (a narrower web), 2.97× the lamination metres (three plies is two
+> passes) and 8 colours against 1. Fitted against the works' fourteen job sheets,
+> minutes give R² 0.95 and halve the worst-case error.
+
+> `worksDayCost` and `makeReadyDays` were **fitted from the works' own job
+> sheets, not given by the works.** Both are on the Costing screen and nothing
+> here is precise until they recognise them.
+
+### 6.8a Everything else
+
+```
+transport = consumed kg × transport per kg          (Rs 6.80)
+packing   = consumed kg × packing per kg            (Rs 1.22)
 sundries  = a flat sum per job                      (Rs 250)
 
 EMI per minute = monthly EMI ÷ (machine hours a month × 60)
-EMI cost       = EMI per minute × minutes
+EMI cost       = EMI per minute × minutes           PER_MINUTE only
 
-overhead cost = labour + transport + packing + sundries + EMI
+overhead cost = charged labour + works day cost + transport + packing
+              + sundries + EMI
 ```
 
 Estimation `G48`–`G51`. Which minutes the EMI is spread over is a setting:
 **run time** (the sheet) or **occupied** time, which includes setup.
+
+> **Transport and packing were four years stale**, at Rs 10 and Rs 5. Against the
+> works' own September 2026 spending they median **6.80** (never above 7.00) and
+> **1.22** (never above 1.95 — four times out). Both were corrected **on a date**,
+> so nothing already quoted moved: the seven 2022 quotations still reproduce
+> exactly. It took the quote-against-cost gap from +10.8% to **+8.0%**.
 
 ### 6.9 Margin
 
@@ -517,8 +578,13 @@ Estimation `G55` and `G56`.
 >
 > It is also why **the margin per kilogram is the same at every quantity**:
 > material cost per kilogram does not move with volume, so 9% of it does not
-> either. A three-fold order moves the rate about 38 paise, all of it from the
-> setup being spread wider.
+> either.
+>
+> Under `PER_MINUTE` that left almost nothing to move with the order size — a
+> three-fold order shifted the rate about 38 paise, all of it the Rs 250 of
+> sundries being spread wider. **Under `PER_DAY` the make-ready days are the
+> fixed cost**, and they are what make a bigger order genuinely cheaper: about
+> Rs 9.50 a kilogram between 1,000 and 2,000 kg. See §6.8.
 
 ### 6.10 The rate
 
@@ -549,13 +615,31 @@ money and press time that were never spent.
 ```
 colours      = the inks named on the line
 cylinders    = colours                    both ways — typing a bigger count
-stations     = the cylinder count         adds specials, a smaller one removes
+stations     = the cylinder count         grows the list, a smaller one shrinks it
 special      = the dearest COSTABLE ink on the rates list, of any kind
 ```
 
-The count and the colour list are one fact told twice, so they move together:
-typing 7 against a CMYK job adds three specials, and typing 2 takes the specials
-off and then the process colours from the end. One colour is the floor.
+The count and the colour list are one fact told twice, so they move together.
+
+**Growing fills the missing process colours first, then adds specials** — the
+order the works fills a press in: the four it always carries, then whatever the
+artwork turns out to need. So typing 7 means **CMYK and three specials**, not
+seven specials. Shrinking takes the specials off first, newest first, then
+process colours off the end. One colour is the floor.
+
+> That was a real fault, not a refinement. `resizeColours` only ever appended
+> specials, because it was never told what the process palette was — right from a
+> CMYK line, wrong from every other. A line with no process colours read
+> **"7 colours — so 7 cylinders and 7 stations"** with all seven chips saying
+> _Special colour_, every one priced at the dearest ink on the list. Two ways in,
+> and the second bites: the office takes the process colours off, or **the count
+> is typed before the rates list has arrived** to price them from, after which the
+> seeding sees a non-empty strip and never runs.
+>
+> The cost of the fix: a deliberately deleted process colour comes back if the
+> count is then raised. Typing a number is a coarse instruction about stations;
+> taking a chip off is a precise one about ink, so the precise action stays on the
+> chip.
 
 **A special is priced at the dearest ink** because which colour it is gets
 settled at artwork, weeks after the price was given. Every costable ink is in
@@ -728,10 +812,9 @@ profitable than it is because a price was not keyed in that morning.
 ### 8.1 Which rate prices a ply
 
 ```
-1. the rate the office typed for this job, if there is one
-2. otherwise the film's own rate — but only if the gauge quoted is the
-   gauge the film is stocked and priced at
-3. otherwise nothing, and the line reads as uncostable
+1. the rate agreed for this job, if there is one
+2. otherwise the film's own rate — at WHATEVER gauge is quoted
+3. nothing only when no film is chosen, or the film has no rate on record
 ```
 
 **A typed rate is stored, not deduced.** `quotation_item_layers.rate_override`
@@ -744,11 +827,27 @@ so reopening the quotation and pressing Save replaced what was charged with the
 catalogue price. Rows written before the column exists fall back to the old
 inference, so nothing already saved moves.
 
-`PET 12µm` and `PET 19µm` are two materials at two prices. Quote a 20µ PET and
-neither rate is right, so the line asks rather than silently costing it at the
-12µ price. A film named without a gauge — `PP Woven`, sold by GSM — is priced at
-its rate whatever thickness is quoted, because there is nothing to disagree
-with.
+**A film has one rate and it applies at every gauge.** The works pays near
+enough the same for a kilogram of PET whether the reel is 12 micron or 15, so it
+keeps one PET rate rather than one per thickness — and the same for MET PET, PE
+and the rest. The gauge decides how many metres that kilogram covers, which is
+the GSM and is carried elsewhere; it never decides what the kilogram costs.
+
+> Step 2 briefly read "**only if** the gauge quoted is the gauge the film is
+> stocked at", on the premise that `PET 12µm` and `PET 19µm` were two materials
+> at two prices. They are not. The refusal left an ordinary 50µ sealant
+> uncostable — material cost blank, margin a dash — until somebody typed a figure
+> nobody had a reason to give.
+>
+> The caution behind it was sound: costing a 20µ PET at the 12µ price once
+> reported an **87.7% margin** with an empty rate box beside it. It was the
+> premise that was wrong.
+
+**The rate box is filled in, not hinted at.** It arrives carrying the film's own
+rate and is there to be typed over on the job agreed at something else. The
+column beside it names the **list** rate and reports the distance when the two
+differ, because once the box is editable and pre-filled nothing else on the
+screen would catch 190 typed where 210 was meant.
 
 ---
 
@@ -879,6 +978,12 @@ they are multiplied: the sheet works from 92.9532 minutes where this works from
 
 ---
 
+> **This worked example is the `PER_MINUTE` frame** — the Estimation sheet's own,
+> which is what Rs 263.40 reconciles against. Under the works' current `PER_DAY`
+> setting the same job prices higher, because make-ready is charged. See §6.8.
+
+---
+
 ## 11. What is editable, and where
 
 Nothing in the list below is baked into the code. As prices rise or the works
@@ -934,11 +1039,35 @@ the basis of quotations already sent.
 
 ### Per quotation
 
-**Margin %, transport per kg and pouch making per kg** — the three the client
-varies job to job. Their own seven old sheets carry margins of 5%, 9% and 10%,
-transport at Rs 5 and Rs 10, and pouch making at 0, 11.04 and 15, with nothing
-charged on the jobs sold as reels. Left blank each follows the Costing screen,
-so an ordinary quotation keeps up with the works' own figures as they change.
+**Margin %, transport per kg, pouch making per kg and wastage %** — the four the
+client varies job to job. Their own seven old sheets carry margins of 5%, 9% and
+10%, transport at Rs 5 and Rs 10, and pouch making at 0, 11.04 and 15, with
+nothing charged on the jobs sold as reels.
+
+Varying one is the **rare** job, so the four are **folded away** behind a
+checkbox at the bottom of the Jobs step, under a line of what this quotation is
+priced at. Ticking it opens them **already filled in** with the works' own
+figures.
+
+Two of the four are not read off the Costing screen — they are worked out for
+this document, because the works holds no single figure for either:
+
+```
+wastage       from the STYLES on the document      7% or 8%
+pouch making  perPouch × pouchesPerKg              what the rate actually carries
+```
+
+Either can fail to land on one figure — before a job has a size, on a document
+whose jobs disagree, on one that makes no pouches — and the box then stays empty
+and names what decides it instead.
+
+**Untouched means the works' figure, not a copy of it.** Anything still equal to
+the master on save is sent blank, so reading the figures and closing the section
+leaves no trace and the quotation goes on following the Costing screen. An open
+box also keeps following while the job below it is edited, until somebody types
+in it — otherwise a figure filled in before a pouch was resized would look like
+the works' own, no longer be equal to it, and survive as an override nobody
+made.
 
 Also cylinder rate, GST %, material advance %, cylinder advance % — and on each line,
 the lanes, the repeat, the cylinder count, and a rate typed over the one the
