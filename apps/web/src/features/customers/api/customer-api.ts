@@ -9,6 +9,7 @@ import type {
   UpdateCustomerInput,
 } from '@yuva/shared';
 import { request } from '@/lib/api-client';
+import { settle } from '@/lib/query';
 
 export interface CustomerListParams {
   page: number;
@@ -53,7 +54,7 @@ export function useCreateCustomer() {
   return useMutation({
     mutationFn: (input: CreateCustomerInput) =>
       request<CustomerDetail>({ url: '/customers', method: 'POST', data: input }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: customerKeys.lists() }),
+    onSuccess: () => settle(queryClient, customerKeys.lists()),
   });
 }
 
@@ -63,10 +64,11 @@ export function useUpdateCustomer() {
     mutationFn: ({ id, input }: { id: string; input: UpdateCustomerInput }) =>
       request<CustomerDetail>({ url: `/customers/${id}`, method: 'PATCH', data: input }),
     onSuccess: (customer) => {
-      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
       // Jobs may have changed, so replace the cached detail rather than
-      // leaving a stale expanded row on screen.
+      // leaving a stale expanded row on screen. Written BEFORE the wait, since
+      // it is the server's own answer and needs no round trip to confirm.
       queryClient.setQueryData(customerKeys.detail(customer.id), customer);
+      return settle(queryClient, customerKeys.lists());
     },
   });
 }
@@ -79,7 +81,7 @@ export function useDeleteCustomer() {
         url: `/customers/${id}`,
         method: 'DELETE',
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: customerKeys.lists() }),
+    onSuccess: () => settle(queryClient, customerKeys.lists()),
   });
 }
 
@@ -116,12 +118,9 @@ export function useSaveCustomerJob() {
             method: 'POST',
             data: input,
           }),
-    onSuccess: (_job, variables) => {
+    onSuccess: (_job, variables) =>
       // The saved-job dropdown reads from the customer detail, so a design
       // added here has to appear there without a reload.
-      void queryClient.invalidateQueries({
-        queryKey: customerKeys.detail(variables.customerId),
-      });
-    },
+      settle(queryClient, customerKeys.detail(variables.customerId)),
   });
 }

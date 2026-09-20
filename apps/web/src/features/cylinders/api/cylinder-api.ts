@@ -13,6 +13,7 @@ import type {
   UpdateCylinderInput,
 } from '@yuva/shared';
 import { request } from '@/lib/api-client';
+import { settle } from '@/lib/query';
 
 export interface DesignListParams {
   q?: string;
@@ -56,7 +57,7 @@ export function useUnregisteredDesigns(enabled: boolean) {
 
 function useInvalidate() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: cylinderKeys.all });
+  return () => settle(queryClient, cylinderKeys.all);
 }
 
 export function useRegisterCylinders() {
@@ -109,13 +110,11 @@ export function useDeleteDesign() {
   return useMutation({
     mutationFn: (jobId: string) =>
       request<DesignDeleted>({ url: `/cylinders/${jobId}`, method: 'DELETE' }),
-    onSuccess: () => {
+    onSuccess: () =>
       /*
        * The artwork cache too: its files went with the design, and a stale
        * entry would show a panel for a design that is no longer there.
        */
-      void queryClient.invalidateQueries({ queryKey: cylinderKeys.all });
-      void queryClient.invalidateQueries({ queryKey: ['artwork'] });
-    },
+      settle(queryClient, cylinderKeys.all, ['artwork']),
   });
 }

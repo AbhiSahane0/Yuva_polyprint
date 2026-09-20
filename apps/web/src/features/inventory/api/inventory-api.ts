@@ -12,6 +12,7 @@ import type {
   TransferStockInput,
 } from '@yuva/shared';
 import { request } from '@/lib/api-client';
+import { settle } from '@/lib/query';
 
 export interface StockListParams {
   q?: string;
@@ -53,7 +54,7 @@ function useStockMutation<TInput, TResult>(url: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: TInput) => request<TResult>({ url, method: 'POST', data: input }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: inventoryKeys.all }),
+    onSuccess: () => settle(queryClient, inventoryKeys.all),
   });
 }
 
@@ -71,6 +72,6 @@ export function useSetReorderLevel(materialId: string) {
   return useMutation({
     mutationFn: (input: SetReorderLevelInput) =>
       request({ url: `/inventory/${materialId}/reorder-level`, method: 'PATCH', data: input }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: inventoryKeys.all }),
+    onSuccess: () => settle(queryClient, inventoryKeys.all),
   });
 }

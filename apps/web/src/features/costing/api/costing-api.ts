@@ -14,6 +14,7 @@ import type {
   UpdateMachineInput,
 } from '@yuva/shared';
 import { apiClient, request } from '@/lib/api-client';
+import { settle } from '@/lib/query';
 import { saveBlob } from '@/lib/download';
 
 export const costingKeys = {
@@ -55,7 +56,7 @@ function useOverheadMutation<TArgs>(run: (args: TArgs) => Promise<CostingOverhea
     mutationFn: run,
     /* Every costing on screen rests on these, so the whole tree is refreshed
        rather than one key — a stale rate is worse than a second request. */
-    onSuccess: () => client.invalidateQueries({ queryKey: costingKeys.all }),
+    onSuccess: () => settle(client, costingKeys.all),
   });
 }
 
@@ -80,11 +81,11 @@ export function useEndOverhead() {
 
 function useInvalidate() {
   const queryClient = useQueryClient();
-  return () => {
-    void queryClient.invalidateQueries({ queryKey: costingKeys.all });
+  /* Both at once rather than one after the other: they are two reads of the
+     same save, and serialising them doubles how long the button spins. */
+  return () =>
     /* The wizard prices against these, so its costing must be recomputed. */
-    void queryClient.invalidateQueries({ queryKey: ['settings'] });
-  };
+    settle(queryClient, costingKeys.all, ['settings']);
 }
 
 export function useSaveMachine() {
@@ -132,7 +133,7 @@ export function useUpdateSettings() {
   return useMutation({
     mutationFn: (input: Partial<AppSettings>) =>
       request<AppSettings>({ url: '/settings', method: 'PATCH', data: input }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
+    onSuccess: () => settle(queryClient, ['settings']),
   });
 }
 

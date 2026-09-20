@@ -2068,6 +2068,53 @@ export const customerKeys = {
 Mutations invalidate `lists()` and write the fresh record into `detail(id)`,
 so an expanded row is never left showing stale data after a save.
 
+### A mutation is not finished until the screen shows what it did
+
+**Every mutation invalidates through `settle()` in `lib/query.ts`, and returns
+it from `onSuccess`.** That is the rule; there are no bare `invalidateQueries`
+calls left in the features.
+
+`invalidateQueries` marks the cache stale and _starts_ a refetch — it does not
+wait for one. Without the wait, the mutation settles immediately, so the modal
+closes, the toast fires and the draft clears while the list still holds the
+previous values. A round trip later the refetch lands and the screen snaps to
+the new figure.
+
+On the Rates screen it is worse than a flash, because saving also clears the
+drafts: the box you typed **200** into falls back to the cached **185**, sits
+there, and then becomes 200. Nothing is wrong with the data at any point, which
+is exactly why it reads as a bug — the screen is telling you two different
+things about the same moment.
+
+React Query awaits a promise returned from `onSuccess` before a mutation is
+settled, so returning `settle(...)` keeps the button spinning until the queries
+behind the screen have actually refetched. Measured on the Rates screen with the
+old behaviour restored: the toast appeared **22 ms before** the figure changed.
+With `settle`, both land in the same frame.
+
+```ts
+onSuccess: () => settle(queryClient, materialKeys.all, ['quotations']),
+```
+
+Three things about it are deliberate:
+
+- **It takes every key at once** rather than being called twice, so two reads of
+  the same save run in parallel instead of doubling how long the button spins.
+- **A failed refetch never fails the save.** The write happened; this is only
+  the reading back of it. Telling somebody their rate did not save when it did
+  — and having them type it again — is the worse of the two outcomes.
+- **It is not an optimistic update.** Writing the expected value into the cache
+  before the server answers is faster still and shows a figure nobody has
+  confirmed: the server rounds, recomputes, applies a dated setting, or refuses.
+  On screens whose whole job is to say what something costs, a number that
+  appears and is then quietly corrected is worse than one that takes an extra
+  moment.
+
+Where the server's response **is** the record — a customer, a quotation, a job
+sheet — it still goes straight into `detail(id)` with `setQueryData` first, and
+only the derived list is waited on. That needs no round trip to confirm: it is
+the server's own answer.
+
 **Every request goes through `apiClient`, including files.** Use `requestBlob()`
 for a PDF or any other download — never an `<a href>` or `<object data>` to an
 API path.

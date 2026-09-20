@@ -74,6 +74,11 @@ features/<feature>/
    in `features/auth`, which holds the signed-in user and the token the API
    client reads on every request.
 3. **One query-key factory per feature** in `api/`, so invalidation is reliable.
+   **Invalidate through `settle()` from `src/lib/query.ts` and return it from
+   `onSuccess`** — never a bare `invalidateQueries`. Awaiting it is what keeps a
+   mutation from settling while the screen still shows the old value, which is
+   the flash that follows every save otherwise. The rule and the measurement are
+   in [`apps/web/README.md`](../../README.md#a-mutation-is-not-finished-until-the-screen-shows-what-it-did).
 4. **Pages are lazy-loaded** in `src/app/router.tsx` to keep the shop-floor
    bundle small.
 5. **Mobile-first.** Every screen starts at 375px and scales up; tables get a
