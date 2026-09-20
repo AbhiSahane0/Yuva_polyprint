@@ -416,6 +416,16 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
     ['defaultWastagePercent', 'Wastage %', 'Film spoiled setting up and running'],
     ['pouchWastagePercent', 'Wastage % on a pouch job', 'The works runs pouches at its own figure'],
     ['defaultMarginPercent', 'Margin %', 'Added to cost, not taken off the rate'],
+    /*
+     * Both ink figures, not only the pouch one.
+     *
+     * This decides what a laminate WEIGHS, so it moves the count per kilogram
+     * and therefore the price of every pouch — and it was the one figure of
+     * that weight with no box anywhere in the app. The pouch variant sat here
+     * on its own, which read as though 1.8 were a constant rather than the
+     * Estimation sheet's figure.
+     */
+    ['inkGsm', 'Ink GSM', 'What a laminate is weighed with — decides what a pouch weighs'],
     ['pouchInkGsm', 'Ink GSM on a pouch job', 'The pouch workbook weighs with less'],
     ['inkSolventParts', 'Solvent per 100 of ink', 'How the press thins it'],
     ['ethylAcetatePercent', 'Ethyl acetate %', 'The rest is toluene'],

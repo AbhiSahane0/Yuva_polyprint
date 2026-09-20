@@ -298,14 +298,18 @@ money.
 
 ### 4h. Ink and solvent
 
-| Setting                | Now | What it means                                                                      |
-| ---------------------- | --- | ---------------------------------------------------------------------------------- |
-| Ink GSM on a pouch job | 1.2 | The pouch workbook weighs a laminate with less ink than the Estimation sheet's 1.8 |
-| Solvent per 100 of ink | 80  | How much thinner the press adds — 100 parts ink to 80 of solvent                   |
-| Ethyl acetate %        | 50  | Of that solvent. The rest is toluene                                               |
+| Setting                | Now | What it means                                                    |
+| ---------------------- | --- | ---------------------------------------------------------------- |
+| Ink GSM                | 1.8 | What a laminate is weighed with — the Estimation sheet's figure  |
+| Ink GSM on a pouch job | 1.2 | The pouch workbook weighs with less                              |
+| Solvent per 100 of ink | 80  | How much thinner the press adds — 100 parts ink to 80 of solvent |
+| Ethyl acetate %        | 50  | Of that solvent. The rest is toluene                             |
 
-> Ink GSM decides what a pouch **weighs**, so it moves the count per kilogram
-> and therefore the price each — as well as what the ink costs.
+> **Ink GSM decides what a pouch weighs**, so it moves the count per kilogram
+> and therefore the price each — as well as what the ink costs. Which of the two
+> applies is decided by the **style**, exactly as the wastage is: the pouch
+> workbook's 1.2 on a standup, zipper or D punch, the Estimation sheet's 1.8 on
+> everything else.
 
 ---
 
@@ -419,23 +423,25 @@ npm run seed:old-quotations -w @yuva/api
 Honest gap, recorded so nobody hunts for these. The API accepts all of them —
 there is simply no input rendered.
 
-| Setting                       | Now                     | What it decides                                                                     |
-| ----------------------------- | ----------------------- | ----------------------------------------------------------------------------------- |
-| Ink GSM                       | 1.8                     | What a laminate weighs on a non-workbook style — **moves the price of every pouch** |
-| Adhesive GSM                  | 2.5                     | The flat method's adhesive coat                                                     |
-| Adhesive coat, thin / thick   | 2 / 3                   | The per-bond coat, and which ply counts as thick                                    |
-| Thick ply above, µ            | 40                      | Where that step falls                                                               |
-| Cylinder rate, Rs/cm²         | 2.50                    | What the engraver charges                                                           |
-| GST %                         | 18                      | On material and cylinders                                                           |
-| Material / cylinder advance % | 70 / 100                | Taken on the GST-inclusive value                                                    |
-| Ink material (flat preview)   | Ink — Black             | Used by the form's live material cost                                               |
-| Default PET / MET PET         | PET 12µm / MET PET 12µm | Seed defaults                                                                       |
-| Job sheet defaults (seven)    | —                       | Electricity/day, transport, pouching, EMI/day, profit %, wastage %, yield %         |
+| Setting                       | Now                     | What it decides                                                             |
+| ----------------------------- | ----------------------- | --------------------------------------------------------------------------- |
+| Adhesive GSM                  | 2.5                     | The flat method's adhesive coat                                             |
+| Adhesive coat, thin / thick   | 2 / 3                   | The per-bond coat, and which ply counts as thick                            |
+| Thick ply above, µ            | 40                      | Where that step falls                                                       |
+| Cylinder rate, Rs/cm²         | 2.50                    | What the engraver charges                                                   |
+| GST %                         | 18                      | On material and cylinders                                                   |
+| Material / cylinder advance % | 70 / 100                | Taken on the GST-inclusive value                                            |
+| Ink material (flat preview)   | Ink — Black             | Used by the form's live material cost                                       |
+| Default PET / MET PET         | PET 12µm / MET PET 12µm | Seed defaults                                                               |
+| Job sheet defaults (seven)    | —                       | Electricity/day, transport, pouching, EMI/day, profit %, wastage %, yield % |
 
 **Cylinder rate, GST and the two advances can still be set per quotation**, so a
-one-off is not blocked. **Ink GSM is the one to watch** — 1.8 against the pouch
-workbook's 1.2 is over half a per cent of a pouch's weight, on every pouch, and
-only the pouch figure is editable here.
+one-off is not blocked.
+
+> **Ink GSM used to head this list** and no longer does. It decides what a pouch
+> weighs, so it moves the price of every pouch — and only the pouch variant had
+> a box, which read as though 1.8 were a constant rather than the Estimation
+> sheet's figure. Both are now in §4h.
 
 ---
 
@@ -475,7 +481,7 @@ only the pouch figure is editable here.
 | Cylinder mounting              | 80 mm                                   |
 | Wastage                        | 8%, or 7% on a workbook pouch           |
 | Margin                         | 9%, on materials only                   |
-| Ink GSM on a pouch job         | 1.2                                     |
+| Ink GSM                        | 1.8, or 1.2 on a workbook pouch         |
 | Solvent per 100 of ink         | 80, half ethyl acetate                  |
 | Ink is costed                  | By GSM × one rate                       |
 | Adhesive is costed             | By GSM × one rate                       |

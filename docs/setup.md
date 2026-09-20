@@ -227,13 +227,12 @@ move whatever has drifted.
 | **A machine-day**       | 1,606 minutes   | Turns machine minutes into running days          |
 | **Kilograms a day**     | 1,945           | Fallback only, for a line with no structure      |
 
-> **Six more figures the rate depends on have no box on that screen** — ink GSM
-> (1.8), adhesive GSM (2.5), the adhesive coat (2 or 3, stepping at 40µ), the
+> **Five more figures the rate depends on have no box on that screen** —
+> adhesive GSM (2.5), the adhesive coat (2 or 3, stepping at 40µ), the
 > cylinder rate (Rs 2.50/cm²), GST (18%) and the two advance percentages
 > (70/100). The API accepts all of them, so they can be changed; there is simply
 > no input rendered. The last four can also be set **per quotation**, so a
-> one-off is not blocked. **Ink GSM is the one to watch**, because it decides
-> what a pouch weighs and therefore the price of every single one. See
+> one-off is not blocked. See
 > [the Costing screen README](../apps/web/src/features/costing/README.md#8-what-is-not-on-this-screen).
 
 > **Pouch making is charged per POUCH, and the style decides what it costs.**
