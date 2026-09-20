@@ -4,16 +4,21 @@ import {
   ADHESIVE_BATCHES,
   MACHINE_KINDS,
   MACHINE_KIND_LABELS,
+  OVERHEAD_BASES,
+  OVERHEAD_BASIS_HINTS,
+  OVERHEAD_BASIS_LABELS,
   formatNumber,
   formatRs,
   salaryPerMinute,
   type AppSettings,
+  type CostingOverhead,
   type Labour,
   type Machine,
+  type OverheadBasis,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Field, NumberInput, Select } from '@/components/ui/Field';
+import { Field, Input, NumberInput, Select } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -25,8 +30,11 @@ import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import {
   useCostingMasterData,
+  useCreateOverhead,
+  useEndOverhead,
   useRetireLabour,
   useRetireMachine,
+  useUpdateOverhead,
   useUpdateSettings,
 } from '../api/costing-api';
 import { MachineModal } from '../components/MachineModal';
@@ -98,6 +106,7 @@ export default function CostingPage() {
         </div>
         {data.machines.some((m) => !m.isActive) ||
         data.labour.some((l) => !l.isActive) ||
+        data.overheads.some((o) => o.effectiveTo !== null) ||
         showRetired ? (
           <Button variant="ghost" size="sm" onClick={() => setShowRetired((on) => !on)}>
             <RotateCcw className="size-4" />
@@ -307,6 +316,8 @@ export default function CostingPage() {
         </div>
       </section>
 
+      <CustomOverheads overheads={data.overheads} canEdit={canEdit} showEnded={showRetired} />
+
       <OverheadsForm settings={settings} canEdit={canEdit} />
 
       <MachineModal
@@ -354,6 +365,237 @@ export default function CostingPage() {
         <p className="mt-2">It stays on this screen, greyed, with a Restore beside it.</p>
       </ConfirmDialog>
     </div>
+  );
+}
+
+/**
+ * Overheads the works added for itself.
+ *
+ * Everything in `OverheadsForm` is a figure this system knows by name. These
+ * are not, and that is the point — a works that starts paying for something new
+ * should be able to say so without a developer. Each carries the **basis** it is
+ * charged on, because nothing else could work it out: "Maintenance 5000" is
+ * three orders of magnitude apart read per job and read per kilogram.
+ *
+ * **Ended, not deleted.** A row stops applying from today and stays on record,
+ * so the quotations it priced can still say what they were priced on and still
+ * reprice to the same figure. Same rule as a retired machine, written as a date
+ * because these are dated rather than flagged.
+ */
+function CustomOverheads({
+  overheads,
+  canEdit,
+  showEnded,
+}: {
+  overheads: CostingOverhead[];
+  canEdit: boolean;
+  showEnded: boolean;
+}) {
+  const create = useCreateOverhead();
+  const update = useUpdateOverhead();
+  const end = useEndOverhead();
+
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState<{ name: string; basis: OverheadBasis; amount: string }>({
+    name: '',
+    basis: 'PER_KG',
+    amount: '',
+  });
+  const [ending, setEnding] = useState<CostingOverhead | null>(null);
+
+  const live = overheads.filter((row) => row.effectiveTo === null);
+  const shown = showEnded ? overheads : live;
+
+  async function add() {
+    if (!draft.name.trim()) {
+      toast.error('Give the overhead a name');
+      return;
+    }
+    try {
+      await create.mutateAsync({
+        name: draft.name.trim(),
+        basis: draft.basis,
+        amount: Number(draft.amount) || 0,
+        sortOrder: 0,
+      });
+      toast.success(`${draft.name.trim()} added — it applies from today`);
+      setDraft({ name: '', basis: 'PER_KG', amount: '' });
+      setAdding(false);
+    } catch (error) {
+      toast.error(error instanceof ApiClientError ? error.message : 'Could not add it');
+    }
+  }
+
+  async function changeAmount(row: CostingOverhead, raw: string) {
+    const amount = Number(raw);
+    if (!Number.isFinite(amount) || amount === row.amount) return;
+    try {
+      await update.mutateAsync({ id: row.id, input: { amount } });
+    } catch (error) {
+      toast.error(error instanceof ApiClientError ? error.message : 'Could not save');
+    }
+  }
+
+  return (
+    <section className="mt-8">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-ink-900 flex items-center gap-2 text-base font-semibold">
+            <Cog className="text-ink-400 size-4" />
+            The works&rsquo; own overheads
+          </h2>
+          <p className="text-ink-500 mt-0.5 text-sm">
+            Anything else this works pays for. Each is charged on the basis you pick, and applies
+            from the day you add it — nothing already quoted moves.
+          </p>
+        </div>
+        {canEdit && !adding ? (
+          <Button size="sm" onClick={() => setAdding(true)}>
+            <Plus className="size-4" />
+            Add an overhead
+          </Button>
+        ) : null}
+      </div>
+
+      <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white shadow-[var(--shadow-card)]">
+        {shown.length === 0 && !adding ? (
+          <EmptyState
+            title="No overheads of your own"
+            description="Transport, packing, sundries and the rest are already costed. This is for anything they do not cover."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-ink-500 border-ink-200 border-b text-left text-xs uppercase">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium">Name</th>
+                  <th className="px-4 py-2.5 font-medium">Charged</th>
+                  <th className="px-4 py-2.5 font-medium">Amount</th>
+                  <th className="px-4 py-2.5 font-medium">Applies</th>
+                  <th className="px-4 py-2.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-ink-100 divide-y">
+                {shown.map((row) => {
+                  const ended = row.effectiveTo !== null;
+                  return (
+                    <tr key={row.id} className={cn(ended && 'text-ink-400')}>
+                      <td className="px-4 py-2.5 font-medium">
+                        {row.name}
+                        {ended ? (
+                          <Badge className="ml-2" tone="neutral">
+                            ended
+                          </Badge>
+                        ) : null}
+                      </td>
+                      <td className="text-ink-600 px-4 py-2.5">
+                        {OVERHEAD_BASIS_LABELS[row.basis]}
+                      </td>
+                      <td className="px-4 py-2.5 tabular-nums">
+                        {canEdit && !ended ? (
+                          <NumberInput
+                            allowNegative
+                            aria-label={`Amount for ${row.name}`}
+                            defaultValue={String(row.amount)}
+                            onBlur={(event) => void changeAmount(row, event.target.value)}
+                            className="max-w-28"
+                          />
+                        ) : (
+                          formatNumber(row.amount, 2)
+                        )}
+                      </td>
+                      <td className="text-ink-500 px-4 py-2.5 text-xs">
+                        {row.effectiveFrom}
+                        {row.effectiveTo ? ` — ${row.effectiveTo}` : ' onwards'}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        {canEdit && !ended ? (
+                          <Button variant="ghost" size="sm" onClick={() => setEnding(row)}>
+                            End it
+                          </Button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {adding ? (
+          <div className="border-ink-200 grid gap-3 border-t p-4 sm:grid-cols-12">
+            <div className="sm:col-span-4">
+              <Field label="Name" htmlFor="new-overhead-name">
+                <Input
+                  id="new-overhead-name"
+                  autoFocus
+                  value={draft.name}
+                  placeholder="e.g. Machine maintenance"
+                  onChange={(event) => setDraft((d) => ({ ...d, name: event.target.value }))}
+                />
+              </Field>
+            </div>
+            <div className="sm:col-span-4">
+              <Field
+                label="Charged"
+                htmlFor="new-overhead-basis"
+                hint={OVERHEAD_BASIS_HINTS[draft.basis]}
+              >
+                <Select
+                  id="new-overhead-basis"
+                  value={draft.basis}
+                  onChange={(event) =>
+                    setDraft((d) => ({ ...d, basis: event.target.value as OverheadBasis }))
+                  }
+                >
+                  {OVERHEAD_BASES.map((basis) => (
+                    <option key={basis} value={basis}>
+                      {OVERHEAD_BASIS_LABELS[basis]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            <div className="sm:col-span-2">
+              <Field label="Amount" htmlFor="new-overhead-amount">
+                <NumberInput
+                  allowNegative
+                  id="new-overhead-amount"
+                  value={draft.amount}
+                  onChange={(event) => setDraft((d) => ({ ...d, amount: event.target.value }))}
+                />
+              </Field>
+            </div>
+            <div className="flex items-end gap-2 sm:col-span-2">
+              <Button onClick={() => void add()} loading={create.isPending}>
+                Add
+              </Button>
+              <Button variant="ghost" onClick={() => setAdding(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <ConfirmDialog
+        open={ending !== null}
+        title={ending ? `End ${ending.name}?` : 'End it'}
+        confirmLabel="End it"
+        loading={end.isPending}
+        onClose={() => setEnding(null)}
+        onConfirm={() => {
+          if (!ending) return;
+          end.mutate(ending.id, { onSettled: () => setEnding(null) });
+        }}
+      >
+        It stops being charged from today, so every rate worked out from now on drops by whatever it
+        was adding. Quotations already saved keep the figures they were saved with, and repricing
+        one written while it was live still picks it up.
+        <p className="mt-2">It stays on this screen under Show retired, with the dates it ran.</p>
+      </ConfirmDialog>
+    </section>
   );
 }
 

@@ -3,6 +3,9 @@ import type {
   AppSettings,
   CostingInput,
   CostingMasterData,
+  CostingOverhead,
+  CostingOverheadInput,
+  UpdateCostingOverheadInput,
   Labour,
   LabourInput,
   Machine,
@@ -15,7 +18,8 @@ import { saveBlob } from '@/lib/download';
 
 export const costingKeys = {
   all: ['costing'] as const,
-  master: (includeRetired: boolean) => [...costingKeys.all, 'master', includeRetired] as const,
+  master: (includeRetired: boolean, onDate?: string) =>
+    [...costingKeys.all, 'master', includeRetired, onDate ?? 'today'] as const,
 };
 
 /**
@@ -25,17 +29,53 @@ export const costingKeys = {
  * change while a quotation is being written, and refetching it on every
  * keystroke of the wizard would be a request per character.
  */
-export function useCostingMasterData(includeRetired = false) {
+export function useCostingMasterData(includeRetired = false, onDate?: string) {
   return useQuery({
-    queryKey: costingKeys.master(includeRetired),
+    queryKey: costingKeys.master(includeRetired, onDate),
     queryFn: () =>
       request<CostingMasterData>({
         url: '/costing',
         method: 'GET',
-        params: includeRetired ? { includeRetired: 'true' } : {},
+        params: {
+          ...(includeRetired ? { includeRetired: 'true' } : {}),
+          /* Only the works' own overheads are dated; the machines and wages
+             come back the same whatever day is asked for. */
+          ...(onDate ? { onDate } : {}),
+        },
       }),
     staleTime: 5 * 60_000,
   });
+}
+
+/* --- the works' own overheads ------------------------------------------- */
+
+function useOverheadMutation<TArgs>(run: (args: TArgs) => Promise<CostingOverhead>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    /* Every costing on screen rests on these, so the whole tree is refreshed
+       rather than one key — a stale rate is worse than a second request. */
+    onSuccess: () => client.invalidateQueries({ queryKey: costingKeys.all }),
+  });
+}
+
+export function useCreateOverhead() {
+  return useOverheadMutation((input: CostingOverheadInput) =>
+    request<CostingOverhead>({ url: '/costing/overheads', method: 'POST', data: input }),
+  );
+}
+
+export function useUpdateOverhead() {
+  return useOverheadMutation(({ id, input }: { id: string; input: UpdateCostingOverheadInput }) =>
+    request<CostingOverhead>({ url: `/costing/overheads/${id}`, method: 'PATCH', data: input }),
+  );
+}
+
+/** Ends it from today. The row stays, so what it priced stays explicable. */
+export function useEndOverhead() {
+  return useOverheadMutation((id: string) =>
+    request<CostingOverhead>({ url: `/costing/overheads/${id}/end`, method: 'POST' }),
+  );
 }
 
 function useInvalidate() {

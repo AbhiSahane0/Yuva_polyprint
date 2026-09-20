@@ -458,6 +458,24 @@ pouch making per kg = charge per pouch × pouches per kg
 > The zipper crosses the **finished** mouth, not the flat film: a standup's
 > bottom gusset lengthens the film without widening the mouth.
 
+### 10a. Anything else the works pays for
+
+The seven overheads above are the ones this system knows by name. A works pays
+for other things too — maintenance, an effluent charge, a rented compressor —
+and it can add those itself on the Costing screen without waiting for a
+developer.
+
+Each is given the **basis** it is charged on, because nothing else could work it
+out: per kilogram, flat per job, per pouch, per day, or a percentage of the
+material or of the cost. They are costed exactly like transport and packing, and
+so earn no margin.
+
+**One added today applies from today.** A quotation written last year is priced
+on last year's figures and cannot pick up a charge that did not exist then —
+which is how the works can add one without disturbing a document already sent.
+Ending one stops it from today and keeps the record of what it was, so the
+quotations it priced can still be explained.
+
 ---
 
 ## 11. The margin

@@ -29,8 +29,8 @@ wages and these tariffs.
 Only somebody with **rates** permission can change anything. Everyone else sees
 the same figures, greyed.
 
-The screen has three parts: **Machines**, **Wages**, and **Overheads and
-defaults**.
+The screen has four parts: **Machines**, **Wages**, **The works' own
+overheads**, and **Overheads and defaults**.
 
 ---
 
@@ -161,6 +161,72 @@ explain.
 > action only teaches the office to click through dialogs.
 
 Use **Show retired** to see them and bring one back.
+
+---
+
+## 3a. The works' own overheads
+
+Everything in §4 below is a figure this system knows **by name** — `transportPerKg`
+is multiplied by the kilograms because the code says so. This section is the
+opposite: rows the works adds for itself, for anything the fixed list does not
+cover.
+
+| Field       | What it means                                                     |
+| ----------- | ----------------------------------------------------------------- |
+| **Name**    | What the works calls it. "Machine maintenance", "Effluent charge" |
+| **Charged** | The basis — see below. **This is the part that matters**          |
+| **Amount**  | Rupees, or a percentage where the basis is one                    |
+
+### The basis, because nothing else could work it out
+
+A row reading "Maintenance 5000" is three orders of magnitude apart read per job
+and read per kilogram. So the basis travels with the figure:
+
+| Charged                         | Multiplies                                                                                         |
+| ------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **Rupees a kilogram**           | The kilograms **consumed** — the order plus its wastage, the same weight transport and packing use |
+| **Rupees a job, flat**          | Nothing. Added once, whatever the order size                                                       |
+| **Rupees a pouch**              | The pouches on the order. **Nothing on a roll**, which is made into nothing                        |
+| **Rupees a day**                | Make-ready plus running days — under **both** rate models                                          |
+| **% of the material cost**      | Film, ink and adhesive only                                                                        |
+| **% of the cost before margin** | Everything else on the job, **and not the other custom overheads**                                 |
+
+Three of those need a word:
+
+**Per day works under both rate models.** The days are arithmetic; only the
+_crew_ charge is conditional on the model. A rented compressor is paid for by
+the day whether or not the works recovers its own people that way, and it would
+be a trap for the figure to come silently to nothing because a switch elsewhere
+is set to per-minute.
+
+**Percentage of the total is not taken on itself, or on the others.** Including
+them would be circular — the total contains the percentage being worked out from
+it. Two overheads at 5% each come to exactly twice one of them, not 5% of a
+figure that already has 5% in it.
+
+**They sit outside the margin**, exactly as transport and packing do. A charge
+the works _earns_ on is a margin, and there is a setting for that in §6.
+
+### Adding one, and ending one
+
+**It applies from the day you add it — not from the beginning of time.** A
+quotation written last year is costed on last year's figures, so it cannot pick
+up an overhead that did not exist then. That is what lets the works add a charge
+on a Tuesday afternoon without disturbing a single document already sent.
+
+**Changing the amount keeps what it used to be.** The row is closed today and a
+new one opened, the same way a material rate keeps its history — a quotation
+written last month must go on repricing at the figure it was written under. The
+name is not priced, so correcting a spelling changes the row in place.
+
+**"End it" is not a delete.** It stops being charged from today; the row stays
+on record with the dates it ran, under **Show retired**. Repricing a quotation
+written while it was live still picks it up, which is the same rule a retired
+machine follows.
+
+> A negative amount is allowed. A works that gives a standing rebate on a line
+> of work has recorded a real thing, and refusing it would send them to type a
+> smaller figure somewhere nobody can see what they did.
 
 ---
 

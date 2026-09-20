@@ -1,5 +1,9 @@
+import { overheadsLiveOn } from '@yuva/shared';
 import type {
   CostingMasterData,
+  CostingOverhead,
+  CostingOverheadInput,
+  UpdateCostingOverheadInput,
   Labour,
   LabourInput,
   Machine,
@@ -49,19 +53,166 @@ const toLabour = (row: Prisma.CostingLabourGetPayload<Record<string, never>>): L
   sortOrder: row.sortOrder,
 });
 
+const toOverhead = (
+  row: Prisma.CostingOverheadGetPayload<Record<string, never>>,
+): CostingOverhead => ({
+  id: row.id,
+  name: row.name,
+  basis: row.basis,
+  amount: toNumber(row.amount),
+  effectiveFrom: row.effectiveFrom.toISOString().slice(0, 10),
+  effectiveTo: row.effectiveTo ? row.effectiveTo.toISOString().slice(0, 10) : null,
+  sortOrder: row.sortOrder,
+});
+
 const ORDER = [{ sortOrder: 'asc' as const }, { name: 'asc' as const }];
 
-/** Both lists at once: costing a rate needs all of it, and it is small. */
-export async function getMasterData(includeRetired = false): Promise<CostingMasterData> {
+/** Midnight UTC for a yyyy-mm-dd, which is how a `@db.Date` column compares. */
+const asDate = (iso: string): Date => new Date(`${iso}T00:00:00.000Z`);
+
+/** Today, as the works' own calendar day rather than as an instant. */
+const today = (): string => new Date().toISOString().slice(0, 10);
+
+/**
+ * The overheads live on a given day.
+ *
+ * **On or after `effectiveFrom`, and strictly before `effectiveTo`.** The
+ * half-open window is what makes closing one row and opening another on the
+ * same day mean "the new figure applies from today" rather than "both apply".
+ *
+ * This is the whole reason the works can add an overhead without disturbing
+ * anything: a quotation is costed on its own date, and a row that starts today
+ * is simply not in the list for a document written in 2022.
+ */
+export async function overheadsAsAt(onDate?: string): Promise<CostingOverhead[]> {
+  const on = onDate ?? today();
+  const rows = await prisma.costingOverhead.findMany({
+    where: {
+      effectiveFrom: { lte: asDate(on) },
+      OR: [{ effectiveTo: null }, { effectiveTo: { gt: asDate(on) } }],
+    },
+    orderBy: ORDER,
+  });
+
+  /*
+   * Narrowed in SQL, decided in `overheadsLiveOn`.
+   *
+   * The two say the same thing, and the point of saying it twice is that only
+   * one of them can be tested without a database — so that one has the tests
+   * and the last word. A `@db.Date` read back through a timezone is exactly
+   * the sort of thing that would shift a boundary by a day, and this compares
+   * the ISO strings the API actually returns.
+   */
+  return overheadsLiveOn(rows.map(toOverhead), on);
+}
+
+/** Every row ever, newest window first — what "show ended" shows. */
+export async function allOverheads(): Promise<CostingOverhead[]> {
+  const rows = await prisma.costingOverhead.findMany({
+    orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }, { effectiveFrom: 'desc' }],
+  });
+  return rows.map(toOverhead);
+}
+
+/** Every list at once: costing a rate needs all of it, and it is small. */
+export async function getMasterData(
+  includeRetired = false,
+  onDate?: string,
+): Promise<CostingMasterData> {
   const where = includeRetired ? {} : { isActive: true };
-  const [machines, labour] = await Promise.all([
+  const [machines, labour, overheads] = await Promise.all([
     prisma.costingMachine.findMany({ where, orderBy: ORDER }),
     prisma.costingLabour.findMany({
       where,
       orderBy: [{ sortOrder: 'asc' }, { role: 'asc' }],
     }),
+    includeRetired ? allOverheads() : overheadsAsAt(onDate),
   ]);
-  return { machines: machines.map(toMachine), labour: labour.map(toLabour) };
+  return { machines: machines.map(toMachine), labour: labour.map(toLabour), overheads };
+}
+
+/**
+ * Adds an overhead, live from today.
+ *
+ * Not from the beginning of time, which would reach back and change the price
+ * of every quotation anybody reprices. A works that genuinely wants an older
+ * start date is asking to move documents that have already gone out, and that
+ * is a different conversation from adding a charge.
+ */
+export async function createOverhead(input: CostingOverheadInput): Promise<CostingOverhead> {
+  return toOverhead(
+    await prisma.costingOverhead.create({
+      data: { ...input, effectiveFrom: asDate(today()) },
+    }),
+  );
+}
+
+/**
+ * Changes one, keeping what it used to be.
+ *
+ * A name is not priced, so it is corrected in place — the row that charged
+ * Rs 500 charged Rs 500 whatever it was called. **The amount and the basis
+ * are**, so changing either ends this row today and opens a new one from
+ * today: a quotation written last month must go on repricing at the figure it
+ * was written under.
+ *
+ * Unless the row started today, in which case it has priced nothing yet and
+ * editing it in place leaves no dead window behind.
+ */
+export async function updateOverhead(
+  id: string,
+  input: UpdateCostingOverheadInput,
+): Promise<CostingOverhead> {
+  const existing = await prisma.costingOverhead.findUnique({ where: { id } });
+  if (!existing) throw ApiError.notFound('That overhead is not on record');
+  if (existing.effectiveTo) throw ApiError.conflict('That overhead has already been ended');
+
+  const now = today();
+  const priced =
+    (input.amount !== undefined && toNumber(existing.amount) !== input.amount) ||
+    (input.basis !== undefined && existing.basis !== input.basis);
+
+  if (!priced || existing.effectiveFrom.toISOString().slice(0, 10) === now) {
+    return toOverhead(await prisma.costingOverhead.update({ where: { id }, data: input }));
+  }
+
+  return prisma.$transaction(async (tx) => {
+    await tx.costingOverhead.update({
+      where: { id },
+      data: { effectiveTo: asDate(now) },
+    });
+    return toOverhead(
+      await tx.costingOverhead.create({
+        data: {
+          name: input.name ?? existing.name,
+          basis: input.basis ?? existing.basis,
+          amount: input.amount ?? toNumber(existing.amount),
+          sortOrder: input.sortOrder ?? existing.sortOrder,
+          effectiveFrom: asDate(now),
+        },
+      }),
+    );
+  });
+}
+
+/**
+ * Ends an overhead from today, rather than deleting it.
+ *
+ * Same rule as a retired machine: the quotations it priced have to stay
+ * explicable, and repricing one of them must still pick it up. It simply stops
+ * applying to anything written from today.
+ */
+export async function endOverhead(id: string): Promise<CostingOverhead> {
+  const existing = await prisma.costingOverhead.findUnique({ where: { id } });
+  if (!existing) throw ApiError.notFound('That overhead is not on record');
+  if (existing.effectiveTo) return toOverhead(existing);
+
+  return toOverhead(
+    await prisma.costingOverhead.update({
+      where: { id },
+      data: { effectiveTo: asDate(today()) },
+    }),
+  );
 }
 
 /** A name already in use, told apart from anything else that could fail. */

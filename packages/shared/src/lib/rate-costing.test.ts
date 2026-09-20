@@ -11,6 +11,7 @@ import {
   salaryPerMinute,
   unpricedColours,
   type CostingInput,
+  type CustomOverhead,
 } from './rate-costing.js';
 
 /**
@@ -904,5 +905,165 @@ describe('why the margin is the same at every quantity', () => {
         overheads: { ...MASTER.overheads, marginBasis: 'TOTAL_COST' },
       })!;
     expect(whole(500).marginAmount / 500).toBeGreaterThan(whole(5000).marginAmount / 5000);
+  });
+});
+
+/**
+ * **Overheads the works adds for itself.**
+ *
+ * Everything else on this screen is wired into the engine by name. These are
+ * not, which is the point: a works that starts paying for something new — a
+ * rented compressor, a maintenance contract, a shift allowance — should be able
+ * to say so without a migration.
+ *
+ * Each carries the **basis** it is charged on, because nothing else could work
+ * it out. "Maintenance 5000" is three orders of magnitude apart read per job
+ * and read per kilogram, and an engine guessing between them would be wrong
+ * quietly and on every quotation.
+ *
+ * They are costed exactly like transport and packing: inside the overhead, and
+ * therefore OUTSIDE the margin base under `MATERIAL_ONLY`. A charge the works
+ * earns on is a margin, and there is a setting for that already.
+ */
+describe('the works’ own overheads', () => {
+  const withOverheads = (customOverheads: CustomOverhead[]): CostingInput => ({
+    ...input(),
+    overheads: { ...MASTER.overheads, customOverheads },
+  });
+
+  const base = costRate(input())!;
+
+  it('changes nothing at all when there are none', () => {
+    /* The guard that matters most. Every quotation written before the works
+       added one carries an empty list, and none of them may move. */
+    expect(costRate(withOverheads([]))!.ratePerKg).toBe(base.ratePerKg);
+    expect(costRate(input())!.customOverheadCost).toBe(0);
+    expect(costRate(input())!.customOverheads).toEqual([]);
+  });
+
+  it('charges per kilogram on the CONSUMED weight, not the ordered one', () => {
+    // 500 kg ordered at 8% wastage is 540 consumed — the same weight transport
+    // and packing are charged on, because it is the film actually bought.
+    const r = costRate(withOverheads([{ name: 'Levy', basis: 'PER_KG', amount: 2 }]))!;
+    expect(r.customOverheadCost).toBe(1080);
+  });
+
+  it('charges a flat sum once, whatever the order size', () => {
+    const r = costRate(withOverheads([{ name: 'Courier', basis: 'PER_JOB', amount: 750 }]))!;
+    expect(r.customOverheadCost).toBe(750);
+
+    const bigger = costRate({
+      ...withOverheads([{ name: 'Courier', basis: 'PER_JOB', amount: 750 }]),
+      job: { ...JOB, orderQtyKg: 5000 },
+    })!;
+    expect(bigger.customOverheadCost).toBe(750);
+  });
+
+  it('charges per pouch on the pouches the order makes', () => {
+    const r = costRate(withOverheads([{ name: 'Label', basis: 'PER_POUCH', amount: 0.1 }]))!;
+    expect(r.customOverheadCost).toBeCloseTo(500 * base.piecesPerKg * 0.1, 1);
+  });
+
+  it('charges nothing per pouch on a roll, which is made into nothing', () => {
+    const r = costRate({
+      ...withOverheads([{ name: 'Label', basis: 'PER_POUCH', amount: 0.1 }]),
+      job: { ...JOB, makesPouches: false },
+    })!;
+    expect(r.customOverheadCost).toBe(0);
+  });
+
+  it('charges per day under BOTH rate models', () => {
+    /*
+     * The days are arithmetic; only the CREW charge is conditional. A rented
+     * compressor is paid for by the day whether or not the works recovers its
+     * own people that way, and it would be a trap for the figure to come
+     * silently to nothing because a switch elsewhere is set to per-minute.
+     */
+    const overhead: CustomOverhead[] = [{ name: 'Compressor', basis: 'PER_DAY', amount: 400 }];
+
+    /* The works' day figures are settings in their own right and are always
+       present; only `rateModel` decides whether the CREW is charged on them. */
+    const days = { makeReadyDays: 0.75, machineMinutesPerDay: 1606, worksDayCost: 20000 };
+
+    const perMinute = costRate({
+      ...withOverheads(overhead),
+      overheads: {
+        ...MASTER.overheads,
+        ...days,
+        customOverheads: overhead,
+        rateModel: 'PER_MINUTE',
+      },
+    })!;
+    const perDay = costRate({
+      ...withOverheads(overhead),
+      overheads: { ...MASTER.overheads, ...days, customOverheads: overhead, rateModel: 'PER_DAY' },
+    })!;
+
+    expect(perMinute.occupiedDays).toBeGreaterThan(0);
+    expect(perMinute.customOverheadCost).toBeCloseTo(perMinute.occupiedDays * 400, 1);
+
+    /* The same days, the same overhead — only the crew charge differs. */
+    expect(perDay.occupiedDays).toBe(perMinute.occupiedDays);
+    expect(perDay.customOverheadCost).toBe(perMinute.customOverheadCost);
+    expect(perMinute.worksDayCost).toBe(0);
+    expect(perDay.worksDayCost).toBeGreaterThan(0);
+  });
+
+  it('takes a percentage of the material alone', () => {
+    const r = costRate(
+      withOverheads([{ name: 'Insurance', basis: 'PERCENT_MATERIAL', amount: 2 }]),
+    )!;
+    expect(r.customOverheadCost).toBeCloseTo(base.materialCost * 0.02, 1);
+  });
+
+  it('takes a percentage of everything else, and not of itself', () => {
+    /*
+     * `PERCENT_TOTAL` on the cost before margin, with the custom overheads left
+     * out of the base. Including them is circular — the total contains the
+     * percentage being worked out from it — and defining it away beats picking
+     * a number of passes nobody could explain across a table.
+     */
+    const one = costRate(withOverheads([{ name: 'Admin', basis: 'PERCENT_TOTAL', amount: 5 }]))!;
+    const expected = base.materialCost + base.overheadCost + base.electricityCost;
+    expect(one.customOverheadCost).toBeCloseTo(expected * 0.05, 0);
+
+    /* Two of them do not compound: the second is not taken on the first. */
+    const two = costRate(
+      withOverheads([
+        { name: 'Admin', basis: 'PERCENT_TOTAL', amount: 5 },
+        { name: 'Contingency', basis: 'PERCENT_TOTAL', amount: 5 },
+      ]),
+    )!;
+    expect(two.customOverheadCost).toBeCloseTo(one.customOverheadCost * 2, 0);
+  });
+
+  it('sits outside the margin, like transport and packing', () => {
+    const r = costRate(withOverheads([{ name: 'Courier', basis: 'PER_JOB', amount: 1000 }]))!;
+    // MATERIAL_ONLY, so the margin is on the film, ink and adhesive alone and
+    // a new overhead must not earn anything on top of itself.
+    expect(r.marginAmount).toBe(base.marginAmount);
+    expect(r.totalCost).toBeCloseTo(base.totalCost + 1000, 1);
+  });
+
+  it('reports each one with what it came to, so the breakdown can show it', () => {
+    const r = costRate(
+      withOverheads([
+        { name: 'Courier', basis: 'PER_JOB', amount: 750 },
+        { name: 'Levy', basis: 'PER_KG', amount: 2 },
+      ]),
+    )!;
+    expect(r.customOverheads).toEqual([
+      { name: 'Courier', basis: 'PER_JOB', amount: 750, cost: 750 },
+      { name: 'Levy', basis: 'PER_KG', amount: 2, cost: 1080 },
+    ]);
+    expect(r.customOverheadCost).toBe(1830);
+  });
+
+  it('treats a nonsense amount as nothing rather than as NaN', () => {
+    // A rate that came back NaN would print as a blank on the document, which
+    // is worse than a charge of zero: one is obviously wrong, the other is not.
+    const r = costRate(withOverheads([{ name: 'Broken', basis: 'PER_KG', amount: Number.NaN }]))!;
+    expect(r.customOverheadCost).toBe(0);
+    expect(Number.isFinite(r.ratePerKg)).toBe(true);
   });
 });
