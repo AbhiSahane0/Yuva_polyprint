@@ -676,9 +676,21 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
   return (
     <section>
       <h2 className="text-ink-900 mb-1 text-base font-semibold">Overheads and defaults</h2>
+      {/*
+        The office asked how to DELETE one of these, which is the right question
+        and had no answer on the screen. There is nothing to delete: each is a
+        figure the costing multiplies by something, so a zero contributes
+        nothing and is the same result a missing row would give — while staying
+        visible, reversible and dated.
+
+        The five that refuse a zero are divisors rather than charges. A works
+        with no working days in the month has no arithmetic, not a smaller bill.
+      */}
       <p className="text-ink-500 mb-3 text-sm">
-        Everything else a rate is built from. Each one is a starting point on a new quotation and
-        can be changed on the line.
+        Everything else a rate is built from, and a starting point every quotation can override.{' '}
+        <strong className="text-ink-700 font-medium">Set a charge to 0 to turn it off</strong> —
+        that is how one of these is removed. The figures that will not take a zero are the ones
+        divided BY: working days, hours, machine minutes and kilograms a day.
       </p>
 
       <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4 shadow-[var(--shadow-card)] sm:p-5">

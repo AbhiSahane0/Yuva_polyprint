@@ -1067,3 +1067,61 @@ describe('the works’ own overheads', () => {
     expect(Number.isFinite(r.ratePerKg)).toBe(true);
   });
 });
+
+/**
+ * **Zero is how a fixed charge is deleted.**
+ *
+ * The works asked how to remove one of the built-in overheads, and the honest
+ * answer is that there is nothing to remove: every one of them is a figure the
+ * engine multiplies by something, so a zero contributes exactly nothing and is
+ * the same result a missing row would give — while staying visible, reversible
+ * and dated.
+ *
+ * Worth a test rather than a note in a README, because "setting it to 0 turns
+ * it off" is a promise about arithmetic. A charge with a floor, or one added
+ * before the multiplication, would quietly go on being charged.
+ */
+describe('turning a fixed overhead off', () => {
+  it('charges nothing for the ones set to zero', () => {
+    const off = costRate({
+      ...input(),
+      overheads: {
+        ...MASTER.overheads,
+        transportPerKg: 0,
+        packingPerKg: 0,
+        otherPerJob: 0,
+        emiPerMonth: 0,
+      },
+    })!;
+
+    expect(off.transportCost).toBe(0);
+    expect(off.packingCost).toBe(0);
+    expect(off.otherCost).toBe(0);
+    expect(off.emiCost).toBe(0);
+
+    /* And the rate falls by exactly what they were worth — not by some of it. */
+    const on = costRate(input())!;
+    const removed = on.transportCost + on.packingCost + on.otherCost + on.emiCost;
+    expect(on.totalCost - off.totalCost).toBeCloseTo(removed, 1);
+  });
+
+  it('still prices the job with every charge off', () => {
+    // A works that charges no transport, no packing and no sundries is not a
+    // broken configuration — it is a works that has not entered them yet.
+    const off = costRate({
+      ...input(),
+      overheads: {
+        ...MASTER.overheads,
+        transportPerKg: 0,
+        packingPerKg: 0,
+        otherPerJob: 0,
+        emiPerMonth: 0,
+        defaultMarginPercent: 0,
+        marginPercent: 0,
+      },
+    })!;
+    expect(off.ratePerKg).toBeGreaterThan(0);
+    expect(Number.isFinite(off.ratePerKg)).toBe(true);
+    expect(off.marginAmount).toBe(0);
+  });
+});

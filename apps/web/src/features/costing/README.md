@@ -235,6 +235,43 @@ machine follows.
 Everything else a rate is built from. Grouped below by what they do; on screen
 they are one grid.
 
+### How you delete one: set it to 0
+
+There is no delete button here, and there is nothing for it to do. **Every
+charge on this screen is a figure the costing multiplies by something**, so a
+zero contributes exactly nothing — the same result removing the row would give,
+while staying visible, reversible and dated.
+
+Transport 0 means no transport is charged. Sundries 0, no sundries. Margin 0
+quotes at cost. The 8th station already sits at 0, which is the works saying
+they do not charge for one.
+
+> That is a promise about arithmetic rather than a figure of speech, so it has
+> a test: with transport, packing, sundries and EMI all at zero, the rate falls
+> by **exactly** what those four were worth, and a job with every charge off
+> still prices.
+
+**Five figures refuse a zero, and they are not charges.** They are the numbers
+the costing divides _by_:
+
+| Figure                | Why it cannot be zero                         |
+| --------------------- | --------------------------------------------- |
+| Working days a month  | Turns a monthly salary into a rate per minute |
+| Hours a day           | The same                                      |
+| Machine hours a month | What the EMI is spread over                   |
+| Machine minutes a day | Turns machine minutes into running days       |
+| Kilograms a day       | The fallback that does the same from weight   |
+
+A works with no working days in the month has no arithmetic, not a smaller
+bill. If the intent is "stop charging the crew", that is the **rate model** in
+§4b or a wage retired in §3 — not a zero here.
+
+**The five method switches** are not figures either. They pick between two ways
+of doing the same thing, and there is no "off".
+
+**To add a charge that is not on this list**, see §3a — that is what the works'
+own overheads are for, and those genuinely can be ended.
+
 ### 4a. The working month
 
 | Setting              | Now | What it means                                 |
