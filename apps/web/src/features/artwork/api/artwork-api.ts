@@ -8,6 +8,7 @@ import type {
   UpdateArtworkInput,
 } from '@yuva/shared';
 import { request } from '@/lib/api-client';
+import { settle } from '@/lib/query';
 
 export const artworkKeys = {
   all: ['artwork'] as const,
@@ -37,7 +38,7 @@ export function useJobArtwork(jobId: string | null, includeArchived = false) {
 
 function useInvalidate() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: artworkKeys.all });
+  return () => settle(queryClient, artworkKeys.all);
 }
 
 /**

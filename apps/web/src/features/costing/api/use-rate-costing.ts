@@ -101,7 +101,9 @@ export function useRateCosting(
   overrides: RateCostingOverrides = {},
 ) {
   const { data: settings } = useSettings(overrides.onDate);
-  const { data: master } = useCostingMasterData();
+  /* As at the quotation's date, like the settings beside it — see the custom
+     overheads below, which are the only part of it that is dated. */
+  const { data: master } = useCostingMasterData(false, overrides.onDate);
 
   const inks = useMemo(
     () =>
@@ -157,6 +159,9 @@ export function useRateCosting(
     overrides.transportPerKg,
     overrides.pouchMakingPerKg,
     overrides.onDate,
+    /* So a costing recomputes when the works adds or ends an overhead, which
+       the object identity of `master` alone would not guarantee. */
+    (master?.overheads ?? []).map((o) => `${o.id}:${o.amount}:${o.basis}`).join(','),
   ].join('|');
 
   /** A blank box means "follow the works' figure", which is not the same as 0. */
@@ -253,6 +258,19 @@ export function useRateCosting(
         /* The office's own figure replaces the whole charge, in the unit it is
            stated in. Null lets the style decide. */
         pouchMakingPerKgOverride: overrides.pouchMakingPerKg ?? null,
+        /*
+         * The works' own overheads, as at this quotation's date.
+         *
+         * `master` is fetched for the date too, so a document written in 2022
+         * is costed with the overheads that were live then — which is usually
+         * none of them, and is why adding one today moves nothing already on
+         * file.
+         */
+        customOverheads: master.overheads.map((overhead) => ({
+          name: overhead.name,
+          basis: overhead.basis,
+          amount: overhead.amount,
+        })),
         stationSurcharges: [
           settings.stationSurcharge6,
           settings.stationSurcharge7,

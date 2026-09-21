@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { JobSheet, JobSheetSummary, Paginated } from '@yuva/shared';
 import { request } from '@/lib/api-client';
+import { settle } from '@/lib/query';
 import { inventoryKeys } from '@/features/inventory/api/inventory-api';
 
 export interface JobSheetListParams {
@@ -46,7 +47,7 @@ export function useCreateJobSheet() {
   return useMutation({
     mutationFn: (body: Record<string, unknown>) =>
       request<JobSheet>({ url: '/job-sheets', method: 'POST', data: body }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: jobSheetKeys.all }),
+    onSuccess: () => settle(queryClient, jobSheetKeys.all),
   });
 }
 
@@ -64,8 +65,10 @@ export function useUpdateJobSheet(id: string) {
     mutationFn: (body: Record<string, unknown>) =>
       request<JobSheet>({ url: `/job-sheets/${id}`, method: 'PATCH', data: body }),
     onSuccess: (sheet) => {
+      /* The server's own answer, so it needs no round trip to confirm — the
+         wait below is only for the LIST, which is derived. */
       queryClient.setQueryData(jobSheetKeys.one(id), sheet);
-      void queryClient.invalidateQueries({ queryKey: jobSheetKeys.all });
+      return settle(queryClient, jobSheetKeys.all);
     },
   });
 }
@@ -76,7 +79,7 @@ export function useCostJobSheet(id: string) {
     mutationFn: () => request<JobSheet>({ url: `/job-sheets/${id}/cost`, method: 'POST' }),
     onSuccess: (sheet) => {
       queryClient.setQueryData(jobSheetKeys.one(id), sheet);
-      void queryClient.invalidateQueries({ queryKey: jobSheetKeys.all });
+      return settle(queryClient, jobSheetKeys.all);
     },
   });
 }
@@ -92,9 +95,8 @@ export function usePostJobSheetToStock(id: string) {
       }),
     onSuccess: (result) => {
       queryClient.setQueryData(jobSheetKeys.one(id), result.sheet);
-      void queryClient.invalidateQueries({ queryKey: jobSheetKeys.all });
       /* Stock has genuinely moved, so every inventory screen is now stale. */
-      void queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
+      return settle(queryClient, jobSheetKeys.all, inventoryKeys.all);
     },
   });
 }
@@ -104,6 +106,6 @@ export function useDeleteJobSheet() {
   return useMutation({
     mutationFn: (id: string) =>
       request<{ id: string }>({ url: `/job-sheets/${id}`, method: 'DELETE' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: jobSheetKeys.all }),
+    onSuccess: () => settle(queryClient, jobSheetKeys.all),
   });
 }

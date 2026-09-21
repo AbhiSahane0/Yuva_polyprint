@@ -16,6 +16,7 @@ import type {
   UpdateQuotationInput,
 } from '@yuva/shared';
 import { request, requestBlob } from '@/lib/api-client';
+import { settle } from '@/lib/query';
 
 export interface QuotationListParams {
   page: number;
@@ -88,7 +89,7 @@ export function useCreateQuotation() {
   return useMutation({
     mutationFn: (input: CreateQuotationInput) =>
       request<Quotation>({ url: '/quotations', method: 'POST', data: input }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: quotationKeys.all }),
+    onSuccess: () => settle(queryClient, quotationKeys.all),
   });
 }
 
@@ -111,8 +112,8 @@ export function useCreateQuotationVersion() {
        * with, not under the new one. Invalidating the list alone left that
        * dropdown showing one version when there were two.
        */
-      queryClient.invalidateQueries({ queryKey: quotationKeys.all });
       queryClient.setQueryData(quotationKeys.detail(quotation.id), quotation);
+      return settle(queryClient, quotationKeys.all);
     },
   });
 }
@@ -132,8 +133,10 @@ export function useUpdateQuotation() {
     mutationFn: ({ id, input }: { id: string; input: UpdateQuotationInput }) =>
       request<Quotation>({ url: `/quotations/${id}`, method: 'PATCH', data: input }),
     onSuccess: (quotation) => {
-      queryClient.invalidateQueries({ queryKey: quotationKeys.lists() });
+      /* The server's own answer goes straight in — no round trip needed to
+         confirm what it just told us. Only the LIST has to be re-read. */
       queryClient.setQueryData(quotationKeys.detail(quotation.id), quotation);
+      return settle(queryClient, quotationKeys.lists());
     },
   });
 }
@@ -143,7 +146,7 @@ export function useDeleteQuotation() {
   return useMutation({
     mutationFn: (id: string) =>
       request<{ id: string }>({ url: `/quotations/${id}`, method: 'DELETE' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: quotationKeys.lists() }),
+    onSuccess: () => settle(queryClient, quotationKeys.lists()),
   });
 }
 
@@ -188,11 +191,9 @@ export function useSendQuotation() {
   return useMutation({
     mutationFn: ({ id, ...input }: SendQuotationInput & { id: string }) =>
       request<SendQuotationResult>({ url: `/quotations/${id}/send`, method: 'POST', data: input }),
-    onSuccess: (_result, variables) => {
+    onSuccess: (_result, variables) =>
       // Sending moves a draft to Sent, so the list and the row are both stale.
-      void queryClient.invalidateQueries({ queryKey: quotationKeys.all });
-      void queryClient.invalidateQueries({ queryKey: quotationKeys.emails(variables.id) });
-    },
+      settle(queryClient, quotationKeys.all, quotationKeys.emails(variables.id)),
   });
 }
 
@@ -221,9 +222,6 @@ export function useRecordOutcome() {
         method: 'POST',
         data: input,
       }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: quotationKeys.all });
-      void queryClient.invalidateQueries({ queryKey: ['customers'] });
-    },
+    onSuccess: () => settle(queryClient, quotationKeys.all, ['customers']),
   });
 }

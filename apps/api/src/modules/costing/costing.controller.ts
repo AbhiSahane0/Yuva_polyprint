@@ -1,5 +1,7 @@
 import type { Request, Response } from 'express';
 import type {
+  CostingOverheadInput,
+  UpdateCostingOverheadInput,
   LabourInput,
   MachineInput,
   UpdateLabourInput,
@@ -13,7 +15,10 @@ import * as costingService from './costing.service.js';
 
 export async function masterData(req: Request, res: Response) {
   const includeRetired = req.query.includeRetired === 'true';
-  ok(res, await costingService.getMasterData(includeRetired));
+  /* Only the works' own overheads are dated. A machine's speed is what it is;
+     an overhead added last week did not exist the week before. */
+  const onDate = typeof req.query.onDate === 'string' ? req.query.onDate : undefined;
+  ok(res, await costingService.getMasterData(includeRetired, onDate));
 }
 
 export async function createMachine(req: Request, res: Response) {
@@ -44,6 +49,24 @@ export async function updateLabour(req: Request, res: Response) {
 
 export async function retireLabour(req: Request, res: Response) {
   ok(res, await costingService.retireLabour(req.params.id as string));
+}
+
+export async function createOverhead(req: Request, res: Response) {
+  created(res, await costingService.createOverhead(req.body as CostingOverheadInput));
+}
+
+export async function updateOverhead(req: Request, res: Response) {
+  ok(
+    res,
+    await costingService.updateOverhead(
+      req.params.id as string,
+      req.body as UpdateCostingOverheadInput,
+    ),
+  );
+}
+
+export async function endOverhead(req: Request, res: Response) {
+  ok(res, await costingService.endOverhead(req.params.id as string));
 }
 
 /**

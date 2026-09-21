@@ -55,6 +55,7 @@ vi.mock('../api/costing-api', () => ({
       data: {
         machines: [LIVE_MACHINE],
         labour: includeRetired ? [RETIRED_WAGE] : [],
+        overheads: [],
       },
       isPending: false,
     };
@@ -64,6 +65,9 @@ vi.mock('../api/costing-api', () => ({
   useRetireMachine: () => ({ mutate: vi.fn(), isPending: false }),
   useRetireLabour: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateSettings: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreateOverhead: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateOverhead: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useEndOverhead: () => ({ mutate: vi.fn(), isPending: false }),
   costingKeys: { master: (r: boolean) => ['costing', r] },
   downloadCostingWorkbook: vi.fn(),
 }));

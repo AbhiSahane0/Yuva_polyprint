@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import {
+  costingOverheadSchema,
   costingWorkbookSchema,
   idParamSchema,
+  updateCostingOverheadSchema,
   labourSchema,
   machineSchema,
   updateLabourSchema,
@@ -74,6 +76,33 @@ router.post(
   requireModule('rates'),
   validate({ params: idParamSchema }),
   asyncHandler(controller.retireLabour),
+);
+
+/*
+ * Overheads the works added for itself.
+ *
+ * `end`, not `retire` and not DELETE. The row stays and stops applying from
+ * today, because a quotation written while it was live has to go on repricing
+ * with it — the same rule a retired machine follows, expressed as a date
+ * because these are dated rather than flagged.
+ */
+router.post(
+  '/overheads',
+  requireModule('rates'),
+  validate({ body: costingOverheadSchema }),
+  asyncHandler(controller.createOverhead),
+);
+router.patch(
+  '/overheads/:id',
+  requireModule('rates'),
+  validate({ params: idParamSchema, body: updateCostingOverheadSchema }),
+  asyncHandler(controller.updateOverhead),
+);
+router.post(
+  '/overheads/:id/end',
+  requireModule('rates'),
+  validate({ params: idParamSchema }),
+  asyncHandler(controller.endOverhead),
 );
 
 export default router;

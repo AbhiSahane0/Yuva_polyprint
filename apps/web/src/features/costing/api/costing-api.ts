@@ -3,6 +3,9 @@ import type {
   AppSettings,
   CostingInput,
   CostingMasterData,
+  CostingOverhead,
+  CostingOverheadInput,
+  UpdateCostingOverheadInput,
   Labour,
   LabourInput,
   Machine,
@@ -11,11 +14,13 @@ import type {
   UpdateMachineInput,
 } from '@yuva/shared';
 import { apiClient, request } from '@/lib/api-client';
+import { settle } from '@/lib/query';
 import { saveBlob } from '@/lib/download';
 
 export const costingKeys = {
   all: ['costing'] as const,
-  master: (includeRetired: boolean) => [...costingKeys.all, 'master', includeRetired] as const,
+  master: (includeRetired: boolean, onDate?: string) =>
+    [...costingKeys.all, 'master', includeRetired, onDate ?? 'today'] as const,
 };
 
 /**
@@ -25,26 +30,62 @@ export const costingKeys = {
  * change while a quotation is being written, and refetching it on every
  * keystroke of the wizard would be a request per character.
  */
-export function useCostingMasterData(includeRetired = false) {
+export function useCostingMasterData(includeRetired = false, onDate?: string) {
   return useQuery({
-    queryKey: costingKeys.master(includeRetired),
+    queryKey: costingKeys.master(includeRetired, onDate),
     queryFn: () =>
       request<CostingMasterData>({
         url: '/costing',
         method: 'GET',
-        params: includeRetired ? { includeRetired: 'true' } : {},
+        params: {
+          ...(includeRetired ? { includeRetired: 'true' } : {}),
+          /* Only the works' own overheads are dated; the machines and wages
+             come back the same whatever day is asked for. */
+          ...(onDate ? { onDate } : {}),
+        },
       }),
     staleTime: 5 * 60_000,
   });
 }
 
+/* --- the works' own overheads ------------------------------------------- */
+
+function useOverheadMutation<TArgs>(run: (args: TArgs) => Promise<CostingOverhead>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    /* Every costing on screen rests on these, so the whole tree is refreshed
+       rather than one key — a stale rate is worse than a second request. */
+    onSuccess: () => settle(client, costingKeys.all),
+  });
+}
+
+export function useCreateOverhead() {
+  return useOverheadMutation((input: CostingOverheadInput) =>
+    request<CostingOverhead>({ url: '/costing/overheads', method: 'POST', data: input }),
+  );
+}
+
+export function useUpdateOverhead() {
+  return useOverheadMutation(({ id, input }: { id: string; input: UpdateCostingOverheadInput }) =>
+    request<CostingOverhead>({ url: `/costing/overheads/${id}`, method: 'PATCH', data: input }),
+  );
+}
+
+/** Ends it from today. The row stays, so what it priced stays explicable. */
+export function useEndOverhead() {
+  return useOverheadMutation((id: string) =>
+    request<CostingOverhead>({ url: `/costing/overheads/${id}/end`, method: 'POST' }),
+  );
+}
+
 function useInvalidate() {
   const queryClient = useQueryClient();
-  return () => {
-    void queryClient.invalidateQueries({ queryKey: costingKeys.all });
+  /* Both at once rather than one after the other: they are two reads of the
+     same save, and serialising them doubles how long the button spins. */
+  return () =>
     /* The wizard prices against these, so its costing must be recomputed. */
-    void queryClient.invalidateQueries({ queryKey: ['settings'] });
-  };
+    settle(queryClient, costingKeys.all, ['settings']);
 }
 
 export function useSaveMachine() {
@@ -92,7 +133,7 @@ export function useUpdateSettings() {
   return useMutation({
     mutationFn: (input: Partial<AppSettings>) =>
       request<AppSettings>({ url: '/settings', method: 'PATCH', data: input }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
+    onSuccess: () => settle(queryClient, ['settings']),
   });
 }
 

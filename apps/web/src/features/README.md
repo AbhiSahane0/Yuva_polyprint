@@ -4,20 +4,21 @@
 
 One folder per business feature, mirroring the API modules. Built so far:
 
-| Feature      | Screens it owns                                     |
-| ------------ | --------------------------------------------------- |
-| `auth`       | Sign-in, the session store, route guards            |
-| `users`      | User management (admins only)                       |
-| `customers`  | Customer list, edit modal, job specification editor |
-| `quotations` | Quotation list, wizard, PDF preview, sending        |
-| `job-sheets` | The production job sheet — what a run actually cost |
-| `rates`      | Daily material rates                                |
-| `inventory`  | Stock, batches, the movement ledger                 |
-| `purchase`   | Suppliers, orders, receiving into stock             |
-| `cylinders`  | The design register and cylinder history            |
-| `artwork`    | Design files — no screen of its own; see rule 1     |
-| `gstin`      | GST field and lookup — no screen of its own         |
-| `monitor`    | Sign-in log (admins only)                           |
+| Feature      | Screens it owns                                                                                     |
+| ------------ | --------------------------------------------------------------------------------------------------- |
+| `auth`       | Sign-in, the session store, route guards                                                            |
+| `users`      | User management (admins only)                                                                       |
+| `customers`  | Customer list, edit modal, job specification editor                                                 |
+| `quotations` | Quotation list, wizard, PDF preview, sending                                                        |
+| `job-sheets` | The production job sheet — what a run actually cost                                                 |
+| `costing`    | Machines, wages and every overhead a rate is built from — see [its own README](./costing/README.md) |
+| `rates`      | Daily material rates                                                                                |
+| `inventory`  | Stock, batches, the movement ledger                                                                 |
+| `purchase`   | Suppliers, orders, receiving into stock                                                             |
+| `cylinders`  | The design register and cylinder history                                                            |
+| `artwork`    | Design files — no screen of its own; see rule 1                                                     |
+| `gstin`      | GST field and lookup — no screen of its own                                                         |
+| `monitor`    | Sign-in log (admins only)                                                                           |
 
 Two of these own no route. `artwork` supplies the design files panel and
 `gstin` supplies a form field, and both are folders rather than components in
@@ -73,6 +74,11 @@ features/<feature>/
    in `features/auth`, which holds the signed-in user and the token the API
    client reads on every request.
 3. **One query-key factory per feature** in `api/`, so invalidation is reliable.
+   **Invalidate through `settle()` from `src/lib/query.ts` and return it from
+   `onSuccess`** — never a bare `invalidateQueries`. Awaiting it is what keeps a
+   mutation from settling while the screen still shows the old value, which is
+   the flash that follows every save otherwise. The rule and the measurement are
+   in [`apps/web/README.md`](../../README.md#a-mutation-is-not-finished-until-the-screen-shows-what-it-did).
 4. **Pages are lazy-loaded** in `src/app/router.tsx` to keep the shop-floor
    bundle small.
 5. **Mobile-first.** Every screen starts at 375px and scales up; tables get a

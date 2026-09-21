@@ -200,36 +200,40 @@ Already filled in with the works' own figures, so this stage is a **read-through
 not a data-entry job**. Check each one against what the works actually spends and
 move whatever has drifted.
 
-| Figure                  | Set to          | What it decides                                    |
-| ----------------------- | --------------- | -------------------------------------------------- |
-| Working days a month    | 26              | Turns a salary into a rate per minute              |
-| Hours a day             | 8               | The shift, for the same reason                     |
-| Wastage                 | 8%              | Film spoiled setting up and running — a reel       |
-| Wastage on a pouch job  | 7%              | Standup, standup zipper, zipper and D punch only   |
-| Ink GSM on a pouch job  | 1.2             | The pouch workbook weighs with less than 1.8       |
-| Margin                  | 9%              | Added to cost — set per quotation too              |
-| Trim                    | 15 mm           | Added to the web width                             |
-| Transport               | Rs 6.80 / kg    | On the quantity consumed — per quotation too       |
-| Packing                 | Rs 1.22 / kg    | On the quantity consumed                           |
-| Sundries                | Rs 250 / job    | A flat sum the works does not itemise              |
-| Bank EMI                | Rs 4,166.66     | Spread over 24 machine hours a month               |
-| Pouch making            | Rs 0.25 / pouch | Forming, sealing and cutting one                   |
-| D punch                 | Rs 0.60 / pouch | What one costs to make instead — a flat charge     |
-| D punch, wide           | Rs 0.80 / pouch | Over the width below                               |
-| A D punch is wide above | 450 mm          | Pouch width at which the rate steps                |
-| Zipper                  | Rs 3.60 / metre | Across the mouth, on a zipper or standup zipper    |
-| 6th / 7th / 8th station | 5.50 / 7.50 / 0 | Surcharge past five colours                        |
-| Ink GSM                 | 1.8             | What the laminate is weighed with                  |
-| Adhesive coat           | 2 or 3          | 3 above 40µ, 2 below, per bond                     |
-| Cylinder rate           | Rs 2.50 / cm²   | What the engraver charges                          |
-| Cylinder mounting       | 80 mm           | Face beyond the web, also charged for              |
-| GST                     | 18%             | On material and cylinders alike                    |
-| Advance                 | 70% / 100%      | Material and cylinders, on the GST-inclusive value |
-| **Rate model**          | **Per day**     | How the works' own time is recovered — see below   |
-| **A day of the works**  | Rs 20,000       | Crew and bank, charged by the day                  |
-| **Make-ready**          | 0.75 days       | The same hours whatever the order size             |
-| **A machine-day**       | 1,606 minutes   | Turns machine minutes into running days            |
-| **Kilograms a day**     | 1,945           | Fallback only, for a line with no structure        |
+| Figure                  | Set to          | What it decides                                  |
+| ----------------------- | --------------- | ------------------------------------------------ |
+| Working days a month    | 26              | Turns a salary into a rate per minute            |
+| Hours a day             | 8               | The shift, for the same reason                   |
+| Wastage                 | 8%              | Film spoiled setting up and running — a reel     |
+| Wastage on a pouch job  | 7%              | Standup, standup zipper, zipper and D punch only |
+| Ink GSM on a pouch job  | 1.2             | The pouch workbook weighs with less than 1.8     |
+| Margin                  | 9%              | Added to cost — set per quotation too            |
+| Trim                    | 15 mm           | Added to the web width                           |
+| Transport               | Rs 6.80 / kg    | On the quantity consumed — per quotation too     |
+| Packing                 | Rs 1.22 / kg    | On the quantity consumed                         |
+| Sundries                | Rs 250 / job    | A flat sum the works does not itemise            |
+| Bank EMI                | Rs 4,166.66     | Spread over 24 machine hours a month             |
+| Pouch making            | Rs 0.25 / pouch | Forming, sealing and cutting one                 |
+| D punch                 | Rs 0.60 / pouch | What one costs to make instead — a flat charge   |
+| D punch, wide           | Rs 0.80 / pouch | Over the width below                             |
+| A D punch is wide above | 450 mm          | Pouch width at which the rate steps              |
+| Zipper                  | Rs 3.60 / metre | Across the mouth, on a zipper or standup zipper  |
+| 6th / 7th / 8th station | 5.50 / 7.50 / 0 | Surcharge past five colours                      |
+| Cylinder mounting       | 80 mm           | Face beyond the web, also charged for            |
+| **Rate model**          | **Per day**     | How the works' own time is recovered — see below |
+| Solvent per 100 of ink  | 80              | How the press thins it; half ethyl, half toluene |
+| **A day of the works**  | Rs 20,000       | Crew and bank, charged by the day                |
+| **Make-ready**          | 0.75 days       | The same hours whatever the order size           |
+| **A machine-day**       | 1,606 minutes   | Turns machine minutes into running days          |
+| **Kilograms a day**     | 1,945           | Fallback only, for a line with no structure      |
+
+> **Five more figures the rate depends on have no box on that screen** —
+> adhesive GSM (2.5), the adhesive coat (2 or 3, stepping at 40µ), the
+> cylinder rate (Rs 2.50/cm²), GST (18%) and the two advance percentages
+> (70/100). The API accepts all of them, so they can be changed; there is simply
+> no input rendered. The last four can also be set **per quotation**, so a
+> one-off is not blocked. See
+> [the Costing screen README](../apps/web/src/features/costing/README.md#8-what-is-not-on-this-screen).
 
 > **Pouch making is charged per POUCH, and the style decides what it costs.**
 > A standup pays making; a zipper pays making plus the zipper across its mouth,

@@ -30,6 +30,9 @@ erDiagram
   costing_machines {
     text id PK
   }
+  costing_overheads {
+    text id PK
+  }
   customers {
     text id PK
     text company_name
@@ -236,6 +239,7 @@ erDiagram
 | `app_settings` | 3 | 40 | Editable rates: cylinder rate, GST %, advance %. |
 | `costing_labour` | 8 | 7 |  |
 | `costing_machines` | 14 | 4 |  |
+| `costing_overheads` | 9 | 0 |  |
 | `customers` | 17 | 70 | Companies that order from Yuva Polyprint. |
 | `cylinder_events` | 11 | 0 |  |
 | `cylinders` | 16 | 0 |  |
@@ -251,13 +255,13 @@ erDiagram
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
 | `purchase_receipts` | 11 | 1 |  |
-| `quotation_emails` | 10 | 0 |  |
-| `quotation_item_colours` | 9 | 0 |  |
-| `quotation_item_layers` | 10 | 0 |  |
-| `quotation_item_quantities` | 13 | 0 |  |
-| `quotation_items` | 31 | 0 | One priced line on a quotation. |
-| `quotation_tiers` | 14 | 0 |  |
-| `quotations` | 33 | 0 | Customer-facing quotations, with totals frozen at save. |
+| `quotation_emails` | 10 | 1 |  |
+| `quotation_item_colours` | 9 | 4 |  |
+| `quotation_item_layers` | 10 | 2 |  |
+| `quotation_item_quantities` | 13 | 3 |  |
+| `quotation_items` | 31 | 1 | One priced line on a quotation. |
+| `quotation_tiers` | 14 | 3 |  |
+| `quotations` | 33 | 1 | Customer-facing quotations, with totals frozen at save. |
 | `sessions` | 6 | 9 |  |
 | `stock_batches` | 14 | 1 |  |
 | `stock_movements` | 13 | 5 |  |
@@ -325,6 +329,7 @@ erDiagram
 | `JobSheetStatus` | `OPEN`, `COSTED`, `CLOSED` |
 | `MachineKind` | `PRINTING`, `LAMINATION`, `SLITTING`, `POUCHING` |
 | `MaterialCategory` | `FILM`, `INK`, `ADHESIVE`, `SOLVENT`, `CONSUMABLE` |
+| `OverheadBasis` | `PER_KG`, `PER_JOB`, `PER_POUCH`, `PER_DAY`, `PERCENT_MATERIAL`, `PERCENT_TOTAL` |
 | `PouchType` | `STANDUP`, `STANDUP_ZIPPER`, `ZIPPER`, `D_PUNCH`, `SPOUT`, `CENTRE_SEAL`, `THREE_SIDE_SEAL`, `OTHER` |
 | `PricingBasis` | `PER_KG`, `PER_POUCH` |
 | `PurchaseOrderStatus` | `ORDERED`, `IN_TRANSIT`, `PARTIALLY_RECEIVED`, `RECEIVED`, `CANCELLED` |
@@ -381,6 +386,20 @@ erDiagram
 | `setup_power_factor` | `decimal(4,3)` |  |  |
 | `station_horsepower` | `decimal(10,2)` |  |  |
 | `station_colour_steps` | `text` |  |  |
+
+### `costing_overheads`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `name` | `text` |  |  |
+| `basis` | `OverheadBasis` (enum) |  |  |
+| `amount` | `decimal(12,4)` |  |  |
+| `effective_from` | `date` |  |  |
+| `effective_to` | `date` | ✓ |  |
+| `sort_order` | `integer` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
 
 ### `customers`
 

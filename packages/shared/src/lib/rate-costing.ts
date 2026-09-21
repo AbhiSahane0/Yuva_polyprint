@@ -115,6 +115,21 @@ export interface CostingOverheads {
   /** A flat sum on the job — sundries the works does not itemise. */
   otherPerJob: number;
 
+  /**
+   * Overheads the works added for itself, each with the basis it is charged on.
+   *
+   * The fixed figures above are wired into this engine by name; these are not,
+   * which is the whole point — a works that starts paying for something new
+   * should not need a migration to say so. They are costed exactly like
+   * transport and packing: part of the overhead, and so **outside** the margin
+   * base under `MATERIAL_ONLY`. A charge the works earns on is a margin, and
+   * there is already a setting for that.
+   *
+   * Empty or absent on every quotation written before the works added one,
+   * which is what keeps the seven verified 2022 documents reproducing.
+   */
+  customOverheads?: CustomOverhead[];
+
   /** Recovered across machine time, as the sheet does. */
   emiPerMonth: number;
   /** Machine hours a month the EMI is spread over. */
@@ -290,6 +305,56 @@ export function adhesiveGsmFor(
 }
 
 /** The five dilutions the works uses, and what each leaves behind. */
+/**
+ * How a works-defined overhead is applied to a job.
+ *
+ * The engine cannot guess. A row reading "Machine maintenance 5000" is per job,
+ * per kilogram, per day or a percentage depending on what the works meant, and
+ * the difference between the first two is three orders of magnitude. So an
+ * overhead carries its basis and the costing reads it.
+ */
+export const OVERHEAD_BASES = [
+  'PER_KG',
+  'PER_JOB',
+  'PER_POUCH',
+  'PER_DAY',
+  'PERCENT_MATERIAL',
+  'PERCENT_TOTAL',
+] as const;
+
+export type OverheadBasis = (typeof OVERHEAD_BASES)[number];
+
+export const OVERHEAD_BASIS_LABELS: Record<OverheadBasis, string> = {
+  PER_KG: 'Rupees a kilogram',
+  PER_JOB: 'Rupees a job, flat',
+  PER_POUCH: 'Rupees a pouch',
+  PER_DAY: 'Rupees a day the job occupies the works',
+  PERCENT_MATERIAL: '% of the material cost',
+  PERCENT_TOTAL: '% of the cost before margin',
+};
+
+/** What each basis multiplies. Written out because the screen says it too. */
+export const OVERHEAD_BASIS_HINTS: Record<OverheadBasis, string> = {
+  PER_KG: 'Times the kilograms CONSUMED — the order plus its wastage',
+  PER_JOB: 'Added once, whatever the order size',
+  PER_POUCH: 'Times the pouches on the order. Nothing on a roll',
+  PER_DAY: 'Times make-ready plus running days, whichever rate model is on',
+  PERCENT_MATERIAL: 'Film, ink and adhesive only',
+  PERCENT_TOTAL: 'Everything else on the job, custom overheads excluded',
+};
+
+/** One works-defined overhead, as the costing receives it. */
+export interface CustomOverhead {
+  name: string;
+  basis: OverheadBasis;
+  amount: number;
+}
+
+/** The same, with what it came to on this job. */
+export interface CustomOverheadCost extends CustomOverhead {
+  cost: number;
+}
+
 export const ADHESIVE_BATCHES = [
   { ratio: '100:189:15', solidsPercent: 30 },
   { ratio: '100:146:15', solidsPercent: 35 },
@@ -509,7 +574,9 @@ export interface CostingBreakdown {
   totalMachineMinutes: number;
   /**
    * Days the job occupies the works: make-ready plus running.
-   * Zero under `PER_MINUTE`, which does not think in days.
+   *
+   * Computed under both rate models. Only the CHARGE below is conditional —
+   * a works-defined overhead may be per day whether or not the crew is.
    */
   occupiedDays: number;
   /** What those days cost — crew and bank. Zero under `PER_MINUTE`. */
@@ -520,6 +587,10 @@ export interface CostingBreakdown {
   packingCost: number;
   otherCost: number;
   emiCost: number;
+  /** The works' own overheads, each with what it came to on this job. */
+  customOverheads: CustomOverheadCost[];
+  /** Their total, already inside `overheadCost`. */
+  customOverheadCost: number;
   overheadCost: number;
 
   /* --- the rate --------------------------------------------------------- */
@@ -967,6 +1038,22 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
   const electricityCost = round(sum(processes.map((process) => process.electricityCost)), 2);
   const labourCost = round(sum(processes.map((process) => process.labourCost)), 2);
 
+  /*
+   * --- per piece, BEFORE the overheads ------------------------------------
+   *
+   * The pouch charge is per pouch, so the rate cannot be finished until the
+   * count is known — and a works-defined overhead may be per pouch too, which
+   * is why this now sits above them rather than between them and the rate.
+   */
+  const ownPieceWeightG = round((job.filmWidthMm * job.filmHeightMm * totalGsm) / 1_000_000, 4);
+  const piecesPerKg =
+    job.piecesPerKgOverride && job.piecesPerKgOverride > 0
+      ? round(job.piecesPerKgOverride, 4)
+      : ownPieceWeightG > 0
+        ? round(1000 / ownPieceWeightG, 4)
+        : 0;
+  const pieceWeightG = piecesPerKg > 0 ? round(1000 / piecesPerKg, 4) : ownPieceWeightG;
+
   /* --- everything else --------------------------------------------------- */
   const transportCost = round(consumedKg * overheads.transportPerKg, 2);
   const packingCost = round(consumedKg * overheads.packingPerKg, 2);
@@ -1012,7 +1099,15 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
         ? job.orderQtyKg / kgPerDay
         : 0;
 
-  const occupiedDays = perDay ? round((overheads.makeReadyDays ?? 0) + runningDays, 4) : 0;
+  /*
+   * Days are worked out under BOTH models; only the charge is conditional.
+   *
+   * A works-defined overhead may be per day — a rented compressor, a shift
+   * allowance — whether or not the crew is paid that way, and it would be a
+   * trap for it to silently come to nothing because a switch elsewhere is set
+   * to per-minute.
+   */
+  const occupiedDays = round((overheads.makeReadyDays ?? 0) + runningDays, 4);
   const worksDayCost = perDay ? round(occupiedDays * (overheads.worksDayCost ?? 0), 2) : 0;
 
   /* Under PER_DAY the day charge REPLACES the per-minute crew and EMI; it does
@@ -1020,10 +1115,48 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
   const chargedLabourCost = perDay ? 0 : labourCost;
   const emiCost = perDay ? 0 : perMinuteEmiCost;
 
-  const overheadCost = round(
+  const fixedOverheadCost = round(
     chargedLabourCost + worksDayCost + transportCost + packingCost + otherCost + emiCost,
     2,
   );
+
+  /*
+   * --- the works' own overheads -------------------------------------------
+   *
+   * Each carries the basis it is charged on, because the engine cannot guess:
+   * "Maintenance 5000" is three orders of magnitude apart read per job and read
+   * per kilogram.
+   *
+   * `PERCENT_TOTAL` is taken on everything else on the job and NOT on the other
+   * custom overheads. Including them would be circular — the total contains the
+   * percentage that is being worked out from it — and defining it away is
+   * better than picking an arbitrary pass count nobody could explain.
+   */
+  const pouchesOnOrder = job.makesPouches ? job.orderQtyKg * piecesPerKg : 0;
+  const costBeforeCustom = round(materialCost + fixedOverheadCost + electricityCost, 2);
+
+  const customOverheads: CustomOverheadCost[] = (overheads.customOverheads ?? []).map(
+    (overhead) => {
+      const amount = Number.isFinite(overhead.amount) ? overhead.amount : 0;
+      const cost =
+        overhead.basis === 'PER_KG'
+          ? amount * consumedKg
+          : overhead.basis === 'PER_JOB'
+            ? amount
+            : overhead.basis === 'PER_POUCH'
+              ? amount * pouchesOnOrder
+              : overhead.basis === 'PER_DAY'
+                ? amount * occupiedDays
+                : overhead.basis === 'PERCENT_MATERIAL'
+                  ? (materialCost * amount) / 100
+                  : (costBeforeCustom * amount) / 100;
+      return { ...overhead, amount, cost: round(cost, 2) };
+    },
+  );
+
+  const customOverheadCost = round(sum(customOverheads.map((overhead) => overhead.cost)), 2);
+
+  const overheadCost = round(fixedOverheadCost + customOverheadCost, 2);
 
   /* --- margin ------------------------------------------------------------ */
   const costBeforeMargin = round(materialCost + overheadCost + electricityCost, 2);
@@ -1040,22 +1173,6 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
    */
   const extraStations = Math.max(0, stationsOn - 5);
   const stationSurchargePerKg = round(sum(overheads.stationSurcharges.slice(0, extraStations)), 4);
-
-  /*
-   * --- per piece, BEFORE the rate ----------------------------------------
-   *
-   * The pouch charge is per pouch now, so the rate cannot be finished until the
-   * count is known. It used to sit after, when the charge was a flat rate per
-   * kilogram that did not depend on how big the pouch was.
-   */
-  const ownPieceWeightG = round((job.filmWidthMm * job.filmHeightMm * totalGsm) / 1_000_000, 4);
-  const piecesPerKg =
-    job.piecesPerKgOverride && job.piecesPerKgOverride > 0
-      ? round(job.piecesPerKgOverride, 4)
-      : ownPieceWeightG > 0
-        ? round(1000 / ownPieceWeightG, 4)
-        : 0;
-  const pieceWeightG = piecesPerKg > 0 ? round(1000 / piecesPerKg, 4) : ownPieceWeightG;
 
   /*
    * What making one pouch costs, and what that comes to on a kilogram of them.
@@ -1126,6 +1243,8 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
     packingCost,
     otherCost,
     emiCost,
+    customOverheads,
+    customOverheadCost,
     overheadCost,
 
     costBeforeMargin,

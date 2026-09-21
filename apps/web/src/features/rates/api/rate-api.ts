@@ -8,6 +8,7 @@ import type {
   UpdateMaterialInput,
 } from '@yuva/shared';
 import { request } from '@/lib/api-client';
+import { settle } from '@/lib/query';
 import { inventoryKeys } from '@/features/inventory/api/inventory-api';
 
 export const materialKeys = {
@@ -43,11 +44,12 @@ export function useSaveRates() {
   return useMutation({
     mutationFn: (input: SaveRatesInput) =>
       request<RatesSaveResult>({ url: '/materials/rates', method: 'PUT', data: input }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: materialKeys.all });
+    /* Awaited, so the list already holds the new rate when the drafts clear
+       and the toast fires — see `settle`. Without it the box you typed 200
+       into falls back to 185 for a round trip. */
+    onSuccess: () =>
       // Quotation costing reads these rates, so its figures are now stale.
-      queryClient.invalidateQueries({ queryKey: ['quotations'] });
-    },
+      settle(queryClient, materialKeys.all, ['quotations']),
   });
 }
 
@@ -56,7 +58,7 @@ export function useCreateMaterial() {
   return useMutation({
     mutationFn: (input: CreateMaterialInput) =>
       request<Material>({ url: '/materials', method: 'POST', data: input }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: materialKeys.all }),
+    onSuccess: () => settle(queryClient, materialKeys.all),
   });
 }
 
@@ -83,10 +85,7 @@ export function useDeleteMaterial() {
         method: 'DELETE',
         ...(discardStock ? { params: { discardStock: 'true' } } : {}),
       }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: materialKeys.all });
-      void queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
-    },
+    onSuccess: () => settle(queryClient, materialKeys.all, inventoryKeys.all),
   });
 }
 
@@ -95,6 +94,6 @@ export function useUpdateMaterial() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateMaterialInput }) =>
       request<Material>({ url: `/materials/${id}`, method: 'PATCH', data: input }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: materialKeys.all }),
+    onSuccess: () => settle(queryClient, materialKeys.all),
   });
 }

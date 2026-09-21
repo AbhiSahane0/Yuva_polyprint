@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { partialWithoutDefaults } from './partial-update.js';
-import { MACHINE_KINDS, type CostingInput } from '../lib/rate-costing.js';
+import { MACHINE_KINDS, OVERHEAD_BASES, type CostingInput } from '../lib/rate-costing.js';
 
 /**
  * Costing master data — what the works is, rather than what a job is.
@@ -74,6 +74,29 @@ export const labourSchema = z.object({
 export type LabourInput = z.infer<typeof labourSchema>;
 export const updateLabourSchema = partialWithoutDefaults(labourSchema);
 export type UpdateLabourInput = z.infer<typeof updateLabourSchema>;
+
+/**
+ * An overhead the works added for itself.
+ *
+ * Everything else a rate is built from is a figure this engine knows by name.
+ * These are not, so each carries the **basis** it is charged on — the engine
+ * cannot tell whether "Maintenance 5000" is per job or per kilogram, and the
+ * two are three orders of magnitude apart.
+ *
+ * Negative is allowed. A works that gives a standing rebate on a line of work
+ * has recorded a real thing, and refusing it would send them to type a smaller
+ * figure somewhere else where nobody can see what they did.
+ */
+export const costingOverheadSchema = z.object({
+  name: z.string().trim().min(1, 'Give the overhead a name').max(80),
+  basis: z.enum(OVERHEAD_BASES),
+  amount: z.coerce.number().min(-1_000_000).max(1_000_000, 'That looks wrong — check the amount'),
+  sortOrder: z.coerce.number().int().min(0).max(999).default(0),
+});
+
+export type CostingOverheadInput = z.infer<typeof costingOverheadSchema>;
+export const updateCostingOverheadSchema = partialWithoutDefaults(costingOverheadSchema);
+export type UpdateCostingOverheadInput = z.infer<typeof updateCostingOverheadSchema>;
 
 /**
  * A costing sent up to be written out as a spreadsheet.

@@ -12,6 +12,7 @@ import type {
   UpdateSupplierInput,
 } from '@yuva/shared';
 import { request } from '@/lib/api-client';
+import { settle } from '@/lib/query';
 import { inventoryKeys } from '@/features/inventory/api/inventory-api';
 
 export interface OrderListParams {
@@ -59,7 +60,7 @@ export function usePurchaseOrder(id: string | null) {
 
 function useInvalidate() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: purchaseKeys.all });
+  return () => settle(queryClient, purchaseKeys.all);
 }
 
 export function useCreateSupplier() {
@@ -126,12 +127,10 @@ export function useReceivePurchaseLine() {
   return useMutation({
     mutationFn: (input: ReceivePurchaseLineInput) =>
       request<PurchaseOrder>({ url: '/purchase/receipts', method: 'POST', data: input }),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: purchaseKeys.all }),
-        queryClient.invalidateQueries({ queryKey: inventoryKeys.all }),
-      ]);
-    },
+    /* Already awaited before `settle` existed — receiving stock moves two
+       screens and showing one of them stale was obvious. Now it also survives
+       a refetch that fails, which the hand-rolled version did not. */
+    onSuccess: () => settle(queryClient, purchaseKeys.all, inventoryKeys.all),
   });
 }
 

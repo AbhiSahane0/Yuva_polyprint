@@ -544,7 +544,7 @@ EMI per minute = monthly EMI ÷ (machine hours a month × 60)
 EMI cost       = EMI per minute × minutes           PER_MINUTE only
 
 overhead cost = charged labour + works day cost + transport + packing
-              + sundries + EMI
+              + sundries + EMI + the works' own overheads
 ```
 
 Estimation `G48`–`G51`. Which minutes the EMI is spread over is a setting:
@@ -555,6 +555,36 @@ Estimation `G48`–`G51`. Which minutes the EMI is spread over is a setting:
 > **1.22** (never above 1.95 — four times out). Both were corrected **on a date**,
 > so nothing already quoted moved: the seven 2022 quotations still reproduce
 > exactly. It took the quote-against-cost gap from +10.8% to **+8.0%**.
+
+### 6.8b The works' own overheads
+
+Rows the works adds for itself, for anything the fixed list above does not
+cover. Each carries the **basis** it is charged on, because the engine cannot
+guess — "Maintenance 5000" is three orders of magnitude apart read per job and
+read per kilogram.
+
+```
+PER_KG            × consumed kg        the order plus its wastage
+PER_JOB           × 1                  flat, whatever the order size
+PER_POUCH         × pouches on order   0 on a roll
+PER_DAY           × occupied days      make-ready + running, under BOTH models
+PERCENT_MATERIAL  × material cost      film, ink and adhesive
+PERCENT_TOTAL     × (material + fixed overheads + electricity)
+```
+
+`PERCENT_TOTAL` deliberately excludes the custom overheads from its own base:
+including them is circular, and two at 5% each come to exactly twice one of
+them rather than compounding.
+
+They land in `overheadCost` beside transport and packing, and so sit **outside**
+the margin base under `MATERIAL_ONLY`.
+
+**Dated, and that is the whole point.** A row applies to a quotation whose date
+falls on or after `effectiveFrom` and strictly before `effectiveTo` — the
+half-open window in `overheadsLiveOn`. An overhead added today is invisible to a
+document written in 2022, which is what lets the works add one without moving
+anything already quoted. Changing the amount closes the row and opens another;
+ending one sets `effectiveTo` rather than deleting it.
 
 ### 6.9 Margin
 
@@ -1005,6 +1035,9 @@ made on.
 
 ### Costing screen
 
+**The works' own overheads** — name, basis and amount, added and ended by the
+office. Dated, so one added today changes nothing already quoted.
+
 **Machines** — horsepower, rate per HP-hour, speed in m/min, setup minutes,
 setup power factor.
 
@@ -1012,9 +1045,18 @@ setup power factor.
 
 **Overheads and defaults** — working days a month, hours a day, transport per
 kg, packing per kg, sundries per job, bank EMI and the hours it spreads over,
-**pouch making per pouch, D punch per pouch, zipper per metre**, the 6th/7th/8th
-station surcharges, trim, **cylinder mounting**, **wastage % and wastage % on a
-pouch job**, **ink GSM and ink GSM on a pouch job**, margin %, solvent per 100 of ink, ethyl acetate %.
+**the rate model and the three day figures it rests on**, **pouch making per
+pouch, D punch per pouch and the width it steps at, zipper per metre**, the
+6th/7th/8th station surcharges, trim, **cylinder mounting**, **wastage % and
+wastage % on a pouch job**, **ink GSM and ink GSM on a pouch job**, margin %,
+solvent per
+100 of ink, ethyl acetate %.
+
+> **Not on that screen, though the rate depends on them:** adhesive GSM, the
+> adhesive coat and its 40µ step, the cylinder rate, GST and
+> the two advance percentages. The API accepts every one; there is no input
+> rendered. The last four are settable per quotation. See
+> [the Costing screen README](../apps/web/src/features/costing/README.md#8-what-is-not-on-this-screen).
 
 **Which material prices what** — the flat ink and flat adhesive blends, the
 per-batch adhesive, the hardener, ethyl acetate, toluene.

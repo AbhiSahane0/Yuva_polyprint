@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CreateUserInput, UpdateUserInput, User } from '@yuva/shared';
 import { request } from '@/lib/api-client';
+import { settle } from '@/lib/query';
 
 export const userKeys = {
   all: ['users'] as const,
@@ -19,7 +20,7 @@ export function useCreateUser() {
   return useMutation({
     mutationFn: (input: CreateUserInput) =>
       request<User>({ url: '/users', method: 'POST', data: input }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: userKeys.all }),
+    onSuccess: () => settle(queryClient, userKeys.all),
   });
 }
 
@@ -28,7 +29,7 @@ export function useUpdateUser() {
   return useMutation({
     mutationFn: ({ id, ...input }: UpdateUserInput & { id: string }) =>
       request<User>({ url: `/users/${id}`, method: 'PATCH', data: input }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: userKeys.all }),
+    onSuccess: () => settle(queryClient, userKeys.all),
   });
 }
 
@@ -48,6 +49,6 @@ export function useDeleteUser() {
   return useMutation({
     mutationFn: (id: string) =>
       request<{ deleted: boolean }>({ url: `/users/${id}`, method: 'DELETE' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: userKeys.all }),
+    onSuccess: () => settle(queryClient, userKeys.all),
   });
 }

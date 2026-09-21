@@ -11,6 +11,7 @@ import {
   salaryPerMinute,
   unpricedColours,
   type CostingInput,
+  type CustomOverhead,
 } from './rate-costing.js';
 
 /**
@@ -904,5 +905,269 @@ describe('why the margin is the same at every quantity', () => {
         overheads: { ...MASTER.overheads, marginBasis: 'TOTAL_COST' },
       })!;
     expect(whole(500).marginAmount / 500).toBeGreaterThan(whole(5000).marginAmount / 5000);
+  });
+});
+
+/**
+ * **Overheads the works adds for itself.**
+ *
+ * Everything else on this screen is wired into the engine by name. These are
+ * not, which is the point: a works that starts paying for something new — a
+ * rented compressor, a maintenance contract, a shift allowance — should be able
+ * to say so without a migration.
+ *
+ * Each carries the **basis** it is charged on, because nothing else could work
+ * it out. "Maintenance 5000" is three orders of magnitude apart read per job
+ * and read per kilogram, and an engine guessing between them would be wrong
+ * quietly and on every quotation.
+ *
+ * They are costed exactly like transport and packing: inside the overhead, and
+ * therefore OUTSIDE the margin base under `MATERIAL_ONLY`. A charge the works
+ * earns on is a margin, and there is a setting for that already.
+ */
+describe('the works’ own overheads', () => {
+  const withOverheads = (customOverheads: CustomOverhead[]): CostingInput => ({
+    ...input(),
+    overheads: { ...MASTER.overheads, customOverheads },
+  });
+
+  const base = costRate(input())!;
+
+  it('changes nothing at all when there are none', () => {
+    /* The guard that matters most. Every quotation written before the works
+       added one carries an empty list, and none of them may move. */
+    expect(costRate(withOverheads([]))!.ratePerKg).toBe(base.ratePerKg);
+    expect(costRate(input())!.customOverheadCost).toBe(0);
+    expect(costRate(input())!.customOverheads).toEqual([]);
+  });
+
+  it('charges per kilogram on the CONSUMED weight, not the ordered one', () => {
+    // 500 kg ordered at 8% wastage is 540 consumed — the same weight transport
+    // and packing are charged on, because it is the film actually bought.
+    const r = costRate(withOverheads([{ name: 'Levy', basis: 'PER_KG', amount: 2 }]))!;
+    expect(r.customOverheadCost).toBe(1080);
+  });
+
+  it('charges a flat sum once, whatever the order size', () => {
+    const r = costRate(withOverheads([{ name: 'Courier', basis: 'PER_JOB', amount: 750 }]))!;
+    expect(r.customOverheadCost).toBe(750);
+
+    const bigger = costRate({
+      ...withOverheads([{ name: 'Courier', basis: 'PER_JOB', amount: 750 }]),
+      job: { ...JOB, orderQtyKg: 5000 },
+    })!;
+    expect(bigger.customOverheadCost).toBe(750);
+  });
+
+  it('charges per pouch on the pouches the order makes', () => {
+    const r = costRate(withOverheads([{ name: 'Label', basis: 'PER_POUCH', amount: 0.1 }]))!;
+    expect(r.customOverheadCost).toBeCloseTo(500 * base.piecesPerKg * 0.1, 1);
+  });
+
+  it('charges nothing per pouch on a roll, which is made into nothing', () => {
+    const r = costRate({
+      ...withOverheads([{ name: 'Label', basis: 'PER_POUCH', amount: 0.1 }]),
+      job: { ...JOB, makesPouches: false },
+    })!;
+    expect(r.customOverheadCost).toBe(0);
+  });
+
+  it('charges per day under BOTH rate models', () => {
+    /*
+     * The days are arithmetic; only the CREW charge is conditional. A rented
+     * compressor is paid for by the day whether or not the works recovers its
+     * own people that way, and it would be a trap for the figure to come
+     * silently to nothing because a switch elsewhere is set to per-minute.
+     */
+    const overhead: CustomOverhead[] = [{ name: 'Compressor', basis: 'PER_DAY', amount: 400 }];
+
+    /* The works' day figures are settings in their own right and are always
+       present; only `rateModel` decides whether the CREW is charged on them. */
+    const days = { makeReadyDays: 0.75, machineMinutesPerDay: 1606, worksDayCost: 20000 };
+
+    const perMinute = costRate({
+      ...withOverheads(overhead),
+      overheads: {
+        ...MASTER.overheads,
+        ...days,
+        customOverheads: overhead,
+        rateModel: 'PER_MINUTE',
+      },
+    })!;
+    const perDay = costRate({
+      ...withOverheads(overhead),
+      overheads: { ...MASTER.overheads, ...days, customOverheads: overhead, rateModel: 'PER_DAY' },
+    })!;
+
+    expect(perMinute.occupiedDays).toBeGreaterThan(0);
+    expect(perMinute.customOverheadCost).toBeCloseTo(perMinute.occupiedDays * 400, 1);
+
+    /* The same days, the same overhead — only the crew charge differs. */
+    expect(perDay.occupiedDays).toBe(perMinute.occupiedDays);
+    expect(perDay.customOverheadCost).toBe(perMinute.customOverheadCost);
+    expect(perMinute.worksDayCost).toBe(0);
+    expect(perDay.worksDayCost).toBeGreaterThan(0);
+  });
+
+  it('takes a percentage of the material alone', () => {
+    const r = costRate(
+      withOverheads([{ name: 'Insurance', basis: 'PERCENT_MATERIAL', amount: 2 }]),
+    )!;
+    expect(r.customOverheadCost).toBeCloseTo(base.materialCost * 0.02, 1);
+  });
+
+  it('takes a percentage of everything else, and not of itself', () => {
+    /*
+     * `PERCENT_TOTAL` on the cost before margin, with the custom overheads left
+     * out of the base. Including them is circular — the total contains the
+     * percentage being worked out from it — and defining it away beats picking
+     * a number of passes nobody could explain across a table.
+     */
+    const one = costRate(withOverheads([{ name: 'Admin', basis: 'PERCENT_TOTAL', amount: 5 }]))!;
+    const expected = base.materialCost + base.overheadCost + base.electricityCost;
+    expect(one.customOverheadCost).toBeCloseTo(expected * 0.05, 0);
+
+    /* Two of them do not compound: the second is not taken on the first. */
+    const two = costRate(
+      withOverheads([
+        { name: 'Admin', basis: 'PERCENT_TOTAL', amount: 5 },
+        { name: 'Contingency', basis: 'PERCENT_TOTAL', amount: 5 },
+      ]),
+    )!;
+    expect(two.customOverheadCost).toBeCloseTo(one.customOverheadCost * 2, 0);
+  });
+
+  it('sits outside the margin, like transport and packing', () => {
+    const r = costRate(withOverheads([{ name: 'Courier', basis: 'PER_JOB', amount: 1000 }]))!;
+    // MATERIAL_ONLY, so the margin is on the film, ink and adhesive alone and
+    // a new overhead must not earn anything on top of itself.
+    expect(r.marginAmount).toBe(base.marginAmount);
+    expect(r.totalCost).toBeCloseTo(base.totalCost + 1000, 1);
+  });
+
+  it('reports each one with what it came to, so the breakdown can show it', () => {
+    const r = costRate(
+      withOverheads([
+        { name: 'Courier', basis: 'PER_JOB', amount: 750 },
+        { name: 'Levy', basis: 'PER_KG', amount: 2 },
+      ]),
+    )!;
+    expect(r.customOverheads).toEqual([
+      { name: 'Courier', basis: 'PER_JOB', amount: 750, cost: 750 },
+      { name: 'Levy', basis: 'PER_KG', amount: 2, cost: 1080 },
+    ]);
+    expect(r.customOverheadCost).toBe(1830);
+  });
+
+  it('treats a nonsense amount as nothing rather than as NaN', () => {
+    // A rate that came back NaN would print as a blank on the document, which
+    // is worse than a charge of zero: one is obviously wrong, the other is not.
+    const r = costRate(withOverheads([{ name: 'Broken', basis: 'PER_KG', amount: Number.NaN }]))!;
+    expect(r.customOverheadCost).toBe(0);
+    expect(Number.isFinite(r.ratePerKg)).toBe(true);
+  });
+});
+
+/**
+ * **Zero is how a fixed charge is deleted.**
+ *
+ * The works asked how to remove one of the built-in overheads, and the honest
+ * answer is that there is nothing to remove: every one of them is a figure the
+ * engine multiplies by something, so a zero contributes exactly nothing and is
+ * the same result a missing row would give — while staying visible, reversible
+ * and dated.
+ *
+ * Worth a test rather than a note in a README, because "setting it to 0 turns
+ * it off" is a promise about arithmetic. A charge with a floor, or one added
+ * before the multiplication, would quietly go on being charged.
+ */
+describe('turning a fixed overhead off', () => {
+  it('charges nothing for the ones set to zero', () => {
+    const off = costRate({
+      ...input(),
+      overheads: {
+        ...MASTER.overheads,
+        transportPerKg: 0,
+        packingPerKg: 0,
+        otherPerJob: 0,
+        emiPerMonth: 0,
+      },
+    })!;
+
+    expect(off.transportCost).toBe(0);
+    expect(off.packingCost).toBe(0);
+    expect(off.otherCost).toBe(0);
+    expect(off.emiCost).toBe(0);
+
+    /* And the rate falls by exactly what they were worth — not by some of it. */
+    const on = costRate(input())!;
+    const removed = on.transportCost + on.packingCost + on.otherCost + on.emiCost;
+    expect(on.totalCost - off.totalCost).toBeCloseTo(removed, 1);
+  });
+
+  it('still prices the job with every charge off', () => {
+    // A works that charges no transport, no packing and no sundries is not a
+    // broken configuration — it is a works that has not entered them yet.
+    const off = costRate({
+      ...input(),
+      overheads: {
+        ...MASTER.overheads,
+        transportPerKg: 0,
+        packingPerKg: 0,
+        otherPerJob: 0,
+        emiPerMonth: 0,
+        defaultMarginPercent: 0,
+        marginPercent: 0,
+      },
+    })!;
+    expect(off.ratePerKg).toBeGreaterThan(0);
+    expect(Number.isFinite(off.ratePerKg)).toBe(true);
+    expect(off.marginAmount).toBe(0);
+  });
+});
+
+/**
+ * **Not everything on the Costing screen is a charge, and the ones that are not
+ * cannot be deleted because they are not adding anything.**
+ *
+ * The office asked how to remove the adhesive split. The answer is that there
+ * is nothing there to remove: it is not money, it is how one figure is divided
+ * into three parts, and it only divides anything under the per-batch method.
+ * On the flat method — which is what the works runs — it is computed and
+ * thrown away.
+ *
+ * Worth pinning, because "it does nothing under this setting" is the kind of
+ * claim that is true until somebody moves a line.
+ */
+describe('the settings that are not charges', () => {
+  const withAdhesive = (model: 'FLAT_GSM' | 'BATCH', splitRatio: string | null): CostingInput => ({
+    ...input(),
+    job: { ...JOB, adhesiveSplitRatio: splitRatio },
+    overheads: { ...MASTER.overheads, adhesiveCostModel: model },
+  });
+
+  it('the adhesive split changes nothing on the flat method', () => {
+    const a = costRate(withAdhesive('FLAT_GSM', '100:189:15'))!;
+    const b = costRate(withAdhesive('FLAT_GSM', '100:68:15'))!;
+    const none = costRate(withAdhesive('FLAT_GSM', null))!;
+
+    expect(b.adhesiveCost).toBe(a.adhesiveCost);
+    expect(none.adhesiveCost).toBe(a.adhesiveCost);
+    expect(b.ratePerKg).toBe(a.ratePerKg);
+  });
+
+  it('and changes the price on the per-batch method, which is when it is real', () => {
+    /* The other half of the same claim: it is inert because of the METHOD, not
+       because it is ignored — so the answer changes the day somebody switches. */
+    const a = costRate(withAdhesive('BATCH', '100:189:15'))!;
+    const b = costRate(withAdhesive('BATCH', '100:68:15'))!;
+    expect(b.adhesiveCost).not.toBe(a.adhesiveCost);
+  });
+
+  it('a method switch has no off, because it picks between two ways', () => {
+    // Both produce a price. Neither is "nothing", which is why there is no
+    // third option and no way to delete one.
+    expect(costRate(withAdhesive('FLAT_GSM', null))!.adhesiveCost).toBeGreaterThan(0);
+    expect(costRate(withAdhesive('BATCH', null))!.adhesiveCost).toBeGreaterThan(0);
   });
 });
