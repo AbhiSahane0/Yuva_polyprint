@@ -10,6 +10,7 @@ import jobRoutes from '../modules/jobs/job.routes.js';
 import jobSheetRoutes from '../modules/job-sheets/job-sheet.routes.js';
 import materialRoutes from '../modules/materials/material.routes.js';
 import monitorRoutes from '../modules/monitor/monitor.routes.js';
+import orderRoutes from '../modules/orders/order.routes.js';
 import purchaseRoutes from '../modules/purchase/purchase.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
 import settingsRoutes from '../modules/settings/settings.routes.js';
@@ -35,6 +36,15 @@ router.use('/auth', authRoutes);
 
 router.use('/customers', authenticate, requireModule('customers'), customerRoutes);
 router.use('/quotations', authenticate, requireModule('quotations'), quotationRoutes);
+
+/*
+ * What the customer actually committed to — the thing between a quotation and
+ * a job sheet. Readable by anyone signed in, because what is due and when is
+ * the floor's question as much as the office's, and the floor has no business
+ * changing it. Writing needs the quotations module: an order is the commercial
+ * commitment a quotation becomes, made at the same desk.
+ */
+router.use('/orders', authenticate, orderRoutes);
 
 /*
  * Jobs are edited from two places — the customer editor and the quotation
@@ -118,12 +128,5 @@ router.use('/gstin', authenticate, gstinRoutes);
 /** Administrators only — each router applies that guard to itself. */
 router.use('/users', userRoutes);
 router.use('/monitor', monitorRoutes);
-
-/* ---------------------------------------------------------------------------
- * Further module routes are registered here as each is scoped in and built:
- *
- *   import orderRoutes from '../modules/orders/order.routes.js';
- *   router.use('/orders', orderRoutes);
- * ------------------------------------------------------------------------- */
 
 export default router;

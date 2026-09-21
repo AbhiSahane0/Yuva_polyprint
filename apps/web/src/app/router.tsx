@@ -15,6 +15,9 @@ import { canAccess, useAuthStore } from '@/features/auth/auth-store';
 const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'));
 const CustomersPage = lazy(() => import('@/features/customers/pages/CustomersPage'));
 const QuotationsPage = lazy(() => import('@/features/quotations/pages/QuotationsPage'));
+const OrdersPage = lazy(() => import('@/features/orders/pages/OrdersPage'));
+const OrderPage = lazy(() => import('@/features/orders/pages/OrderPage'));
+const NewOrderPage = lazy(() => import('@/features/orders/pages/NewOrderPage'));
 const RatesPage = lazy(() => import('@/features/rates/pages/RatesPage'));
 const CostingPage = lazy(() => import('@/features/costing/pages/CostingPage'));
 const InventoryPage = lazy(() => import('@/features/inventory/pages/InventoryPage'));
@@ -126,6 +129,23 @@ function AppRoutes() {
               </RequireModule>
             }
           />
+          {/*
+            Orders are READABLE by anyone signed in — what is due and when is
+            the floor's question as much as the office's — so the list and the
+            detail carry no module guard. Raising or changing one needs
+            `quotations`, which is the desk that makes the commitment, and that
+            guard is on the route that does it as well as on the API.
+          */}
+          <Route path="/orders" element={<OrdersPage />} />
+          <Route
+            path="/orders/new"
+            element={
+              <RequireModule module="quotations">
+                <NewOrderPage />
+              </RequireModule>
+            }
+          />
+          <Route path="/orders/:id" element={<OrderPage />} />
           <Route
             path="/rates"
             element={

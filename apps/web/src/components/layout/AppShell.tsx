@@ -15,6 +15,7 @@ import {
   X,
   Calculator,
   ClipboardList,
+  ClipboardCheck,
 } from 'lucide-react';
 import type { AppModule } from '@yuva/shared';
 import { cn } from '@/lib/utils';
@@ -40,6 +41,13 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { to: '/customers', label: 'Customers', icon: Users, module: 'customers' },
       { to: '/quotations', label: 'Quotations', icon: FileText, module: 'quotations' },
+      /*
+       * No module, on purpose. What is due and when is the floor's question as
+       * much as the office's, so anyone signed in can read the orders; raising
+       * or changing one needs `quotations`, enforced on that route and on the
+       * API rather than by hiding the whole section.
+       */
+      { to: '/orders', label: 'Orders', icon: ClipboardCheck },
     ],
   },
   {

@@ -242,4 +242,11 @@ export interface RecordOutcomeResult {
   jobsCreated: string[];
   /** Lines whose job the customer already had, left untouched. */
   jobsSkipped: string[];
+  /**
+   * Order numbers raised from the lines — one per line, at the quantity the
+   * customer accepted. Empty on a LOST quotation.
+   */
+  ordersCreated: number[];
+  /** Lines that already had an order. Winning twice raises nothing again. */
+  ordersSkipped: number[];
 }

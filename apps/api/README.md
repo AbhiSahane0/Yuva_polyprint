@@ -2401,6 +2401,100 @@ empty box being submitted by reflex.
 
 ---
 
+## Orders — what the customer actually asked for
+
+A quotation is an **offer** and a job sheet is a **post-mortem**. An order is the
+thing in between that neither of them is: a commitment, with a quantity, a rate
+agreed, a day it is wanted by and a place it has got to.
+
+Before this, winning a quotation was a dead end — it created the customer and
+their job records and then stopped. Nothing said that somebody had asked for
+1,000 kg by the fifth, against their own purchase order number.
+
+| Method | Path                  | Notes                                                                             |
+| ------ | --------------------- | --------------------------------------------------------------------------------- |
+| GET    | `/orders`             | Search by customer, job, PO number or order number; filter by status and due date |
+| GET    | `/orders/next-number` | The next order number                                                             |
+| GET    | `/orders/:id`         | One order                                                                         |
+| POST   | `/orders`             | Raise one by hand, for repeat work taken without a quotation                      |
+| PATCH  | `/orders/:id`         | Correct it, or move its status                                                    |
+| DELETE | `/orders/:id`         | **Only while it is CONFIRMED** — see below                                        |
+
+**Reading is open to anyone signed in.** What is due and when is the floor's
+question as much as the office's, and the floor has no business changing it.
+Writing needs `quotations`: an order is the commercial commitment a quotation
+becomes, made at the same desk.
+
+### One order per quotation LINE, not per quotation
+
+A quotation carries several jobs and they are made, finished and delivered
+separately. One order holding all of them could never say that two are done and
+one is late.
+
+### Winning a quotation raises them, in the same transaction
+
+`ordersFromQuotation` runs inside the transaction that wins the quotation, so a
+quotation cannot end up WON with nothing behind it — the office would see a won
+document, no order, and no reason to think anything was missing.
+
+**The quantity is the one the customer accepted**, not the first column. A
+quotation priced at three quantities is three prices for one job; the order
+takes the won tier, falling back to the quantity the document was printed for.
+Checked on a two-line quotation priced at 500 kg and 1,000 kg with the second
+selected: both orders came out at the second tier's quantity and rate.
+
+**Idempotent, exactly as the job records beside it are.** `quotation_item_id` is
+unique on the order, so winning the same quotation twice creates nothing the
+second time and says which lines already had orders:
+
+```json
+{ "status": "WON", "ordersCreated": [], "ordersSkipped": [1, 2] }
+```
+
+### Where an order may go, and where it may not
+
+```
+CONFIRMED  ──►  IN_PRODUCTION  ──►  COMPLETED
+     │                │
+     └────────────────┴──────────►  CANCELLED
+```
+
+A short repeat may go straight from confirmed to completed; there is nothing to
+gain from making somebody click through a stage that did not happen. **Nothing
+goes backwards**, and completed and cancelled are ends — reopening one is a
+decision somebody should have to make deliberately, and nothing yet needs it.
+
+The rule lives in `canMoveOrderTo` in `@yuva/shared` and is enforced by the
+service, not only by the screen: the screen is not the only way in, and a
+completed order quietly returning to production is the kind of thing nobody
+notices until the month's figures disagree with the floor's.
+
+> **Four statuses, deliberately not the wireframe's seven.** "Pending Materials"
+> and "Awaiting QC" describe gates that Planning and Quality will own. A status
+> nobody can honestly move an order out of is worse than no status at all,
+> because the screen then says something the office cannot act on. They belong
+> here the day those modules exist.
+
+### Deleting versus cancelling
+
+**Delete is refused once an order has been in production.** There is a run
+behind it by then, and a deleted order is a run nothing explains. Cancelling
+says the same thing and keeps the record — which is why it takes a reason, for
+the same purpose `lostReason` serves on a quotation: "we cancelled it" teaches
+nothing a year later, and the reason does.
+
+### The total is stored, not multiplied on read
+
+`orderAmount` in `@yuva/shared` computes it once, at the moment the order is
+written — per pouch where the order was taken that way, per kilogram otherwise.
+Shared so the form showing the figure and the server storing it cannot disagree:
+an order whose screen and record differ by a rounding rule is one nobody can
+defend over the phone.
+
+A pouch count with **no** per-pouch rate does not zero the order. A quotation
+line carries both units whether or not it was sold per pouch, so a
+21,565-pouch order at no per-pouch rate is still worth its kilograms.
+
 ## Sending quotations by email
 
 `POST /quotations/:id/send` renders the PDF, attaches it, and emails it through

@@ -93,6 +93,11 @@ is priced on its own and they are totalled at the end.
 | **Transport** (per line)                                | A flat sum added to the cylinder charge                                                                                                                   |
 | **Quantities** — 1 to 3                                 | The order sizes being quoted. Each is priced separately                                                                                                   |
 
+> **Winning a quotation now raises its orders** — one per job, at the quantity
+> the customer accepted. See the Orders module; before it, winning created the
+> customer and their job records and then stopped, with nothing to say what had
+> been committed to.
+
 ### Step 4 — Review
 
 The document as the customer will see it, with the subtotals, GST and the

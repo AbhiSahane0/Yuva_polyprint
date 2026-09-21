@@ -10,6 +10,7 @@ One folder per business feature, mirroring the API modules. Built so far:
 | `users`      | User management (admins only)                                                                       |
 | `customers`  | Customer list, edit modal, job specification editor                                                 |
 | `quotations` | Quotation list, wizard, PDF preview, sending                                                        |
+| `orders`     | What the customer committed to — list, detail, and one raised by hand                               |
 | `job-sheets` | The production job sheet — what a run actually cost                                                 |
 | `costing`    | Machines, wages and every overhead a rate is built from — see [its own README](./costing/README.md) |
 | `rates`      | Daily material rates                                                                                |
@@ -52,6 +53,7 @@ features/<feature>/
    | From         | Imports              | Why                                   |
    | ------------ | -------------------- | ------------------------------------- |
    | `quotations` | `customers/api`      | The wizard picks a customer           |
+   | `orders`     | `customers/api`      | Typing one picks a customer too       |
    | `quotations` | `rates/api`          | Costing needs today's rates           |
    | `quotations` | `gstin/components`   | The GST field                         |
    | `customers`  | `gstin/components`   | The same field, the same rules        |

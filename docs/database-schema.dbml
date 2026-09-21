@@ -106,6 +106,13 @@ Enum MaterialCategory {
   CONSUMABLE
 }
 
+Enum OrderStatus {
+  CONFIRMED
+  IN_PRODUCTION
+  COMPLETED
+  CANCELLED
+}
+
 Enum OverheadBasis {
   PER_KG
   PER_JOB
@@ -160,7 +167,7 @@ Table app_setting_history {
   effective_date date [pk]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '6 row(s) at time of generation'
+  Note: '66 row(s) at time of generation'
 }
 
 Table app_settings {
@@ -168,7 +175,7 @@ Table app_settings {
   value text [not null]
   updated_at timestamp [not null]
 
-  Note: '40 row(s) at time of generation'
+  Note: '61 row(s) at time of generation'
 }
 
 Table costing_labour {
@@ -489,7 +496,7 @@ Table material_rates {
   entered_by text [not null, default: `'Office'`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '381 row(s) at time of generation'
+  Note: '405 row(s) at time of generation'
 }
 
 Table materials {
@@ -508,6 +515,34 @@ Table materials {
   ink_kind InkKind
 
   Note: '24 row(s) at time of generation'
+}
+
+Table orders {
+  id text [pk]
+  number integer [unique, not null]
+  status OrderStatus [not null, default: `'CONFIRMED'::"OrderStatus"`]
+  customer_id text
+  customer_name text [not null]
+  job_id text
+  job_name text [not null]
+  quotation_id text
+  quotation_item_id text [unique]
+  quantity_kg decimal(12,3) [not null]
+  rate_per_kg decimal(12,2) [not null]
+  quantity_pouches integer [not null, default: `0`]
+  rate_per_pouch decimal(12,4) [not null, default: `0`]
+  amount decimal(14,2) [not null]
+  customer_po_number text [not null, default: `''`]
+  order_date date [not null]
+  due_date date
+  notes text [not null, default: `''`]
+  completed_at timestamp
+  cancelled_at timestamp
+  cancelled_reason text [not null, default: `''`]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+
+  Note: '0 row(s) at time of generation'
 }
 
 Table purchase_order_lines {
@@ -826,3 +861,7 @@ Ref: job_sheet_lines.sheet_id > job_sheets.id [delete: cascade]
 Ref: job_sheet_lines.material_id > materials.id [delete: set null]
 Ref: job_sheet_labour.sheet_id > job_sheets.id [delete: cascade]
 Ref: job_sheet_stage_usage.sheet_id > job_sheets.id [delete: cascade]
+Ref: orders.customer_id > customers.id [delete: set null]
+Ref: orders.job_id > jobs.id [delete: set null]
+Ref: orders.quotation_id > quotations.id [delete: set null]
+Ref: orders.quotation_item_id > quotation_items.id [delete: set null]

@@ -279,6 +279,62 @@ shows a muted dash and edit boxes open blank. Clearing a box saves it back as
 Removing a job from the list **unlinks it, it does not delete it** — the job
 returns to the "needs a customer" worklist.
 
+### Orders — `/orders`, `/orders/new`, `/orders/:id`
+
+**What the customer actually asked for.** A quotation is an offer and a job
+sheet is a post-mortem; this is the commitment in between — a quantity, a rate
+agreed, the day it is wanted and where it has got to. Before it, winning a
+quotation was a dead end.
+
+**Ordered by what is open and soonest due, not by number.** A list ordered by
+number puts the oldest order at the bottom on the day it goes late, which is the
+one morning anybody needs to see it.
+
+Two figures head the screen — **Open** and **Past due** — because those are the
+two questions asked of it every morning. Past due earns its colour only when
+there is some; a red zero is a red herring.
+
+**How late, in words.** A date on its own makes somebody do the arithmetic every
+time they read the row, and the answer they want is "is this a problem". So a
+due date reads `05-09-2026 · 3d late` or `· in 4d` or `· today`. Only on an open
+order: a completed one was due whenever it was due, and telling the office it is
+40 days late is both true and useless.
+
+**Reading is open to anyone signed in** — what is due and when is the floor's
+question as much as the office's — and the module guard sits on the routes that
+raise or change one, not on the section. A screen hidden from the people who
+need to read it is the wrong shape of protection.
+
+#### One order shows what may happen to it, and nothing else
+
+The status buttons are only the places it may actually go. Offering every status
+and refusing four of them on save teaches the office to expect errors; offering
+one or two teaches them the rule. A completed order has no buttons at all and
+its fields lock — an end that a dropdown can undo is not an end.
+
+**Delete only exists while nobody has started it.** Once it has been in
+production there is a run behind it, and a deleted order is a run nothing
+explains. The dialog says so and points at cancelling instead, which keeps the
+record — and asks why, for the same reason a lost quotation does.
+
+Three fields stay editable after the fact, because they are the three that
+genuinely change: the **due date**, the customer's **PO number**, and **notes**.
+The quantity and rate are what was agreed and are not an edit — changing them is
+a correction, and it belongs where the correction was decided.
+
+#### New order — for the phone
+
+Most orders arrive by winning a quotation, which carries everything across on
+one click. This is the other way in: repeat business taken without pricing it
+again, which is a real part of how the works runs and would otherwise have no
+record at all.
+
+Deliberately short — a customer, a job, a quantity and a rate. Everything a
+quotation would have decided belongs to the quotation, and asking for it again
+here would make this the slower path to the same place. The **amount** updates
+as you type, through the same `orderAmount` the server stores it with, so the
+figure on the screen and the figure on the record cannot differ.
+
 ### Quotations — `/quotations`
 
 By default the list reads as a **work queue, not a diary**: Draft first, then
