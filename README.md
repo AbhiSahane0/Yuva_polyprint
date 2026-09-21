@@ -3,9 +3,17 @@
 Flexible packaging manufacturing ERP: quotation → order → planning → multi-stage
 production → quality/waste → costing → dispatch, with full job-level traceability.
 
-> **Status: project scaffold.** The platform foundation is in place and verified.
-> No business modules are implemented yet — they are added one at a time as each
+> **Status: in use, and being built out module by module.** Quoting, costing,
+> rates, stock, buying, the cylinder register, job sheets and orders are
+> implemented and verified against the works' own paperwork — seven of their
+> 2022 quotations reproduce to the paisa, and all fourteen tabs of their
+> September job-sheet workbook cost exactly. Planning, production, quality,
+> dispatch and reporting are not built yet; they are added one at a time as each
 > is confirmed in scope.
+>
+> | Built                                                                                                                                                      | Not yet                                                                                                                                     |
+> | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+> | Customers · **Quotations** · **Orders** · Rates · Costing · Inventory · Purchase · Design & cylinders · Artwork · **Job sheets** · Users · Sign-in monitor | Planning · Production · Product master · Quality & waste · Machines · Employees · Warehouse · Dispatch · Reports · Overview · Operator view |
 
 ---
 
@@ -375,18 +383,18 @@ sheet stores as ranges (`"15-16"`, `"60-70"`) are kept in their own text columns
 
 Each app documents itself, next to the code it describes:
 
-| Document                                                                               | Covers                                                                                                                                                                             |
-| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`apps/api/README.md`](./apps/api/README.md)                                           | Every endpoint, the request/response envelope, **all the calculations with worked examples**, the job sheet and what a run actually cost, the data model, and the scripts          |
-| [`apps/web/README.md`](./apps/web/README.md)                                           | Every screen and what it does, how server state is handled, which figures are previewed in the browser, and the UI components                                                      |
-| [`docs/quotation-module.md`](./docs/quotation-module.md)                               | **The whole quotation, in plain words** — every input and what it does to the price, the rate chain step by step, why a bigger order is now cheaper, and what to say to the client |
-| [`apps/web/src/features/costing/README.md`](./apps/web/src/features/costing/README.md) | **The Costing screen, figure by figure** — what each machine, wage, overhead and method switch means, what it moves, and what is not on the screen at all                          |
-| [`docs/job-sheet-module.md`](./docs/job-sheet-module.md)                               | **The job sheet, in plain words** — the mix drums, the overheads, the wastage check, how it replaces the spreadsheet, and a worked example from drums to cost a kilogram           |
-| [`docs/old-quotation-check.md`](./docs/old-quotation-check.md)                         | **Seven of the works' own 2022 quotations, rebuilt here and matched to the paisa** — what was entered on each, what came out, and the two figures that changed over time           |
-| [`docs/stations.md`](./docs/stations.md)                                               | **Printing stations** — what one is, what decides how many a job has when there is no artwork yet, and what each one adds to the rate and the cylinder bill                        |
-| [`docs/setup.md`](./docs/setup.md)                                                     | **What to enter before the first quotation** — machines, wages, films, inks, adhesive and the overheads, in dependency order, and what goes wrong quietly when one is missed       |
-| [`docs/formulas.md`](./docs/formulas.md)                                               | **Every formula in one place** — the laminate, the pouch, the cylinder, the rate, GST and the advance, each against the cell it answers to in the client's workbook                |
-| [`docs/database-schema.md`](./docs/database-schema.md)                                 | ER diagram and full column reference, generated from the live database                                                                                                             |
+| Document                                                                               | Covers                                                                                                                                                                                                     |
+| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/api/README.md`](./apps/api/README.md)                                           | Every endpoint, the request/response envelope, **all the calculations with worked examples**, the job sheet and what a run actually cost, **orders and the status rules**, the data model, and the scripts |
+| [`apps/web/README.md`](./apps/web/README.md)                                           | Every screen and what it does, how server state is handled, which figures are previewed in the browser, and the UI components                                                                              |
+| [`docs/quotation-module.md`](./docs/quotation-module.md)                               | **The whole quotation, in plain words** — every input and what it does to the price, the rate chain step by step, why a bigger order is now cheaper, and what to say to the client                         |
+| [`apps/web/src/features/costing/README.md`](./apps/web/src/features/costing/README.md) | **The Costing screen, figure by figure** — what each machine, wage, overhead and method switch means, what it moves, and what is not on the screen at all                                                  |
+| [`docs/job-sheet-module.md`](./docs/job-sheet-module.md)                               | **The job sheet, in plain words** — the mix drums, the overheads, the wastage check, how it replaces the spreadsheet, and a worked example from drums to cost a kilogram                                   |
+| [`docs/old-quotation-check.md`](./docs/old-quotation-check.md)                         | **Seven of the works' own 2022 quotations, rebuilt here and matched to the paisa** — what was entered on each, what came out, and the two figures that changed over time                                   |
+| [`docs/stations.md`](./docs/stations.md)                                               | **Printing stations** — what one is, what decides how many a job has when there is no artwork yet, and what each one adds to the rate and the cylinder bill                                                |
+| [`docs/setup.md`](./docs/setup.md)                                                     | **What to enter before the first quotation** — machines, wages, films, inks, adhesive and the overheads, in dependency order, and what goes wrong quietly when one is missed                               |
+| [`docs/formulas.md`](./docs/formulas.md)                                               | **Every formula in one place** — the laminate, the pouch, the cylinder, the rate, GST and the advance, each against the cell it answers to in the client's workbook                                        |
+| [`docs/database-schema.md`](./docs/database-schema.md)                                 | ER diagram and full column reference, generated from the live database                                                                                                                                     |
 
 Start with [`docs/quotation-module.md`](./docs/quotation-module.md) if you want
 the explanation, or [`docs/formulas.md`](./docs/formulas.md) if you want the
@@ -670,9 +678,13 @@ Five rules worth repeating here:
    keeps twenty modules from turning into a dependency knot.
 3. **Server state belongs to TanStack Query, not Zustand.** Zustand is for real
    client state only — open panels, filter selections, shop-floor session.
-4. **Mobile-first.** Every screen starts at 375px. The shop-floor operator view
-   is a separate shell with large touch targets, not a responsive squeeze of the
-   office layout.
+4. **Mobile-first.** Every screen starts at 375px, and a table either becomes
+   cards below `md` or gets an `overflow-x-auto` wrapper — never a clipping card
+   with no scroller, which makes the columns past the fold unreachable rather
+   than merely off screen. Anything clickable shows a pointer, from one base
+   rule rather than a class on each. The shop-floor operator view is a separate
+   shell with large touch targets, not a responsive squeeze of the office
+   layout.
 5. **A Tailwind colour class only exists if its token does.** Tailwind v4
    generates a utility from `@theme`, and generates **nothing** — silently — for
    a shade with no token. `text-danger-700` was written in fourteen files

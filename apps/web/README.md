@@ -2306,9 +2306,37 @@ trailing icon button gets a label-height spacer so it lands level with them.
 
 ## Conventions
 
-**Mobile-first.** Every screen starts at 375px. Tables become **cards** below
-`md` rather than scrolling sideways — a squeezed table is unusable on a phone.
-The layout respects safe areas.
+**Mobile-first.** Every screen starts at 375px, and the layout respects safe
+areas. **A table either becomes cards below `md`, or sits in an
+`overflow-x-auto` wrapper** — the customer, cylinder and inventory lists take
+the first, everything else the second. What a table must never do is sit inside
+a card that clips for its rounded corners with no scroller between them: the
+columns past the fold are then not merely off screen, they are **unreachable**.
+
+That is exactly what the Rates screen did at 375px, and it took the whole
+actions column with it — figures, rate history and delete, gone, with nothing to
+say they were there. Its header row did not wrap either, so Save lost its last
+two letters off the right edge.
+
+Swept afterwards: every route reports **0 page overflow and 0 unreachable
+content** at 375px. The only thing still poking past the edge anywhere is the
+TanStack devtools button, which production does not render.
+
+**Everything you can click says so under the cursor.** A `<button>` has cursor
+`default` unless something says otherwise, and the UI kit's `Button` sets
+`cursor-pointer` itself — so the ones that read wrong were the raw `<button>`
+elements written inline: the wizard's step-back link, the Existing/New company
+toggle, the icon buttons on a job sheet. Eleven of them, across two screens.
+
+There is now a base rule in `styles/index.css` covering every button, select,
+summary, `role="button"` and checkbox label, rather than a class on each —
+**the class is the thing that gets forgotten.** It is in the base layer, so any
+utility still wins: `disabled:cursor-not-allowed` keeps working, and a component
+that genuinely wants a different cursor says so and is obeyed.
+
+> Both sweeps read React's own `onClick` props off the DOM rather than trusting
+> the markup, because a `<div>` with a handler is as clickable as a button and
+> does not look like one in a grep.
 
 Controls are **15px on a mouse and 16px on a touch device**, because iOS zooms
 the page when focusing anything under 16px and the shop floor is on tablets.

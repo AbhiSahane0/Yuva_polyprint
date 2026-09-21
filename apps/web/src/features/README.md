@@ -83,5 +83,12 @@ features/<feature>/
    in [`apps/web/README.md`](../../README.md#a-mutation-is-not-finished-until-the-screen-shows-what-it-did).
 4. **Pages are lazy-loaded** in `src/app/router.tsx` to keep the shop-floor
    bundle small.
-5. **Mobile-first.** Every screen starts at 375px and scales up; tables get a
-   card layout on small screens rather than horizontal scroll.
+5. **Mobile-first.** Every screen starts at 375px and scales up. A table either
+   becomes cards below `md` or sits in an `overflow-x-auto` wrapper — never
+   inside a card that clips for its rounded corners with nothing to scroll,
+   which makes the columns past the fold unreachable rather than merely off
+   screen.
+6. **Anything clickable shows a pointer**, from one base rule in
+   `styles/index.css` rather than a class on each — the class is what gets
+   forgotten. Only override it on something that genuinely wants a different
+   cursor; a utility still beats the rule.

@@ -3,6 +3,7 @@ import {
   changePasswordSchema,
   createCustomerSchema,
   createMaterialSchema,
+  createOrderSchema,
   createQuotationSchema,
   createUserSchema,
   listCustomersQuerySchema,
@@ -27,6 +28,7 @@ import {
   receiveStockSchema,
   setReorderLevelSchema,
   transferStockSchema,
+  listOrdersQuerySchema,
   listQuotationsQuerySchema,
   loginSchema,
   recordOutcomeSchema,
@@ -36,6 +38,7 @@ import {
   sendQuotationSchema,
   updateCustomerSchema,
   updateMaterialSchema,
+  updateOrderSchema,
   updateQuotationSchema,
   updateSettingsSchema,
   updateUserSchema,
@@ -217,6 +220,12 @@ export function buildOpenApiDocument(serverUrl: string) {
       { name: 'Customers', description: 'Companies, and the designs each one has on record.' },
       { name: 'Jobs', description: 'One design at a time.' },
       { name: 'Quotations', description: 'Quoting, pricing, sending, and the outcome.' },
+      {
+        name: 'Orders',
+        description:
+          'What the customer committed to. Readable by anyone signed in — what is due and ' +
+          'when is the floor’s question too; raising or changing one needs `quotations`.',
+      },
       { name: 'Materials', description: 'Films, inks and adhesives, and the day’s rates.' },
       {
         name: 'Cylinders',
@@ -919,6 +928,74 @@ export function buildOpenApiDocument(serverUrl: string) {
           parameters: [ID_PARAM],
           requestBody: body(recordOutcomeSchema),
           responses: { 200: ok('The outcome, and what it created.'), ...COMMON },
+        },
+      },
+
+      '/api/orders': {
+        get: {
+          tags: ['Orders'],
+          summary: 'Orders, soonest due first',
+          description:
+            'Open work first, then by the day it is wanted. A list ordered by number puts the ' +
+            'oldest order at the bottom on the day it goes late, which is the one morning ' +
+            'anybody needs to see it. Search matches the customer, the job, their PO number or ' +
+            'the order number.',
+          parameters: query(listOrdersQuerySchema),
+          responses: { 200: page('A page of orders.'), ...AUTH_FAILURES },
+        },
+        post: {
+          tags: ['Orders'],
+          summary: 'Raise one by hand',
+          description:
+            'For repeat work taken without a fresh quotation. Winning a quotation raises its ' +
+            'own orders — one per line — so this is the other way in, not the usual one.',
+          requestBody: body(createOrderSchema),
+          responses: { 201: ok('The order.'), ...COMMON },
+        },
+      },
+      '/api/orders/next-number': {
+        get: {
+          tags: ['Orders'],
+          summary: 'The next order number',
+          responses: { 200: ok('The number the next order will take.'), ...AUTH_FAILURES },
+        },
+      },
+      '/api/orders/{id}': {
+        get: {
+          tags: ['Orders'],
+          summary: 'One order',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The order.'), ...COMMON },
+        },
+        patch: {
+          tags: ['Orders'],
+          summary: 'Correct it, or move it along',
+          description:
+            'Statuses go CONFIRMED → IN_PRODUCTION → COMPLETED, with CANCELLED reachable from ' +
+            'either open state. Nothing goes backwards and the two ends are ends: a completed ' +
+            'order returning to production is the kind of thing nobody notices until the ' +
+            'month’s figures disagree with the floor’s. A refused move answers 409.',
+          parameters: [ID_PARAM],
+          requestBody: body(updateOrderSchema),
+          responses: {
+            200: ok('The order as it now stands.'),
+            409: { description: 'That status move is not allowed.', ...json('Error') },
+            ...COMMON,
+          },
+        },
+        delete: {
+          tags: ['Orders'],
+          summary: 'Delete one nobody has started',
+          description:
+            'Refused once it has been in production: there is a run behind it by then, and a ' +
+            'deleted order is a run nothing explains. Cancelling says the same thing and keeps ' +
+            'the record.',
+          parameters: [ID_PARAM],
+          responses: {
+            200: ok('Deleted.'),
+            409: { description: 'Past CONFIRMED. Cancel it instead.', ...json('Error') },
+            ...COMMON,
+          },
         },
       },
 
