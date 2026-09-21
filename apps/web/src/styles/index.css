@@ -113,6 +113,30 @@
   :focus-visible {
     @apply outline-brand-600 outline-2 outline-offset-2;
   }
+
+  /*
+   * Anything you can click says so under the cursor.
+   *
+   * A `<button>` has cursor `default` unless something says otherwise, and the
+   * UI kit's `Button` sets `cursor-pointer` itself — so the ones that looked
+   * wrong were the raw `<button>` elements written inline: the wizard's step
+   * back link, the Existing/New company toggle, the icon buttons on a job
+   * sheet. Eleven of them, on two screens, and nothing but noticing catches the
+   * twelfth.
+   *
+   * A rule rather than a class on each, because the class is the thing that
+   * gets forgotten. Base layer, so any utility still wins — `disabled:cursor-
+   * not-allowed` keeps working, and a component that genuinely wants a
+   * different cursor says so and is obeyed.
+   */
+  button:not(:disabled),
+  select:not(:disabled),
+  summary,
+  [role='button']:not([aria-disabled='true']),
+  label:has(> input[type='checkbox']:not(:disabled)),
+  label:has(> input[type='radio']:not(:disabled)) {
+    cursor: pointer;
+  }
 }
 
 /*

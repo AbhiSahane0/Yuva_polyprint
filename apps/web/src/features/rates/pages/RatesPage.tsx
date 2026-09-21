@@ -141,7 +141,10 @@ export default function RatesPage() {
             on its own date, so a quotation already sent keeps the margin it was made on.
           </p>
         </div>
-        <div className="flex items-end gap-3">
+        {/* Wraps, because at 375px a 160px date field and two buttons come to
+            24px more than the screen and the Save button loses its last two
+            letters off the right edge. */}
+        <div className="flex flex-wrap items-end gap-3">
           <div className="w-40">
             <Field label="Rates for" htmlFor="effectiveDate">
               <Input
@@ -188,122 +191,133 @@ export default function RatesPage() {
                 {MATERIAL_CATEGORY_LABELS[category]}
               </h2>
 
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-ink-100 text-ink-500 border-b text-left">
-                    <th className="px-4 py-2 font-medium">Material</th>
-                    <th className="hidden px-4 py-2 text-right font-medium sm:table-cell">
-                      Previous
-                    </th>
-                    <th className="px-4 py-2 text-right font-medium">Current</th>
-                    <th className="px-4 py-2 text-right font-medium">New rate</th>
-                    <th className="px-4 py-2 text-right font-medium">Change</th>
-                    <th className="px-2 py-2">
-                      <span className="sr-only">Figures and history</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((material) => {
-                    const draft = drafts[material.id] ?? '';
-                    const typed = draft.trim() === '' ? null : Number(draft);
-                    const base = material.currentRate;
-                    // Preview the move the typed rate would make, before saving.
-                    const delta =
-                      typed !== null && base !== null && base > 0
-                        ? ((typed - base) / base) * 100
-                        : material.changePercent;
-                    const isPreview = typed !== null && typed !== base;
+              {/*
+                Scrolls sideways, like every other table in the app.
 
-                    return (
-                      <tr key={material.id} className="border-ink-100 border-b last:border-0">
-                        <td className="px-4 py-2.5">
-                          <span className="text-ink-900 font-medium">{material.name}</span>
-                          <span className="text-ink-400 ml-2 text-xs">/{material.unit}</span>
-                        </td>
-                        <td className="text-ink-400 hidden px-4 py-2.5 text-right tabular-nums sm:table-cell">
-                          {material.previousRate === null
-                            ? '—'
-                            : formatNumber(material.previousRate, 2)}
-                        </td>
-                        <td className="text-ink-700 px-4 py-2.5 text-right tabular-nums">
-                          {base === null ? '—' : formatNumber(base, 2)}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <NumberInput
-                            aria-label={`New rate for ${material.name}`}
-                            placeholder={base === null ? '0.00' : formatNumber(base, 2)}
-                            value={draft}
-                            onChange={(event) =>
-                              setDrafts((current) => ({
-                                ...current,
-                                [material.id]: event.target.value,
-                              }))
-                            }
-                            className={cn(
-                              'py-1.5 text-right tabular-nums',
-                              isPreview && 'border-brand-600 bg-brand-50',
-                            )}
-                          />
-                        </td>
-                        <td className="px-4 py-2.5 text-right">
-                          {delta === null || Number.isNaN(delta) ? (
-                            <span className="text-ink-300">—</span>
-                          ) : (
-                            <span
+                The section clips with `overflow-hidden` for its rounded
+                corners, so without this the columns past the fold were not
+                merely off screen — they were unreachable. On a phone that took
+                the whole actions column with it: figures, rate history and
+                delete, with nothing to say they were there.
+              */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-ink-100 text-ink-500 border-b text-left">
+                      <th className="px-4 py-2 font-medium">Material</th>
+                      <th className="hidden px-4 py-2 text-right font-medium sm:table-cell">
+                        Previous
+                      </th>
+                      <th className="px-4 py-2 text-right font-medium">Current</th>
+                      <th className="px-4 py-2 text-right font-medium">New rate</th>
+                      <th className="px-4 py-2 text-right font-medium">Change</th>
+                      <th className="px-2 py-2">
+                        <span className="sr-only">Figures and history</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((material) => {
+                      const draft = drafts[material.id] ?? '';
+                      const typed = draft.trim() === '' ? null : Number(draft);
+                      const base = material.currentRate;
+                      // Preview the move the typed rate would make, before saving.
+                      const delta =
+                        typed !== null && base !== null && base > 0
+                          ? ((typed - base) / base) * 100
+                          : material.changePercent;
+                      const isPreview = typed !== null && typed !== base;
+
+                      return (
+                        <tr key={material.id} className="border-ink-100 border-b last:border-0">
+                          <td className="px-4 py-2.5">
+                            <span className="text-ink-900 font-medium">{material.name}</span>
+                            <span className="text-ink-400 ml-2 text-xs">/{material.unit}</span>
+                          </td>
+                          <td className="text-ink-400 hidden px-4 py-2.5 text-right tabular-nums sm:table-cell">
+                            {material.previousRate === null
+                              ? '—'
+                              : formatNumber(material.previousRate, 2)}
+                          </td>
+                          <td className="text-ink-700 px-4 py-2.5 text-right tabular-nums">
+                            {base === null ? '—' : formatNumber(base, 2)}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <NumberInput
+                              aria-label={`New rate for ${material.name}`}
+                              placeholder={base === null ? '0.00' : formatNumber(base, 2)}
+                              value={draft}
+                              onChange={(event) =>
+                                setDrafts((current) => ({
+                                  ...current,
+                                  [material.id]: event.target.value,
+                                }))
+                              }
                               className={cn(
-                                'inline-flex items-center gap-1 text-xs font-medium tabular-nums',
-                                delta > 0
-                                  ? 'text-danger-600'
-                                  : delta < 0
-                                    ? 'text-success-600'
-                                    : 'text-ink-400',
+                                'py-1.5 text-right tabular-nums',
+                                isPreview && 'border-brand-600 bg-brand-50',
                               )}
+                            />
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            {delta === null || Number.isNaN(delta) ? (
+                              <span className="text-ink-300">—</span>
+                            ) : (
+                              <span
+                                className={cn(
+                                  'inline-flex items-center gap-1 text-xs font-medium tabular-nums',
+                                  delta > 0
+                                    ? 'text-danger-600'
+                                    : delta < 0
+                                      ? 'text-success-600'
+                                      : 'text-ink-400',
+                                )}
+                              >
+                                {delta > 0 ? (
+                                  <TrendingUp className="size-3.5" />
+                                ) : delta < 0 ? (
+                                  <TrendingDown className="size-3.5" />
+                                ) : null}
+                                {delta > 0 ? '+' : ''}
+                                {formatNumber(delta, 2)}%
+                              </span>
+                            )}
+                          </td>
+                          <td className="flex justify-end gap-1 px-2 py-2.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setEditing(material)}
+                              aria-label={`Figures for ${material.name}`}
+                              title={specHint(material)}
+                              className="text-ink-400 hover:bg-ink-100 hover:text-ink-700 cursor-pointer rounded-[var(--radius-md)] p-2"
                             >
-                              {delta > 0 ? (
-                                <TrendingUp className="size-3.5" />
-                              ) : delta < 0 ? (
-                                <TrendingDown className="size-3.5" />
-                              ) : null}
-                              {delta > 0 ? '+' : ''}
-                              {formatNumber(delta, 2)}%
-                            </span>
-                          )}
-                        </td>
-                        <td className="flex justify-end gap-1 px-2 py-2.5 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setEditing(material)}
-                            aria-label={`Figures for ${material.name}`}
-                            title={specHint(material)}
-                            className="text-ink-400 hover:bg-ink-100 hover:text-ink-700 cursor-pointer rounded-[var(--radius-md)] p-2"
-                          >
-                            <SlidersHorizontal className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setHistoryFor(material)}
-                            aria-label={`Rate history for ${material.name}`}
-                            title="Rate history"
-                            className="text-ink-400 hover:bg-ink-100 hover:text-ink-700 cursor-pointer rounded-[var(--radius-md)] p-2"
-                          >
-                            <History className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleting(material)}
-                            aria-label={`Delete ${material.name}`}
-                            title="Delete — only a material nothing has used"
-                            className="text-ink-400 hover:bg-danger-50 hover:text-danger-600 cursor-pointer rounded-[var(--radius-md)] p-2"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                              <SlidersHorizontal className="size-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setHistoryFor(material)}
+                              aria-label={`Rate history for ${material.name}`}
+                              title="Rate history"
+                              className="text-ink-400 hover:bg-ink-100 hover:text-ink-700 cursor-pointer rounded-[var(--radius-md)] p-2"
+                            >
+                              <History className="size-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleting(material)}
+                              aria-label={`Delete ${material.name}`}
+                              title="Delete — only a material nothing has used"
+                              className="text-ink-400 hover:bg-danger-50 hover:text-danger-600 cursor-pointer rounded-[var(--radius-md)] p-2"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </section>
           ))}
         </div>
