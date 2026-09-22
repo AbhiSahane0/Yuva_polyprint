@@ -114,6 +114,23 @@ erDiagram
     decimal quantity_kg
     decimal rate_per_kg
   }
+  production_orders {
+    text id PK
+    integer number
+    ProductionStatus status
+    text order_id FK
+    text customer_name
+    text job_name
+    text job_id FK
+    decimal quantity_kg
+  }
+  production_stages {
+    text id PK
+    text production_order_id FK
+    integer position
+    ProductionStageStatus status
+    text machine_id FK
+  }
   purchase_order_lines {
     text id PK
     text order_id FK
@@ -246,6 +263,10 @@ erDiagram
   jobs ||--o{ orders : "job_id"
   quotations ||--o{ orders : "quotation_id"
   quotation_items ||--o{ orders : "quotation_item_id"
+  orders ||--|{ production_orders : "order_id"
+  jobs ||--o{ production_orders : "job_id"
+  production_orders ||--|{ production_stages : "production_order_id"
+  costing_machines ||--o{ production_stages : "machine_id"
 ```
 
 ## Tables
@@ -267,9 +288,11 @@ erDiagram
 | `job_sheets` | 59 | 15 |  |
 | `jobs` | 55 | 419 | Products and their full engineering specification. |
 | `login_events` | 7 | 49 |  |
-| `material_rates` | 6 | 405 |  |
+| `material_rates` | 6 | 429 |  |
 | `materials` | 13 | 24 |  |
-| `orders` | 23 | 0 |  |
+| `orders` | 23 | 1 |  |
+| `production_orders` | 13 | 0 |  |
+| `production_stages` | 16 | 0 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
 | `purchase_receipts` | 11 | 1 |  |
@@ -331,6 +354,10 @@ erDiagram
 | `orders.job_id` | `jobs.id` | SET NULL |  |
 | `orders.quotation_id` | `quotations.id` | SET NULL |  |
 | `orders.quotation_item_id` | `quotation_items.id` | SET NULL |  |
+| `production_orders.order_id` | `orders.id` | CASCADE |  |
+| `production_orders.job_id` | `jobs.id` | SET NULL |  |
+| `production_stages.production_order_id` | `production_orders.id` | CASCADE |  |
+| `production_stages.machine_id` | `costing_machines.id` | SET NULL |  |
 
 ## Enums
 
@@ -355,6 +382,8 @@ erDiagram
 | `OverheadBasis` | `PER_KG`, `PER_JOB`, `PER_POUCH`, `PER_DAY`, `PERCENT_MATERIAL`, `PERCENT_TOTAL` |
 | `PouchType` | `STANDUP`, `STANDUP_ZIPPER`, `ZIPPER`, `D_PUNCH`, `SPOUT`, `CENTRE_SEAL`, `THREE_SIDE_SEAL`, `OTHER` |
 | `PricingBasis` | `PER_KG`, `PER_POUCH` |
+| `ProductionStageStatus` | `PENDING`, `RUNNING`, `DONE`, `SKIPPED` |
+| `ProductionStatus` | `PLANNED`, `RUNNING`, `ON_HOLD`, `COMPLETED` |
 | `PurchaseOrderStatus` | `ORDERED`, `IN_TRANSIT`, `PARTIALLY_RECEIVED`, `RECEIVED`, `CANCELLED` |
 | `QuotationStatus` | `DRAFT`, `SENT`, `WON`, `LOST` |
 | `StockMovementKind` | `RECEIPT`, `ISSUE`, `WASTE`, `ADJUSTMENT`, `TRANSFER` |
@@ -742,6 +771,45 @@ erDiagram
 | `completed_at` | `timestamp` | ✓ |  |
 | `cancelled_at` | `timestamp` | ✓ |  |
 | `cancelled_reason` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+
+### `production_orders`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `number` | `integer` |  | unique |
+| `status` | `ProductionStatus` (enum) |  |  |
+| `order_id` | `text` |  | FK → `orders.id` |
+| `customer_name` | `text` |  |  |
+| `job_name` | `text` |  |  |
+| `job_id` | `text` | ✓ | FK → `jobs.id` |
+| `quantity_kg` | `decimal(12,3)` |  |  |
+| `notes` | `text` |  |  |
+| `started_at` | `timestamp` | ✓ |  |
+| `completed_at` | `timestamp` | ✓ |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+
+### `production_stages`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `production_order_id` | `text` |  | FK → `production_orders.id` |
+| `position` | `integer` |  | unique |
+| `stage` | `MachineKind` (enum) |  |  |
+| `pass` | `integer` |  |  |
+| `status` | `ProductionStageStatus` (enum) |  |  |
+| `machine_id` | `text` | ✓ | FK → `costing_machines.id` |
+| `machine_name` | `text` |  |  |
+| `operator` | `text` |  |  |
+| `input_kg` | `decimal(12,3)` |  |  |
+| `output_kg` | `decimal(12,3)` |  |  |
+| `started_at` | `timestamp` | ✓ |  |
+| `finished_at` | `timestamp` | ✓ |  |
+| `notes` | `text` |  |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
 

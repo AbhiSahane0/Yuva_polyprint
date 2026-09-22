@@ -213,6 +213,7 @@ model Job {
   /// Every run of this design, and what each actually cost.
   jobSheets      JobSheet[]
   orders         Order[]
+  productionOrders ProductionOrder[]
 
   sourceRow Int @map("source_row")
 
@@ -1558,6 +1559,9 @@ model CostingMachine {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  /// Stages of a job card run on it.
+  productionStages ProductionStage[]
+
   @@map("costing_machines")
 }
 
@@ -1695,6 +1699,10 @@ model Order {
 
   notes String @default("")
 
+  /// The job cards raised against it. Usually one; several when a big order
+  /// is run in batches, which is why this is not a one-to-one.
+  productionOrders ProductionOrder[]
+
   completedAt     DateTime? @map("completed_at")
   cancelledAt     DateTime? @map("cancelled_at")
   /// Why it was cancelled. "We lost it" teaches nothing; the reason does.
@@ -1707,6 +1715,123 @@ model Order {
   @@index([customerId])
   @@index([dueDate])
   @@map("orders")
+}
+
+/// Where a job card as a whole has got to.
+///
+/// "Delayed" is deliberately not here — it is the order's due date compared
+/// with today, not a state anybody sets. A status somebody has to remember to
+/// change is a status that is wrong most of the time.
+enum ProductionStatus {
+  PLANNED
+  RUNNING
+  ON_HOLD
+  COMPLETED
+}
+
+/// Where one stage of a job card has got to.
+enum ProductionStageStatus {
+  PENDING
+  RUNNING
+  DONE
+  SKIPPED
+}
+
+/// A job card — the run itself, against the order it is making.
+///
+/// The link the works has been missing: a quotation says what a job should
+/// cost, an order says what was asked for, and this says what the floor
+/// actually did about it — on which machine, by whom, and what it lost at each
+/// stage.
+///
+/// **Not unique per order.** Usually one card answers one order, but a large
+/// order genuinely runs in batches, and a unique constraint would be a
+/// migration the first time that happened. The service refuses a second card
+/// while one is still open, which is the rule that actually wanted enforcing.
+model ProductionOrder {
+  id     String           @id @default(cuid())
+  /// Sequential and human-facing. Its own series, like an order's.
+  number Int              @unique
+  status ProductionStatus @default(PLANNED)
+
+  orderId String @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// Snapshots, so a card still reads if the design is renamed.
+  customerName String @map("customer_name")
+  jobName      String @map("job_name")
+
+  jobId String? @map("job_id")
+  job   Job?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  /// What this card is making. Usually the whole order; less when it is one
+  /// batch of it.
+  quantityKg Decimal @map("quantity_kg") @db.Decimal(12, 3)
+
+  notes String @default("")
+
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  stages ProductionStage[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([orderId])
+  @@map("production_orders")
+}
+
+/// One process a job card passes through.
+///
+/// Derived from the structure when the card is raised — printing unless the job
+/// prints nothing, one lamination row **per bond**, slitting always, pouch
+/// making only where pouches are made — and then the office's to correct. A
+/// stage that does not apply is SKIPPED rather than deleted, so the card still
+/// says what the job did not need instead of leaving a gap.
+///
+/// Each lamination pass is its own row because it is its own run: its own
+/// machine, its own operator and its own waste. The works' job sheet names them
+/// Lamination 1 and Lamination 2 for the same reason.
+model ProductionStage {
+  id String @id @default(cuid())
+
+  productionOrderId String          @map("production_order_id")
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+
+  /// 1-based, the order the job meets them in.
+  position Int
+  stage    MachineKind
+  /// Which lamination pass, 1 or 2. Zero on every other stage.
+  pass     Int                   @default(0)
+  status   ProductionStageStatus @default(PENDING)
+
+  machineId String?         @map("machine_id")
+  machine   CostingMachine? @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  /// Snapshot, so a finished card still says which machine ran it.
+  machineName String        @default("") @map("machine_name")
+
+  /// Who ran it. Free text until there is an employee master to point at.
+  operator String @default("")
+
+  /// Weighed, both of them. What it lost is the difference and is never stored
+  /// — a third figure that can disagree with the two it comes from is a figure
+  /// nobody can trust.
+  inputKg  Decimal @default(0) @map("input_kg") @db.Decimal(12, 3)
+  outputKg Decimal @default(0) @map("output_kg") @db.Decimal(12, 3)
+
+  startedAt  DateTime? @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+
+  notes String @default("")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([productionOrderId, position])
+  @@index([status])
+  @@map("production_stages")
 }
 
 /// Whether an ink is one of the four every press carries, or a job's own.

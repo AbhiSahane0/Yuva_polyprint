@@ -323,6 +323,12 @@ production there is a run behind it, and a deleted order is a run nothing
 explains. The dialog says so and points at cancelling instead, which keeps the
 record — and asks why, for the same reason a lost quotation does.
 
+**Production is raised from here**, in an "On the floor" block: nothing started
+yet and a **Start production** button, or a link to the card with its current
+stage and progress. Once the card exists this is a link and nothing more — the
+stages live there, and duplicating any of them here would be a second place to
+keep in step.
+
 Three fields stay editable after the fact, because they are the three that
 genuinely change: the **due date**, the customer's **PO number**, and **notes**.
 The quantity and rate are what was agreed and are not an edit — changing them is
@@ -340,6 +346,43 @@ quotation would have decided belongs to the quotation, and asking for it again
 here would make this the slower path to the same place. The **amount** updates
 as you type, through the same `orderAmount` the server stores it with, so the
 figure on the screen and the figure on the record cannot differ.
+
+### Production — `/production`, `/production/:id`
+
+**What is on the floor right now.** Running first, then planned, then finished —
+the floor's order, not the filing cabinet's. The **stage filter** answers the
+question a supervisor actually asks, which is not "show me everything" but
+"what is waiting for the press".
+
+Progress is a bar as well as a number, because a row is scanned rather than
+read, and it is **derived** from the stages — done ÷ applicable — so the list
+and the card cannot disagree about it. "Past due" is computed from the order's
+promise, not stored: a status somebody has to remember to change is wrong most
+of the time.
+
+**A card is raised from the order it makes**, not from here. There is no "new
+job card" button on this screen on purpose — a card without an order is a run
+nobody asked for.
+
+#### The job card itself
+
+One block per stage rather than a table, because a stage is filled in by
+somebody standing at a machine with two weights and a name, not read across in
+a row. Each has a machine (only machines of that **kind** — a slitter is not a
+choice for the press), an operator, weight in, weight out, and the waste those
+two come to.
+
+**Waste is shown, never typed.** A third figure that can disagree with the two
+it comes from is one nobody can trust. A negative one is called out in amber —
+more off a machine than went onto it means one of the two weights is wrong, and
+a quiet zero is how that goes unnoticed for a year.
+
+**Stages that do not apply stay on the card**, marked _Skipped — not required_,
+and can be put back. A gap would read as something nobody has got to yet, which
+is the opposite of what it means.
+
+The floor presses **Start** on a stage; the card and the order follow on their
+own. Nobody has to remember to start three things.
 
 ### Quotations — `/quotations`
 

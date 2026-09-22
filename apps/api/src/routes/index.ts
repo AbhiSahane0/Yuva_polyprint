@@ -11,6 +11,7 @@ import jobSheetRoutes from '../modules/job-sheets/job-sheet.routes.js';
 import materialRoutes from '../modules/materials/material.routes.js';
 import monitorRoutes from '../modules/monitor/monitor.routes.js';
 import orderRoutes from '../modules/orders/order.routes.js';
+import productionRoutes from '../modules/production/production.routes.js';
 import purchaseRoutes from '../modules/purchase/purchase.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
 import settingsRoutes from '../modules/settings/settings.routes.js';
@@ -61,6 +62,15 @@ router.use('/jobs', authenticate, requireModule('customers'), jobRoutes);
  * module's own routes, next to the endpoints they protect.
  */
 router.use('/job-sheets', authenticate, jobSheetRoutes);
+
+/*
+ * Job cards — what the floor actually did, stage by stage. Readable by anyone
+ * signed in: it is the floor's own document and the office watches it from the
+ * other side of the wall. Writing needs the jobs module, the same permission
+ * job sheets use, because both are records of what a run did and both are kept
+ * by the same people. The guard is in the module's own routes.
+ */
+router.use('/production', authenticate, productionRoutes);
 
 /*
  * Rates are readable by anyone signed in, because quotation costing depends on

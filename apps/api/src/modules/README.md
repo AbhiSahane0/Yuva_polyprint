@@ -13,6 +13,7 @@ One folder per business module. Built so far:
 | `job-sheets` | What a run actually consumed, and what it cost a kilogram        |
 | `quotations` | Quotations, their costing, and the generated PDF                 |
 | `orders`     | What the customer committed to — the link between the two above  |
+| `production` | Job cards — what the floor did, stage by stage                   |
 | `materials`  | The rate catalogue and daily rates                               |
 | `inventory`  | Stock as a ledger — batches, movements, and what is running out  |
 | `purchase`   | Suppliers and orders; receiving is where buying becomes stock    |

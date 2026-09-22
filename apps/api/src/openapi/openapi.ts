@@ -3,7 +3,9 @@ import {
   changePasswordSchema,
   createCustomerSchema,
   createMaterialSchema,
+  addProductionStageSchema,
   createOrderSchema,
+  createProductionOrderSchema,
   createQuotationSchema,
   createUserSchema,
   listCustomersQuerySchema,
@@ -29,6 +31,7 @@ import {
   setReorderLevelSchema,
   transferStockSchema,
   listOrdersQuerySchema,
+  listProductionQuerySchema,
   listQuotationsQuerySchema,
   loginSchema,
   recordOutcomeSchema,
@@ -39,6 +42,8 @@ import {
   updateCustomerSchema,
   updateMaterialSchema,
   updateOrderSchema,
+  updateProductionOrderSchema,
+  updateProductionStageSchema,
   updateQuotationSchema,
   updateSettingsSchema,
   updateUserSchema,
@@ -220,6 +225,12 @@ export function buildOpenApiDocument(serverUrl: string) {
       { name: 'Customers', description: 'Companies, and the designs each one has on record.' },
       { name: 'Jobs', description: 'One design at a time.' },
       { name: 'Quotations', description: 'Quoting, pricing, sending, and the outcome.' },
+      {
+        name: 'Production',
+        description:
+          'Job cards — what the floor actually did, stage by stage. Readable by anyone signed ' +
+          'in; recording a stage needs `jobs`.',
+      },
       {
         name: 'Orders',
         description:
@@ -996,6 +1007,109 @@ export function buildOpenApiDocument(serverUrl: string) {
             409: { description: 'Past CONFIRMED. Cancel it instead.', ...json('Error') },
             ...COMMON,
           },
+        },
+      },
+
+      '/api/production': {
+        get: {
+          tags: ['Production'],
+          summary: 'Job cards on the floor',
+          description:
+            'Running first, then planned, then finished — the floor’s order, not the filing ' +
+            'cabinet’s. `stage` narrows to cards waiting on one process, which is the question ' +
+            'a supervisor actually asks.',
+          parameters: query(listProductionQuerySchema),
+          responses: { 200: page('A page of job cards.'), ...AUTH_FAILURES },
+        },
+        post: {
+          tags: ['Production'],
+          summary: 'Raise a job card against an order',
+          description:
+            'The stages are DERIVED, not sent: printing unless the job prints nothing, one ' +
+            'lamination row per bond, slitting always, pouch making only where pouches are ' +
+            'made. Refused while another card on the same order is still open. Starting it ' +
+            'moves the order to in-production in the same transaction.',
+          requestBody: body(createProductionOrderSchema),
+          responses: {
+            201: ok('The job card, with its stages.'),
+            409: { description: 'A card is already open on that order.', ...json('Error') },
+            ...COMMON,
+          },
+        },
+      },
+      '/api/production/next-number': {
+        get: {
+          tags: ['Production'],
+          summary: 'The next job card number',
+          responses: { 200: ok('The number the next card will take.'), ...AUTH_FAILURES },
+        },
+      },
+      '/api/production/{id}': {
+        get: {
+          tags: ['Production'],
+          summary: 'One job card, with every stage',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The job card.'), ...COMMON },
+        },
+        patch: {
+          tags: ['Production'],
+          summary: 'Move the card along',
+          description:
+            'PLANNED → RUNNING → COMPLETED, with ON_HOLD reachable from either open state and ' +
+            'back again — a hold is temporary, and it is the only move that goes back. A ' +
+            'completed card is an end.',
+          parameters: [ID_PARAM],
+          requestBody: body(updateProductionOrderSchema),
+          responses: {
+            200: ok('The card as it now stands.'),
+            409: { description: 'That status move is not allowed.', ...json('Error') },
+            ...COMMON,
+          },
+        },
+        delete: {
+          tags: ['Production'],
+          summary: 'Delete a card nobody has started',
+          description:
+            'Once a stage has run there is material behind it, and a deleted card is material ' +
+            'nothing explains.',
+          parameters: [ID_PARAM],
+          responses: {
+            200: ok('Deleted.'),
+            409: { description: 'It has already started.', ...json('Error') },
+            ...COMMON,
+          },
+        },
+      },
+      '/api/production/stages/{stageId}': {
+        patch: {
+          tags: ['Production'],
+          summary: 'Record what a stage did',
+          description:
+            'The endpoint the floor actually uses. Both weights travel, never the waste — a ' +
+            'third figure that can disagree with the two it comes from is one nobody can ' +
+            'trust. Starting a stage starts the card, and the order with it.',
+          parameters: [
+            {
+              name: 'stageId',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+              description: 'The stage on the card.',
+            },
+          ],
+          requestBody: body(updateProductionStageSchema),
+          responses: { 200: ok('The whole card, re-read.'), ...COMMON },
+        },
+      },
+      '/api/production/{id}/stages': {
+        post: {
+          tags: ['Production'],
+          summary: 'Put a stage back on the card',
+          description:
+            'For a job the derivation guessed wrong about. The office has the last word.',
+          parameters: [ID_PARAM],
+          requestBody: body(addProductionStageSchema),
+          responses: { 201: ok('The card, with the stage added.'), ...COMMON },
         },
       },
 

@@ -11,6 +11,7 @@ One folder per business feature, mirroring the API modules. Built so far:
 | `customers`  | Customer list, edit modal, job specification editor                                                 |
 | `quotations` | Quotation list, wizard, PDF preview, sending                                                        |
 | `orders`     | What the customer committed to — list, detail, and one raised by hand                               |
+| `production` | Job cards — the stages a job needs, and what each one did                                           |
 | `job-sheets` | The production job sheet — what a run actually cost                                                 |
 | `costing`    | Machines, wages and every overhead a rate is built from — see [its own README](./costing/README.md) |
 | `rates`      | Daily material rates                                                                                |
@@ -50,19 +51,21 @@ features/<feature>/
    load-bearing is the direction and the depth, so that is what it says now.
    The whole list, which should stay short enough to read:
 
-   | From         | Imports              | Why                                   |
-   | ------------ | -------------------- | ------------------------------------- |
-   | `quotations` | `customers/api`      | The wizard picks a customer           |
-   | `orders`     | `customers/api`      | Typing one picks a customer too       |
-   | `quotations` | `rates/api`          | Costing needs today's rates           |
-   | `quotations` | `gstin/components`   | The GST field                         |
-   | `customers`  | `gstin/components`   | The same field, the same rules        |
-   | `inventory`  | `rates/api`          | Valuing stock                         |
-   | `purchase`   | `inventory/api`      | Receiving creates stock               |
-   | `job-sheets` | `inventory/api`      | Posting a sheet moves stock           |
-   | `purchase`   | `rates/api`          | Pricing an order line                 |
-   | `cylinders`  | `artwork/components` | The design files panel                |
-   | anything     | `auth/auth-store`    | Who is signed in, and what they reach |
+   | From         | Imports              | Why                                    |
+   | ------------ | -------------------- | -------------------------------------- |
+   | `quotations` | `customers/api`      | The wizard picks a customer            |
+   | `orders`     | `customers/api`      | Typing one picks a customer too        |
+   | `orders`     | `production/api`     | An order is where a job card is raised |
+   | `production` | `costing/api`        | The machines a stage can run on        |
+   | `quotations` | `rates/api`          | Costing needs today's rates            |
+   | `quotations` | `gstin/components`   | The GST field                          |
+   | `customers`  | `gstin/components`   | The same field, the same rules         |
+   | `inventory`  | `rates/api`          | Valuing stock                          |
+   | `purchase`   | `inventory/api`      | Receiving creates stock                |
+   | `job-sheets` | `inventory/api`      | Posting a sheet moves stock            |
+   | `purchase`   | `rates/api`          | Pricing an order line                  |
+   | `cylinders`  | `artwork/components` | The design files panel                 |
+   | anything     | `auth/auth-store`    | Who is signed in, and what they reach  |
 
    `auth` is infrastructure rather than a peer — every screen needs to know who
    is looking at it — so it is not counted against this rule.

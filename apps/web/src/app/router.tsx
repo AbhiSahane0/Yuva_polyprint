@@ -18,6 +18,8 @@ const QuotationsPage = lazy(() => import('@/features/quotations/pages/Quotations
 const OrdersPage = lazy(() => import('@/features/orders/pages/OrdersPage'));
 const OrderPage = lazy(() => import('@/features/orders/pages/OrderPage'));
 const NewOrderPage = lazy(() => import('@/features/orders/pages/NewOrderPage'));
+const ProductionPage = lazy(() => import('@/features/production/pages/ProductionPage'));
+const JobCardPage = lazy(() => import('@/features/production/pages/JobCardPage'));
 const RatesPage = lazy(() => import('@/features/rates/pages/RatesPage'));
 const CostingPage = lazy(() => import('@/features/costing/pages/CostingPage'));
 const InventoryPage = lazy(() => import('@/features/inventory/pages/InventoryPage'));
@@ -146,6 +148,16 @@ function AppRoutes() {
             }
           />
           <Route path="/orders/:id" element={<OrderPage />} />
+
+          {/*
+            Job cards are the floor's own document, so reading needs no module —
+            the office watches from the other side of the wall and the floor
+            needs it open. Recording what a stage did needs `jobs`, and that
+            guard is on the API rather than on the route, because the screen is
+            useful read-only.
+          */}
+          <Route path="/production" element={<ProductionPage />} />
+          <Route path="/production/:id" element={<JobCardPage />} />
           <Route
             path="/rates"
             element={

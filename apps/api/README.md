@@ -2495,6 +2495,103 @@ A pouch count with **no** per-pouch rate does not zero the order. A quotation
 line carries both units whether or not it was sold per pouch, so a
 21,565-pouch order at no per-pouch rate is still worth its kilograms.
 
+## Production — what the floor actually did
+
+A quotation says what a job should cost. An order says what was asked for. A job
+card says what happened: on which machine, by whom, and what each stage lost.
+
+| Method | Path                          | Notes                                                                 |
+| ------ | ----------------------------- | --------------------------------------------------------------------- |
+| GET    | `/production`                 | Running first; filter by status, or by the stage a card is waiting on |
+| GET    | `/production/next-number`     | The next card number                                                  |
+| GET    | `/production/:id`             | One card, with every stage                                            |
+| POST   | `/production`                 | Raise one against an order — **the stages are derived**               |
+| PATCH  | `/production/:id`             | Move the card along                                                   |
+| PATCH  | `/production/stages/:stageId` | **What the floor actually uses** — one stage, as it happens           |
+| POST   | `/production/:id/stages`      | Put a stage back the derivation left off                              |
+| DELETE | `/production/:id`             | Only one nobody has started                                           |
+
+**Reading is open to anyone signed in** — a job card is the floor's own document
+and the office watches it from the other side of the wall. Writing needs `jobs`,
+the same permission job sheets use: both are records of what a run did, kept by
+the same people.
+
+### The stages are derived, not entered
+
+The pitch's central claim is that not every product goes through every process,
+and the system knows without being told. `requiredStages` in `@yuva/shared`:
+
+```
+printing      unless the job prints nothing
+lamination    once per BOND — three plies is two passes, two rows
+slitting      always. Everything comes off wider than it is sold
+pouch making  only where pouches are made. A reel is converted into nothing
+```
+
+**It reads the structure**, which is what the costing already does — the same
+ply count that decides how many lamination passes to _charge_ for decides how
+many to _run_. So a job card and the quotation behind it cannot disagree about
+what the job involves, and there is no third place to keep in step.
+
+The structure is looked for in descending order of authority: the quotation line
+the order came from, then the job master, then the ordinary two-ply pouch. The
+last case is a guess and is meant to be — a card with no stages would look
+finished.
+
+**Each lamination pass is its own row**, because it is its own run: its own
+machine, its own operator, its own waste. The works' job sheet names them
+Lamination 1 and Lamination 2 for the same reason.
+
+**The office has the last word.** A stage can be marked _not needed_ or put back.
+A stage that does not apply is `SKIPPED` rather than deleted, so the card still
+says what the job did not need instead of leaving a gap — which would read as
+something nobody has got to yet.
+
+### Starting a stage starts everything above it
+
+The floor starts a stage, not a card. So a stage moving to RUNNING moves the
+card to RUNNING and the **order to IN_PRODUCTION**, in the same transaction.
+
+That is the one piece of automation in the module and it earns it: an order
+sitting at confirmed while its job card runs is exactly the disagreement between
+the office and the floor that this exists to end.
+
+**Completing the card does not complete the order.** For a customer, complete
+means delivered, and nothing here knows about that yet — Dispatch will. The
+order stays in production until somebody says otherwise, which is honest.
+
+### Waste is shown, never stored
+
+```
+waste = what went in − what came out
+```
+
+A third figure that can disagree with the two it comes from is a figure nobody
+can trust. **Negative is reported rather than floored at zero**: more off a
+machine than went onto it means one of the two weights is wrong, and a quiet
+zero is how that goes unnoticed. The works' own Samarth Atta job sheet does
+exactly this.
+
+### Progress is derived too
+
+```
+progress = stages DONE ÷ stages that apply
+```
+
+Skipped stages are left out of **both** halves. A job that skips three of four
+is not three-quarters done before it starts, and it is not stuck at 25% when its
+one real stage finishes. "Delayed" is not a status at all — it is the order's due
+date against today, because a status somebody has to remember to change is one
+that is wrong most of the time.
+
+### One card per order, usually
+
+`orderId` is not unique. A large order genuinely runs in batches, and a unique
+constraint would be a migration the first time that happened. What is enforced
+is the rule that actually wanted enforcing: **a second card is refused while one
+is still open**, because a second card on the same order is either a mistake or
+a batch and the two look identical from here.
+
 ## Sending quotations by email
 
 `POST /quotations/:id/send` renders the PDF, attaches it, and emails it through

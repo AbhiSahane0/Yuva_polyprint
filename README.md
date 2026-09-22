@@ -4,16 +4,17 @@ Flexible packaging manufacturing ERP: quotation → order → planning → multi
 production → quality/waste → costing → dispatch, with full job-level traceability.
 
 > **Status: in use, and being built out module by module.** Quoting, costing,
-> rates, stock, buying, the cylinder register, job sheets and orders are
+> rates, stock, buying, the cylinder register, job sheets, orders and the
+> production floor are
 > implemented and verified against the works' own paperwork — seven of their
 > 2022 quotations reproduce to the paisa, and all fourteen tabs of their
 > September job-sheet workbook cost exactly. Planning, production, quality,
 > dispatch and reporting are not built yet; they are added one at a time as each
 > is confirmed in scope.
 >
-> | Built                                                                                                                                                      | Not yet                                                                                                                                     |
-> | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-> | Customers · **Quotations** · **Orders** · Rates · Costing · Inventory · Purchase · Design & cylinders · Artwork · **Job sheets** · Users · Sign-in monitor | Planning · Production · Product master · Quality & waste · Machines · Employees · Warehouse · Dispatch · Reports · Overview · Operator view |
+> | Built                                                                                                                                                                       | Not yet                                                                                                                        |
+> | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+> | Customers · **Quotations** · **Orders** · **Production** · Rates · Costing · Inventory · Purchase · Design & cylinders · Artwork · **Job sheets** · Users · Sign-in monitor | Planning · Product master · Quality & waste · Machines · Employees · Warehouse · Dispatch · Reports · Overview · Operator view |
 
 ---
 

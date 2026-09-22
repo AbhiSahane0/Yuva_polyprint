@@ -138,6 +138,20 @@ Enum PricingBasis {
   PER_POUCH
 }
 
+Enum ProductionStageStatus {
+  PENDING
+  RUNNING
+  DONE
+  SKIPPED
+}
+
+Enum ProductionStatus {
+  PLANNED
+  RUNNING
+  ON_HOLD
+  COMPLETED
+}
+
 Enum PurchaseOrderStatus {
   ORDERED
   IN_TRANSIT
@@ -496,7 +510,7 @@ Table material_rates {
   entered_by text [not null, default: `'Office'`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '405 row(s) at time of generation'
+  Note: '429 row(s) at time of generation'
 }
 
 Table materials {
@@ -539,6 +553,45 @@ Table orders {
   completed_at timestamp
   cancelled_at timestamp
   cancelled_reason text [not null, default: `''`]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+
+  Note: '1 row(s) at time of generation'
+}
+
+Table production_orders {
+  id text [pk]
+  number integer [unique, not null]
+  status ProductionStatus [not null, default: `'PLANNED'::"ProductionStatus"`]
+  order_id text [not null]
+  customer_name text [not null]
+  job_name text [not null]
+  job_id text
+  quantity_kg decimal(12,3) [not null]
+  notes text [not null, default: `''`]
+  started_at timestamp
+  completed_at timestamp
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+
+  Note: '0 row(s) at time of generation'
+}
+
+Table production_stages {
+  id text [pk]
+  production_order_id text [unique, not null]
+  position integer [unique, not null]
+  stage MachineKind [not null]
+  pass integer [not null, default: `0`]
+  status ProductionStageStatus [not null, default: `'PENDING'::"ProductionStageStatus"`]
+  machine_id text
+  machine_name text [not null, default: `''`]
+  operator text [not null, default: `''`]
+  input_kg decimal(12,3) [not null, default: `0`]
+  output_kg decimal(12,3) [not null, default: `0`]
+  started_at timestamp
+  finished_at timestamp
+  notes text [not null, default: `''`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
 
@@ -865,3 +918,7 @@ Ref: orders.customer_id > customers.id [delete: set null]
 Ref: orders.job_id > jobs.id [delete: set null]
 Ref: orders.quotation_id > quotations.id [delete: set null]
 Ref: orders.quotation_item_id > quotation_items.id [delete: set null]
+Ref: production_orders.order_id > orders.id [delete: cascade]
+Ref: production_orders.job_id > jobs.id [delete: set null]
+Ref: production_stages.production_order_id > production_orders.id [delete: cascade]
+Ref: production_stages.machine_id > costing_machines.id [delete: set null]

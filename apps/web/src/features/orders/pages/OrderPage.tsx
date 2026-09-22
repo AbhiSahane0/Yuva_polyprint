@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft, Factory, Trash2 } from 'lucide-react';
 import {
   canMoveOrderTo,
   formatNumber,
   formatRs,
   ORDER_STATUS_LABELS,
   ORDER_STATUSES,
+  PRODUCTION_STAGE_LABELS,
+  PRODUCTION_STATUS_LABELS,
   type Order,
   type OrderStatus,
 } from '@yuva/shared';
@@ -21,6 +23,7 @@ import { canAccess, useAuthStore } from '@/features/auth/auth-store';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 import { useDeleteOrder, useOrder, useUpdateOrder } from '../api/order-api';
+import { useCreateProduction, useProductionOrders } from '@/features/production/api/production-api';
 
 const TONE: Record<OrderStatus, 'neutral' | 'brand' | 'success' | 'warning'> = {
   CONFIRMED: 'neutral',
@@ -60,6 +63,10 @@ export default function OrderPage() {
   const { data: order, isPending, isError } = useOrder(id ?? null);
   const update = useUpdateOrder();
   const remove = useDeleteOrder();
+
+  const { data: production } = useProductionOrders({ pageSize: 50 });
+  const cards = (production?.items ?? []).filter((card) => card.orderId === id);
+  const startProduction = useCreateProduction();
 
   const [cancelling, setCancelling] = useState(false);
   const [reason, setReason] = useState('');
@@ -104,6 +111,16 @@ export default function OrderPage() {
       toast.success(`Order #${order!.number} is now ${ORDER_STATUS_LABELS[status].toLowerCase()}`);
     } catch (caught) {
       toast.error(caught instanceof ApiClientError ? caught.message : 'Could not save');
+    }
+  }
+
+  async function raiseCard() {
+    try {
+      const card = await startProduction.mutateAsync({ orderId: order!.id, notes: '' });
+      toast.success(`Job card #${card.number} raised with ${card.stages.length} stages`);
+      navigate(`/production/${card.id}`);
+    } catch (caught) {
+      toast.error(caught instanceof ApiClientError ? caught.message : 'Could not start it');
     }
   }
 
@@ -273,6 +290,69 @@ export default function OrderPage() {
           </Field>
         </div>
       </section>
+
+      {/*
+        Production, from the order's side.
+        
+        The one place a job card is raised, because a card without an order is
+        a run nobody asked for. Once raised it is a link — the card is where the
+        stages live, and duplicating any of them here would be a second place to
+        keep in step.
+      */}
+      {order.status !== 'CANCELLED' ? (
+        <section className="border-ink-200 mb-5 rounded-[var(--radius-lg)] border bg-white p-4 shadow-[var(--shadow-card)] sm:p-5">
+          <h2 className="text-ink-800 mb-3 text-xs font-semibold tracking-wider uppercase">
+            On the floor
+          </h2>
+          {cards.length === 0 ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-ink-500 text-sm">
+                Nothing has been started. Raising a job card works out the stages this job needs
+                from its own structure.
+              </p>
+              {canEdit ? (
+                <Button
+                  variant="secondary"
+                  loading={startProduction.isPending}
+                  onClick={() => void raiseCard()}
+                >
+                  <Factory className="size-4" />
+                  Start production
+                </Button>
+              ) : null}
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {cards.map((card) => (
+                <li key={card.id}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/production/${card.id}`)}
+                    className="border-ink-200 hover:bg-ink-25 flex w-full items-center justify-between gap-3 rounded-[var(--radius-md)] border px-3 py-2.5 text-left"
+                  >
+                    <span className="text-ink-900 text-sm font-medium">
+                      Job card #{card.number}
+                      <span className="text-ink-500 ml-2 text-xs font-normal">
+                        {card.currentStage
+                          ? PRODUCTION_STAGE_LABELS[card.currentStage]
+                          : 'every stage done'}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-2.5">
+                      <span className="text-ink-600 text-xs tabular-nums">
+                        {card.progressPercent}%
+                      </span>
+                      <Badge tone={card.status === 'COMPLETED' ? 'success' : 'brand'}>
+                        {PRODUCTION_STATUS_LABELS[card.status]}
+                      </Badge>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       {order.status === 'CANCELLED' ? (
         <section className="border-warning-200 bg-warning-50 mb-5 rounded-[var(--radius-lg)] border p-4">

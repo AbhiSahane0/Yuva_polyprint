@@ -16,6 +16,7 @@ import {
   Calculator,
   ClipboardList,
   ClipboardCheck,
+  Factory,
 } from 'lucide-react';
 import type { AppModule } from '@yuva/shared';
 import { cn } from '@/lib/utils';
@@ -62,6 +63,9 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'Production',
     items: [
+      /* No module: a job card is the floor's own document and the office
+         watches it. Writing to it needs `jobs`, enforced on the API. */
+      { to: '/production', label: 'Production', icon: Factory },
       { to: '/cylinders', label: 'Design & Cylinders', icon: Disc3, module: 'cylinders' },
       { to: '/job-sheets', label: 'Job sheets', icon: ClipboardList, module: 'jobs' },
       { to: '/jobs', label: 'Jobs', icon: Boxes, module: 'jobs', disabled: true },
