@@ -11,6 +11,7 @@ import {
   type StockHealth,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -255,8 +256,8 @@ export default function InventoryPage() {
                     </td>
                     {canDelete ? (
                       <td className="px-2 py-3 text-right">
-                        <button
-                          type="button"
+                        <IconButton
+                          tone="danger"
                           /* The row opens the material. Without this, deleting
                              would navigate to the thing being deleted first. */
                           onClick={(event) => {
@@ -265,10 +266,9 @@ export default function InventoryPage() {
                           }}
                           aria-label={`Delete ${item.name}`}
                           title="Delete this material"
-                          className="text-ink-400 hover:bg-danger-50 hover:text-danger-600 cursor-pointer rounded-[var(--radius-md)] p-2"
                         >
                           <Trash2 className="size-4" />
-                        </button>
+                        </IconButton>
                       </td>
                     ) : null}
                   </tr>
@@ -299,14 +299,13 @@ export default function InventoryPage() {
                 {canDelete ? (
                   /* Beside the row rather than inside it — a button within a
                      button is invalid, and the outer one would swallow the tap. */
-                  <button
-                    type="button"
+                  <IconButton
+                    tone="danger"
                     onClick={() => setDeleting(item)}
                     aria-label={`Delete ${item.name}`}
-                    className="text-ink-400 hover:bg-danger-50 hover:text-danger-600 mr-2 shrink-0 cursor-pointer rounded-[var(--radius-md)] p-2"
                   >
                     <Trash2 className="size-4" />
-                  </button>
+                  </IconButton>
                 ) : null}
               </li>
             ))}

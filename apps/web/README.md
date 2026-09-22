@@ -307,6 +307,12 @@ need to read it is the wrong shape of protection.
 
 #### One order shows what may happen to it, and nothing else
 
+The status actions sit in **one row on a desktop** — they had wrapped onto two
+lines, which read as two groups when they are one — and behind a **single menu
+button below `sm`**. Stacked full-width on a phone they pushed the order's own
+figures, the quantity and the rate and the amount, off the first screen; the
+page is read far more often than it is acted on.
+
 The status buttons are only the places it may actually go. Offering every status
 and refusing four of them on save teaches the office to expect errors; offering
 one or two teaches them the rule. A completed order has no buttons at all and

@@ -3,6 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { createPurchaseOrderSchema, formatRs, purchaseUnitsFor, unitLabel } from '@yuva/shared';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { Field, Input, NumberInput, Select } from '@/components/ui/Field';
 import { useMaterials } from '@/features/rates/api/rate-api';
 import { ApiClientError } from '@/lib/api-client';
@@ -249,14 +250,13 @@ export function NewOrderModal({ open, onClose }: { open: boolean; onClose: () =>
                     &nbsp;
                   </span>
                   {lines.length > 1 ? (
-                    <button
-                      type="button"
+                    <IconButton
+                      tone="danger"
                       onClick={() => setLines((current) => current.filter((_, i) => i !== index))}
                       aria-label={`Remove line ${index + 1}`}
-                      className="text-ink-400 hover:text-danger-600 mt-1.5 cursor-pointer p-2.5"
                     >
                       <Trash2 className="size-4" />
-                    </button>
+                    </IconButton>
                   ) : null}
                 </div>
               </div>

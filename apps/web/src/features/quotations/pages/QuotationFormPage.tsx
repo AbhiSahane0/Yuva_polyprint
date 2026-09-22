@@ -60,6 +60,7 @@ import {
   totalMicronForLayers,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { LoadingState } from '@/components/ui/LoadingState';
 import {
   Field,
@@ -1888,14 +1889,9 @@ function JobCard({
       <div className="mb-4 flex items-start justify-between gap-3">
         <h2 className="text-ink-900 text-base font-semibold">Job {index + 1}</h2>
         {canRemove ? (
-          <button
-            type="button"
-            onClick={onRemove}
-            aria-label={`Remove job ${index + 1}`}
-            className="text-ink-400 hover:text-danger-600"
-          >
+          <IconButton tone="danger" onClick={onRemove} aria-label={`Remove job ${index + 1}`}>
             <Trash2 className="size-4" />
-          </button>
+          </IconButton>
         ) : null}
       </div>
 

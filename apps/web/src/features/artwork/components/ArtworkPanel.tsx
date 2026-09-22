@@ -243,7 +243,7 @@ export function ArtworkPanel({
                         Replace
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="dangerGhost"
                         size="sm"
                         onClick={() => setRemoving(file)}
                         title="Remove it, or delete the file for good"
@@ -260,7 +260,7 @@ export function ArtworkPanel({
                         Put back
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="dangerGhost"
                         size="sm"
                         onClick={() => setRemoving(file)}
                         title="Delete the file for good"

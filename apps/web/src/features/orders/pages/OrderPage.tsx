@@ -12,6 +12,7 @@ import {
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { ActionMenu } from '@/components/ui/ActionMenu';
 import { Field, Input } from '@/components/ui/Field';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -125,8 +126,16 @@ export default function OrderPage() {
         Orders
       </button>
 
-      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+      {/*
+        A row at every width, not a stack below `sm`.
+
+        Stacking put the menu button on its own line under the title, left
+        aligned, with the sheet opening rightwards from it into empty space. The
+        actions belong beside the thing they act on — and the title block
+        shrinks (`min-w-0`) and wraps instead, which is what should give.
+      */}
+      <header className="mb-6 flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-ink-900 text-xl font-bold sm:text-2xl">Order #{order.number}</h1>
             <Badge tone={TONE[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
@@ -138,21 +147,53 @@ export default function OrderPage() {
         </div>
 
         {canEdit && !ended ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {nextStatuses.map((status) => (
+          <>
+            {/*
+              One row on a desktop, one button on a phone.
+
+              Three actions wrapped onto two lines at desktop width, which read
+              as two groups when they are one. `flex-nowrap` with the title
+              block allowed to shrink (`min-w-0`) keeps them together; the
+              labels never wrap mid-word.
+
+              Below `sm` the same three go behind a menu. Stacked full-width
+              they pushed the order's own figures — the quantity, the rate, the
+              amount — off the first screen, and the page is read far more often
+              than it is acted on.
+            */}
+            <div className="hidden shrink-0 items-center gap-2 sm:flex sm:flex-nowrap">
+              {nextStatuses.map((status) => (
+                <Button
+                  key={status}
+                  variant={status === 'COMPLETED' ? 'primary' : 'secondary'}
+                  loading={update.isPending}
+                  onClick={() => void move(status)}
+                  className="whitespace-nowrap"
+                >
+                  Mark {ORDER_STATUS_LABELS[status].toLowerCase()}
+                </Button>
+              ))}
               <Button
-                key={status}
-                variant={status === 'COMPLETED' ? 'primary' : 'secondary'}
-                loading={update.isPending}
-                onClick={() => void move(status)}
+                variant="dangerGhost"
+                className="whitespace-nowrap"
+                onClick={() => setCancelling(true)}
               >
-                Mark {ORDER_STATUS_LABELS[status].toLowerCase()}
+                Cancel order
               </Button>
-            ))}
-            <Button variant="ghost" onClick={() => setCancelling(true)}>
-              Cancel order
-            </Button>
-          </div>
+            </div>
+
+            <ActionMenu
+              className="sm:hidden"
+              label={`Actions for order ${order.number}`}
+              actions={[
+                ...nextStatuses.map((status) => ({
+                  label: `Mark ${ORDER_STATUS_LABELS[status].toLowerCase()}`,
+                  onSelect: () => void move(status),
+                })),
+                { label: 'Cancel order', danger: true, onSelect: () => setCancelling(true) },
+              ]}
+            />
+          </>
         ) : null}
       </header>
 
@@ -249,7 +290,7 @@ export default function OrderPage() {
           {/* Only while nobody has started it. Once a run is behind it, a
               deleted order is a run nothing explains — cancelling says the same
               thing and keeps the record. */}
-          <Button variant="ghost" onClick={() => setDeleting(true)}>
+          <Button variant="dangerGhost" onClick={() => setDeleting(true)}>
             <Trash2 className="size-4" />
             Delete this order
           </Button>

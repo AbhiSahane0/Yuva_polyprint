@@ -5,6 +5,7 @@ import type { CreateCustomerFormValues } from '@yuva/shared';
 import { Field, FieldSection, Input, ReadOnlyValue, Select, Textarea } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
 import { Combobox } from '@/components/ui/Combobox';
+import { IconButton } from '@/components/ui/IconButton';
 import { cn } from '@/lib/utils';
 import { JOB_FIELD_GROUPS, SPAN_CLASS, type JobFieldDef } from '../job-fields';
 
@@ -144,18 +145,17 @@ export function JobCard({
         {summary.jobType && summary.jobType !== 'NA' ? <Badge>{summary.jobType}</Badge> : null}
         {hasError ? <Badge tone="warning">Check fields</Badge> : null}
 
-        <button
-          type="button"
+        <IconButton
+          tone="danger"
           onClick={(event) => {
             event.stopPropagation();
             onRemove();
           }}
           aria-label={`Remove job ${index + 1}`}
           title="Remove this job from the customer"
-          className="text-ink-400 hover:bg-danger-50 hover:text-danger-600 cursor-pointer rounded-[var(--radius-md)] p-2"
         >
           <Trash2 className="size-4" />
-        </button>
+        </IconButton>
       </div>
 
       {open ? (

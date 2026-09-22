@@ -15,6 +15,7 @@ import {
   type MaterialCategory,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { Field, Input, NumberInput } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -302,15 +303,14 @@ export default function RatesPage() {
                             >
                               <History className="size-4" />
                             </button>
-                            <button
-                              type="button"
+                            <IconButton
+                              tone="danger"
                               onClick={() => setDeleting(material)}
                               aria-label={`Delete ${material.name}`}
                               title="Delete — only a material nothing has used"
-                              className="text-ink-400 hover:bg-danger-50 hover:text-danger-600 cursor-pointer rounded-[var(--radius-md)] p-2"
                             >
                               <Trash2 className="size-4" />
-                            </button>
+                            </IconButton>
                           </td>
                         </tr>
                       );
