@@ -172,6 +172,13 @@ Enum ReservationStatus {
   RELEASED
 }
 
+Enum Shift {
+  MORNING
+  AFTERNOON
+  NIGHT
+  GENERAL
+}
+
 Enum StockMovementKind {
   RECEIPT
   ISSUE
@@ -295,6 +302,23 @@ Table cylinders {
   cost decimal(12,2)
   engraver text [not null, default: `'NA'`]
   engraved_on date
+  notes text [not null, default: `''`]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+
+  Note: '0 row(s) at time of generation'
+}
+
+Table employees {
+  id text [pk]
+  name text [not null]
+  code text [not null, default: `''`]
+  role_id text
+  role_name text [not null]
+  shift Shift [not null, default: `'GENERAL'::"Shift"`]
+  phone text [not null, default: `''`]
+  joined_on date
+  is_active boolean [not null, default: `true`]
   notes text [not null, default: `''`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
@@ -603,6 +627,7 @@ Table production_stages {
   notes text [not null, default: `''`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
+  operator_id text
 
   Note: '0 row(s) at time of generation'
 }
@@ -947,3 +972,5 @@ Ref: production_stages.machine_id > costing_machines.id [delete: set null]
 Ref: stock_reservations.material_id > materials.id [delete: restrict]
 Ref: stock_reservations.production_order_id > production_orders.id [delete: cascade]
 Ref: job_sheets.production_order_id > production_orders.id [delete: set null]
+Ref: employees.role_id > costing_labour.id [delete: restrict]
+Ref: production_stages.operator_id > employees.id [delete: set null]

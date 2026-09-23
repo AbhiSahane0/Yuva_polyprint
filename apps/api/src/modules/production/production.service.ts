@@ -61,6 +61,7 @@ function toStage(row: Row['stages'][number]): ProductionStageRow {
     status: row.status,
     machineId: row.machineId,
     machineName: row.machineName,
+    operatorId: row.operatorId,
     operator: row.operator,
     inputKg,
     outputKg,
@@ -446,6 +447,28 @@ export async function updateStage(
       machineName = '';
     }
 
+    /*
+     * The operator, exactly as the machine above: the link is what the dropdown
+     * sends and the NAME is snapshotted beside it. That snapshot is what keeps
+     * a card from March readable after somebody leaves in June — the link goes
+     * null and the name stays.
+     *
+     * A typed name with no id is still accepted, and has to be: somebody
+     * covering a shift is not always on the books yet, and refusing the record
+     * is how the works goes back to writing it on paper.
+     */
+    let operatorName: string | undefined;
+    if (input.operatorId) {
+      const person = await tx.employee.findUnique({
+        where: { id: input.operatorId },
+        select: { name: true },
+      });
+      if (!person) throw ApiError.notFound('That person is not on record');
+      operatorName = person.name;
+    } else if (input.operatorId === null) {
+      operatorName = '';
+    }
+
     const status = input.status ?? existing.status;
     const movedTo = status !== existing.status ? status : null;
 
@@ -470,7 +493,14 @@ export async function updateStage(
       data: {
         ...(input.machineId !== undefined ? { machineId: input.machineId } : {}),
         ...(machineName !== undefined ? { machineName } : {}),
-        ...(input.operator !== undefined ? { operator: input.operator } : {}),
+        ...(input.operatorId !== undefined ? { operatorId: input.operatorId } : {}),
+        /* The snapshot wins over a typed name when both travel: the dropdown
+           is the one that knows how the works spells it. */
+        ...(operatorName !== undefined
+          ? { operator: operatorName }
+          : input.operator !== undefined
+            ? { operator: input.operator }
+            : {}),
         ...(input.inputKg !== undefined ? { inputKg: input.inputKg } : {}),
         ...(input.outputKg !== undefined ? { outputKg: input.outputKg } : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),

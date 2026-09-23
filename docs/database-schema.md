@@ -50,6 +50,10 @@ erDiagram
     integer position
     CylinderStatus status
   }
+  employees {
+    text id PK
+    text role_id FK
+  }
   job_artwork {
     text id PK
     text job_id FK
@@ -131,6 +135,7 @@ erDiagram
     integer position
     ProductionStageStatus status
     text machine_id FK
+    text operator_id FK
   }
   purchase_order_lines {
     text id PK
@@ -277,6 +282,8 @@ erDiagram
   materials ||--|{ stock_reservations : "material_id"
   production_orders ||--|{ stock_reservations : "production_order_id"
   production_orders ||--o{ job_sheets : "production_order_id"
+  costing_labour ||--o{ employees : "role_id"
+  employees ||--o{ production_stages : "operator_id"
 ```
 
 ## Tables
@@ -291,6 +298,7 @@ erDiagram
 | `customers` | 17 | 70 | Companies that order from Yuva Polyprint. |
 | `cylinder_events` | 11 | 0 |  |
 | `cylinders` | 16 | 0 |  |
+| `employees` | 12 | 0 |  |
 | `job_artwork` | 17 | 0 |  |
 | `job_sheet_labour` | 8 | 120 |  |
 | `job_sheet_lines` | 17 | 315 |  |
@@ -302,7 +310,7 @@ erDiagram
 | `materials` | 13 | 24 |  |
 | `orders` | 23 | 1 |  |
 | `production_orders` | 16 | 0 |  |
-| `production_stages` | 16 | 0 |  |
+| `production_stages` | 17 | 0 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
 | `purchase_receipts` | 11 | 1 |  |
@@ -372,6 +380,8 @@ erDiagram
 | `stock_reservations.material_id` | `materials.id` | RESTRICT |  |
 | `stock_reservations.production_order_id` | `production_orders.id` | CASCADE |  |
 | `job_sheets.production_order_id` | `production_orders.id` | SET NULL |  |
+| `employees.role_id` | `costing_labour.id` | RESTRICT |  |
+| `production_stages.operator_id` | `employees.id` | SET NULL |  |
 
 ## Enums
 
@@ -401,6 +411,7 @@ erDiagram
 | `PurchaseOrderStatus` | `ORDERED`, `IN_TRANSIT`, `PARTIALLY_RECEIVED`, `RECEIVED`, `CANCELLED` |
 | `QuotationStatus` | `DRAFT`, `SENT`, `WON`, `LOST` |
 | `ReservationStatus` | `HELD`, `RELEASED` |
+| `Shift` | `MORNING`, `AFTERNOON`, `NIGHT`, `GENERAL` |
 | `StockMovementKind` | `RECEIPT`, `ISSUE`, `WASTE`, `ADJUSTMENT`, `TRANSFER` |
 
 ## Full column reference
@@ -523,6 +534,23 @@ erDiagram
 | `cost` | `decimal(12,2)` | ✓ |  |
 | `engraver` | `text` |  |  |
 | `engraved_on` | `date` | ✓ |  |
+| `notes` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+
+### `employees`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `name` | `text` |  |  |
+| `code` | `text` |  |  |
+| `role_id` | `text` | ✓ | FK → `costing_labour.id` |
+| `role_name` | `text` |  |  |
+| `shift` | `Shift` (enum) |  |  |
+| `phone` | `text` |  |  |
+| `joined_on` | `date` | ✓ |  |
+| `is_active` | `boolean` |  |  |
 | `notes` | `text` |  |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
@@ -831,6 +859,7 @@ erDiagram
 | `notes` | `text` |  |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
+| `operator_id` | `text` | ✓ | FK → `employees.id` |
 
 ### `purchase_order_lines`
 

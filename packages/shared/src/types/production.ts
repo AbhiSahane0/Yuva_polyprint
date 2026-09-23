@@ -13,6 +13,9 @@ export interface ProductionStageRow {
 
   machineId: string | null;
   machineName: string;
+  /** The person on the books, when the stage names one. */
+  operatorId: string | null;
+  /** Their name, snapshotted — so a finished card reads after they leave. */
   operator: string;
 
   inputKg: number;

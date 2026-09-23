@@ -4,6 +4,7 @@ import authRoutes from '../modules/auth/auth.routes.js';
 import costingRoutes from '../modules/costing/costing.routes.js';
 import customerRoutes from '../modules/customers/customer.routes.js';
 import cylinderRoutes from '../modules/cylinders/cylinder.routes.js';
+import employeeRoutes from '../modules/employees/employee.routes.js';
 import gstinRoutes from '../modules/gstin/gstin.routes.js';
 import inventoryRoutes from '../modules/inventory/inventory.routes.js';
 import jobRoutes from '../modules/jobs/job.routes.js';
@@ -71,6 +72,16 @@ router.use('/job-sheets', authenticate, jobSheetRoutes);
  * by the same people. The guard is in the module's own routes.
  */
 router.use('/production', authenticate, productionRoutes);
+
+/*
+ * The works' own people. Readable by anyone signed in, and it has to be: the
+ * operator dropdown on a job card is what this module exists for, and gating
+ * the list would leave the floor typing names by hand on the one screen it was
+ * built for. Writing needs the jobs module — the same permission job cards and
+ * job sheets use, because adding an operator is a supervisor's act. It moves no
+ * money: the wage stays on the costing role, behind rates.
+ */
+router.use('/employees', authenticate, employeeRoutes);
 
 /*
  * Rates are readable by anyone signed in, because quotation costing depends on

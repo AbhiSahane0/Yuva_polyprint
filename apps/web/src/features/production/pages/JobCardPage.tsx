@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ActionMenu } from '@/components/ui/ActionMenu';
-import { Field, Input, NumberInput, Select } from '@/components/ui/Field';
+import { Field, NumberInput, Select } from '@/components/ui/Field';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -25,6 +25,8 @@ import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { useCreateJobSheet } from '@/features/job-sheets/api/job-sheet-api';
+import { useEmployees } from '@/features/employees/api/employee-api';
+import { OperatorSelect } from '../components/OperatorSelect';
 import { MaterialPanel } from '../components/MaterialPanel';
 import {
   useDeleteProduction,
@@ -69,6 +71,12 @@ export default function JobCardPage() {
 
   const { data: card, isPending, isError } = useProductionOrder(id ?? null);
   const { data: master } = useCostingMasterData();
+  /*
+   * Everybody, including those who have left: a stage filled in months ago may
+   * name somebody who has since gone, and a dropdown that cannot show its own
+   * value shows a blank — which reads as nobody ran it.
+   */
+  const { data: works } = useEmployees({ includeLeft: true });
   const update = useUpdateProduction();
   const updateStage = useUpdateStage();
   const remove = useDeleteProduction();
@@ -133,6 +141,8 @@ export default function JobCardPage() {
       toast.error(caught instanceof ApiClientError ? caught.message : 'Could not save');
     }
   }
+
+  const people = works?.items ?? [];
 
   /* Only machines of this stage's own kind. A slitter is not a choice for the
      press, and offering it is offering a mistake. */
@@ -351,15 +361,12 @@ export default function JobCardPage() {
                   </Field>
 
                   <Field label="Operator" htmlFor={`operator-${stage.id}`}>
-                    <Input
+                    <OperatorSelect
                       id={`operator-${stage.id}`}
-                      defaultValue={stage.operator}
+                      stage={stage}
+                      people={people}
                       disabled={locked}
-                      placeholder="Who ran it"
-                      onBlur={(event) =>
-                        event.target.value.trim() !== stage.operator &&
-                        void patchStage(stage.id, { operator: event.target.value.trim() })
-                      }
+                      onPick={(operatorId) => void patchStage(stage.id, { operatorId })}
                     />
                   </Field>
 

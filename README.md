@@ -12,9 +12,9 @@ production → quality/waste → costing → dispatch, with full job-level trace
 > dispatch and reporting are not built yet; they are added one at a time as each
 > is confirmed in scope.
 >
-> | Built                                                                                                                                                                       | Not yet                                                                                                                        |
-> | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-> | Customers · **Quotations** · **Orders** · **Production** · Rates · Costing · Inventory · Purchase · Design & cylinders · Artwork · **Job sheets** · Users · Sign-in monitor | Planning · Product master · Quality & waste · Machines · Employees · Warehouse · Dispatch · Reports · Overview · Operator view |
+> | Built                                                                                                                                                                                       | Not yet                                                                                                            |
+> | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+> | Customers · **Quotations** · **Orders** · **Production** · **Employees** · Rates · Costing · Inventory · Purchase · Design & cylinders · Artwork · **Job sheets** · Users · Sign-in monitor | Planning · Product master · Quality & waste · Machines · Warehouse · Dispatch · Reports · Overview · Operator view |
 
 ---
 

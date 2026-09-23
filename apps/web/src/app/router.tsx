@@ -20,6 +20,7 @@ const OrderPage = lazy(() => import('@/features/orders/pages/OrderPage'));
 const NewOrderPage = lazy(() => import('@/features/orders/pages/NewOrderPage'));
 const ProductionPage = lazy(() => import('@/features/production/pages/ProductionPage'));
 const JobCardPage = lazy(() => import('@/features/production/pages/JobCardPage'));
+const EmployeesPage = lazy(() => import('@/features/employees/pages/EmployeesPage'));
 const RatesPage = lazy(() => import('@/features/rates/pages/RatesPage'));
 const CostingPage = lazy(() => import('@/features/costing/pages/CostingPage'));
 const InventoryPage = lazy(() => import('@/features/inventory/pages/InventoryPage'));
@@ -158,6 +159,9 @@ function AppRoutes() {
           */}
           <Route path="/production" element={<ProductionPage />} />
           <Route path="/production/:id" element={<JobCardPage />} />
+          {/* No guard, like Production: the floor reads this to fill in a job
+              card. Adding somebody is refused by the API without `jobs`. */}
+          <Route path="/employees" element={<EmployeesPage />} />
           <Route
             path="/rates"
             element={

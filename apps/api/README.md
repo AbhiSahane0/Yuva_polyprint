@@ -2495,6 +2495,88 @@ A pouch count with **no** per-pouch rate does not zero the order. A quotation
 line carries both units whether or not it was sold per pouch, so a
 21,565-pouch order at no per-pouch rate is still worth its kilograms.
 
+## Employees — the works' own people
+
+Deliberately **not a personnel system**: no attendance, no leave calendar, no
+payroll. A works of forty does not run those off a screen, and a screen that
+asks for them is filled in once and then abandoned. This holds the handful of
+facts the rest of the system needs so that a person stops being typed by hand.
+
+| Method | Path             | Notes                                                    |
+| ------ | ---------------- | -------------------------------------------------------- |
+| GET    | `/employees`     | Everybody, with what each is on right now. Filters below |
+| GET    | `/employees/:id` | One person                                               |
+| POST   | `/employees`     | Add somebody                                             |
+| PATCH  | `/employees/:id` | Change them, or clear `isActive` when they leave         |
+| DELETE | `/employees/:id` | Only somebody nobody's work names                        |
+
+**Reading is open to anyone signed in**, and has to be: the operator dropdown on
+a job card is what this module exists for, and gating the list would leave the
+floor typing names by hand on the one screen it was built for. Writing needs
+`jobs`, the permission the floor's own records use — adding an operator is a
+supervisor's act and it moves no money.
+
+### Why it exists
+
+The works' own fourteen job sheets hold these as though they were separate
+roles:
+
+```
+"Operator 1"  "Printing operator 2"  "Printing operattor 2" (x12, a typo)
+"Lamination operattor 2"  "Slitting operator 3"  "Pouch operator"
+"helper l"  "helper g"  "Helper — lamination"  "Helper — general"
+"Office 1"  "office 1"  "Office 2"
+```
+
+Thirteen spellings for perhaps six people. Nothing can be totalled per person or
+per role from that, and no amount of care at the keyboard fixes it — only
+removing the keyboard does.
+
+### No wage lives here
+
+An employee points at a **costing role** — `CostingLabour`, the same rows the
+Costing screen maintains, which already carry the monthly salary and which
+process they belong to. So what a printing operator costs has exactly one
+answer, dated, and a rise is typed once rather than onto forty records.
+
+`roleName` carries free text for the people no costing role describes: the
+office, the warehouse, a supervisor. One or the other is required.
+
+The role's own name wins when reading, so renaming a role on the Costing screen
+renames it here too rather than leaving a stale copy behind. The copy is kept
+anyway, as the fallback for a role that is later retired.
+
+### What somebody is DOING is not stored
+
+Working, which machine, which card, which order: all four come from the **one
+job card stage that is RUNNING with their name on it**, worked out on the way
+out. A status somebody has to remember to change is wrong most of the time —
+the same reason a card's progress and an order's lateness are derived here.
+
+One query answers it for the whole list, however many people are on it. Somebody
+on two running stages at once is not an error — you set a laminator going and
+walk to the slitter — and the first by position wins the row, which is the job
+card's own order of work.
+
+| Query         | Narrows to                               |
+| ------------- | ---------------------------------------- |
+| `search`      | Name, code or role                       |
+| `process`     | The printing people, the slitting people |
+| `shift`       | Morning, afternoon, night, general       |
+| `includeLeft` | Off by default — see below               |
+| `workingOnly` | Just the people on a machine right now   |
+
+### Leaving is not deleting
+
+Clearing `isActive` is how somebody leaves. **Deleting is refused once they have
+run a stage**, and the message says so. That is not squeamishness: a stage keeps
+the name beside the link precisely so an old card survives, but a leaver is
+history, not a mistake. A row mistyped this morning is the case delete exists
+for.
+
+People who have left are out of the list by default and never gone — a card from
+March names them, and a list that hides them cannot explain it.
+
 ## Production — what the floor actually did
 
 A quotation says what a job should cost. An order says what was asked for. A job
@@ -2695,6 +2777,21 @@ the office and the floor that this exists to end.
 **Completing the card does not complete the order.** For a customer, complete
 means delivered, and nothing here knows about that yet — Dispatch will. The
 order stays in production until somebody says otherwise, which is honest.
+
+### Who ran it — a link and a snapshot
+
+Exactly the shape the machine beside it uses: `operatorId` points at an
+employee, and `operator` holds their name, written at the moment it is picked.
+
+The snapshot is what keeps a card from March readable after somebody leaves in
+June — the link goes null and the name stays. It is also why the fourteen
+imported sheets still say who ran them, naming people this works never
+registered.
+
+**A typed name with no id is still accepted**, and has to be: somebody covering
+a shift is not always on the books yet, and refusing the record is how a works
+goes back to writing it on paper. When both travel, the snapshot from the link
+wins — the dropdown is the one that knows how the works spells it.
 
 ### Waste is shown, never stored
 
