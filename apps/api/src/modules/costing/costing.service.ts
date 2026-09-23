@@ -1,4 +1,4 @@
-import { overheadsLiveOn } from '@yuva/shared';
+import { liveOn } from '@yuva/shared';
 import type {
   CostingMasterData,
   CostingOverhead,
@@ -49,7 +49,11 @@ const toLabour = (row: Prisma.CostingLabourGetPayload<Record<string, never>>): L
   role: row.role,
   process: row.process,
   monthlySalary: toNumber(row.monthlySalary),
-  isActive: row.isActive,
+  effectiveFrom: row.effectiveFrom.toISOString().slice(0, 10),
+  effectiveTo: row.effectiveTo ? row.effectiveTo.toISOString().slice(0, 10) : null,
+  /* Derived, never stored — see the type. A row is live while its window has
+     not been closed. */
+  isActive: row.effectiveTo === null,
   sortOrder: row.sortOrder,
 });
 
@@ -95,7 +99,7 @@ export async function overheadsAsAt(onDate?: string): Promise<CostingOverhead[]>
   });
 
   /*
-   * Narrowed in SQL, decided in `overheadsLiveOn`.
+   * Narrowed in SQL, decided in `liveOn`.
    *
    * The two say the same thing, and the point of saying it twice is that only
    * one of them can be tested without a database — so that one has the tests
@@ -103,7 +107,7 @@ export async function overheadsAsAt(onDate?: string): Promise<CostingOverhead[]>
    * the sort of thing that would shift a boundary by a day, and this compares
    * the ISO strings the API actually returns.
    */
-  return overheadsLiveOn(rows.map(toOverhead), on);
+  return liveOn(rows.map(toOverhead), on);
 }
 
 /** Every row ever, newest window first — what "show ended" shows. */
@@ -114,6 +118,36 @@ export async function allOverheads(): Promise<CostingOverhead[]> {
   return rows.map(toOverhead);
 }
 
+/**
+ * The wages in force on a given day.
+ *
+ * The same shape as `overheadsAsAt`, and for the same reason: a quotation is
+ * costed against the master as it stood on ITS date, so taking on a lamination
+ * crew today cannot reach back and re-price what went out last year.
+ */
+export async function labourAsAt(onDate?: string): Promise<Labour[]> {
+  const on = onDate ?? today();
+  const rows = await prisma.costingLabour.findMany({
+    where: {
+      effectiveFrom: { lte: asDate(on) },
+      OR: [{ effectiveTo: null }, { effectiveTo: { gt: asDate(on) } }],
+    },
+    orderBy: [{ sortOrder: 'asc' }, { role: 'asc' }],
+  });
+
+  /* Narrowed in SQL, decided in `liveOn` — the one with the tests, and the one
+     that compares ISO strings so no timezone can shift a boundary by a day. */
+  return liveOn(rows.map(toLabour), on);
+}
+
+/** Every window ever, newest first — what "show retired" shows. */
+export async function allLabour(): Promise<Labour[]> {
+  const rows = await prisma.costingLabour.findMany({
+    orderBy: [{ sortOrder: 'asc' }, { role: 'asc' }, { effectiveFrom: 'desc' }],
+  });
+  return rows.map(toLabour);
+}
+
 /** Every list at once: costing a rate needs all of it, and it is small. */
 export async function getMasterData(
   includeRetired = false,
@@ -122,13 +156,12 @@ export async function getMasterData(
   const where = includeRetired ? {} : { isActive: true };
   const [machines, labour, overheads] = await Promise.all([
     prisma.costingMachine.findMany({ where, orderBy: ORDER }),
-    prisma.costingLabour.findMany({
-      where,
-      orderBy: [{ sortOrder: 'asc' }, { role: 'asc' }],
-    }),
+    /* Wages are dated now, so they are read the way the overheads are: as at
+       the quotation's own date, not as at whatever a switch says today. */
+    includeRetired ? allLabour() : labourAsAt(onDate),
     includeRetired ? allOverheads() : overheadsAsAt(onDate),
   ]);
-  return { machines: machines.map(toMachine), labour: labour.map(toLabour), overheads };
+  return { machines: machines.map(toMachine), labour, overheads };
 }
 
 /**
@@ -286,41 +319,136 @@ export async function retireMachine(id: string): Promise<Machine> {
   );
 }
 
+/**
+ * Adds a role, live from today.
+ *
+ * Not from the beginning of time, which would reach back and change the price
+ * of every quotation anybody reprices — the same rule the works' own overheads
+ * follow, and the rule whose absence here re-priced seven 2022 documents the
+ * moment the lamination crew was switched back on.
+ *
+ * A role whose window was closed **without ever pricing anything** is brought
+ * back rather than duplicated: an empty window is not history, it is a row that
+ * never applied, and the id surviving means everything already pointing at it —
+ * the employees paid as that role — still does.
+ */
 export async function createLabour(input: LabourInput): Promise<Labour> {
-  /* A retired role of the same name comes back — see `revive`. */
-  const retiredId = await revive(
-    await prisma.costingLabour.findUnique({ where: { role: input.role } }),
-  );
-  if (retiredId) {
+  const now = today();
+
+  /*
+   * The role name is no longer unique in the database: two windows of one job
+   * is the whole point. So the check that used to be an index lives here, where
+   * it can say something useful instead of raising a constraint error.
+   */
+  const live = await prisma.costingLabour.findFirst({
+    where: { role: input.role, effectiveTo: null },
+    select: { id: true },
+  });
+  if (live) throw ApiError.conflict('There is already a role with that name');
+
+  const empty = await prisma.costingLabour.findFirst({
+    where: { role: input.role, effectiveTo: { not: null } },
+    orderBy: { effectiveFrom: 'desc' },
+  });
+  if (empty?.effectiveTo && empty.effectiveFrom.getTime() === empty.effectiveTo.getTime()) {
     return toLabour(
       await prisma.costingLabour.update({
-        where: { id: retiredId },
-        data: { ...input, isActive: true },
+        where: { id: empty.id },
+        data: { ...input, effectiveFrom: asDate(now), effectiveTo: null },
       }),
     );
   }
 
-  try {
-    return toLabour(await prisma.costingLabour.create({ data: input }));
-  } catch (error) {
-    nameTaken(error, 'role');
-  }
+  return toLabour(
+    await prisma.costingLabour.create({ data: { ...input, effectiveFrom: asDate(now) } }),
+  );
 }
 
+/**
+ * Changes a role, keeping what it used to pay.
+ *
+ * A name is not priced, so it is corrected in place — the row that paid
+ * Rs 18,000 paid Rs 18,000 whatever the job was called. **The salary and the
+ * process are**, so changing either ends this window today and opens a new one
+ * from today: a quotation written last month must go on repricing at the crew
+ * it was written under.
+ *
+ * Unless the window opened today, in which case it has priced nothing yet and
+ * editing it in place leaves no dead window behind.
+ */
 export async function updateLabour(id: string, input: UpdateLabourInput): Promise<Labour> {
   const existing = await prisma.costingLabour.findUnique({ where: { id } });
   if (!existing) throw ApiError.notFound('That role is not on record');
-  try {
+  if (existing.effectiveTo) throw ApiError.conflict('That role has already been retired');
+
+  const now = today();
+  const priced =
+    (input.monthlySalary !== undefined &&
+      toNumber(existing.monthlySalary) !== input.monthlySalary) ||
+    (input.process !== undefined && existing.process !== input.process);
+
+  if (!priced || existing.effectiveFrom.toISOString().slice(0, 10) === now) {
     return toLabour(await prisma.costingLabour.update({ where: { id }, data: input }));
-  } catch (error) {
-    nameTaken(error, 'role');
   }
+
+  return prisma.$transaction(async (tx) => {
+    await tx.costingLabour.update({ where: { id }, data: { effectiveTo: asDate(now) } });
+    return toLabour(
+      await tx.costingLabour.create({
+        data: {
+          role: input.role ?? existing.role,
+          process: input.process ?? existing.process,
+          monthlySalary: input.monthlySalary ?? toNumber(existing.monthlySalary),
+          sortOrder: input.sortOrder ?? existing.sortOrder,
+          effectiveFrom: asDate(now),
+        },
+      }),
+    );
+  });
 }
 
+/**
+ * Ends a role today, or takes one back on from today.
+ *
+ * One control, because the screen has one switch — but the two directions are
+ * not symmetrical, and that asymmetry is the whole feature. Ending closes the
+ * window, and every quotation already written goes on being costed with the
+ * crew it was written under. Taking the role back on opens a **new** window
+ * from today, so it applies to what the works quotes from now and to nothing
+ * that has already gone out.
+ */
 export async function retireLabour(id: string): Promise<Labour> {
   const existing = await prisma.costingLabour.findUnique({ where: { id } });
   if (!existing) throw ApiError.notFound('That role is not on record');
+
+  const now = today();
+
+  if (!existing.effectiveTo) {
+    return toLabour(
+      await prisma.costingLabour.update({ where: { id }, data: { effectiveTo: asDate(now) } }),
+    );
+  }
+
+  /* An empty window priced nothing, so there is no history to keep and the row
+     itself comes back — see createLabour. */
+  if (existing.effectiveFrom.getTime() === existing.effectiveTo.getTime()) {
+    return toLabour(
+      await prisma.costingLabour.update({
+        where: { id },
+        data: { effectiveFrom: asDate(now), effectiveTo: null },
+      }),
+    );
+  }
+
   return toLabour(
-    await prisma.costingLabour.update({ where: { id }, data: { isActive: !existing.isActive } }),
+    await prisma.costingLabour.create({
+      data: {
+        role: existing.role,
+        process: existing.process,
+        monthlySalary: toNumber(existing.monthlySalary),
+        sortOrder: existing.sortOrder,
+        effectiveFrom: asDate(now),
+      },
+    }),
   );
 }

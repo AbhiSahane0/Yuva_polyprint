@@ -1573,16 +1573,39 @@ model CostingMachine {
 /// Salaries are monthly; the working month in settings turns them into a rate
 /// per minute. Somebody is paid for the setup time as well as the run time,
 /// which is why the setup minutes live on the machine.
+/**
+ * What a process is crewed at, and from when.
+ *
+ * **Dated, like every other costing figure**, and it was the last one that was
+ * not. A single live row with an on/off switch reached backwards: switching the
+ * lamination crew on in 2026 re-priced seven quotations written in 2022, each
+ * by about a rupee a kilogram, because a quotation is costed against whatever
+ * the master says now. The half-open window is what stops that — see
+ * `costing-window.ts`.
+ *
+ * The role name is **not unique**, for the same reason an overhead's is not:
+ * "Lamination Operator" at Rs 18,000 until March and Rs 20,000 after it is the
+ * same job twice, and both windows have to survive or the March quotations stop
+ * explaining themselves.
+ *
+ * There is no `isActive` column either. Whether a row is live is a question
+ * about a date, and holding the answer in a second place is how the two come to
+ * disagree — the API derives it from `effectiveTo`.
+ */
 model CostingLabour {
   id String @id @default(cuid())
 
-  role    String      @unique
+  role    String
   process MachineKind
 
   monthlySalary Decimal @map("monthly_salary") @db.Decimal(12, 2)
 
-  isActive  Boolean @default(true) @map("is_active")
-  sortOrder Int     @default(0) @map("sort_order")
+  /// The first day this wage applies.
+  effectiveFrom DateTime  @map("effective_from") @db.Date
+  /// The first day it does NOT. Null while it is still live.
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+
+  sortOrder Int @default(0) @map("sort_order")
 
   /// The people paid as this. Restricted rather than cascaded: a role with
   /// somebody on it is a role the works still has, and deleting it out from
@@ -1592,6 +1615,8 @@ model CostingLabour {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([effectiveFrom])
+  @@index([effectiveTo])
   @@map("costing_labour")
 }
 

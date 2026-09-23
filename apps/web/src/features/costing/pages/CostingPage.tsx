@@ -268,6 +268,16 @@ export default function CostingPage() {
                           Retired
                         </Badge>
                       ) : null}
+                      {/*
+                        The window, like the overheads carry. A wage applies to
+                        a quotation whose date falls in it, which is what lets
+                        the works take a crew on today without re-pricing what
+                        went out last year.
+                      */}
+                      <div className="text-ink-400 mt-0.5 text-xs font-normal">
+                        {row.effectiveFrom}
+                        {row.effectiveTo ? ` — ${row.effectiveTo}` : ' onwards'}
+                      </div>
                     </td>
                     <td className="text-ink-600 px-4 py-3">{MACHINE_KIND_LABELS[row.process]}</td>
                     <td className="text-ink-600 px-4 py-3 text-right tabular-nums">
@@ -303,7 +313,7 @@ export default function CostingPage() {
                                 : retireLabour.mutate(row.id)
                             }
                           >
-                            {row.isActive ? 'Retire' : 'Restore'}
+                            {row.isActive ? 'Retire' : 'Take back on'}
                           </Button>
                         </>
                       ) : null}
@@ -358,11 +368,17 @@ export default function CostingPage() {
           </>
         ) : (
           <>
-            This wage stops being charged, so every rate worked out from now on drops by what this
-            person was costing. Quotations already saved keep the figures they were saved with.
+            This wage stops being charged from today, so every rate worked out from now on drops by
+            what this person was costing. <strong>Nothing already quoted moves</strong> — a wage
+            applies to a quotation whose date falls inside its window, so one written last year goes
+            on repricing with the crew it was written under.
           </>
         )}
-        <p className="mt-2">It stays on this screen, greyed, with a Restore beside it.</p>
+        <p className="mt-2">
+          {retiring?.kind === 'machine'
+            ? 'It stays on this screen, greyed, with a Restore beside it.'
+            : 'It stays on this screen, greyed. Taking it back on opens a new window from that day — it never reaches backwards.'}
+        </p>
       </ConfirmDialog>
     </div>
   );

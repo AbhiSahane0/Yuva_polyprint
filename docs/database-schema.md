@@ -292,7 +292,7 @@ erDiagram
 | --- | ---: | ---: | --- |
 | `app_setting_history` | 4 | 66 |  |
 | `app_settings` | 3 | 61 | Editable rates: cylinder rate, GST %, advance %. |
-| `costing_labour` | 8 | 7 |  |
+| `costing_labour` | 9 | 8 |  |
 | `costing_machines` | 14 | 4 |  |
 | `costing_overheads` | 9 | 0 |  |
 | `customers` | 17 | 70 | Companies that order from Yuva Polyprint. |
@@ -438,13 +438,14 @@ erDiagram
 | Column | Type | Null | Key |
 | --- | --- | :-: | --- |
 | `id` | `text` |  | PK |
-| `role` | `text` |  | unique |
+| `role` | `text` |  |  |
 | `process` | `MachineKind` (enum) |  |  |
 | `monthly_salary` | `decimal(12,2)` |  |  |
-| `is_active` | `boolean` |  |  |
 | `sort_order` | `integer` |  |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
+| `effective_from` | `date` |  |  |
+| `effective_to` | `date` | ✓ |  |
 
 ### `costing_machines`
 

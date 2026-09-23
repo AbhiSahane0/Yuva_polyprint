@@ -45,6 +45,7 @@ import {
 } from '@yuva/shared';
 import { prisma } from '../src/lib/prisma.js';
 import { createQuotation } from '../src/modules/quotations/quotation.service.js';
+import { labourAsAt } from '../src/modules/costing/costing.service.js';
 import { getSettings } from '../src/modules/settings/settings.service.js';
 
 const WORKBOOK =
@@ -177,10 +178,16 @@ const machines = (
   setupMinutes: m.setupMinutes,
   setupPowerFactor: Number(m.setupPowerFactor),
 }));
-const labour = (await prisma.costingLabour.findMany({ where: { isActive: true } })).map((l) => ({
+/*
+ * The crew in force today, because this script prices every sheet as at today
+ * — the same basis `settings` above is read on. Wages are dated now, so this
+ * asks the window rather than a boolean: a crew taken on tomorrow does not
+ * reach back into what these runs cost.
+ */
+const labour = (await labourAsAt()).map((l) => ({
   role: l.role,
   process: l.process,
-  monthlySalary: Number(l.monthlySalary),
+  monthlySalary: l.monthlySalary,
 }));
 
 /**

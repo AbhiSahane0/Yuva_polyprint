@@ -206,15 +206,16 @@ Table app_settings {
 
 Table costing_labour {
   id text [pk]
-  role text [unique, not null]
+  role text [not null]
   process MachineKind [not null]
   monthly_salary decimal(12,2) [not null]
-  is_active boolean [not null, default: `true`]
   sort_order integer [not null, default: `0`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
+  effective_from date [not null]
+  effective_to date
 
-  Note: '7 row(s) at time of generation'
+  Note: '8 row(s) at time of generation'
 }
 
 Table costing_machines {

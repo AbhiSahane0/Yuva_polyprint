@@ -133,20 +133,50 @@ running plus setup.
 
 ### The works' wages today
 
-| Role                  | Works on   | Monthly               |
-| --------------------- | ---------- | --------------------- |
-| Printing Operator     | Printing   | Rs 25,000             |
-| Printing Assistant    | Printing   | Rs 13,000             |
-| Printing Helper       | Printing   | Rs 8,000              |
-| Slitting Operator     | Slitting   | Rs 12,000             |
-| Slitting Helper       | Slitting   | Rs 8,000              |
-| _Lamination Operator_ | Lamination | _Rs 18,000 — retired_ |
-| _Lamination Helper_   | Lamination | _Rs 8,000 — retired_  |
+| Role                | Works on     | Monthly   | From        |
+| ------------------- | ------------ | --------- | ----------- |
+| Printing Operator   | Printing     | Rs 25,000 | always      |
+| Printing Assistant  | Printing     | Rs 13,000 | always      |
+| Printing Helper     | Printing     | Rs 8,000  | always      |
+| Slitting Operator   | Slitting     | Rs 12,000 | always      |
+| Slitting Helper     | Slitting     | Rs 8,000  | always      |
+| Lamination Operator | Lamination   | Rs 18,000 | 23 Sep 2026 |
+| Lamination Helper   | Lamination   | Rs 8,000  | 23 Sep 2026 |
+| Pouch Operator      | Pouch making | Rs 12,000 | 23 Sep 2026 |
 
-> **Nobody is paid for lamination.** The laminator runs 86 minutes on the works'
-> reference job and their sheet pays nobody for it. The two roles were seeded
-> and then retired to match, which is worth **48 paise a kilogram**. They are
-> still on this screen, greyed, with a **Restore** beside them.
+> **Lamination went unpaid until 23 September 2026.** The laminator runs 86
+> minutes on the works' reference job and their 2022 sheet pays nobody for it,
+> so the two roles were seeded and then retired to match — worth **48 paise a
+> kilogram**. The works took the crew back on in September 2026, from that day.
+>
+> **Pouch Operator costs nothing yet.** Wages are charged against the minutes of
+> a machine of that kind, and there is no pouch-making machine on this screen.
+> The figure is a placeholder at the slitting operator's wage — **check it**
+> before adding the machine, because that is the moment it starts pricing jobs.
+
+### Every wage has a window
+
+Each row says the day it starts applying, and the day it stops if it has
+stopped. **A quotation is costed with the wages that were live on its own
+date** — the same rule the overheads in §3a follow, and the same rule a
+material's dated rates follow.
+
+That is what lets the works take a crew back on without disturbing anything
+already quoted. Turning the lamination crew on before wages were dated moved all
+seven of the verified 2022 documents, about a rupee a kilogram each; now it
+moves none of them.
+
+So the three things you can do to a wage all point forwards:
+
+| Action          | What it does                                    |
+| --------------- | ----------------------------------------------- |
+| Add a role      | Live from today                                 |
+| Change the wage | Ends today's window, opens a new one from today |
+| Retire it       | Closes the window today                         |
+| Take it back on | Opens a **new** window from today               |
+
+Correcting a **name** is the exception and happens in place — the row that paid
+Rs 18,000 paid Rs 18,000 whatever the job was called.
 
 ### Retiring, not deleting
 
@@ -154,13 +184,13 @@ A machine or a wage is **retired**, never deleted — the quotations costed with
 it are still on file, and deleting the row would make them impossible to
 explain.
 
-> **Retiring asks first; restoring does not.** Taking a machine or a wage out of
-> the costing moves every rate costed afterwards, and it moves it **down** — the
-> job looks cheaper to make than it is, at once and without a word. Putting one
-> back is the harmless direction, and a confirmation dialog in front of a safe
-> action only teaches the office to click through dialogs.
+> **Retiring asks first; taking back on does not.** Taking a wage out of the
+> costing moves every rate costed afterwards, and it moves it **down** — the job
+> looks cheaper to make than it is, at once and without a word. Putting one back
+> is the harmless direction, and a confirmation dialog in front of a safe action
+> only teaches the office to click through dialogs.
 
-Use **Show retired** to see them and bring one back.
+Use **Show retired** to see closed windows and open a fresh one.
 
 ---
 

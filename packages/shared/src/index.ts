@@ -44,7 +44,7 @@ export * from './lib/operator-choices.js';
 export * from './schemas/employee.js';
 export * from './types/employee.js';
 export * from './lib/material-cost.js';
-export * from './lib/overhead-window.js';
+export * from './lib/costing-window.js';
 export * from './lib/phone.js';
 export * from './lib/inventory.js';
 export * from './lib/units.js';
