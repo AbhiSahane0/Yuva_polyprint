@@ -3,6 +3,7 @@ import type { JobSheet, JobSheetSummary, Paginated } from '@yuva/shared';
 import { request } from '@/lib/api-client';
 import { settle } from '@/lib/query';
 import { inventoryKeys } from '@/features/inventory/api/inventory-api';
+import { productionKeys } from '@/features/production/api/production-api';
 
 export interface JobSheetListParams {
   search?: string;
@@ -47,7 +48,9 @@ export function useCreateJobSheet() {
   return useMutation({
     mutationFn: (body: Record<string, unknown>) =>
       request<JobSheet>({ url: '/job-sheets', method: 'POST', data: body }),
-    onSuccess: () => settle(queryClient, jobSheetKeys.all),
+    /* A sheet can be raised against a job card, and that card now has one —
+       which is what its screen offers instead of raising a second. */
+    onSuccess: () => settle(queryClient, jobSheetKeys.all, productionKeys.all),
   });
 }
 
@@ -68,7 +71,8 @@ export function useUpdateJobSheet(id: string) {
       /* The server's own answer, so it needs no round trip to confirm — the
          wait below is only for the LIST, which is derived. */
       queryClient.setQueryData(jobSheetKeys.one(id), sheet);
-      return settle(queryClient, jobSheetKeys.all);
+      /* The job card this sheet points at may have changed with this save. */
+      return settle(queryClient, jobSheetKeys.all, productionKeys.all);
     },
   });
 }
@@ -95,8 +99,12 @@ export function usePostJobSheetToStock(id: string) {
       }),
     onSuccess: (result) => {
       queryClient.setQueryData(jobSheetKeys.one(id), result.sheet);
-      /* Stock has genuinely moved, so every inventory screen is now stale. */
-      return settle(queryClient, jobSheetKeys.all, inventoryKeys.all);
+      /*
+       * Stock has genuinely moved, so every inventory screen is now stale — and
+       * so is every production screen: posting releases the linked card's claim
+       * on its film, which changes what every OTHER card sees as free.
+       */
+      return settle(queryClient, jobSheetKeys.all, inventoryKeys.all, productionKeys.all);
     },
   });
 }

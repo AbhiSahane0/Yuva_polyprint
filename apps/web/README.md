@@ -421,6 +421,21 @@ was already solved. The figures stay; only the alarm goes.
 The list carries the same fact as a **Short of film** badge beside the job name,
 so a supervisor scanning the floor sees it without opening anything.
 
+Once the run's job sheet has been taken off stock, the panel says so and the
+claim is gone — what the run actually weighed is in the ledger by then. The
+figures stay as a record of what it was expected to take.
+
+#### Record what it cost
+
+The handover from the floor to the office. The button raises a job sheet
+**already pointed at this card**, which matters more than it looks: posting a
+linked sheet releases the card's claim on its film, and a sheet started from the
+Job sheets list has to have the card picked by hand. The one nobody picks is the
+one that leaves stock reading low until somebody remembers to complete the card.
+
+Once a sheet exists the button becomes a link to it, so there is no way to raise
+a second — one run, one costing.
+
 ### Quotations — `/quotations`
 
 By default the list reads as a **work queue, not a diary**: Draft first, then
@@ -1271,6 +1286,22 @@ The list leads with the cost a kilogram, because that is the one figure anybody
 comes here for — it is what the office prices repeat work from, and the reason
 the sheet is filled in at all. Wastage over the allowance shows red, which is
 how a 26% run announces itself without anybody opening it.
+
+#### Which run this sheet is costing
+
+The header carries a **Job card** picker, and it is worth setting rather than
+skipping: **taking the sheet off stock releases that card's claim on its film.**
+Without it the claim stands until somebody completes the card, and for that
+whole window free stock reads low by this entire run — the claim and the issue
+both against the same material.
+
+Only cards nothing else costs are offered, plus whichever this sheet already
+names, which would otherwise vanish from its own dropdown. Choosing one fills
+the design, the name and the customer from the card, but only where they are
+blank — an office that typed a name meant it.
+
+A sheet raised from the job card itself arrives with this already set, which is
+the path to prefer.
 
 #### The sheet is laid out like the paper one
 

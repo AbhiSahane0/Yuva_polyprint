@@ -2602,14 +2602,15 @@ rows that are not real drums, so there is nothing there to reserve against.
 
 #### When it is checked, and what it stops
 
-| Moment                | What happens                                                            |
-| --------------------- | ----------------------------------------------------------------------- |
-| Card raised           | The claim is written. A shortage is **flagged, not refused**            |
-| Card quantity changed | The claim follows it, upserted — never stacked                          |
-| A stage is started    | **Re-checked against stock now, and refused with 409**                  |
-| Card moved to RUNNING | Same check, same refusal                                                |
-| Card completed        | The claim is released — by then the job sheet has posted the real issue |
-| Card deleted          | The claim goes with it, by cascade                                      |
+| Moment                  | What happens                                                      |
+| ----------------------- | ----------------------------------------------------------------- |
+| Card raised             | The claim is written. A shortage is **flagged, not refused**      |
+| Card quantity changed   | The claim follows it, upserted — never stacked                    |
+| A stage is started      | **Re-checked against stock now, and refused with 409**            |
+| Card moved to RUNNING   | Same check, same refusal                                          |
+| **Its job sheet posts** | **The claim is released** — the film has genuinely left the shelf |
+| Card completed          | Released too, for a card no sheet was linked to                   |
+| Card deleted            | The claim goes with it, by cascade                                |
 
 Raising a card is deliberately not the place to refuse. It is how the floor
 finds out what is missing and how purchase finds out what to order, and a works
@@ -2642,15 +2643,45 @@ buy more, and film already promised to a job cannot answer it: 600 kg on hand
 with 550 committed is 50 kg to run the next job on, and a screen calling that
 healthy lets the works run out while showing a comfortable figure.
 
-#### The one gap, stated
+#### Where the claim ends — the job sheet
 
-A job sheet is linked to a _design_, not to a job card, so a posted sheet cannot
-be matched back to the card whose film it used. Between the sheet posting and
-the card being completed, that card's claim still stands alongside the issue the
-sheet made — so free stock reads **lower** than it is for that window. The error
-is in the safe direction (nothing is double-_deducted_; the ledger and the
-batches are untouched, and the figure only ever understates what is free), and
-it ends when the card is completed. Linking job sheets to cards would close it.
+A job sheet carries `productionOrderId`: **the card whose run it costs**. One
+run, one costing, so the column is unique — two sheets against one card would
+each claim to be what that run cost, and nothing could say which was right.
+
+**Posting a linked sheet releases that card's claim, in the same transaction
+that issues the material.** That is the moment the film genuinely leaves the
+shelf, so it is the moment the claim standing in for it must stop counting.
+Without the link the claim stands until somebody completes the card, and for
+that whole window free stock reads low by the entire run — the claim and the
+issue both against the same film.
+
+Measured on a real run of 1,000 kg with 600 kg of PET on the shelf:
+
+|                    | on hand | committed | free    |
+| ------------------ | ------- | --------- | ------- |
+| Card raised        | 600     | 487.599   | 112.401 |
+| Sheet posts 400 kg | 200     | 0         | **200** |
+
+200 is the truth. The unlinked behaviour would have read −287.6 until the card
+was completed. The film left stock exactly once, in the 600 → 200.
+
+Two guards keep it that way:
+
+- **Nothing re-claims film that has been issued.** Once the linked sheet has
+  posted, `materialIsSettled` stops a changed card quantity writing the claim
+  back — it would stand alongside the issue and take the same film off free
+  stock twice — and stops a start being refused over a question already settled.
+- **A card with no sheet still releases on completion.** The works' own imported
+  sheets predate job cards entirely, and an office keying yesterday's paper has
+  no card to point at. The link is the earlier and more accurate of the two
+  releases, not the only one.
+
+The link is set from either end: the job card offers **Record what it cost**,
+which raises the sheet already pointed at it, and the sheet's own header has a
+job card picker listing the cards nothing else costs. Linking a blank sheet
+fills its design, name and customer from the card — blanks only, because an
+office that typed a name meant it.
 
 ### Starting a stage starts everything above it
 

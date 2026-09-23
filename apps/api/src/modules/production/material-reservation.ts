@@ -269,6 +269,25 @@ export async function releaseFor(tx: Prisma.TransactionClient, cardId: string): 
   });
 }
 
+/**
+ * Whether this card's material question is already settled.
+ *
+ * True once its job sheet has been posted: the run's real consumption is in the
+ * ledger by then, against real batches. After that a claim must never be
+ * written again — it would stand alongside the issue and take the same film off
+ * free stock twice — and there is nothing left to refuse a start over.
+ */
+export async function materialIsSettled(
+  tx: Prisma.TransactionClient,
+  cardId: string,
+): Promise<boolean> {
+  const sheet = await tx.jobSheet.findUnique({
+    where: { productionOrderId: cardId },
+    select: { stockPostedAt: true },
+  });
+  return Boolean(sheet?.stockPostedAt);
+}
+
 /** The sentence the floor reads when a job cannot be made. */
 export function shortageMessage(lines: MaterialAvailability[]): string {
   const short = shortages(lines);

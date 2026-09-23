@@ -65,6 +65,15 @@ export const jobSheetSchema = z.object({
   jobName: z.string().trim().max(200).default(''),
   customerId: z.string().trim().min(1).nullable().default(null),
 
+  /**
+   * The job card this sheet costs. Null unlinks it.
+   *
+   * Refused by the server when another sheet already has that card: one run,
+   * one costing, and two sheets claiming to be what a run cost is a question
+   * nothing can answer.
+   */
+  productionOrderId: z.string().trim().min(1).nullable().default(null),
+
   operatorName: z.string().trim().max(120).default(''),
 
   filmType: z.string().trim().max(80).default(''),

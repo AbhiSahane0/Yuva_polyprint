@@ -14,6 +14,7 @@ import type { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
 import { issueMaterialFifo } from '../inventory/inventory.service.js';
+import { releaseFor } from '../production/material-reservation.js';
 import { getSettings } from '../settings/settings.service.js';
 
 /**
@@ -40,6 +41,8 @@ import { getSettings } from '../settings/settings.service.js';
 
 const SHEET_INCLUDE = {
   customer: { select: { companyName: true, brandName: true } },
+  /* Only its number: the sheet names the card it costs, it does not restate it. */
+  productionOrder: { select: { number: true } },
   lines: { orderBy: { position: 'asc' } },
   labour: { orderBy: { position: 'asc' } },
   stages: { orderBy: { stage: 'asc' } },
@@ -80,6 +83,9 @@ function toJobSheet(row: SheetRow): JobSheet {
     jobName: row.jobName,
     customerId: row.customerId,
     customerName: customerName(row.customer),
+
+    productionOrderId: row.productionOrderId,
+    productionOrderNumber: row.productionOrder?.number ?? null,
 
     operatorName: row.operatorName,
 
@@ -260,6 +266,15 @@ export async function createJobSheet(input: JobSheetInput, enteredBy: string): P
     : null;
   if (input.jobId && !job) throw ApiError.badRequest('That job is no longer on record');
 
+  /*
+   * Raised straight off a job card, which is the ordinary path once the floor
+   * has finished a run: the card knows the design and the customer, so the
+   * office is not asked to retype what is already on the screen.
+   */
+  const fromCard = input.productionOrderId
+    ? await resolveCardLink(prisma, null, input.productionOrderId)
+    : null;
+
   const number = await peekNextNumber();
 
   const created = await prisma.jobSheet.create({
@@ -268,9 +283,11 @@ export async function createJobSheet(input: JobSheetInput, enteredBy: string): P
       date: asDate(input.date),
       status: 'OPEN',
 
-      jobId: job?.id ?? null,
-      jobName: input.jobName || job?.jobName || '',
-      customerId: input.customerId ?? job?.customerId ?? null,
+      jobId: job?.id ?? fromCard?.jobId ?? null,
+      jobName: input.jobName || job?.jobName || fromCard?.jobName || '',
+      customerId: input.customerId ?? job?.customerId ?? fromCard?.customerId ?? null,
+
+      productionOrderId: input.productionOrderId ?? null,
 
       operatorName: input.operatorName,
       filmType: input.filmType,
@@ -455,6 +472,50 @@ async function editable(id: string) {
   return row;
 }
 
+/**
+ * Checks a sheet may claim that job card, and says what the card can fill in.
+ *
+ * **One run, one costing.** A second sheet against the same card would be a
+ * second answer to "what did this run cost", and nothing could say which was
+ * right — so the unique index refuses it and this turns that into a sentence
+ * somebody can act on.
+ *
+ * The card also carries the design and the customer, so a sheet linked to one
+ * stops asking for what the card already knows. Only blanks are filled: an
+ * office that typed a name meant it.
+ */
+async function resolveCardLink(
+  tx: Prisma.TransactionClient,
+  sheetId: string | null,
+  productionOrderId: string,
+): Promise<{ jobId: string | null; jobName: string; customerId: string | null }> {
+  const card = await tx.productionOrder.findUnique({
+    where: { id: productionOrderId },
+    select: {
+      id: true,
+      number: true,
+      jobId: true,
+      jobName: true,
+      jobSheet: { select: { id: true, number: true } },
+    },
+  });
+  if (!card) throw ApiError.badRequest('That job card is no longer on record');
+  if (card.jobSheet && card.jobSheet.id !== sheetId) {
+    throw ApiError.conflict(
+      `Job sheet ${card.jobSheet.number} already costs job card #${card.number}`,
+    );
+  }
+
+  /* The customer comes off the order rather than the card: the card snapshots a
+     NAME for the floor to read, and a name is not a link. */
+  const order = await tx.order.findFirst({
+    where: { productionOrders: { some: { id: card.id } } },
+    select: { customerId: true },
+  });
+
+  return { jobId: card.jobId, jobName: card.jobName, customerId: order?.customerId ?? null };
+}
+
 export async function updateJobSheet(
   id: string,
   input: Partial<JobSheetInput>,
@@ -463,7 +524,23 @@ export async function updateJobSheet(
   await editable(id);
 
   await prisma.$transaction(async (tx) => {
-    const { lines, labour, stages, date, jobId, ...rest } = input;
+    const { lines, labour, stages, date, jobId, productionOrderId, ...rest } = input;
+
+    /*
+     * Pulled out of the spread on purpose. Linking a sheet to a card is the
+     * only field here that can be refused, and letting it through with the
+     * rest would make it the one write nothing checked.
+     */
+    let fromCard: { jobId: string | null; jobName: string; customerId: string | null } | null =
+      null;
+    if (productionOrderId) fromCard = await resolveCardLink(tx, id, productionOrderId);
+
+    const current = fromCard
+      ? await tx.jobSheet.findUniqueOrThrow({
+          where: { id },
+          select: { jobId: true, jobName: true, customerId: true },
+        })
+      : null;
 
     await tx.jobSheet.update({
       where: { id },
@@ -471,6 +548,15 @@ export async function updateJobSheet(
         ...rest,
         ...(date ? { date: asDate(date) } : {}),
         ...(jobId !== undefined ? { jobId } : {}),
+        ...(productionOrderId !== undefined ? { productionOrderId } : {}),
+        /* Blanks only — an office that typed a name meant it. */
+        ...(fromCard && current
+          ? {
+              ...(current.jobId ? {} : { jobId: fromCard.jobId }),
+              ...(current.jobName ? {} : { jobName: fromCard.jobName }),
+              ...(current.customerId ? {} : { customerId: fromCard.customerId }),
+            }
+          : {}),
       },
     });
 
@@ -571,6 +657,8 @@ export async function listJobSheets(query: {
         status: true,
         jobName: true,
         customer: { select: { companyName: true, brandName: true } },
+        /* Only its number: the sheet names the card it costs, it does not restate it. */
+        productionOrder: { select: { number: true } },
         pouchingWeightKg: true,
         finalOutputKg: true,
         materialCost: true,
@@ -661,6 +749,21 @@ export async function postToStock(
       where: { id },
       data: { status: 'CLOSED', stockPostedAt: new Date() },
     });
+
+    /*
+     * **Where the claim ends.**
+     *
+     * The job card held this film so nothing else could be promised it. The
+     * lines above have just issued what the run actually took, against real
+     * batches and real movements — so from this moment the claim and the issue
+     * would both be standing against the same material, and free stock would
+     * read low by the whole run.
+     *
+     * Releasing it here rather than waiting for the card to be completed is
+     * what closes that window. A card with no sheet still releases on
+     * completion; this is the earlier and more accurate of the two.
+     */
+    if (sheet.productionOrderId) await releaseFor(tx, sheet.productionOrderId);
   });
 
   return { sheet: await getJobSheet(id), posted, skipped };

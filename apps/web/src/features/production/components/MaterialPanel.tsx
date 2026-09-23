@@ -48,6 +48,9 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
   }
 
   const overridden = Boolean(card.materialOverrideReason);
+  /* The claim is over: the sheet has issued what the run actually took, against
+     real batches, so there is nothing left standing in for it. */
+  const posted = Boolean(card.jobSheetPostedAt);
 
   async function save(text: string) {
     try {
@@ -69,7 +72,12 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-ink-800 text-xs font-semibold tracking-wider uppercase">Material</h2>
-        {short.length > 0 ? (
+        {posted ? (
+          <Badge tone="neutral">
+            <Check className="mr-1 size-3.5" />
+            Taken off stock by sheet {card.jobSheetNumber}
+          </Badge>
+        ) : short.length > 0 ? (
           <Badge tone="danger">
             <AlertTriangle className="mr-1 size-3.5" />
             Short of {short.length === 1 ? short[0]!.name : `${short.length} materials`}
@@ -130,7 +138,15 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
         </table>
       </div>
 
-      {short.length > 0 && !overridden ? (
+      {posted ? (
+        <p className="text-ink-500 mt-3 text-sm">
+          Job sheet {card.jobSheetNumber} has taken this run's material off stock, so the claim
+          above is released — what the run actually weighed is in the ledger now. The figures stay
+          as a record of what it was expected to take.
+        </p>
+      ) : null}
+
+      {short.length > 0 && !posted && !overridden ? (
         <p className="text-danger-800 mt-3 text-sm">
           This job cannot be started until the film is in. Free stock is what is on hand less what
           other open job cards have claimed.
@@ -165,7 +181,7 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
             </Button>
           ) : null}
         </div>
-      ) : short.length > 0 && canEdit ? (
+      ) : short.length > 0 && !posted && canEdit ? (
         opening ? (
           <div className="mt-3">
             <Field

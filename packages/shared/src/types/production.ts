@@ -64,6 +64,18 @@ export interface ProductionOrder {
    */
   materials: MaterialAvailability[];
 
+  /**
+   * The sheet that costs this run, once the office has started one.
+   *
+   * Posting it is what takes the run's material off stock — and what releases
+   * this card's claim on it, so the two never stand against the same film at
+   * once. Null until a sheet is linked.
+   */
+  jobSheetId: string | null;
+  jobSheetNumber: number | null;
+  /** When that sheet's material was taken off stock. Null until it is. */
+  jobSheetPostedAt: string | null;
+
   /** Why this card was allowed to run short, if it was. Empty means it was not. */
   materialOverrideReason: string;
   /** Who said so, and when. Both empty until somebody does. */

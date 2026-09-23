@@ -24,6 +24,7 @@ import { useCostingMasterData } from '@/features/costing/api/costing-api';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
+import { useCreateJobSheet } from '@/features/job-sheets/api/job-sheet-api';
 import { MaterialPanel } from '../components/MaterialPanel';
 import {
   useDeleteProduction,
@@ -71,6 +72,7 @@ export default function JobCardPage() {
   const update = useUpdateProduction();
   const updateStage = useUpdateStage();
   const remove = useDeleteProduction();
+  const startSheet = useCreateJobSheet();
   const [deleting, setDeleting] = useState(false);
 
   if (isPending) return <LoadingState label="Loading the job card…" />;
@@ -103,6 +105,21 @@ export default function JobCardPage() {
       );
     } catch (caught) {
       toast.error(caught instanceof ApiClientError ? caught.message : 'Could not save');
+    }
+  }
+
+  /** Raises the sheet that will cost this run, already pointed at this card. */
+  async function recordCost() {
+    try {
+      const sheet = await startSheet.mutateAsync({
+        date: new Date().toISOString().slice(0, 10),
+        productionOrderId: card!.id,
+      });
+      navigate(`/job-sheets/${sheet.id}`);
+    } catch (caught) {
+      toast.error(
+        caught instanceof ApiClientError ? caught.message : 'Could not start a job sheet',
+      );
     }
   }
 
@@ -151,9 +168,35 @@ export default function JobCardPage() {
           </p>
         </div>
 
-        {canEdit && !ended ? (
+        {canEdit ? (
           <>
             <div className="hidden shrink-0 items-center gap-2 sm:flex sm:flex-nowrap">
+              {/*
+               * The handover from the floor to the office, and the reason it is
+               * on this screen at all: a sheet raised here is LINKED to the
+               * card, and posting a linked sheet releases the card's claim on
+               * its film. A sheet started from the Job sheets list has to have
+               * the card picked by hand, and the one nobody picks is the one
+               * that leaves stock reading low.
+               */}
+              {card.jobSheetId ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => navigate(`/job-sheets/${card.jobSheetId}`)}
+                  className="whitespace-nowrap"
+                >
+                  Job sheet {card.jobSheetNumber}
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  loading={startSheet.isPending}
+                  onClick={() => void recordCost()}
+                  className="whitespace-nowrap"
+                >
+                  Record what it cost
+                </Button>
+              )}
               {nextStatuses.map((status) => (
                 <Button
                   key={status}
@@ -169,10 +212,18 @@ export default function JobCardPage() {
             <ActionMenu
               className="sm:hidden"
               label={`Actions for job card ${card.number}`}
-              actions={nextStatuses.map((status) => ({
-                label: PRODUCTION_STATUS_LABELS[status],
-                onSelect: () => void move(status),
-              }))}
+              actions={[
+                card.jobSheetId
+                  ? {
+                      label: `Job sheet ${card.jobSheetNumber}`,
+                      onSelect: () => navigate(`/job-sheets/${card.jobSheetId}`),
+                    }
+                  : { label: 'Record what it cost', onSelect: () => void recordCost() },
+                ...nextStatuses.map((status) => ({
+                  label: PRODUCTION_STATUS_LABELS[status],
+                  onSelect: () => void move(status),
+                })),
+              ]}
             />
           </>
         ) : null}

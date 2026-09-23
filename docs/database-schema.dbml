@@ -431,6 +431,7 @@ Table job_sheets {
   entered_by text [not null, default: `''`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
+  production_order_id text [unique]
 
   Note: '15 row(s) at time of generation'
 }
@@ -945,3 +946,4 @@ Ref: production_stages.production_order_id > production_orders.id [delete: casca
 Ref: production_stages.machine_id > costing_machines.id [delete: set null]
 Ref: stock_reservations.material_id > materials.id [delete: restrict]
 Ref: stock_reservations.production_order_id > production_orders.id [delete: cascade]
+Ref: job_sheets.production_order_id > production_orders.id [delete: set null]

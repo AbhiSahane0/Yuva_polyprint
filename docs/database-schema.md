@@ -80,6 +80,7 @@ erDiagram
     text job_id FK
     text job_name
     text customer_id FK
+    text production_order_id FK
   }
   jobs {
     text id PK
@@ -275,6 +276,7 @@ erDiagram
   costing_machines ||--o{ production_stages : "machine_id"
   materials ||--|{ stock_reservations : "material_id"
   production_orders ||--|{ stock_reservations : "production_order_id"
+  production_orders ||--o{ job_sheets : "production_order_id"
 ```
 
 ## Tables
@@ -293,7 +295,7 @@ erDiagram
 | `job_sheet_labour` | 8 | 120 |  |
 | `job_sheet_lines` | 17 | 315 |  |
 | `job_sheet_stage_usage` | 7 | 75 |  |
-| `job_sheets` | 59 | 15 |  |
+| `job_sheets` | 60 | 15 |  |
 | `jobs` | 55 | 419 | Products and their full engineering specification. |
 | `login_events` | 7 | 51 |  |
 | `material_rates` | 6 | 453 |  |
@@ -369,6 +371,7 @@ erDiagram
 | `production_stages.machine_id` | `costing_machines.id` | SET NULL |  |
 | `stock_reservations.material_id` | `materials.id` | RESTRICT |  |
 | `stock_reservations.production_order_id` | `production_orders.id` | CASCADE |  |
+| `job_sheets.production_order_id` | `production_orders.id` | SET NULL |  |
 
 ## Enums
 
@@ -656,6 +659,7 @@ erDiagram
 | `entered_by` | `text` |  |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
+| `production_order_id` | `text` | ✓ | FK → `production_orders.id` |
 
 ### `jobs`
 

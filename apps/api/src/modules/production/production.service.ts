@@ -22,6 +22,7 @@ import {
   availabilityForCard,
   availabilityForCards,
   holdFor,
+  materialIsSettled,
   refuseUnlessOverridden,
   releaseFor,
   requirementsFor,
@@ -42,6 +43,9 @@ const isoDate = (value: Date): string => value.toISOString().slice(0, 10);
 const WITH_ALL = {
   order: { select: { number: true, dueDate: true } },
   stages: { orderBy: { position: 'asc' } },
+  /* What this run cost, once the office starts working it out. Posting that
+     sheet is what releases this card's claim on its film. */
+  jobSheet: { select: { id: true, number: true, stockPostedAt: true } },
 } as const;
 
 type Row = Prisma.ProductionOrderGetPayload<{ include: typeof WITH_ALL }>;
@@ -98,6 +102,10 @@ function toProduction(row: Row, materials: MaterialAvailability[] = []): Product
     currentStage: current?.stage ?? null,
 
     materials,
+    jobSheetId: row.jobSheet?.id ?? null,
+    jobSheetNumber: row.jobSheet?.number ?? null,
+    jobSheetPostedAt: row.jobSheet?.stockPostedAt?.toISOString() ?? null,
+
     materialOverrideReason: row.materialOverrideReason,
     materialOverrideBy: row.materialOverrideBy,
     materialOverrideAt: row.materialOverrideAt?.toISOString() ?? null,
@@ -339,7 +347,7 @@ export async function updateProduction(
      * card is the works committing the material, and the one thing that gets
      * past an honest shortage is somebody putting their name to a reason.
      */
-    if (movedTo === 'RUNNING') {
+    if (movedTo === 'RUNNING' && !(await materialIsSettled(tx, existing.id))) {
       refuseUnlessOverridden(await availabilityForCard(tx, cardForStock(existing)), existing);
     }
 
@@ -361,7 +369,13 @@ export async function updateProduction(
      * A changed quantity is a changed claim, so the hold follows it rather than
      * standing at whatever the card was first raised for.
      */
-    if (input.quantityKg !== undefined && input.quantityKg !== toNumber(existing.quantityKg)) {
+    if (
+      input.quantityKg !== undefined &&
+      input.quantityKg !== toNumber(existing.quantityKg) &&
+      /* Never after the sheet has posted: the claim would come back on top of
+         the issue, and the same film would leave free stock twice. */
+      !(await materialIsSettled(tx, row.id))
+    ) {
       await holdFor(tx, row.id, await requirementsFor(tx, cardForStock(row)));
     }
 
@@ -444,7 +458,7 @@ export async function updateStage(
      * have gone to another job, and a claim made on Monday is not a guarantee
      * on Thursday.
      */
-    if (movedTo === 'RUNNING') {
+    if (movedTo === 'RUNNING' && !(await materialIsSettled(tx, existing.productionOrderId))) {
       refuseUnlessOverridden(
         await availabilityForCard(tx, cardForStock(existing.productionOrder)),
         existing.productionOrder,

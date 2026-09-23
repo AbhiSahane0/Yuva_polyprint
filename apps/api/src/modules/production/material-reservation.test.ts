@@ -24,6 +24,7 @@ const read = (file: string): string =>
 
 const RESERVATION = read('./material-reservation.ts');
 const SERVICE = read('./production.service.ts');
+const JOB_SHEET = read('../job-sheets/job-sheet.service.ts');
 
 describe('production reserves material — it never issues it', () => {
   it('writes no stock movement anywhere in the module', () => {
@@ -101,5 +102,71 @@ describe('the block on a job that has no film', () => {
     const update = SERVICE.indexOf('tx.productionOrder.update');
     expect(check).toBeGreaterThan(-1);
     expect(check).toBeLessThan(update);
+  });
+});
+
+/**
+ * **The handover between the claim and the issue.**
+ *
+ * A job card claims film; a job sheet issues it. For a window they would both
+ * stand against the same material — the sheet's movements are in the ledger and
+ * the card's claim is still held — and free stock would read low by the whole
+ * run. Linking the two closes that: posting the sheet is the moment the claim
+ * stops counting, because it is the moment the material genuinely left.
+ */
+describe('a posted job sheet ends its card’s claim', () => {
+  it('releases inside the same transaction that issues the material', () => {
+    /*
+     * Inside, not after. A release that happened outside the transaction could
+     * survive a rollback of the issue it was released for, and the works would
+     * have neither the claim nor the movement.
+     */
+    const post = JOB_SHEET.slice(JOB_SHEET.indexOf('export async function postToStock'));
+    const body = post.slice(0, post.indexOf('export async function', 1));
+
+    /* Where the $transaction callback actually ends, by matching braces —
+       the first `});` in it closes an inner call, not the transaction. */
+    const opens = body.indexOf('await prisma.$transaction');
+    let depth = 0;
+    let closes = -1;
+    for (let at = body.indexOf('{', opens); at < body.length; at += 1) {
+      if (body[at] === '{') depth += 1;
+      else if (body[at] === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          closes = at;
+          break;
+        }
+      }
+    }
+
+    const release = body.indexOf('releaseFor(');
+    expect(release).toBeGreaterThan(opens);
+    expect(closes).toBeGreaterThan(-1);
+    expect(release).toBeLessThan(closes);
+  });
+
+  it('releases only when there is a card to release', () => {
+    // Most of the works' sheets predate job cards and have no link at all.
+    expect(JOB_SHEET).toMatch(/if \(sheet\.productionOrderId\) await releaseFor\(/);
+  });
+});
+
+describe('nothing re-claims film that has already been issued', () => {
+  it('guards every hold with the settled check', () => {
+    /*
+     * Once the sheet has posted, writing a claim again would put it alongside
+     * the issue and take the same film off free stock twice — which is the one
+     * thing this whole design exists to prevent. `createProduction` is the
+     * exception and cannot be otherwise: a card being raised has no sheet.
+     */
+    const holds = SERVICE.match(/await holdFor\(/g) ?? [];
+    expect(holds).toHaveLength(2);
+
+    const update = SERVICE.slice(SERVICE.indexOf('export async function updateProduction'));
+    const hold = update.indexOf('await holdFor(');
+    const guard = update.indexOf('materialIsSettled');
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(hold);
   });
 });

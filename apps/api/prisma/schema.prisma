@@ -1789,6 +1789,8 @@ model ProductionOrder {
 
   stages       ProductionStage[]
   reservations StockReservation[]
+  /// What this run cost, once the office has worked it out. See JobSheet.
+  jobSheet     JobSheet?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1977,6 +1979,21 @@ model JobSheet {
 
   customerId String?   @map("customer_id")
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  /**
+   * The job card this sheet is the costing of.
+   *
+   * One run, one costing — hence unique. Two sheets against one card would each
+   * claim to be what that run cost, and nothing could say which was right.
+   *
+   * Nullable, because the works' own imported sheets predate job cards entirely
+   * and an office keying yesterday's paper has no card to point at. But where
+   * it IS set it closes a real gap: posting the sheet is the moment the run's
+   * material genuinely leaves the shelf, so it is the moment the card's claim
+   * on that material should stop counting. See material-reservation.ts.
+   */
+  productionOrderId String?          @unique @map("production_order_id")
+  productionOrder   ProductionOrder? @relation(fields: [productionOrderId], references: [id], onDelete: SetNull)
 
   operatorName String @default("") @map("operator_name")
 
