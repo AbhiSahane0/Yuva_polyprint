@@ -8,6 +8,7 @@ import {
   PRODUCTION_STATUS_LABELS,
   PRODUCTION_STATUSES,
   STAGE_STATUS_LABELS,
+  stageWasteKnown,
   type ProductionStageRow,
   type ProductionStatus,
   type StageStatus,
@@ -408,9 +409,7 @@ export default function JobCardPage() {
                         stage.wasteKg < 0 ? 'text-warning-700' : 'text-ink-800',
                       )}
                     >
-                      {stage.inputKg === 0 && stage.outputKg === 0
-                        ? '—'
-                        : `${formatNumber(stage.wasteKg, 3)} kg`}
+                      {stageWasteKnown(stage) ? `${formatNumber(stage.wasteKg, 3)} kg` : '—'}
                     </div>
                     {stage.wasteKg < 0 ? (
                       <div className="text-warning-700 mt-0.5 text-xs">

@@ -1094,6 +1094,40 @@ has no such line.
 With those off, the workbook reconciles **exactly** — Rs 263.40 a kilogram and
 Rs 13.83 a pouch, on local and on Neon alike.
 
+### Four jobs to look at
+
+```bash
+npm run seed:demo -w @yuva/api
+npm run seed:demo -w @yuva/api -- --clear
+```
+
+Four jobs, one at each stage of the chain, so the whole thing can be walked
+through on the screens:
+
+|                  |                                                 |
+| ---------------- | ----------------------------------------------- |
+| **Quoted**       | a quotation sent, nobody has answered           |
+| **Ordered**      | won, the order is on the books, nothing started |
+| **On the floor** | printing done, lamination running               |
+| **Finished**     | every stage done, costed, and taken off stock   |
+
+**Not fixtures.** Every row is produced by the services the screens call: the
+quotation is priced by the costing engine, winning it raises the order, raising
+a card derives its stages from the structure, starting one checks the film is
+free, and the finished job's sheet posts what it actually took off stock. If any
+of that breaks, the seed breaks, which is most of why it is worth having.
+
+It uses the works' **real** customers and designs, so the screens read as they
+would in use, and it creates no customer and no design of its own. What it does
+create is marked, and it clears before it seeds — so it can be re-run after a
+change and land in a known state. `--clear` removes exactly what it made: the
+quotations, orders, job cards, job sheets, `DEMO-` stock batches and the four
+people, and nothing else.
+
+That last part goes around two refusals on purpose. A posted job sheet will not
+be deleted and a completed card will not either — both right for the works' own
+records, both wrong for a demo somebody wants to reset.
+
 Master data lives in `costing_machines`, `costing_labour`, and the `costing_*`
 keys in settings. `npm run seed:costing -w @yuva/api` loads the works' own 2022
 figures — **check them before quoting on them**.
