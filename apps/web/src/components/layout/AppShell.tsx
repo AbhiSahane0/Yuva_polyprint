@@ -15,6 +15,8 @@ import {
   X,
   Calculator,
   ClipboardList,
+  ClipboardCheck,
+  Factory,
 } from 'lucide-react';
 import type { AppModule } from '@yuva/shared';
 import { cn } from '@/lib/utils';
@@ -40,6 +42,13 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { to: '/customers', label: 'Customers', icon: Users, module: 'customers' },
       { to: '/quotations', label: 'Quotations', icon: FileText, module: 'quotations' },
+      /*
+       * No module, on purpose. What is due and when is the floor's question as
+       * much as the office's, so anyone signed in can read the orders; raising
+       * or changing one needs `quotations`, enforced on that route and on the
+       * API rather than by hiding the whole section.
+       */
+      { to: '/orders', label: 'Orders', icon: ClipboardCheck },
     ],
   },
   {
@@ -54,6 +63,9 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'Production',
     items: [
+      /* No module: a job card is the floor's own document and the office
+         watches it. Writing to it needs `jobs`, enforced on the API. */
+      { to: '/production', label: 'Production', icon: Factory },
       { to: '/cylinders', label: 'Design & Cylinders', icon: Disc3, module: 'cylinders' },
       { to: '/job-sheets', label: 'Job sheets', icon: ClipboardList, module: 'jobs' },
       { to: '/jobs', label: 'Jobs', icon: Boxes, module: 'jobs', disabled: true },

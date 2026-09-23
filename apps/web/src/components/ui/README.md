@@ -1,8 +1,9 @@
 # UI primitives
 
-Generic, feature-agnostic building blocks: Button, Input, **NumberInput**,
-Select, Combobox, Field, Modal, **ConfirmDialog**, Badge, Toaster, EmptyState,
-ReadOnlyValue, Spinner, LoadingState.
+Generic, feature-agnostic building blocks: Button, **IconButton**, Input,
+**NumberInput**, Select, Combobox, Field, Modal, **ConfirmDialog**,
+**ActionMenu**, Badge, Toaster, EmptyState, ReadOnlyValue, Spinner,
+LoadingState.
 
 Rules: no business logic, no data fetching, no feature imports. Style with the
 design tokens in `src/styles/index.css` (`bg-brand-600`, `text-ink-500`, …)
@@ -14,6 +15,55 @@ rather than raw hex values.
 > ramps in `index.css` run 50 to 900 for exactly that reason, and
 > `styles/theme-tokens.test.ts` fails the build on any class naming a shade that
 > is not there.
+
+## Destructive things are red before you reach them
+
+**`IconButton tone="danger"` for a trash icon, `Button variant="dangerGhost"`
+for a labelled one, `danger` on an `ActionMenu` item.** Red at rest, a darker
+red on hover.
+
+The rest-state is the point. Delete buttons were written inline in a dozen
+places and every one of them was **grey until hovered** — so the most
+destructive control in a table row looked exactly like the one beside it until
+the cursor was already on it. They had drifted too: some `text-ink-400`, some
+`text-ink-500`, one with no hover background and its own padding.
+
+The solid `danger` variant had the opposite problem. It went `600 → 500` on
+hover, so the one button in the app that destroys something got **brighter** as
+you reached it, reading as a control lighting up rather than a warning
+deepening. It goes `600 → 700` now, like the others.
+
+> **Red means "this destroys a record", not "this removes a row from a form".**
+> Taking a quantity column off a draft quotation or a colour chip off a strip is
+> editing something unsaved; those stay grey and go red on hover. The line is
+> whether anything is lost by clicking it.
+
+`IconButton` requires an `aria-label` in its type rather than accepting one: an
+icon button without a name reads as "button" to a screen reader, and these are
+the ones that delete things.
+
+## `ActionMenu` is for the actions that do not fit
+
+One button, opening a short sheet. **Used only below `sm`** — on a desktop the
+same actions are ordinary buttons in a row, and a menu there would hide three
+things that comfortably fit while costing a click to reach each one.
+
+On a phone they do not fit. Three buttons either wrap into a stack that pushes
+the page's own figures below the fold, or get squeezed to widths nobody can
+read. The order detail screen is the case it was built for: up to three status
+actions beside a title.
+
+It closes on Escape, on a tap outside, on choosing something, and on the button
+itself — which is the whole of what a menu has to do to not be a trap on a
+touch screen, and all four are tested.
+
+> It listens on **`pointerdown`**, not `click`. A click listener on the document
+> fires after the button has already toggled the menu open again, so tapping the
+> button to close it closed and reopened it in one gesture and the menu never
+> shut.
+
+Deliberately small: no submenus, no icons, no checkable items. Reach for a
+dialog when a choice needs explaining.
 
 ## `ConfirmDialog` asks before something that cannot be clicked back
 

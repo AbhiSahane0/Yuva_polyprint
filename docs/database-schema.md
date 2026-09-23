@@ -80,6 +80,7 @@ erDiagram
     text job_id FK
     text job_name
     text customer_id FK
+    text production_order_id FK
   }
   jobs {
     text id PK
@@ -100,6 +101,36 @@ erDiagram
   }
   materials {
     text id PK
+  }
+  orders {
+    text id PK
+    integer number
+    OrderStatus status
+    text customer_id FK
+    text customer_name
+    text job_id FK
+    text job_name
+    text quotation_id FK
+    text quotation_item_id FK
+    decimal quantity_kg
+    decimal rate_per_kg
+  }
+  production_orders {
+    text id PK
+    integer number
+    ProductionStatus status
+    text order_id FK
+    text customer_name
+    text job_name
+    text job_id FK
+    decimal quantity_kg
+  }
+  production_stages {
+    text id PK
+    text production_order_id FK
+    integer position
+    ProductionStageStatus status
+    text machine_id FK
   }
   purchase_order_lines {
     text id PK
@@ -185,6 +216,12 @@ erDiagram
     text material_id FK
     text job_id FK
   }
+  stock_reservations {
+    text id PK
+    text material_id FK
+    text production_order_id FK
+    ReservationStatus status
+  }
   suppliers {
     text id PK
     text mobile
@@ -229,14 +266,25 @@ erDiagram
   materials ||--o{ job_sheet_lines : "material_id"
   job_sheets ||--|{ job_sheet_labour : "sheet_id"
   job_sheets ||--|{ job_sheet_stage_usage : "sheet_id"
+  customers ||--o{ orders : "customer_id"
+  jobs ||--o{ orders : "job_id"
+  quotations ||--o{ orders : "quotation_id"
+  quotation_items ||--o{ orders : "quotation_item_id"
+  orders ||--|{ production_orders : "order_id"
+  jobs ||--o{ production_orders : "job_id"
+  production_orders ||--|{ production_stages : "production_order_id"
+  costing_machines ||--o{ production_stages : "machine_id"
+  materials ||--|{ stock_reservations : "material_id"
+  production_orders ||--|{ stock_reservations : "production_order_id"
+  production_orders ||--o{ job_sheets : "production_order_id"
 ```
 
 ## Tables
 
 | Table | Columns | Rows | Purpose |
 | --- | ---: | ---: | --- |
-| `app_setting_history` | 4 | 6 |  |
-| `app_settings` | 3 | 40 | Editable rates: cylinder rate, GST %, advance %. |
+| `app_setting_history` | 4 | 66 |  |
+| `app_settings` | 3 | 61 | Editable rates: cylinder rate, GST %, advance %. |
 | `costing_labour` | 8 | 7 |  |
 | `costing_machines` | 14 | 4 |  |
 | `costing_overheads` | 9 | 0 |  |
@@ -247,11 +295,14 @@ erDiagram
 | `job_sheet_labour` | 8 | 120 |  |
 | `job_sheet_lines` | 17 | 315 |  |
 | `job_sheet_stage_usage` | 7 | 75 |  |
-| `job_sheets` | 59 | 15 |  |
+| `job_sheets` | 60 | 15 |  |
 | `jobs` | 55 | 419 | Products and their full engineering specification. |
-| `login_events` | 7 | 49 |  |
-| `material_rates` | 6 | 381 |  |
+| `login_events` | 7 | 51 |  |
+| `material_rates` | 6 | 453 |  |
 | `materials` | 13 | 24 |  |
+| `orders` | 23 | 1 |  |
+| `production_orders` | 16 | 0 |  |
+| `production_stages` | 16 | 0 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
 | `purchase_receipts` | 11 | 1 |  |
@@ -262,9 +313,10 @@ erDiagram
 | `quotation_items` | 31 | 1 | One priced line on a quotation. |
 | `quotation_tiers` | 14 | 3 |  |
 | `quotations` | 33 | 1 | Customer-facing quotations, with totals frozen at save. |
-| `sessions` | 6 | 9 |  |
+| `sessions` | 6 | 5 |  |
 | `stock_batches` | 14 | 1 |  |
-| `stock_movements` | 13 | 5 |  |
+| `stock_movements` | 13 | 0 |  |
+| `stock_reservations` | 8 | 0 |  |
 | `suppliers` | 11 | 1 |  |
 | `users` | 10 | 3 |  |
 
@@ -309,6 +361,17 @@ erDiagram
 | `job_sheet_lines.material_id` | `materials.id` | SET NULL |  |
 | `job_sheet_labour.sheet_id` | `job_sheets.id` | CASCADE |  |
 | `job_sheet_stage_usage.sheet_id` | `job_sheets.id` | CASCADE |  |
+| `orders.customer_id` | `customers.id` | SET NULL |  |
+| `orders.job_id` | `jobs.id` | SET NULL |  |
+| `orders.quotation_id` | `quotations.id` | SET NULL |  |
+| `orders.quotation_item_id` | `quotation_items.id` | SET NULL |  |
+| `production_orders.order_id` | `orders.id` | CASCADE |  |
+| `production_orders.job_id` | `jobs.id` | SET NULL |  |
+| `production_stages.production_order_id` | `production_orders.id` | CASCADE |  |
+| `production_stages.machine_id` | `costing_machines.id` | SET NULL |  |
+| `stock_reservations.material_id` | `materials.id` | RESTRICT |  |
+| `stock_reservations.production_order_id` | `production_orders.id` | CASCADE |  |
+| `job_sheets.production_order_id` | `production_orders.id` | SET NULL |  |
 
 ## Enums
 
@@ -329,11 +392,15 @@ erDiagram
 | `JobSheetStatus` | `OPEN`, `COSTED`, `CLOSED` |
 | `MachineKind` | `PRINTING`, `LAMINATION`, `SLITTING`, `POUCHING` |
 | `MaterialCategory` | `FILM`, `INK`, `ADHESIVE`, `SOLVENT`, `CONSUMABLE` |
+| `OrderStatus` | `CONFIRMED`, `IN_PRODUCTION`, `COMPLETED`, `CANCELLED` |
 | `OverheadBasis` | `PER_KG`, `PER_JOB`, `PER_POUCH`, `PER_DAY`, `PERCENT_MATERIAL`, `PERCENT_TOTAL` |
 | `PouchType` | `STANDUP`, `STANDUP_ZIPPER`, `ZIPPER`, `D_PUNCH`, `SPOUT`, `CENTRE_SEAL`, `THREE_SIDE_SEAL`, `OTHER` |
 | `PricingBasis` | `PER_KG`, `PER_POUCH` |
+| `ProductionStageStatus` | `PENDING`, `RUNNING`, `DONE`, `SKIPPED` |
+| `ProductionStatus` | `PLANNED`, `RUNNING`, `ON_HOLD`, `COMPLETED` |
 | `PurchaseOrderStatus` | `ORDERED`, `IN_TRANSIT`, `PARTIALLY_RECEIVED`, `RECEIVED`, `CANCELLED` |
 | `QuotationStatus` | `DRAFT`, `SENT`, `WON`, `LOST` |
+| `ReservationStatus` | `HELD`, `RELEASED` |
 | `StockMovementKind` | `RECEIPT`, `ISSUE`, `WASTE`, `ADJUSTMENT`, `TRANSFER` |
 
 ## Full column reference
@@ -592,6 +659,7 @@ erDiagram
 | `entered_by` | `text` |  |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
+| `production_order_id` | `text` | ✓ | FK → `production_orders.id` |
 
 ### `jobs`
 
@@ -693,6 +761,76 @@ erDiagram
 | `laydown_gsm` | `decimal(6,3)` | ✓ |  |
 | `solids_percent` | `decimal(6,3)` | ✓ |  |
 | `ink_kind` | `InkKind` (enum) | ✓ |  |
+
+### `orders`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `number` | `integer` |  | unique |
+| `status` | `OrderStatus` (enum) |  |  |
+| `customer_id` | `text` | ✓ | FK → `customers.id` |
+| `customer_name` | `text` |  |  |
+| `job_id` | `text` | ✓ | FK → `jobs.id` |
+| `job_name` | `text` |  |  |
+| `quotation_id` | `text` | ✓ | FK → `quotations.id` |
+| `quotation_item_id` | `text` | ✓ | FK → `quotation_items.id` |
+| `quantity_kg` | `decimal(12,3)` |  |  |
+| `rate_per_kg` | `decimal(12,2)` |  |  |
+| `quantity_pouches` | `integer` |  |  |
+| `rate_per_pouch` | `decimal(12,4)` |  |  |
+| `amount` | `decimal(14,2)` |  |  |
+| `customer_po_number` | `text` |  |  |
+| `order_date` | `date` |  |  |
+| `due_date` | `date` | ✓ |  |
+| `notes` | `text` |  |  |
+| `completed_at` | `timestamp` | ✓ |  |
+| `cancelled_at` | `timestamp` | ✓ |  |
+| `cancelled_reason` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+
+### `production_orders`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `number` | `integer` |  | unique |
+| `status` | `ProductionStatus` (enum) |  |  |
+| `order_id` | `text` |  | FK → `orders.id` |
+| `customer_name` | `text` |  |  |
+| `job_name` | `text` |  |  |
+| `job_id` | `text` | ✓ | FK → `jobs.id` |
+| `quantity_kg` | `decimal(12,3)` |  |  |
+| `notes` | `text` |  |  |
+| `started_at` | `timestamp` | ✓ |  |
+| `completed_at` | `timestamp` | ✓ |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+| `material_override_at` | `timestamp` | ✓ |  |
+| `material_override_by` | `text` |  |  |
+| `material_override_reason` | `text` |  |  |
+
+### `production_stages`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `production_order_id` | `text` |  | FK → `production_orders.id` |
+| `position` | `integer` |  | unique |
+| `stage` | `MachineKind` (enum) |  |  |
+| `pass` | `integer` |  |  |
+| `status` | `ProductionStageStatus` (enum) |  |  |
+| `machine_id` | `text` | ✓ | FK → `costing_machines.id` |
+| `machine_name` | `text` |  |  |
+| `operator` | `text` |  |  |
+| `input_kg` | `decimal(12,3)` |  |  |
+| `output_kg` | `decimal(12,3)` |  |  |
+| `started_at` | `timestamp` | ✓ |  |
+| `finished_at` | `timestamp` | ✓ |  |
+| `notes` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
 
 ### `purchase_order_lines`
 
@@ -941,6 +1079,19 @@ erDiagram
 | `notes` | `text` |  |  |
 | `entered_by` | `text` |  |  |
 | `created_at` | `timestamp` |  |  |
+
+### `stock_reservations`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `material_id` | `text` |  | FK → `materials.id` |
+| `production_order_id` | `text` |  | FK → `production_orders.id` |
+| `quantity` | `decimal(14,3)` |  |  |
+| `status` | `ReservationStatus` (enum) |  |  |
+| `released_at` | `timestamp` | ✓ |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
 
 ### `suppliers`
 

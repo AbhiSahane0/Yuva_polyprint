@@ -69,6 +69,18 @@ export interface JobSheet {
   customerId: string | null;
   customerName: string;
 
+  /**
+   * The job card this sheet is the costing of, when it is one.
+   *
+   * Null on the works' own imported sheets, which predate job cards, and on any
+   * sheet keyed from paper against no card. Where it is set, **posting this
+   * sheet releases that card's claim on its film** — by then the material has
+   * genuinely left the shelf, so the claim standing in for it stops counting.
+   */
+  productionOrderId: string | null;
+  /** The card's human number, carried so the sheet can name it without a lookup. */
+  productionOrderNumber: number | null;
+
   operatorName: string;
 
   filmType: string;

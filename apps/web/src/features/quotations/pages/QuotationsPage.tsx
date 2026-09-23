@@ -24,6 +24,7 @@ import {
   type SortDirection,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -577,15 +578,9 @@ function RowActions({
       >
         <Pencil className="size-4" />
       </Link>
-      <button
-        type="button"
-        onClick={onDelete}
-        title="Delete"
-        aria-label="Delete"
-        className="text-ink-500 hover:bg-danger-50 hover:text-danger-600 cursor-pointer rounded-[var(--radius-md)] p-2"
-      >
+      <IconButton tone="danger" onClick={onDelete} title="Delete" aria-label="Delete">
         <Trash2 className="size-4" />
-      </button>
+      </IconButton>
     </div>
   );
 }

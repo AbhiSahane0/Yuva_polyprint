@@ -10,6 +10,8 @@ One folder per business feature, mirroring the API modules. Built so far:
 | `users`      | User management (admins only)                                                                       |
 | `customers`  | Customer list, edit modal, job specification editor                                                 |
 | `quotations` | Quotation list, wizard, PDF preview, sending                                                        |
+| `orders`     | What the customer committed to — list, detail, and one raised by hand                               |
+| `production` | Job cards — the stages a job needs, and what each one did                                           |
 | `job-sheets` | The production job sheet — what a run actually cost                                                 |
 | `costing`    | Machines, wages and every overhead a rate is built from — see [its own README](./costing/README.md) |
 | `rates`      | Daily material rates                                                                                |
@@ -49,18 +51,21 @@ features/<feature>/
    load-bearing is the direction and the depth, so that is what it says now.
    The whole list, which should stay short enough to read:
 
-   | From         | Imports              | Why                                   |
-   | ------------ | -------------------- | ------------------------------------- |
-   | `quotations` | `customers/api`      | The wizard picks a customer           |
-   | `quotations` | `rates/api`          | Costing needs today's rates           |
-   | `quotations` | `gstin/components`   | The GST field                         |
-   | `customers`  | `gstin/components`   | The same field, the same rules        |
-   | `inventory`  | `rates/api`          | Valuing stock                         |
-   | `purchase`   | `inventory/api`      | Receiving creates stock               |
-   | `job-sheets` | `inventory/api`      | Posting a sheet moves stock           |
-   | `purchase`   | `rates/api`          | Pricing an order line                 |
-   | `cylinders`  | `artwork/components` | The design files panel                |
-   | anything     | `auth/auth-store`    | Who is signed in, and what they reach |
+   | From         | Imports              | Why                                    |
+   | ------------ | -------------------- | -------------------------------------- |
+   | `quotations` | `customers/api`      | The wizard picks a customer            |
+   | `orders`     | `customers/api`      | Typing one picks a customer too        |
+   | `orders`     | `production/api`     | An order is where a job card is raised |
+   | `production` | `costing/api`        | The machines a stage can run on        |
+   | `quotations` | `rates/api`          | Costing needs today's rates            |
+   | `quotations` | `gstin/components`   | The GST field                          |
+   | `customers`  | `gstin/components`   | The same field, the same rules         |
+   | `inventory`  | `rates/api`          | Valuing stock                          |
+   | `purchase`   | `inventory/api`      | Receiving creates stock                |
+   | `job-sheets` | `inventory/api`      | Posting a sheet moves stock            |
+   | `purchase`   | `rates/api`          | Pricing an order line                  |
+   | `cylinders`  | `artwork/components` | The design files panel                 |
+   | anything     | `auth/auth-store`    | Who is signed in, and what they reach  |
 
    `auth` is infrastructure rather than a peer — every screen needs to know who
    is looking at it — so it is not counted against this rule.
@@ -81,5 +86,12 @@ features/<feature>/
    in [`apps/web/README.md`](../../README.md#a-mutation-is-not-finished-until-the-screen-shows-what-it-did).
 4. **Pages are lazy-loaded** in `src/app/router.tsx` to keep the shop-floor
    bundle small.
-5. **Mobile-first.** Every screen starts at 375px and scales up; tables get a
-   card layout on small screens rather than horizontal scroll.
+5. **Mobile-first.** Every screen starts at 375px and scales up. A table either
+   becomes cards below `md` or sits in an `overflow-x-auto` wrapper — never
+   inside a card that clips for its rounded corners with nothing to scroll,
+   which makes the columns past the fold unreachable rather than merely off
+   screen.
+6. **Anything clickable shows a pointer**, from one base rule in
+   `styles/index.css` rather than a class on each — the class is what gets
+   forgotten. Only override it on something that genuinely wants a different
+   cursor; a utility still beats the rule.

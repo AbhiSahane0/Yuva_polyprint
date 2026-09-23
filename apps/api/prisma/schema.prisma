@@ -105,6 +105,7 @@ model Customer {
 
   jobs       Job[]
   quotations Quotation[]
+  orders     Order[]
 
   /// Runs costed against this customer's designs.
   jobSheets JobSheet[]
@@ -211,6 +212,8 @@ model Job {
   artwork        JobArtwork[]
   /// Every run of this design, and what each actually cost.
   jobSheets      JobSheet[]
+  orders         Order[]
+  productionOrders ProductionOrder[]
 
   sourceRow Int @map("source_row")
 
@@ -345,6 +348,8 @@ model Quotation {
   tiers  QuotationTier[]  @relation("QuotationTiers")
   items  QuotationItem[]
   emails QuotationEmail[]
+  /// What the customer actually ordered off it, once it was won.
+  orders Order[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -475,6 +480,9 @@ model QuotationItem {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([quotationId])
+  /// The order this line became, if the quotation was won.
+  order Order?
+
   @@map("quotation_items")
 }
 
@@ -725,6 +733,9 @@ model Material {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([category, sortOrder])
+  /// Held against job cards that have not run yet.
+  reservations StockReservation[]
+
   @@map("materials")
 }
 
@@ -1551,6 +1562,9 @@ model CostingMachine {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  /// Stages of a job card run on it.
+  productionStages ProductionStage[]
+
   @@map("costing_machines")
 }
 
@@ -1624,6 +1638,265 @@ model CostingOverhead {
   @@index([effectiveFrom])
   @@index([effectiveTo])
   @@map("costing_overheads")
+}
+
+/// Where a customer order has got to.
+///
+/// Four, and no more, because a status nobody can honestly move it out of is
+/// worse than no status at all. The wireframe's "Pending Materials" and
+/// "Awaiting QC" describe gates that Planning and Quality will own; they belong
+/// here the day those exist, and not before.
+enum OrderStatus {
+  CONFIRMED
+  IN_PRODUCTION
+  COMPLETED
+  CANCELLED
+}
+
+/// What a customer has actually committed to.
+///
+/// The missing link between a quotation and what the works then made. A won
+/// quotation said what the price would be; a job sheet says what the run cost
+/// once it was over. Neither records that a customer asked for 500 kg by the
+/// fifth, against their purchase order number, and where that has got to.
+///
+/// **One order per quotation LINE, not per quotation.** A quotation carries
+/// several jobs and they are made, finished and delivered separately — one
+/// order holding all of them could never say that two are done and one is late.
+///
+/// `quotationItemId` is unique, which is what makes winning idempotent: the
+/// second time a quotation is won it creates nothing, exactly as its jobs do.
+model Order {
+  id     String      @id @default(cuid())
+  /// Sequential and human-facing, like a quotation's. Its own series.
+  number Int         @unique
+  status OrderStatus @default(CONFIRMED)
+
+  customerId String?   @map("customer_id")
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  /// Snapshot, so an order still reads if the customer record is renamed.
+  customerName String  @map("customer_name")
+
+  jobId   String? @map("job_id")
+  job     Job?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  jobName String  @map("job_name")
+
+  /// Where it came from. Null on one the office typed for repeat business.
+  quotationId     String?        @map("quotation_id")
+  quotation       Quotation?     @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  quotationItemId String?        @unique @map("quotation_item_id")
+  quotationItem   QuotationItem? @relation(fields: [quotationItemId], references: [id], onDelete: SetNull)
+
+  /// What was agreed. Both units, as a quotation line carries both.
+  quantityKg      Decimal @map("quantity_kg") @db.Decimal(12, 3)
+  ratePerKg       Decimal @map("rate_per_kg") @db.Decimal(12, 2)
+  quantityPouches Int     @default(0) @map("quantity_pouches")
+  ratePerPouch    Decimal @default(0) @map("rate_per_pouch") @db.Decimal(12, 4)
+  /// Stored rather than multiplied on read, so a saved order cannot drift.
+  amount          Decimal @db.Decimal(14, 2)
+
+  /// The customer's own reference. What they will quote back on the phone.
+  customerPoNumber String    @default("") @map("customer_po_number")
+  orderDate        DateTime  @map("order_date") @db.Date
+  dueDate          DateTime? @map("due_date") @db.Date
+
+  notes String @default("")
+
+  /// The job cards raised against it. Usually one; several when a big order
+  /// is run in batches, which is why this is not a one-to-one.
+  productionOrders ProductionOrder[]
+
+  completedAt     DateTime? @map("completed_at")
+  cancelledAt     DateTime? @map("cancelled_at")
+  /// Why it was cancelled. "We lost it" teaches nothing; the reason does.
+  cancelledReason String    @default("") @map("cancelled_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([customerId])
+  @@index([dueDate])
+  @@map("orders")
+}
+
+/// Where a job card as a whole has got to.
+///
+/// "Delayed" is deliberately not here — it is the order's due date compared
+/// with today, not a state anybody sets. A status somebody has to remember to
+/// change is a status that is wrong most of the time.
+enum ProductionStatus {
+  PLANNED
+  RUNNING
+  ON_HOLD
+  COMPLETED
+}
+
+/// Where one stage of a job card has got to.
+enum ProductionStageStatus {
+  PENDING
+  RUNNING
+  DONE
+  SKIPPED
+}
+
+/// A job card — the run itself, against the order it is making.
+///
+/// The link the works has been missing: a quotation says what a job should
+/// cost, an order says what was asked for, and this says what the floor
+/// actually did about it — on which machine, by whom, and what it lost at each
+/// stage.
+///
+/// **Not unique per order.** Usually one card answers one order, but a large
+/// order genuinely runs in batches, and a unique constraint would be a
+/// migration the first time that happened. The service refuses a second card
+/// while one is still open, which is the rule that actually wanted enforcing.
+model ProductionOrder {
+  id     String           @id @default(cuid())
+  /// Sequential and human-facing. Its own series, like an order's.
+  number Int              @unique
+  status ProductionStatus @default(PLANNED)
+
+  orderId String @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// Snapshots, so a card still reads if the design is renamed.
+  customerName String @map("customer_name")
+  jobName      String @map("job_name")
+
+  jobId String? @map("job_id")
+  job   Job?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  /// What this card is making. Usually the whole order; less when it is one
+  /// batch of it.
+  quantityKg Decimal @map("quantity_kg") @db.Decimal(12, 3)
+
+  notes String @default("")
+
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  /// Why the works ran it anyway, when the material was short.
+  ///
+  /// A shortage stops a stage starting. It must not stop it for good: material
+  /// is often physically in the building before anybody books it in, and a
+  /// system that refuses to let the floor run a job already on the machine is
+  /// one they work around — after which the data stops being true. So the block
+  /// is real and getting past it is deliberate, named and dated.
+  materialOverrideReason String    @default("") @map("material_override_reason")
+  materialOverrideBy     String    @default("") @map("material_override_by")
+  materialOverrideAt     DateTime? @map("material_override_at")
+
+  stages       ProductionStage[]
+  reservations StockReservation[]
+  /// What this run cost, once the office has worked it out. See JobSheet.
+  jobSheet     JobSheet?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([orderId])
+  @@map("production_orders")
+}
+
+/// One process a job card passes through.
+///
+/// Derived from the structure when the card is raised — printing unless the job
+/// prints nothing, one lamination row **per bond**, slitting always, pouch
+/// making only where pouches are made — and then the office's to correct. A
+/// stage that does not apply is SKIPPED rather than deleted, so the card still
+/// says what the job did not need instead of leaving a gap.
+///
+/// Each lamination pass is its own row because it is its own run: its own
+/// machine, its own operator and its own waste. The works' job sheet names them
+/// Lamination 1 and Lamination 2 for the same reason.
+model ProductionStage {
+  id String @id @default(cuid())
+
+  productionOrderId String          @map("production_order_id")
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+
+  /// 1-based, the order the job meets them in.
+  position Int
+  stage    MachineKind
+  /// Which lamination pass, 1 or 2. Zero on every other stage.
+  pass     Int                   @default(0)
+  status   ProductionStageStatus @default(PENDING)
+
+  machineId String?         @map("machine_id")
+  machine   CostingMachine? @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  /// Snapshot, so a finished card still says which machine ran it.
+  machineName String        @default("") @map("machine_name")
+
+  /// Who ran it. Free text until there is an employee master to point at.
+  operator String @default("")
+
+  /// Weighed, both of them. What it lost is the difference and is never stored
+  /// — a third figure that can disagree with the two it comes from is a figure
+  /// nobody can trust.
+  inputKg  Decimal @default(0) @map("input_kg") @db.Decimal(12, 3)
+  outputKg Decimal @default(0) @map("output_kg") @db.Decimal(12, 3)
+
+  startedAt  DateTime? @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+
+  notes String @default("")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([productionOrderId, position])
+  @@index([status])
+  @@map("production_stages")
+}
+
+/// Whether a reservation is still holding stock back.
+enum ReservationStatus {
+  /// Committed to a job card that has not finished.
+  HELD
+  /// Let go — the card finished, or was cancelled.
+  RELEASED
+}
+
+/// Material committed to a job card, but not yet taken off the shelf.
+///
+/// **A reservation is not a movement.** It never touches a batch and never
+/// appears in the ledger — it only makes stock read as *committed* rather than
+/// *free*. That is the whole design, and it is what guarantees nothing is
+/// deducted twice: the job sheet remains the only thing that issues material,
+/// because the job sheet is the only thing that knows what was actually
+/// weighed. Production knows what a job SHOULD take, which is a different and
+/// earlier question.
+///
+/// So the arithmetic everywhere is:
+///
+///     free = what is on hand − what is held against unfinished cards
+///
+/// and a shortage is measured against `free`, never against the ledger.
+model StockReservation {
+  id String @id @default(cuid())
+
+  materialId String   @map("material_id")
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Restrict)
+
+  productionOrderId String          @map("production_order_id")
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+
+  /// In the material's own unit, as the batches are.
+  quantity Decimal           @db.Decimal(14, 3)
+  status   ReservationStatus @default(HELD)
+
+  releasedAt DateTime? @map("released_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// One row per material per card: raising a card twice for the same film
+  /// should correct the figure, not hold it twice.
+  @@unique([productionOrderId, materialId])
+  @@index([materialId, status])
+  @@map("stock_reservations")
 }
 
 /// Whether an ink is one of the four every press carries, or a job's own.
@@ -1706,6 +1979,21 @@ model JobSheet {
 
   customerId String?   @map("customer_id")
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  /**
+   * The job card this sheet is the costing of.
+   *
+   * One run, one costing — hence unique. Two sheets against one card would each
+   * claim to be what that run cost, and nothing could say which was right.
+   *
+   * Nullable, because the works' own imported sheets predate job cards entirely
+   * and an office keying yesterday's paper has no card to point at. But where
+   * it IS set it closes a real gap: posting the sheet is the moment the run's
+   * material genuinely leaves the shelf, so it is the moment the card's claim
+   * on that material should stop counting. See material-reservation.ts.
+   */
+  productionOrderId String?          @unique @map("production_order_id")
+  productionOrder   ProductionOrder? @relation(fields: [productionOrderId], references: [id], onDelete: SetNull)
 
   operatorName String @default("") @map("operator_name")
 

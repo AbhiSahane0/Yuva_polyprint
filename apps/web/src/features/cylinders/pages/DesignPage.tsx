@@ -107,7 +107,7 @@ export default function DesignPage() {
             ) : null}
             {canDelete ? (
               <Button
-                variant="ghost"
+                variant="dangerGhost"
                 onClick={() => setDeleting(true)}
                 title="Delete this design, its cylinders and its files"
               >

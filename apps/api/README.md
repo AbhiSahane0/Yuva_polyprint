@@ -2401,6 +2401,333 @@ empty box being submitted by reflex.
 
 ---
 
+## Orders — what the customer actually asked for
+
+A quotation is an **offer** and a job sheet is a **post-mortem**. An order is the
+thing in between that neither of them is: a commitment, with a quantity, a rate
+agreed, a day it is wanted by and a place it has got to.
+
+Before this, winning a quotation was a dead end — it created the customer and
+their job records and then stopped. Nothing said that somebody had asked for
+1,000 kg by the fifth, against their own purchase order number.
+
+| Method | Path                  | Notes                                                                             |
+| ------ | --------------------- | --------------------------------------------------------------------------------- |
+| GET    | `/orders`             | Search by customer, job, PO number or order number; filter by status and due date |
+| GET    | `/orders/next-number` | The next order number                                                             |
+| GET    | `/orders/:id`         | One order                                                                         |
+| POST   | `/orders`             | Raise one by hand, for repeat work taken without a quotation                      |
+| PATCH  | `/orders/:id`         | Correct it, or move its status                                                    |
+| DELETE | `/orders/:id`         | **Only while it is CONFIRMED** — see below                                        |
+
+**Reading is open to anyone signed in.** What is due and when is the floor's
+question as much as the office's, and the floor has no business changing it.
+Writing needs `quotations`: an order is the commercial commitment a quotation
+becomes, made at the same desk.
+
+### One order per quotation LINE, not per quotation
+
+A quotation carries several jobs and they are made, finished and delivered
+separately. One order holding all of them could never say that two are done and
+one is late.
+
+### Winning a quotation raises them, in the same transaction
+
+`ordersFromQuotation` runs inside the transaction that wins the quotation, so a
+quotation cannot end up WON with nothing behind it — the office would see a won
+document, no order, and no reason to think anything was missing.
+
+**The quantity is the one the customer accepted**, not the first column. A
+quotation priced at three quantities is three prices for one job; the order
+takes the won tier, falling back to the quantity the document was printed for.
+Checked on a two-line quotation priced at 500 kg and 1,000 kg with the second
+selected: both orders came out at the second tier's quantity and rate.
+
+**Idempotent, exactly as the job records beside it are.** `quotation_item_id` is
+unique on the order, so winning the same quotation twice creates nothing the
+second time and says which lines already had orders:
+
+```json
+{ "status": "WON", "ordersCreated": [], "ordersSkipped": [1, 2] }
+```
+
+### Where an order may go, and where it may not
+
+```
+CONFIRMED  ──►  IN_PRODUCTION  ──►  COMPLETED
+     │                │
+     └────────────────┴──────────►  CANCELLED
+```
+
+A short repeat may go straight from confirmed to completed; there is nothing to
+gain from making somebody click through a stage that did not happen. **Nothing
+goes backwards**, and completed and cancelled are ends — reopening one is a
+decision somebody should have to make deliberately, and nothing yet needs it.
+
+The rule lives in `canMoveOrderTo` in `@yuva/shared` and is enforced by the
+service, not only by the screen: the screen is not the only way in, and a
+completed order quietly returning to production is the kind of thing nobody
+notices until the month's figures disagree with the floor's.
+
+> **Four statuses, deliberately not the wireframe's seven.** "Pending Materials"
+> and "Awaiting QC" describe gates that Planning and Quality will own. A status
+> nobody can honestly move an order out of is worse than no status at all,
+> because the screen then says something the office cannot act on. They belong
+> here the day those modules exist.
+
+### Deleting versus cancelling
+
+**Delete is refused once an order has been in production.** There is a run
+behind it by then, and a deleted order is a run nothing explains. Cancelling
+says the same thing and keeps the record — which is why it takes a reason, for
+the same purpose `lostReason` serves on a quotation: "we cancelled it" teaches
+nothing a year later, and the reason does.
+
+### The total is stored, not multiplied on read
+
+`orderAmount` in `@yuva/shared` computes it once, at the moment the order is
+written — per pouch where the order was taken that way, per kilogram otherwise.
+Shared so the form showing the figure and the server storing it cannot disagree:
+an order whose screen and record differ by a rounding rule is one nobody can
+defend over the phone.
+
+A pouch count with **no** per-pouch rate does not zero the order. A quotation
+line carries both units whether or not it was sold per pouch, so a
+21,565-pouch order at no per-pouch rate is still worth its kilograms.
+
+## Production — what the floor actually did
+
+A quotation says what a job should cost. An order says what was asked for. A job
+card says what happened: on which machine, by whom, and what each stage lost.
+
+| Method | Path                          | Notes                                                                 |
+| ------ | ----------------------------- | --------------------------------------------------------------------- |
+| GET    | `/production`                 | Running first; filter by status, or by the stage a card is waiting on |
+| GET    | `/production/next-number`     | The next card number                                                  |
+| GET    | `/production/:id`             | One card, with every stage                                            |
+| POST   | `/production`                 | Raise one against an order — **the stages are derived**               |
+| PATCH  | `/production/:id`             | Move the card along                                                   |
+| PATCH  | `/production/stages/:stageId` | **What the floor actually uses** — one stage, as it happens           |
+| POST   | `/production/:id/stages`      | Put a stage back the derivation left off                              |
+| POST   | `/production/:id/override`    | **Let a card run short of film**, with a reason, a name and a time    |
+| DELETE | `/production/:id`             | Only one nobody has started                                           |
+
+**Reading is open to anyone signed in** — a job card is the floor's own document
+and the office watches it from the other side of the wall. Writing needs `jobs`,
+the same permission job sheets use: both are records of what a run did, kept by
+the same people.
+
+### The stages are derived, not entered
+
+The pitch's central claim is that not every product goes through every process,
+and the system knows without being told. `requiredStages` in `@yuva/shared`:
+
+```
+printing      unless the job prints nothing
+lamination    once per BOND — three plies is two passes, two rows
+slitting      always. Everything comes off wider than it is sold
+pouch making  only where pouches are made. A reel is converted into nothing
+```
+
+**It reads the structure**, which is what the costing already does — the same
+ply count that decides how many lamination passes to _charge_ for decides how
+many to _run_. So a job card and the quotation behind it cannot disagree about
+what the job involves, and there is no third place to keep in step.
+
+The structure is looked for in descending order of authority: the quotation line
+the order came from, then the job master, then the ordinary two-ply pouch. The
+last case is a guess and is meant to be — a card with no stages would look
+finished.
+
+**Each lamination pass is its own row**, because it is its own run: its own
+machine, its own operator, its own waste. The works' job sheet names them
+Lamination 1 and Lamination 2 for the same reason.
+
+**The office has the last word.** A stage can be marked _not needed_ or put back.
+A stage that does not apply is `SKIPPED` rather than deleted, so the card still
+says what the job did not need instead of leaving a gap — which would read as
+something nobody has got to yet.
+
+### Material: reserved here, issued by the job sheet
+
+**Nothing in this module reduces stock.** That is the whole design, and it is
+what stops material being deducted twice.
+
+The works already has one thing that takes film off the shelf: the job sheet,
+which posts what was actually weighed at the machine. Production answers an
+earlier and different question — what a job _should_ take — and answers it by
+writing a **claim**, not a movement. A claim never touches a batch and never
+reaches the ledger. The only thing it changes is what the next job sees:
+
+```
+free = on hand − everything held by job cards that have not finished
+```
+
+So a card can be short of a film the stock screen shows plenty of, because the
+rest of it is promised to another job. The screens say that in those words
+rather than leaving somebody to work it out.
+
+`material-reservation.test.ts` checks this against the source rather than by
+calling it, because it is a failure of omission: a path that deducts stock is
+caught by the fact that it _exists_. The module may not name `stockMovement` at
+all, may not create, update or delete a `stockBatch`, and reads on-hand stock
+only as a `groupBy` sum.
+
+#### What a card needs
+
+The same arithmetic the costing charges for, so a job card and the quotation
+behind it cannot disagree about how much film the job takes:
+
+```
+consumed  = ordered × (1 + wastage%)
+ply share = that ply's GSM ÷ the whole STRUCTURE's GSM
+ply kg    = share × consumed
+```
+
+The divisor is the structure — plies **plus ink plus adhesive**. A kilogram of
+finished laminate is not a kilogram of film, and dividing by the plies alone
+would over-reserve every job by a few per cent, in the direction that makes the
+works look short of stock it has. The wastage is included because that film has
+to be on the shelf before the run starts.
+
+The wastage is read on the **quotation's own date** and honours that quotation's
+override, so a card raised today against a line quoted in March asks for the
+film that line was costed on.
+
+**Films only.** Only a quotation line names actual material rows per ply, which
+is what makes a requirement a fact rather than a guess. A card on an order typed
+over the phone reserves nothing and says so — reserving the wrong film would be
+worse than reserving none. Ink and adhesive are costed at blended rates against
+rows that are not real drums, so there is nothing there to reserve against.
+
+#### When it is checked, and what it stops
+
+| Moment                  | What happens                                                      |
+| ----------------------- | ----------------------------------------------------------------- |
+| Card raised             | The claim is written. A shortage is **flagged, not refused**      |
+| Card quantity changed   | The claim follows it, upserted — never stacked                    |
+| A stage is started      | **Re-checked against stock now, and refused with 409**            |
+| Card moved to RUNNING   | Same check, same refusal                                          |
+| **Its job sheet posts** | **The claim is released** — the film has genuinely left the shelf |
+| Card completed          | Released too, for a card no sheet was linked to                   |
+| Card deleted            | The claim goes with it, by cascade                                |
+
+Raising a card is deliberately not the place to refuse. It is how the floor
+finds out what is missing and how purchase finds out what to order, and a works
+that cannot write down a job it has not got the film for goes back to writing it
+on paper. **The stop is at the machine**, and the stock is asked again there
+rather than trusted from when the card was raised: a claim made on Monday is not
+a guarantee on Thursday.
+
+A card's own claim is left out of the free stock it is measured against.
+Otherwise a card that already holds its film would report itself short against
+itself, every time, and nobody could get past it.
+
+#### The override, and why it exists
+
+A hard block is the obviously correct rule and the wrong feature. A floor that
+knows the lorry is an hour away, told _no_ by a screen, raises the card against
+a different order or stops using the screen — and then the stock figures are
+wrong in a way nobody can see, which costs more than the stop saved.
+
+So the block is real, there is exactly one way through it, and it writes down
+the reason, who gave it and when. Sending a blank reason clears it and puts the
+block back. Nothing about a shortage is ever stored: whether the works is short
+is asked of the stock every time.
+
+#### What it does to the stock screens
+
+`StockSummary` gains `committed` and `free`, and **`health` now reads against
+free stock rather than what is on the shelf**. A reorder level asks whether to
+buy more, and film already promised to a job cannot answer it: 600 kg on hand
+with 550 committed is 50 kg to run the next job on, and a screen calling that
+healthy lets the works run out while showing a comfortable figure.
+
+#### Where the claim ends — the job sheet
+
+A job sheet carries `productionOrderId`: **the card whose run it costs**. One
+run, one costing, so the column is unique — two sheets against one card would
+each claim to be what that run cost, and nothing could say which was right.
+
+**Posting a linked sheet releases that card's claim, in the same transaction
+that issues the material.** That is the moment the film genuinely leaves the
+shelf, so it is the moment the claim standing in for it must stop counting.
+Without the link the claim stands until somebody completes the card, and for
+that whole window free stock reads low by the entire run — the claim and the
+issue both against the same film.
+
+Measured on a real run of 1,000 kg with 600 kg of PET on the shelf:
+
+|                    | on hand | committed | free    |
+| ------------------ | ------- | --------- | ------- |
+| Card raised        | 600     | 487.599   | 112.401 |
+| Sheet posts 400 kg | 200     | 0         | **200** |
+
+200 is the truth. The unlinked behaviour would have read −287.6 until the card
+was completed. The film left stock exactly once, in the 600 → 200.
+
+Two guards keep it that way:
+
+- **Nothing re-claims film that has been issued.** Once the linked sheet has
+  posted, `materialIsSettled` stops a changed card quantity writing the claim
+  back — it would stand alongside the issue and take the same film off free
+  stock twice — and stops a start being refused over a question already settled.
+- **A card with no sheet still releases on completion.** The works' own imported
+  sheets predate job cards entirely, and an office keying yesterday's paper has
+  no card to point at. The link is the earlier and more accurate of the two
+  releases, not the only one.
+
+The link is set from either end: the job card offers **Record what it cost**,
+which raises the sheet already pointed at it, and the sheet's own header has a
+job card picker listing the cards nothing else costs. Linking a blank sheet
+fills its design, name and customer from the card — blanks only, because an
+office that typed a name meant it.
+
+### Starting a stage starts everything above it
+
+The floor starts a stage, not a card. So a stage moving to RUNNING moves the
+card to RUNNING and the **order to IN_PRODUCTION**, in the same transaction.
+
+That is the one piece of automation in the module and it earns it: an order
+sitting at confirmed while its job card runs is exactly the disagreement between
+the office and the floor that this exists to end.
+
+**Completing the card does not complete the order.** For a customer, complete
+means delivered, and nothing here knows about that yet — Dispatch will. The
+order stays in production until somebody says otherwise, which is honest.
+
+### Waste is shown, never stored
+
+```
+waste = what went in − what came out
+```
+
+A third figure that can disagree with the two it comes from is a figure nobody
+can trust. **Negative is reported rather than floored at zero**: more off a
+machine than went onto it means one of the two weights is wrong, and a quiet
+zero is how that goes unnoticed. The works' own Samarth Atta job sheet does
+exactly this.
+
+### Progress is derived too
+
+```
+progress = stages DONE ÷ stages that apply
+```
+
+Skipped stages are left out of **both** halves. A job that skips three of four
+is not three-quarters done before it starts, and it is not stuck at 25% when its
+one real stage finishes. "Delayed" is not a status at all — it is the order's due
+date against today, because a status somebody has to remember to change is one
+that is wrong most of the time.
+
+### One card per order, usually
+
+`orderId` is not unique. A large order genuinely runs in batches, and a unique
+constraint would be a migration the first time that happened. What is enforced
+is the rule that actually wanted enforcing: **a second card is refused while one
+is still open**, because a second card on the same order is either a mistake or
+a batch and the two look identical from here.
+
 ## Sending quotations by email
 
 `POST /quotations/:id/send` renders the PDF, attaches it, and emails it through

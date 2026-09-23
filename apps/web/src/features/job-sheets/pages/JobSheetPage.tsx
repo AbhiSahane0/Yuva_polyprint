@@ -13,12 +13,13 @@ import {
   type JobSheetLine,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
-import { Field, Input, NumberInput } from '@/components/ui/Field';
+import { Field, Input, NumberInput, Select } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
+import { useProductionOrders } from '@/features/production/api/production-api';
 import {
   useCostJobSheet,
   useJobSheet,
@@ -97,6 +98,13 @@ export default function JobSheetPage() {
   const { data, isLoading } = useJobSheet(id);
 
   const save = useUpdateJobSheet(id ?? '');
+
+  /*
+   * Every card, filtered here rather than by the server: the works runs a few
+   * dozen at a time, and a query parameter for "unsheeted" would be a second
+   * way of asking a question the list already answers.
+   */
+  const { data: cards } = useProductionOrders({ pageSize: 200 });
   const cost = useCostJobSheet(id ?? '');
   const post = usePostJobSheetToStock(id ?? '');
 
@@ -189,11 +197,18 @@ export default function JobSheetPage() {
     [draft],
   );
 
+  /* Cards nothing else costs, plus whichever this sheet already names — which
+     would otherwise vanish from its own dropdown. */
+  const linkableCards = (cards?.items ?? []).filter(
+    (card) => !card.jobSheetId || card.jobSheetId === id,
+  );
+
   async function onSave() {
     if (!draft) return;
     try {
       await save.mutateAsync({
         date: draft.date,
+        productionOrderId: draft.productionOrderId,
         jobName: draft.jobName,
         operatorName: draft.operatorName,
         filmType: draft.filmType,
@@ -456,6 +471,35 @@ export default function JobSheetPage() {
               disabled={locked}
               onChange={(event) => set('date', event.target.value)}
             />
+          </Field>
+          {/*
+           * Which run this sheet is the costing of.
+           *
+           * Worth setting rather than skipping: **posting the sheet releases
+           * that card's claim on its film**. Without the link the claim stands
+           * until somebody completes the card, and until then free stock reads
+           * low by this whole run.
+           *
+           * Only cards nothing else costs are offered — one run, one costing.
+           */}
+          <Field
+            label="Job card"
+            htmlFor="productionOrderId"
+            hint="Taking this sheet off stock frees the card's claim on its film"
+          >
+            <Select
+              id="productionOrderId"
+              value={draft.productionOrderId ?? ''}
+              disabled={locked}
+              onChange={(event) => set('productionOrderId', event.target.value || null)}
+            >
+              <option value="">Not against a job card</option>
+              {linkableCards.map((card) => (
+                <option key={card.id} value={card.id}>
+                  #{card.number} — {card.customerName} · {card.jobName}
+                </option>
+              ))}
+            </Select>
           </Field>
           <Field label="Job name" htmlFor="jobName">
             <Input

@@ -279,6 +279,163 @@ shows a muted dash and edit boxes open blank. Clearing a box saves it back as
 Removing a job from the list **unlinks it, it does not delete it** — the job
 returns to the "needs a customer" worklist.
 
+### Orders — `/orders`, `/orders/new`, `/orders/:id`
+
+**What the customer actually asked for.** A quotation is an offer and a job
+sheet is a post-mortem; this is the commitment in between — a quantity, a rate
+agreed, the day it is wanted and where it has got to. Before it, winning a
+quotation was a dead end.
+
+**Ordered by what is open and soonest due, not by number.** A list ordered by
+number puts the oldest order at the bottom on the day it goes late, which is the
+one morning anybody needs to see it.
+
+Two figures head the screen — **Open** and **Past due** — because those are the
+two questions asked of it every morning. Past due earns its colour only when
+there is some; a red zero is a red herring.
+
+**How late, in words.** A date on its own makes somebody do the arithmetic every
+time they read the row, and the answer they want is "is this a problem". So a
+due date reads `05-09-2026 · 3d late` or `· in 4d` or `· today`. Only on an open
+order: a completed one was due whenever it was due, and telling the office it is
+40 days late is both true and useless.
+
+**Reading is open to anyone signed in** — what is due and when is the floor's
+question as much as the office's — and the module guard sits on the routes that
+raise or change one, not on the section. A screen hidden from the people who
+need to read it is the wrong shape of protection.
+
+#### One order shows what may happen to it, and nothing else
+
+The status actions sit in **one row on a desktop** — they had wrapped onto two
+lines, which read as two groups when they are one — and behind a **single menu
+button below `sm`**. Stacked full-width on a phone they pushed the order's own
+figures, the quantity and the rate and the amount, off the first screen; the
+page is read far more often than it is acted on.
+
+The status buttons are only the places it may actually go. Offering every status
+and refusing four of them on save teaches the office to expect errors; offering
+one or two teaches them the rule. A completed order has no buttons at all and
+its fields lock — an end that a dropdown can undo is not an end.
+
+**Delete only exists while nobody has started it.** Once it has been in
+production there is a run behind it, and a deleted order is a run nothing
+explains. The dialog says so and points at cancelling instead, which keeps the
+record — and asks why, for the same reason a lost quotation does.
+
+**Production is raised from here**, in an "On the floor" block: nothing started
+yet and a **Start production** button, or a link to the card with its current
+stage and progress. Once the card exists this is a link and nothing more — the
+stages live there, and duplicating any of them here would be a second place to
+keep in step.
+
+Three fields stay editable after the fact, because they are the three that
+genuinely change: the **due date**, the customer's **PO number**, and **notes**.
+The quantity and rate are what was agreed and are not an edit — changing them is
+a correction, and it belongs where the correction was decided.
+
+#### New order — for the phone
+
+Most orders arrive by winning a quotation, which carries everything across on
+one click. This is the other way in: repeat business taken without pricing it
+again, which is a real part of how the works runs and would otherwise have no
+record at all.
+
+Deliberately short — a customer, a job, a quantity and a rate. Everything a
+quotation would have decided belongs to the quotation, and asking for it again
+here would make this the slower path to the same place. The **amount** updates
+as you type, through the same `orderAmount` the server stores it with, so the
+figure on the screen and the figure on the record cannot differ.
+
+### Production — `/production`, `/production/:id`
+
+**What is on the floor right now.** Running first, then planned, then finished —
+the floor's order, not the filing cabinet's. The **stage filter** answers the
+question a supervisor actually asks, which is not "show me everything" but
+"what is waiting for the press".
+
+Progress is a bar as well as a number, because a row is scanned rather than
+read, and it is **derived** from the stages — done ÷ applicable — so the list
+and the card cannot disagree about it. "Past due" is computed from the order's
+promise, not stored: a status somebody has to remember to change is wrong most
+of the time.
+
+**A card is raised from the order it makes**, not from here. There is no "new
+job card" button on this screen on purpose — a card without an order is a run
+nobody asked for.
+
+#### The job card itself
+
+One block per stage rather than a table, because a stage is filled in by
+somebody standing at a machine with two weights and a name, not read across in
+a row. Each has a machine (only machines of that **kind** — a slitter is not a
+choice for the press), an operator, weight in, weight out, and the waste those
+two come to.
+
+**Waste is shown, never typed.** A third figure that can disagree with the two
+it comes from is one nobody can trust. A negative one is called out in amber —
+more off a machine than went onto it means one of the two weights is wrong, and
+a quiet zero is how that goes unnoticed for a year.
+
+**Stages that do not apply stay on the card**, marked _Skipped — not required_,
+and can be put back. A gap would read as something nobody has got to yet, which
+is the opposite of what it means.
+
+The floor presses **Start** on a stage; the card and the order follow on their
+own. Nobody has to remember to start three things.
+
+#### The material panel — and the one thing that stops a job
+
+Above the stages, because whether the film is there is the first question and
+its answer decides whether any of the stages below can be started at all.
+
+Three figures per ply, and the order they are read in is the point: what the job
+**needs**, what is **free**, and — only when those disagree — what is **short**.
+Free is what is on hand less what other open job cards have claimed, which is
+why a job can be short of a film the stock screen shows plenty of. The panel
+says that in those words; hovering a free figure gives the on-hand and claimed
+numbers behind it.
+
+**Nothing here has moved any stock.** A claim is not an issue — the job sheet
+remains the only thing that takes material off the shelf, which is what stops
+anything being deducted twice.
+
+Pressing Start on a stage of a short job is **refused by the server**, and the
+refusal names the film, what it needs and what is free. The way through is
+**Run it anyway…**, which asks for a reason in one sentence and records it with
+the user's name and the time, in the panel, for anyone to read afterwards. A
+**Put the block back** button clears it.
+
+Why not simply refuse? A floor that knows the lorry is an hour away, told _no_
+by a screen, raises the card against a different order or stops using the
+screen — and then the stock figures are wrong in a way nobody can see. The block
+is real; there is one way through it and it leaves a record.
+
+A card on an order that was never priced from a quotation says so plainly rather
+than showing "0 kg needed", which would read as a job that needs no film.
+
+**A finished card is never flagged.** What is free today says nothing about a
+run that is over, and a red flag on it sends somebody to solve a problem that
+was already solved. The figures stay; only the alarm goes.
+
+The list carries the same fact as a **Short of film** badge beside the job name,
+so a supervisor scanning the floor sees it without opening anything.
+
+Once the run's job sheet has been taken off stock, the panel says so and the
+claim is gone — what the run actually weighed is in the ledger by then. The
+figures stay as a record of what it was expected to take.
+
+#### Record what it cost
+
+The handover from the floor to the office. The button raises a job sheet
+**already pointed at this card**, which matters more than it looks: posting a
+linked sheet releases the card's claim on its film, and a sheet started from the
+Job sheets list has to have the card picked by hand. The one nobody picks is the
+one that leaves stock reading low until somebody remembers to complete the card.
+
+Once a sheet exists the button becomes a link to it, so there is no way to raise
+a second — one run, one costing.
+
 ### Quotations — `/quotations`
 
 By default the list reads as a **work queue, not a diary**: Draft first, then
@@ -1130,6 +1287,22 @@ comes here for — it is what the office prices repeat work from, and the reason
 the sheet is filled in at all. Wastage over the allowance shows red, which is
 how a 26% run announces itself without anybody opening it.
 
+#### Which run this sheet is costing
+
+The header carries a **Job card** picker, and it is worth setting rather than
+skipping: **taking the sheet off stock releases that card's claim on its film.**
+Without it the claim stands until somebody completes the card, and for that
+whole window free stock reads low by this entire run — the claim and the issue
+both against the same material.
+
+Only cards nothing else costs are offered, plus whichever this sheet already
+names, which would otherwise vanish from its own dropdown. Choosing one fills
+the design, the name and the customer from the card, but only where they are
+blank — an office that typed a name meant it.
+
+A sheet raised from the job card itself arrives with this already set, which is
+the path to prefer.
+
 #### The sheet is laid out like the paper one
 
 Twenty-one rows in the works' own order, always there, a row the job does not
@@ -1198,6 +1371,19 @@ looks clickable and does nothing is worse than one that plainly does not.
 material missing from the screen because it happens to be empty is exactly the
 one somebody needs to order.
 
+**On hand and Free are separate columns.** On hand is what is in the building;
+free is what a new job could actually be given, which is on hand less what open
+job cards have claimed. The difference is the whole reason a job can be short of
+a film the shelf is full of, and the free figure carries the claimed amount in
+its tooltip. On mobile the second figure appears only when the two differ — a
+repeated identical number is noise.
+
+**"Need reordering" reads against free stock**, not against the shelf. A reorder
+level asks whether to buy more, and film already promised to a job cannot answer
+it: 600 kg on hand with 550 committed is 50 kg to run the next job on, and a
+screen calling that healthy lets the works run out while showing a comfortable
+figure.
+
 Filter by category — Films, Ink, Adhesive, Solvents, Consumables — and search by
 name. Totals are over everything the filters matched rather than over a page: an
 inventory value that changes when you click a category filter is not a total
@@ -1209,8 +1395,12 @@ Stock, the batches it is spread over, and every movement against it.
 
 **Batch level, not roll level.** How much PET is there, what is it worth, and is
 it running out are the questions the office asks, and all three are answered per
-batch. Individual roll numbers become worth keying in when there is a production
-module to consume them; until then they would be typing with no reader.
+batch. Individual roll numbers would be typing with no reader: production claims
+material by quantity, not by roll.
+
+Under the on-hand figure, when there is something to say, how much is **free**
+and how much sits **on job cards**. Nothing has moved for a claim — the job
+sheet is still the only thing that issues material.
 
 Batches are listed **oldest first**, which is the order they should be used in,
 and an emptied batch stays on the list greyed out — it is what its movements
@@ -2250,9 +2440,37 @@ trailing icon button gets a label-height spacer so it lands level with them.
 
 ## Conventions
 
-**Mobile-first.** Every screen starts at 375px. Tables become **cards** below
-`md` rather than scrolling sideways — a squeezed table is unusable on a phone.
-The layout respects safe areas.
+**Mobile-first.** Every screen starts at 375px, and the layout respects safe
+areas. **A table either becomes cards below `md`, or sits in an
+`overflow-x-auto` wrapper** — the customer, cylinder and inventory lists take
+the first, everything else the second. What a table must never do is sit inside
+a card that clips for its rounded corners with no scroller between them: the
+columns past the fold are then not merely off screen, they are **unreachable**.
+
+That is exactly what the Rates screen did at 375px, and it took the whole
+actions column with it — figures, rate history and delete, gone, with nothing to
+say they were there. Its header row did not wrap either, so Save lost its last
+two letters off the right edge.
+
+Swept afterwards: every route reports **0 page overflow and 0 unreachable
+content** at 375px. The only thing still poking past the edge anywhere is the
+TanStack devtools button, which production does not render.
+
+**Everything you can click says so under the cursor.** A `<button>` has cursor
+`default` unless something says otherwise, and the UI kit's `Button` sets
+`cursor-pointer` itself — so the ones that read wrong were the raw `<button>`
+elements written inline: the wizard's step-back link, the Existing/New company
+toggle, the icon buttons on a job sheet. Eleven of them, across two screens.
+
+There is now a base rule in `styles/index.css` covering every button, select,
+summary, `role="button"` and checkbox label, rather than a class on each —
+**the class is the thing that gets forgotten.** It is in the base layer, so any
+utility still wins: `disabled:cursor-not-allowed` keeps working, and a component
+that genuinely wants a different cursor says so and is obeyed.
+
+> Both sweeps read React's own `onClick` props off the DOM rather than trusting
+> the markup, because a `<div>` with a handler is as clickable as a button and
+> does not look like one in a grep.
 
 Controls are **15px on a mouse and 16px on a touch device**, because iOS zooms
 the page when focusing anything under 16px and the shop floor is on tablets.

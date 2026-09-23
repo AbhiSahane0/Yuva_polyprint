@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import type { Customer } from '@yuva/shared';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
+import { IconButton } from '@/components/ui/IconButton';
 import { cn } from '@/lib/utils';
 import { useCustomer } from '../api/customer-api';
 
@@ -105,15 +106,14 @@ function RowActions({
       >
         <Pencil className="size-4" />
       </button>
-      <button
-        type="button"
+      <IconButton
+        tone="danger"
         onClick={() => onDelete(customer)}
         aria-label={`Delete ${customer.companyName}`}
         title="Delete"
-        className="text-ink-500 hover:bg-danger-50 hover:text-danger-600 cursor-pointer rounded-[var(--radius-md)] p-2"
       >
         <Trash2 className="size-4" />
-      </button>
+      </IconButton>
     </div>
   );
 }

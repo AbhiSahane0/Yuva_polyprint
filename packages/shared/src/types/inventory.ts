@@ -10,10 +10,28 @@ export interface StockSummary {
   unit: string;
   /** Everything on hand, across every batch. */
   quantity: number;
+  /**
+   * Claimed by job cards that have not finished.
+   *
+   * Not a movement and not in the ledger — the film is still on the shelf and
+   * still counted in `quantity`. It is what stops two jobs being promised the
+   * same roll. See `material-availability.ts`.
+   */
+  committed: number;
+  /** `quantity − committed`. What a new job could actually be given. */
+  free: number;
   /** How many batches that is spread over. */
   batchCount: number;
   /** The level below which stock reads as low, or null when nobody set one. */
   reorderLevel: number | null;
+  /**
+   * Read against FREE stock, not what is on the shelf.
+   *
+   * A reorder level answers "should we buy more", and film already promised to
+   * a job cannot answer it. 600 kg on hand with 550 committed is 50 kg to run
+   * the next job on, and a screen calling that healthy is a screen that lets
+   * the works run out while showing a comfortable figure.
+   */
   health: StockHealth;
   /** Today's catalogue rate, for comparison with what was paid. */
   currentRate: number | null;

@@ -3,6 +3,9 @@ import {
   changePasswordSchema,
   createCustomerSchema,
   createMaterialSchema,
+  addProductionStageSchema,
+  createOrderSchema,
+  createProductionOrderSchema,
   createQuotationSchema,
   createUserSchema,
   listCustomersQuerySchema,
@@ -27,8 +30,11 @@ import {
   receiveStockSchema,
   setReorderLevelSchema,
   transferStockSchema,
+  listOrdersQuerySchema,
+  listProductionQuerySchema,
   listQuotationsQuerySchema,
   loginSchema,
+  overrideMaterialsSchema,
   recordOutcomeSchema,
   resetPasswordSchema,
   saveQuotationJobSchema,
@@ -36,6 +42,9 @@ import {
   sendQuotationSchema,
   updateCustomerSchema,
   updateMaterialSchema,
+  updateOrderSchema,
+  updateProductionOrderSchema,
+  updateProductionStageSchema,
   updateQuotationSchema,
   updateSettingsSchema,
   updateUserSchema,
@@ -217,6 +226,18 @@ export function buildOpenApiDocument(serverUrl: string) {
       { name: 'Customers', description: 'Companies, and the designs each one has on record.' },
       { name: 'Jobs', description: 'One design at a time.' },
       { name: 'Quotations', description: 'Quoting, pricing, sending, and the outcome.' },
+      {
+        name: 'Production',
+        description:
+          'Job cards — what the floor actually did, stage by stage. Readable by anyone signed ' +
+          'in; recording a stage needs `jobs`.',
+      },
+      {
+        name: 'Orders',
+        description:
+          'What the customer committed to. Readable by anyone signed in — what is due and ' +
+          'when is the floor’s question too; raising or changing one needs `quotations`.',
+      },
       { name: 'Materials', description: 'Films, inks and adhesives, and the day’s rates.' },
       {
         name: 'Cylinders',
@@ -919,6 +940,193 @@ export function buildOpenApiDocument(serverUrl: string) {
           parameters: [ID_PARAM],
           requestBody: body(recordOutcomeSchema),
           responses: { 200: ok('The outcome, and what it created.'), ...COMMON },
+        },
+      },
+
+      '/api/orders': {
+        get: {
+          tags: ['Orders'],
+          summary: 'Orders, soonest due first',
+          description:
+            'Open work first, then by the day it is wanted. A list ordered by number puts the ' +
+            'oldest order at the bottom on the day it goes late, which is the one morning ' +
+            'anybody needs to see it. Search matches the customer, the job, their PO number or ' +
+            'the order number.',
+          parameters: query(listOrdersQuerySchema),
+          responses: { 200: page('A page of orders.'), ...AUTH_FAILURES },
+        },
+        post: {
+          tags: ['Orders'],
+          summary: 'Raise one by hand',
+          description:
+            'For repeat work taken without a fresh quotation. Winning a quotation raises its ' +
+            'own orders — one per line — so this is the other way in, not the usual one.',
+          requestBody: body(createOrderSchema),
+          responses: { 201: ok('The order.'), ...COMMON },
+        },
+      },
+      '/api/orders/next-number': {
+        get: {
+          tags: ['Orders'],
+          summary: 'The next order number',
+          responses: { 200: ok('The number the next order will take.'), ...AUTH_FAILURES },
+        },
+      },
+      '/api/orders/{id}': {
+        get: {
+          tags: ['Orders'],
+          summary: 'One order',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The order.'), ...COMMON },
+        },
+        patch: {
+          tags: ['Orders'],
+          summary: 'Correct it, or move it along',
+          description:
+            'Statuses go CONFIRMED → IN_PRODUCTION → COMPLETED, with CANCELLED reachable from ' +
+            'either open state. Nothing goes backwards and the two ends are ends: a completed ' +
+            'order returning to production is the kind of thing nobody notices until the ' +
+            'month’s figures disagree with the floor’s. A refused move answers 409.',
+          parameters: [ID_PARAM],
+          requestBody: body(updateOrderSchema),
+          responses: {
+            200: ok('The order as it now stands.'),
+            409: { description: 'That status move is not allowed.', ...json('Error') },
+            ...COMMON,
+          },
+        },
+        delete: {
+          tags: ['Orders'],
+          summary: 'Delete one nobody has started',
+          description:
+            'Refused once it has been in production: there is a run behind it by then, and a ' +
+            'deleted order is a run nothing explains. Cancelling says the same thing and keeps ' +
+            'the record.',
+          parameters: [ID_PARAM],
+          responses: {
+            200: ok('Deleted.'),
+            409: { description: 'Past CONFIRMED. Cancel it instead.', ...json('Error') },
+            ...COMMON,
+          },
+        },
+      },
+
+      '/api/production': {
+        get: {
+          tags: ['Production'],
+          summary: 'Job cards on the floor',
+          description:
+            'Running first, then planned, then finished — the floor’s order, not the filing ' +
+            'cabinet’s. `stage` narrows to cards waiting on one process, which is the question ' +
+            'a supervisor actually asks.',
+          parameters: query(listProductionQuerySchema),
+          responses: { 200: page('A page of job cards.'), ...AUTH_FAILURES },
+        },
+        post: {
+          tags: ['Production'],
+          summary: 'Raise a job card against an order',
+          description:
+            'The stages are DERIVED, not sent: printing unless the job prints nothing, one ' +
+            'lamination row per bond, slitting always, pouch making only where pouches are ' +
+            'made. Refused while another card on the same order is still open. Starting it ' +
+            'moves the order to in-production in the same transaction.',
+          requestBody: body(createProductionOrderSchema),
+          responses: {
+            201: ok('The job card, with its stages.'),
+            409: { description: 'A card is already open on that order.', ...json('Error') },
+            ...COMMON,
+          },
+        },
+      },
+      '/api/production/next-number': {
+        get: {
+          tags: ['Production'],
+          summary: 'The next job card number',
+          responses: { 200: ok('The number the next card will take.'), ...AUTH_FAILURES },
+        },
+      },
+      '/api/production/{id}': {
+        get: {
+          tags: ['Production'],
+          summary: 'One job card, with every stage',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The job card.'), ...COMMON },
+        },
+        patch: {
+          tags: ['Production'],
+          summary: 'Move the card along',
+          description:
+            'PLANNED → RUNNING → COMPLETED, with ON_HOLD reachable from either open state and ' +
+            'back again — a hold is temporary, and it is the only move that goes back. A ' +
+            'completed card is an end.',
+          parameters: [ID_PARAM],
+          requestBody: body(updateProductionOrderSchema),
+          responses: {
+            200: ok('The card as it now stands.'),
+            409: { description: 'That status move is not allowed.', ...json('Error') },
+            ...COMMON,
+          },
+        },
+        delete: {
+          tags: ['Production'],
+          summary: 'Delete a card nobody has started',
+          description:
+            'Once a stage has run there is material behind it, and a deleted card is material ' +
+            'nothing explains.',
+          parameters: [ID_PARAM],
+          responses: {
+            200: ok('Deleted.'),
+            409: { description: 'It has already started.', ...json('Error') },
+            ...COMMON,
+          },
+        },
+      },
+      '/api/production/stages/{stageId}': {
+        patch: {
+          tags: ['Production'],
+          summary: 'Record what a stage did',
+          description:
+            'The endpoint the floor actually uses. Both weights travel, never the waste — a ' +
+            'third figure that can disagree with the two it comes from is one nobody can ' +
+            'trust. Starting a stage starts the card, and the order with it.',
+          parameters: [
+            {
+              name: 'stageId',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+              description: 'The stage on the card.',
+            },
+          ],
+          requestBody: body(updateProductionStageSchema),
+          responses: { 200: ok('The whole card, re-read.'), ...COMMON },
+        },
+      },
+      '/api/production/{id}/stages': {
+        post: {
+          tags: ['Production'],
+          summary: 'Put a stage back on the card',
+          description:
+            'For a job the derivation guessed wrong about. The office has the last word.',
+          parameters: [ID_PARAM],
+          requestBody: body(addProductionStageSchema),
+          responses: { 201: ok('The card, with the stage added.'), ...COMMON },
+        },
+      },
+
+      '/api/production/{id}/override': {
+        post: {
+          tags: ['Production'],
+          summary: 'Let a card run on film the works has not got',
+          description:
+            'A job card is refused a start when its film is not free — free being what is on ' +
+            'hand less what other open cards have claimed. This is the one way past that, and ' +
+            'it records the reason, who gave it and when. Sending a blank reason clears the ' +
+            'override and puts the block back. Nothing here moves stock: a claim is not an ' +
+            'issue, and the job sheet remains the only thing that takes material off the shelf.',
+          parameters: [ID_PARAM],
+          requestBody: body(overrideMaterialsSchema),
+          responses: { 200: ok('The card, with the override on it.'), ...COMMON },
         },
       },
 

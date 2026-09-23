@@ -9,6 +9,7 @@ import {
   type Supplier,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -278,8 +279,8 @@ export default function PurchasePage() {
                         '—'}
                     </td>
                     <td className="px-2 py-3 text-right">
-                      <button
-                        type="button"
+                      <IconButton
+                        tone="danger"
                         /* The row opens their card. Without this, deleting
                            would open the thing being deleted first. */
                         onClick={(event) => {
@@ -288,10 +289,9 @@ export default function PurchasePage() {
                         }}
                         aria-label={`Delete ${row.name}`}
                         title="Delete — only a supplier nobody has ordered from"
-                        className="text-ink-400 hover:bg-danger-50 hover:text-danger-600 cursor-pointer rounded-[var(--radius-md)] p-2"
                       >
                         <Trash2 className="size-4" />
-                      </button>
+                      </IconButton>
                     </td>
                   </tr>
                 ))}

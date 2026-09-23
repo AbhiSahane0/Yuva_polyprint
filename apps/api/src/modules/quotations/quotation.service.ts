@@ -31,6 +31,7 @@ import {
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../../lib/prisma.js';
+import { ordersFromQuotation } from '../orders/order.service.js';
 import { ApiError } from '../../utils/api-error.js';
 import { getSettings } from '../settings/settings.service.js';
 import { getRateMap } from '../materials/material.service.js';
@@ -1549,6 +1550,8 @@ export async function recordOutcome(
       customerCreated: false,
       jobsCreated: [],
       jobsSkipped: [],
+      ordersCreated: [],
+      ordersSkipped: [],
     };
   }
 
@@ -1636,6 +1639,25 @@ export async function recordOutcome(
       data: { status: 'WON', lostReason: '', decidedAt, customerId },
     });
 
-    return { status: 'WON' as const, customerId, customerCreated, jobsCreated, jobsSkipped };
+    /*
+     * And the orders — one per line, inside the same transaction.
+     *
+     * A quotation that ends up WON with nothing behind it is the failure this
+     * placement prevents: the office would see a won document, no order, and no
+     * reason to think anything was missing. Idempotent like the jobs above, so
+     * winning twice creates nothing the second time and says which lines it
+     * already had orders for.
+     */
+    const orders = await ordersFromQuotation(tx, id);
+
+    return {
+      status: 'WON' as const,
+      customerId,
+      customerCreated,
+      jobsCreated,
+      jobsSkipped,
+      ordersCreated: orders.created,
+      ordersSkipped: orders.skipped,
+    };
   });
 }

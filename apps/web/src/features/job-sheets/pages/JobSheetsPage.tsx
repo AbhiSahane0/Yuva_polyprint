@@ -8,6 +8,7 @@ import {
   type JobSheetSummary,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { Input, Select } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -188,17 +189,16 @@ export default function JobSheetsPage() {
                   <td className="px-3 py-2.5">
                     {/* A posted sheet is refused by the server; no button for it. */}
                     {sheet.stockPostedAt ? null : (
-                      <button
-                        type="button"
+                      <IconButton
+                        tone="danger"
                         aria-label={`Delete job sheet ${sheet.number}`}
                         onClick={(event) => {
                           event.stopPropagation();
                           setDeleting(sheet);
                         }}
-                        className="text-ink-400 hover:text-danger-600 p-1"
                       >
                         <Trash2 className="size-4" />
-                      </button>
+                      </IconButton>
                     )}
                   </td>
                 </tr>

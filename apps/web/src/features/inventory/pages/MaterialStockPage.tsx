@@ -173,6 +173,19 @@ export default function MaterialStockPage() {
             <span className="text-ink-400 ml-1 text-sm font-normal">{summary.unit}</span>
           </div>
           <div className="text-ink-500 mt-0.5 text-xs">On hand</div>
+          {/*
+           * Under the figure rather than beside it, and only when there is
+           * something to say: on hand is what is in the building, free is what
+           * a new job could be given, and they differ by what open job cards
+           * have claimed. No stock has moved for a claim — the job sheet is
+           * still the only thing that issues material.
+           */}
+          {summary.committed > 0 ? (
+            <div className="text-warning-700 mt-1 text-xs">
+              {formatNumber(summary.free, 2)} {summary.unit} free ·{' '}
+              {formatNumber(summary.committed, 2)} on job cards
+            </div>
+          ) : null}
         </div>
         <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white px-4 py-3 shadow-[var(--shadow-card)]">
           <Badge tone={HEALTH_TONE[summary.health]}>{HEALTH_LABELS[summary.health]}</Badge>
