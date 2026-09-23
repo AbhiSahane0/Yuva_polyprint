@@ -733,6 +733,9 @@ model Material {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([category, sortOrder])
+  /// Held against job cards that have not run yet.
+  reservations StockReservation[]
+
   @@map("materials")
 }
 
@@ -1773,7 +1776,19 @@ model ProductionOrder {
   startedAt   DateTime? @map("started_at")
   completedAt DateTime? @map("completed_at")
 
-  stages ProductionStage[]
+  /// Why the works ran it anyway, when the material was short.
+  ///
+  /// A shortage stops a stage starting. It must not stop it for good: material
+  /// is often physically in the building before anybody books it in, and a
+  /// system that refuses to let the floor run a job already on the machine is
+  /// one they work around — after which the data stops being true. So the block
+  /// is real and getting past it is deliberate, named and dated.
+  materialOverrideReason String    @default("") @map("material_override_reason")
+  materialOverrideBy     String    @default("") @map("material_override_by")
+  materialOverrideAt     DateTime? @map("material_override_at")
+
+  stages       ProductionStage[]
+  reservations StockReservation[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1832,6 +1847,54 @@ model ProductionStage {
   @@unique([productionOrderId, position])
   @@index([status])
   @@map("production_stages")
+}
+
+/// Whether a reservation is still holding stock back.
+enum ReservationStatus {
+  /// Committed to a job card that has not finished.
+  HELD
+  /// Let go — the card finished, or was cancelled.
+  RELEASED
+}
+
+/// Material committed to a job card, but not yet taken off the shelf.
+///
+/// **A reservation is not a movement.** It never touches a batch and never
+/// appears in the ledger — it only makes stock read as *committed* rather than
+/// *free*. That is the whole design, and it is what guarantees nothing is
+/// deducted twice: the job sheet remains the only thing that issues material,
+/// because the job sheet is the only thing that knows what was actually
+/// weighed. Production knows what a job SHOULD take, which is a different and
+/// earlier question.
+///
+/// So the arithmetic everywhere is:
+///
+///     free = what is on hand − what is held against unfinished cards
+///
+/// and a shortage is measured against `free`, never against the ledger.
+model StockReservation {
+  id String @id @default(cuid())
+
+  materialId String   @map("material_id")
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Restrict)
+
+  productionOrderId String          @map("production_order_id")
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+
+  /// In the material's own unit, as the batches are.
+  quantity Decimal           @db.Decimal(14, 3)
+  status   ReservationStatus @default(HELD)
+
+  releasedAt DateTime? @map("released_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// One row per material per card: raising a card twice for the same film
+  /// should correct the figure, not hold it twice.
+  @@unique([productionOrderId, materialId])
+  @@index([materialId, status])
+  @@map("stock_reservations")
 }
 
 /// Whether an ink is one of the four every press carries, or a job's own.

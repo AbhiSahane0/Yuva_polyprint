@@ -2509,6 +2509,7 @@ card says what happened: on which machine, by whom, and what each stage lost.
 | PATCH  | `/production/:id`             | Move the card along                                                   |
 | PATCH  | `/production/stages/:stageId` | **What the floor actually uses** — one stage, as it happens           |
 | POST   | `/production/:id/stages`      | Put a stage back the derivation left off                              |
+| POST   | `/production/:id/override`    | **Let a card run short of film**, with a reason, a name and a time    |
 | DELETE | `/production/:id`             | Only one nobody has started                                           |
 
 **Reading is open to anyone signed in** — a job card is the floor's own document
@@ -2546,6 +2547,110 @@ Lamination 1 and Lamination 2 for the same reason.
 A stage that does not apply is `SKIPPED` rather than deleted, so the card still
 says what the job did not need instead of leaving a gap — which would read as
 something nobody has got to yet.
+
+### Material: reserved here, issued by the job sheet
+
+**Nothing in this module reduces stock.** That is the whole design, and it is
+what stops material being deducted twice.
+
+The works already has one thing that takes film off the shelf: the job sheet,
+which posts what was actually weighed at the machine. Production answers an
+earlier and different question — what a job _should_ take — and answers it by
+writing a **claim**, not a movement. A claim never touches a batch and never
+reaches the ledger. The only thing it changes is what the next job sees:
+
+```
+free = on hand − everything held by job cards that have not finished
+```
+
+So a card can be short of a film the stock screen shows plenty of, because the
+rest of it is promised to another job. The screens say that in those words
+rather than leaving somebody to work it out.
+
+`material-reservation.test.ts` checks this against the source rather than by
+calling it, because it is a failure of omission: a path that deducts stock is
+caught by the fact that it _exists_. The module may not name `stockMovement` at
+all, may not create, update or delete a `stockBatch`, and reads on-hand stock
+only as a `groupBy` sum.
+
+#### What a card needs
+
+The same arithmetic the costing charges for, so a job card and the quotation
+behind it cannot disagree about how much film the job takes:
+
+```
+consumed  = ordered × (1 + wastage%)
+ply share = that ply's GSM ÷ the whole STRUCTURE's GSM
+ply kg    = share × consumed
+```
+
+The divisor is the structure — plies **plus ink plus adhesive**. A kilogram of
+finished laminate is not a kilogram of film, and dividing by the plies alone
+would over-reserve every job by a few per cent, in the direction that makes the
+works look short of stock it has. The wastage is included because that film has
+to be on the shelf before the run starts.
+
+The wastage is read on the **quotation's own date** and honours that quotation's
+override, so a card raised today against a line quoted in March asks for the
+film that line was costed on.
+
+**Films only.** Only a quotation line names actual material rows per ply, which
+is what makes a requirement a fact rather than a guess. A card on an order typed
+over the phone reserves nothing and says so — reserving the wrong film would be
+worse than reserving none. Ink and adhesive are costed at blended rates against
+rows that are not real drums, so there is nothing there to reserve against.
+
+#### When it is checked, and what it stops
+
+| Moment                | What happens                                                            |
+| --------------------- | ----------------------------------------------------------------------- |
+| Card raised           | The claim is written. A shortage is **flagged, not refused**            |
+| Card quantity changed | The claim follows it, upserted — never stacked                          |
+| A stage is started    | **Re-checked against stock now, and refused with 409**                  |
+| Card moved to RUNNING | Same check, same refusal                                                |
+| Card completed        | The claim is released — by then the job sheet has posted the real issue |
+| Card deleted          | The claim goes with it, by cascade                                      |
+
+Raising a card is deliberately not the place to refuse. It is how the floor
+finds out what is missing and how purchase finds out what to order, and a works
+that cannot write down a job it has not got the film for goes back to writing it
+on paper. **The stop is at the machine**, and the stock is asked again there
+rather than trusted from when the card was raised: a claim made on Monday is not
+a guarantee on Thursday.
+
+A card's own claim is left out of the free stock it is measured against.
+Otherwise a card that already holds its film would report itself short against
+itself, every time, and nobody could get past it.
+
+#### The override, and why it exists
+
+A hard block is the obviously correct rule and the wrong feature. A floor that
+knows the lorry is an hour away, told _no_ by a screen, raises the card against
+a different order or stops using the screen — and then the stock figures are
+wrong in a way nobody can see, which costs more than the stop saved.
+
+So the block is real, there is exactly one way through it, and it writes down
+the reason, who gave it and when. Sending a blank reason clears it and puts the
+block back. Nothing about a shortage is ever stored: whether the works is short
+is asked of the stock every time.
+
+#### What it does to the stock screens
+
+`StockSummary` gains `committed` and `free`, and **`health` now reads against
+free stock rather than what is on the shelf**. A reorder level asks whether to
+buy more, and film already promised to a job cannot answer it: 600 kg on hand
+with 550 committed is 50 kg to run the next job on, and a screen calling that
+healthy lets the works run out while showing a comfortable figure.
+
+#### The one gap, stated
+
+A job sheet is linked to a _design_, not to a job card, so a posted sheet cannot
+be matched back to the card whose film it used. Between the sheet posting and
+the card being completed, that card's claim still stands alongside the issue the
+sheet made — so free stock reads **lower** than it is for that window. The error
+is in the safe direction (nothing is double-_deducted_; the ledger and the
+batches are untouched, and the figure only ever understates what is free), and
+it ends when the card is completed. Linking job sheets to cards would close it.
 
 ### Starting a stage starts everything above it
 

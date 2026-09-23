@@ -384,6 +384,43 @@ is the opposite of what it means.
 The floor presses **Start** on a stage; the card and the order follow on their
 own. Nobody has to remember to start three things.
 
+#### The material panel — and the one thing that stops a job
+
+Above the stages, because whether the film is there is the first question and
+its answer decides whether any of the stages below can be started at all.
+
+Three figures per ply, and the order they are read in is the point: what the job
+**needs**, what is **free**, and — only when those disagree — what is **short**.
+Free is what is on hand less what other open job cards have claimed, which is
+why a job can be short of a film the stock screen shows plenty of. The panel
+says that in those words; hovering a free figure gives the on-hand and claimed
+numbers behind it.
+
+**Nothing here has moved any stock.** A claim is not an issue — the job sheet
+remains the only thing that takes material off the shelf, which is what stops
+anything being deducted twice.
+
+Pressing Start on a stage of a short job is **refused by the server**, and the
+refusal names the film, what it needs and what is free. The way through is
+**Run it anyway…**, which asks for a reason in one sentence and records it with
+the user's name and the time, in the panel, for anyone to read afterwards. A
+**Put the block back** button clears it.
+
+Why not simply refuse? A floor that knows the lorry is an hour away, told _no_
+by a screen, raises the card against a different order or stops using the
+screen — and then the stock figures are wrong in a way nobody can see. The block
+is real; there is one way through it and it leaves a record.
+
+A card on an order that was never priced from a quotation says so plainly rather
+than showing "0 kg needed", which would read as a job that needs no film.
+
+**A finished card is never flagged.** What is free today says nothing about a
+run that is over, and a red flag on it sends somebody to solve a problem that
+was already solved. The figures stay; only the alarm goes.
+
+The list carries the same fact as a **Short of film** badge beside the job name,
+so a supervisor scanning the floor sees it without opening anything.
+
 ### Quotations — `/quotations`
 
 By default the list reads as a **work queue, not a diary**: Draft first, then
@@ -1303,6 +1340,19 @@ looks clickable and does nothing is worse than one that plainly does not.
 material missing from the screen because it happens to be empty is exactly the
 one somebody needs to order.
 
+**On hand and Free are separate columns.** On hand is what is in the building;
+free is what a new job could actually be given, which is on hand less what open
+job cards have claimed. The difference is the whole reason a job can be short of
+a film the shelf is full of, and the free figure carries the claimed amount in
+its tooltip. On mobile the second figure appears only when the two differ — a
+repeated identical number is noise.
+
+**"Need reordering" reads against free stock**, not against the shelf. A reorder
+level asks whether to buy more, and film already promised to a job cannot answer
+it: 600 kg on hand with 550 committed is 50 kg to run the next job on, and a
+screen calling that healthy lets the works run out while showing a comfortable
+figure.
+
 Filter by category — Films, Ink, Adhesive, Solvents, Consumables — and search by
 name. Totals are over everything the filters matched rather than over a page: an
 inventory value that changes when you click a category filter is not a total
@@ -1314,8 +1364,12 @@ Stock, the batches it is spread over, and every movement against it.
 
 **Batch level, not roll level.** How much PET is there, what is it worth, and is
 it running out are the questions the office asks, and all three are answered per
-batch. Individual roll numbers become worth keying in when there is a production
-module to consume them; until then they would be typing with no reader.
+batch. Individual roll numbers would be typing with no reader: production claims
+material by quantity, not by roll.
+
+Under the on-hand figure, when there is something to say, how much is **free**
+and how much sits **on job cards**. Nothing has moved for a claim — the job
+sheet is still the only thing that issues material.
 
 Batches are listed **oldest first**, which is the order they should be used in,
 and an emptied batch stays on the list greyed out — it is what its movements

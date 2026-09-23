@@ -3,6 +3,7 @@ import type {
   AddProductionStageInput,
   CreateProductionOrderInput,
   ListProductionQuery,
+  OverrideMaterialsInput,
   ProductionOrder,
   UpdateProductionOrderInput,
   UpdateProductionStageInput,
@@ -10,6 +11,7 @@ import type {
 import { request } from '@/lib/api-client';
 import { settle } from '@/lib/query';
 import { orderKeys } from '@/features/orders/api/order-api';
+import { inventoryKeys } from '@/features/inventory/api/inventory-api';
 
 export const productionKeys = {
   all: ['production'] as const,
@@ -61,7 +63,14 @@ function useCardMutation<TArgs>(run: (args: TArgs) => Promise<ProductionOrder>) 
     mutationFn: run,
     onSuccess: (card) => {
       queryClient.setQueryData(productionKeys.detail(card.id), card);
-      return settle(queryClient, productionKeys.lists(), orderKeys.all);
+      /*
+       * Inventory too: raising or re-quantifying a card changes what the works
+       * has FREE, which is the figure the stock screens lead on. No batch has
+       * moved and no movement has been written — a claim is not an issue — but
+       * a stock screen open in another tab would go on showing film as free
+       * that this card has just taken a claim on.
+       */
+      return settle(queryClient, productionKeys.lists(), orderKeys.all, inventoryKeys.all);
     },
   });
 }
@@ -96,11 +105,24 @@ export function useAddStage() {
   );
 }
 
+/**
+ * Lets a card run on film the works has not got, with a reason on the record.
+ *
+ * Sending a blank reason clears it, which puts the block back — so this is the
+ * one control for both, and there is nothing else to find.
+ */
+export function useOverrideMaterials() {
+  return useCardMutation(({ id, input }: { id: string; input: OverrideMaterialsInput }) =>
+    request<ProductionOrder>({ url: `/production/${id}/override`, method: 'POST', data: input }),
+  );
+}
+
 export function useDeleteProduction() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
       request<{ id: string }>({ url: `/production/${id}`, method: 'DELETE' }),
-    onSuccess: () => settle(queryClient, productionKeys.all, orderKeys.all),
+    /* The card's claims go with it — the row cascades — so free stock moves. */
+    onSuccess: () => settle(queryClient, productionKeys.all, orderKeys.all, inventoryKeys.all),
   });
 }

@@ -622,6 +622,21 @@ export async function listStock(query: ListStockQuery): Promise<StockList> {
   });
   const lastMovedAt = new Map(lastMoved.map((row) => [row.materialId, row._max.createdAt]));
 
+  /*
+   * What open job cards have claimed. A claim is not a movement — the film is
+   * on the shelf and counted in `quantity` — but it is spoken for, and the
+   * figure that decides whether a new job can run is what is left after it.
+   * One grouped query, like the one above.
+   */
+  const committedRows = await prisma.stockReservation.groupBy({
+    by: ['materialId'],
+    where: { materialId: { in: ids }, status: 'HELD' },
+    _sum: { quantity: true },
+  });
+  const committedBy = new Map(
+    committedRows.map((row) => [row.materialId, round(toNumber(row._sum.quantity ?? 0), 3)]),
+  );
+
   const items: StockSummary[] = materials.map((material) => {
     const batches = material.stockBatches;
     const currentRate = rates.get(material.id) ?? null;
@@ -640,6 +655,9 @@ export async function listStock(query: ListStockQuery): Promise<StockList> {
       2,
     );
 
+    const committed = committedBy.get(material.id) ?? 0;
+    const free = round(quantity - committed, 3);
+
     const reorderLevel = toNullableNumber(material.reorderLevel);
     const moved = lastMovedAt.get(material.id) ?? null;
     // Ever moved, not "has stock now" — a material that ran out has a history
@@ -652,11 +670,15 @@ export async function listStock(query: ListStockQuery): Promise<StockList> {
       category: material.category,
       unit: material.unit,
       quantity,
+      committed,
+      free,
       // Batches that still hold something. An emptied batch stays on record for
       // its history but is not somewhere stock can be found.
       batchCount: batches.filter((batch) => toNumber(batch.quantity) > 0).length,
       reorderLevel,
-      health: stockHealth(quantity, reorderLevel, everStocked),
+      /* Against FREE stock — see the type. A reorder level asks whether to buy
+         more, and film already promised to a job cannot answer that. */
+      health: stockHealth(free, reorderLevel, everStocked),
       currentRate,
       value,
       locations: [
@@ -719,6 +741,19 @@ export async function getMaterialStock(materialId: string): Promise<MaterialStoc
     currentRates([materialId]),
   ]);
 
+  /* What open job cards have claimed of this one. See the list above. */
+  const committed = round(
+    toNumber(
+      (
+        await prisma.stockReservation.aggregate({
+          where: { materialId, status: 'HELD' },
+          _sum: { quantity: true },
+        })
+      )._sum.quantity ?? 0,
+    ),
+    3,
+  );
+
   const currentRate = rates.get(materialId) ?? null;
   const mapped = batches.map((batch) => toBatch(batch, currentRate));
 
@@ -726,6 +761,7 @@ export async function getMaterialStock(materialId: string): Promise<MaterialStoc
     mapped.reduce((total, batch) => total + batch.quantity, 0),
     3,
   );
+  const free = round(quantity - committed, 3);
   const reorderLevel = toNullableNumber(material.reorderLevel);
 
   return {
@@ -735,9 +771,11 @@ export async function getMaterialStock(materialId: string): Promise<MaterialStoc
       category: material.category,
       unit: material.unit,
       quantity,
+      committed,
+      free,
       batchCount: mapped.filter((batch) => batch.quantity > 0).length,
       reorderLevel,
-      health: stockHealth(quantity, reorderLevel, movements.length > 0),
+      health: stockHealth(free, reorderLevel, movements.length > 0),
       currentRate,
       value: round(
         mapped.reduce((total, batch) => total + batch.value, 0),

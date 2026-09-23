@@ -1,3 +1,4 @@
+import type { MaterialAvailability } from '../lib/material-availability.js';
 import type { MachineKind } from '../lib/rate-costing.js';
 import type { ProductionStatus, StageStatus } from '../constants/production.js';
 
@@ -50,6 +51,24 @@ export interface ProductionOrder {
   progressPercent: number;
   /** The one being worked, or the next one waiting. Null on a finished card. */
   currentStage: MachineKind | null;
+
+  /**
+   * The film this card needs, and what the works has free for it.
+   *
+   * Empty when nothing can be said — a card on an order typed over the phone
+   * has no priced structure behind it, so there is no material to reserve and
+   * none is claimed. A line with `shortBy` above zero is what stops the job.
+   *
+   * These are claims, never movements: see `material-availability.ts`. Stock is
+   * reduced exactly once, by the job sheet, and nothing here touches it.
+   */
+  materials: MaterialAvailability[];
+
+  /** Why this card was allowed to run short, if it was. Empty means it was not. */
+  materialOverrideReason: string;
+  /** Who said so, and when. Both empty until somebody does. */
+  materialOverrideBy: string;
+  materialOverrideAt: string | null;
 
   createdAt: string;
   updatedAt: string;

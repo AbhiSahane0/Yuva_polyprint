@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { AlertTriangle, Search } from 'lucide-react';
 import {
   formatNumber,
   MACHINE_KINDS,
   PRODUCTION_STAGE_LABELS,
   PRODUCTION_STATUS_LABELS,
   PRODUCTION_STATUSES,
+  flagsShort,
   type MachineKind,
   type ProductionOrder,
   type ProductionStatus,
@@ -215,7 +216,19 @@ export default function ProductionPage() {
                         </span>
                       </td>
                       <td className="text-ink-700 px-4 py-2.5">{card.customerName}</td>
-                      <td className="text-ink-700 px-4 py-2.5">{card.jobName}</td>
+                      <td className="text-ink-700 px-4 py-2.5">
+                        <span className="align-middle">{card.jobName}</span>
+                        {/* The one thing on this row that stops the job. It sits
+                            with the job's name rather than in a column of its
+                            own, because it is only ever true of a few rows and
+                            an empty column reads as a column nobody fills in. */}
+                        {flagsShort(card).length > 0 ? (
+                          <Badge tone="danger" className="ml-2 align-middle">
+                            <AlertTriangle className="mr-1 size-3" />
+                            {card.materialOverrideReason ? 'Short — allowed' : 'Short of film'}
+                          </Badge>
+                        ) : null}
+                      </td>
                       <td className="text-ink-700 px-4 py-2.5 text-right tabular-nums">
                         {formatNumber(card.quantityKg, 0)} kg
                       </td>

@@ -5,6 +5,7 @@ import {
   createProductionOrderSchema,
   idParamSchema,
   listProductionQuerySchema,
+  overrideMaterialsSchema,
   updateProductionOrderSchema,
   updateProductionStageSchema,
 } from '@yuva/shared';
@@ -55,6 +56,20 @@ router.post(
   requireModule('jobs'),
   validate({ params: idParamSchema, body: addProductionStageSchema }),
   asyncHandler(controller.addStage),
+);
+
+/*
+ * The one way past a material shortage, and it writes down who and why.
+ *
+ * Its own endpoint rather than a field on the card, so nothing about saving a
+ * card can quietly unlock it, and so the decision is one deliberate request
+ * that can be read off the log on its own.
+ */
+router.post(
+  '/:id/override',
+  requireModule('jobs'),
+  validate({ params: idParamSchema, body: overrideMaterialsSchema }),
+  asyncHandler(controller.overrideMaterials),
 );
 
 /* Only one nobody has started — see the service. */

@@ -201,6 +201,11 @@ export default function InventoryPage() {
                 <tr className="border-ink-200 bg-ink-25 text-ink-500 border-b text-left">
                   <th className="px-4 py-3 font-semibold">Material</th>
                   <th className="px-4 py-3 text-right font-semibold">On hand</th>
+                  {/* On hand is what is in the building; free is what a new job
+                      could be given. They differ by what open job cards have
+                      claimed, and the difference is the whole reason a job can
+                      be short of a film the shelf is full of. */}
+                  <th className="px-4 py-3 text-right font-semibold">Free</th>
                   <th className="px-4 py-3 text-right font-semibold">Reorder at</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
                   <th className="px-4 py-3 font-semibold">Where</th>
@@ -226,6 +231,19 @@ export default function InventoryPage() {
                     </td>
                     <td className="text-ink-900 px-4 py-3 text-right font-medium">
                       <Quantity value={item.quantity} unit={item.unit} />
+                    </td>
+                    <td
+                      className={cn(
+                        'px-4 py-3 text-right font-medium',
+                        item.committed > 0 ? 'text-warning-700' : 'text-ink-500',
+                      )}
+                      title={
+                        item.committed > 0
+                          ? `${formatNumber(item.committed, 3)} ${item.unit} claimed by open job cards`
+                          : 'Nothing is claimed against this material'
+                      }
+                    >
+                      <Quantity value={item.free} unit={item.unit} />
                     </td>
                     <td className="text-ink-500 px-4 py-3 text-right tabular-nums">
                       {item.reorderLevel === null ? (
@@ -292,6 +310,14 @@ export default function InventoryPage() {
                   </div>
                   <p className="text-ink-500 mt-1 text-xs">
                     <Quantity value={item.quantity} unit={item.unit} />
+                    {/* Only when they differ. On a material nothing is claimed
+                        against, a second identical figure is noise. */}
+                    {item.committed > 0 ? (
+                      <span className="text-warning-700">
+                        {' · '}
+                        <Quantity value={item.free} unit={item.unit} /> free
+                      </span>
+                    ) : null}
                     {item.value > 0 ? ` · ${formatRs(item.value)}` : ''}
                     {item.locations.length > 0 ? ` · ${item.locations.join(', ')}` : ''}
                   </p>

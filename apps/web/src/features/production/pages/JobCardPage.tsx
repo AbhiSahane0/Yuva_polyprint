@@ -24,6 +24,7 @@ import { useCostingMasterData } from '@/features/costing/api/costing-api';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
+import { MaterialPanel } from '../components/MaterialPanel';
 import {
   useDeleteProduction,
   useProductionOrder,
@@ -204,6 +205,11 @@ export default function JobCardPage() {
           </div>
         </div>
       </section>
+
+      {/* Above the stages on purpose: whether the film is there is the first
+          question, and the answer to it decides whether any of the stages
+          below can be started at all. */}
+      <MaterialPanel card={card} canEdit={canEdit} />
 
       <h2 className="text-ink-800 mb-3 text-xs font-semibold tracking-wider uppercase">Stages</h2>
 

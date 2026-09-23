@@ -53,6 +53,19 @@ export const addProductionStageSchema = z.object({
 
 export type AddProductionStageInput = z.infer<typeof addProductionStageSchema>;
 
+/**
+ * Letting a card run on film the works has not got.
+ *
+ * The reason is required and not a tick box, because the tick box is what this
+ * is for: a stop nobody can explain gets worked around, and a stop that costs
+ * one sentence gets explained. Blank clears it and puts the block back.
+ */
+export const overrideMaterialsSchema = z.object({
+  reason: z.string().trim().max(500).default(''),
+});
+
+export type OverrideMaterialsInput = z.infer<typeof overrideMaterialsSchema>;
+
 export const listProductionQuerySchema = z.object({
   search: z.string().trim().max(200).optional(),
   status: z.enum(PRODUCTION_STATUSES).optional(),

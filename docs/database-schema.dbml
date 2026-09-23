@@ -167,6 +167,11 @@ Enum QuotationStatus {
   LOST
 }
 
+Enum ReservationStatus {
+  HELD
+  RELEASED
+}
+
 Enum StockMovementKind {
   RECEIPT
   ISSUE
@@ -499,7 +504,7 @@ Table login_events {
   user_agent text
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '49 row(s) at time of generation'
+  Note: '51 row(s) at time of generation'
 }
 
 Table material_rates {
@@ -510,7 +515,7 @@ Table material_rates {
   entered_by text [not null, default: `'Office'`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '429 row(s) at time of generation'
+  Note: '453 row(s) at time of generation'
 }
 
 Table materials {
@@ -573,6 +578,9 @@ Table production_orders {
   completed_at timestamp
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
+  material_override_at timestamp
+  material_override_by text [not null, default: `''`]
+  material_override_reason text [not null, default: `''`]
 
   Note: '0 row(s) at time of generation'
 }
@@ -806,7 +814,7 @@ Table sessions {
   last_seen_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '9 row(s) at time of generation'
+  Note: '5 row(s) at time of generation'
 }
 
 Table stock_batches {
@@ -843,7 +851,20 @@ Table stock_movements {
   entered_by text [not null]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '5 row(s) at time of generation'
+  Note: '0 row(s) at time of generation'
+}
+
+Table stock_reservations {
+  id text [pk]
+  material_id text [unique, not null]
+  production_order_id text [unique, not null]
+  quantity decimal(14,3) [not null]
+  status ReservationStatus [not null, default: `'HELD'::"ReservationStatus"`]
+  released_at timestamp
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+
+  Note: '0 row(s) at time of generation'
 }
 
 Table suppliers {
@@ -922,3 +943,5 @@ Ref: production_orders.order_id > orders.id [delete: cascade]
 Ref: production_orders.job_id > jobs.id [delete: set null]
 Ref: production_stages.production_order_id > production_orders.id [delete: cascade]
 Ref: production_stages.machine_id > costing_machines.id [delete: set null]
+Ref: stock_reservations.material_id > materials.id [delete: restrict]
+Ref: stock_reservations.production_order_id > production_orders.id [delete: cascade]

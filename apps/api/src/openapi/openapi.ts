@@ -34,6 +34,7 @@ import {
   listProductionQuerySchema,
   listQuotationsQuerySchema,
   loginSchema,
+  overrideMaterialsSchema,
   recordOutcomeSchema,
   resetPasswordSchema,
   saveQuotationJobSchema,
@@ -1110,6 +1111,22 @@ export function buildOpenApiDocument(serverUrl: string) {
           parameters: [ID_PARAM],
           requestBody: body(addProductionStageSchema),
           responses: { 201: ok('The card, with the stage added.'), ...COMMON },
+        },
+      },
+
+      '/api/production/{id}/override': {
+        post: {
+          tags: ['Production'],
+          summary: 'Let a card run on film the works has not got',
+          description:
+            'A job card is refused a start when its film is not free — free being what is on ' +
+            'hand less what other open cards have claimed. This is the one way past that, and ' +
+            'it records the reason, who gave it and when. Sending a blank reason clears the ' +
+            'override and puts the block back. Nothing here moves stock: a claim is not an ' +
+            'issue, and the job sheet remains the only thing that takes material off the shelf.',
+          parameters: [ID_PARAM],
+          requestBody: body(overrideMaterialsSchema),
+          responses: { 200: ok('The card, with the override on it.'), ...COMMON },
         },
       },
 

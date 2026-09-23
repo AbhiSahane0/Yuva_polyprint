@@ -9,6 +9,7 @@ import {
   type ListProductionQuery,
   type MachineKind,
   type ProductionOrder,
+  type MaterialAvailability,
   type ProductionStageRow,
   type ProductionStatus,
   type UpdateProductionOrderInput,
@@ -17,6 +18,14 @@ import {
 import type { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
+import {
+  availabilityForCard,
+  availabilityForCards,
+  holdFor,
+  refuseUnlessOverridden,
+  releaseFor,
+  requirementsFor,
+} from './material-reservation.js';
 
 /**
  * Production — what the floor actually did.
@@ -58,7 +67,7 @@ function toStage(row: Row['stages'][number]): ProductionStageRow {
   };
 }
 
-function toProduction(row: Row): ProductionOrder {
+function toProduction(row: Row, materials: MaterialAvailability[] = []): ProductionOrder {
   const stages = row.stages.map(toStage);
   /*
    * The stage being worked, else the next one waiting. What the list column
@@ -87,6 +96,11 @@ function toProduction(row: Row): ProductionOrder {
     stages,
     progressPercent: productionProgress(stages),
     currentStage: current?.stage ?? null,
+
+    materials,
+    materialOverrideReason: row.materialOverrideReason,
+    materialOverrideBy: row.materialOverrideBy,
+    materialOverrideAt: row.materialOverrideAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -130,14 +144,38 @@ export async function listProduction(query: ListProductionQuery) {
     prisma.productionOrder.count({ where }),
   ]);
 
-  return { items: rows.map(toProduction), total, page: query.page, pageSize: query.pageSize };
+  /* Three queries for the whole page, however many cards are on it — see
+     availabilityForCards. The floor's list is where a shortage has to be
+     visible, so it is not something the detail screen alone can answer. */
+  const materials = await availabilityForCards(
+    prisma,
+    rows.map((row) => ({ id: row.id, orderId: row.orderId, quantityKg: toNumber(row.quantityKg) })),
+  );
+
+  return {
+    items: rows.map((row) => toProduction(row, materials.get(row.id) ?? [])),
+    total,
+    page: query.page,
+    pageSize: query.pageSize,
+  };
 }
 
 export async function getProductionById(id: string): Promise<ProductionOrder> {
   const row = await prisma.productionOrder.findUnique({ where: { id }, include: WITH_ALL });
   if (!row) throw ApiError.notFound('That job card is not on record');
-  return toProduction(row);
+  return toProduction(row, await availabilityForCard(prisma, cardForStock(row)));
 }
+
+/** The three fields the stock side needs, off a row the rest of this file has. */
+const cardForStock = (row: {
+  id: string;
+  orderId: string;
+  quantityKg: Prisma.Decimal | number;
+}) => ({
+  id: row.id,
+  orderId: row.orderId,
+  quantityKg: toNumber(row.quantityKg),
+});
 
 /**
  * The structure behind an order, so the stages can be derived from it.
@@ -206,6 +244,13 @@ async function structureFor(
  * Starting production moves the ORDER to in-production in the same transaction.
  * Nothing else is going to do it, and an order sitting at confirmed while its
  * card runs is the kind of disagreement this whole module exists to end.
+ *
+ * **The film is claimed here, and a shortage is flagged rather than refused.**
+ * Raising a card is not moving the job forward — it is how the floor finds out
+ * what is missing and how purchase finds out what to order, and a works that
+ * cannot write down a job it has not got the film for goes back to writing it
+ * on paper. The refusal comes one step later, when a stage is started; see
+ * `updateStage`. Nothing is deducted either way: see material-reservation.ts.
  */
 export async function createProduction(
   input: CreateProductionOrderInput,
@@ -265,7 +310,10 @@ export async function createProduction(
       include: WITH_ALL,
     });
 
-    return toProduction(card);
+    const needs = await requirementsFor(tx, cardForStock(card));
+    await holdFor(tx, card.id, needs);
+
+    return toProduction(card, await availabilityForCard(tx, cardForStock(card)));
   });
 }
 
@@ -286,6 +334,15 @@ export async function updateProduction(
   const movedTo = status !== existing.status ? status : null;
 
   return prisma.$transaction(async (tx) => {
+    /*
+     * Checked BEFORE the card moves, against the film it holds now. Running a
+     * card is the works committing the material, and the one thing that gets
+     * past an honest shortage is somebody putting their name to a reason.
+     */
+    if (movedTo === 'RUNNING') {
+      refuseUnlessOverridden(await availabilityForCard(tx, cardForStock(existing)), existing);
+    }
+
     const row = await tx.productionOrder.update({
       where: { id },
       data: {
@@ -299,7 +356,24 @@ export async function updateProduction(
     });
 
     if (movedTo === 'RUNNING') await startTheOrder(tx, row.orderId);
-    return toProduction(row);
+
+    /*
+     * A changed quantity is a changed claim, so the hold follows it rather than
+     * standing at whatever the card was first raised for.
+     */
+    if (input.quantityKg !== undefined && input.quantityKg !== toNumber(existing.quantityKg)) {
+      await holdFor(tx, row.id, await requirementsFor(tx, cardForStock(row)));
+    }
+
+    /*
+     * **Where the two halves meet.** A finished card's claim stops counting,
+     * because by now the job sheet has posted what the run actually took off
+     * stock. Releasing any earlier would let a second card promise film this
+     * one has already used; never releasing would hold it for ever.
+     */
+    if (movedTo === 'COMPLETED') await releaseFor(tx, row.id);
+
+    return toProduction(row, await availabilityForCard(tx, cardForStock(row)));
   });
 }
 
@@ -326,7 +400,22 @@ export async function updateStage(
 ): Promise<ProductionOrder> {
   const existing = await prisma.productionStage.findUnique({
     where: { id: stageId },
-    select: { id: true, status: true, productionOrderId: true, startedAt: true },
+    select: {
+      id: true,
+      status: true,
+      productionOrderId: true,
+      startedAt: true,
+      productionOrder: {
+        select: {
+          id: true,
+          orderId: true,
+          quantityKg: true,
+          status: true,
+          startedAt: true,
+          materialOverrideReason: true,
+        },
+      },
+    },
   });
   if (!existing) throw ApiError.notFound('That stage is not on record');
 
@@ -345,6 +434,22 @@ export async function updateStage(
 
     const status = input.status ?? existing.status;
     const movedTo = status !== existing.status ? status : null;
+
+    /*
+     * **The re-check, and the point the job actually stops.**
+     *
+     * Not at the card, which the floor may raise days early, but here — the
+     * moment somebody puts film on a machine. The stock is asked again rather
+     * than trusted from when the card was raised, because in between it may
+     * have gone to another job, and a claim made on Monday is not a guarantee
+     * on Thursday.
+     */
+    if (movedTo === 'RUNNING') {
+      refuseUnlessOverridden(
+        await availabilityForCard(tx, cardForStock(existing.productionOrder)),
+        existing.productionOrder,
+      );
+    }
 
     await tx.productionStage.update({
       where: { id: stageId },
@@ -386,8 +491,44 @@ export async function updateStage(
       where: { id: existing.productionOrderId },
       include: WITH_ALL,
     });
-    return toProduction(row!);
+    return toProduction(row!, await availabilityForCard(tx, cardForStock(row!)));
   });
+}
+
+/**
+ * Lets a job run on film the works has not got, on the record.
+ *
+ * **Why this exists at all.** A hard block is the obviously correct rule and
+ * the wrong feature: a floor that knows the lorry is an hour away, told no by a
+ * screen, raises the card against a different order or stops using the screen —
+ * and then the stock figures are wrong in a way nobody can see, which is worse
+ * than the shortage the block was protecting. So the block is real, and there
+ * is exactly one way through it, and it writes down who went through and why.
+ *
+ * Clearing the reason puts the block back. Nothing about a shortage is stored:
+ * whether the works is short is asked of the stock every time.
+ */
+export async function overrideMaterials(
+  id: string,
+  input: { reason: string; by: string },
+): Promise<ProductionOrder> {
+  const existing = await prisma.productionOrder.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!existing) throw ApiError.notFound('That job card is not on record');
+
+  const reason = input.reason.trim();
+  const row = await prisma.productionOrder.update({
+    where: { id },
+    data: {
+      materialOverrideReason: reason,
+      materialOverrideBy: reason ? input.by : '',
+      materialOverrideAt: reason ? new Date() : null,
+    },
+    include: WITH_ALL,
+  });
+  return toProduction(row, await availabilityForCard(prisma, cardForStock(row)));
 }
 
 /** Puts a stage back on a card the derivation left it off. */

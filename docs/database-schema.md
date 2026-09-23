@@ -215,6 +215,12 @@ erDiagram
     text material_id FK
     text job_id FK
   }
+  stock_reservations {
+    text id PK
+    text material_id FK
+    text production_order_id FK
+    ReservationStatus status
+  }
   suppliers {
     text id PK
     text mobile
@@ -267,6 +273,8 @@ erDiagram
   jobs ||--o{ production_orders : "job_id"
   production_orders ||--|{ production_stages : "production_order_id"
   costing_machines ||--o{ production_stages : "machine_id"
+  materials ||--|{ stock_reservations : "material_id"
+  production_orders ||--|{ stock_reservations : "production_order_id"
 ```
 
 ## Tables
@@ -287,11 +295,11 @@ erDiagram
 | `job_sheet_stage_usage` | 7 | 75 |  |
 | `job_sheets` | 59 | 15 |  |
 | `jobs` | 55 | 419 | Products and their full engineering specification. |
-| `login_events` | 7 | 49 |  |
-| `material_rates` | 6 | 429 |  |
+| `login_events` | 7 | 51 |  |
+| `material_rates` | 6 | 453 |  |
 | `materials` | 13 | 24 |  |
 | `orders` | 23 | 1 |  |
-| `production_orders` | 13 | 0 |  |
+| `production_orders` | 16 | 0 |  |
 | `production_stages` | 16 | 0 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
@@ -303,9 +311,10 @@ erDiagram
 | `quotation_items` | 31 | 1 | One priced line on a quotation. |
 | `quotation_tiers` | 14 | 3 |  |
 | `quotations` | 33 | 1 | Customer-facing quotations, with totals frozen at save. |
-| `sessions` | 6 | 9 |  |
+| `sessions` | 6 | 5 |  |
 | `stock_batches` | 14 | 1 |  |
-| `stock_movements` | 13 | 5 |  |
+| `stock_movements` | 13 | 0 |  |
+| `stock_reservations` | 8 | 0 |  |
 | `suppliers` | 11 | 1 |  |
 | `users` | 10 | 3 |  |
 
@@ -358,6 +367,8 @@ erDiagram
 | `production_orders.job_id` | `jobs.id` | SET NULL |  |
 | `production_stages.production_order_id` | `production_orders.id` | CASCADE |  |
 | `production_stages.machine_id` | `costing_machines.id` | SET NULL |  |
+| `stock_reservations.material_id` | `materials.id` | RESTRICT |  |
+| `stock_reservations.production_order_id` | `production_orders.id` | CASCADE |  |
 
 ## Enums
 
@@ -386,6 +397,7 @@ erDiagram
 | `ProductionStatus` | `PLANNED`, `RUNNING`, `ON_HOLD`, `COMPLETED` |
 | `PurchaseOrderStatus` | `ORDERED`, `IN_TRANSIT`, `PARTIALLY_RECEIVED`, `RECEIVED`, `CANCELLED` |
 | `QuotationStatus` | `DRAFT`, `SENT`, `WON`, `LOST` |
+| `ReservationStatus` | `HELD`, `RELEASED` |
 | `StockMovementKind` | `RECEIPT`, `ISSUE`, `WASTE`, `ADJUSTMENT`, `TRANSFER` |
 
 ## Full column reference
@@ -791,6 +803,9 @@ erDiagram
 | `completed_at` | `timestamp` | ✓ |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
+| `material_override_at` | `timestamp` | ✓ |  |
+| `material_override_by` | `text` |  |  |
+| `material_override_reason` | `text` |  |  |
 
 ### `production_stages`
 
@@ -1060,6 +1075,19 @@ erDiagram
 | `notes` | `text` |  |  |
 | `entered_by` | `text` |  |  |
 | `created_at` | `timestamp` |  |  |
+
+### `stock_reservations`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `material_id` | `text` |  | FK → `materials.id` |
+| `production_order_id` | `text` |  | FK → `production_orders.id` |
+| `quantity` | `decimal(14,3)` |  |  |
+| `status` | `ReservationStatus` (enum) |  |  |
+| `released_at` | `timestamp` | ✓ |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
 
 ### `suppliers`
 
