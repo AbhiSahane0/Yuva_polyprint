@@ -3,6 +3,7 @@ import { Cog, Plus, RotateCcw, Users2 } from 'lucide-react';
 import {
   ADHESIVE_BATCHES,
   MACHINE_KINDS,
+  isFromTheStart,
   MACHINE_KIND_LABELS,
   OVERHEAD_BASES,
   OVERHEAD_BASIS_HINTS,
@@ -275,8 +276,15 @@ export default function CostingPage() {
                         went out last year.
                       */}
                       <div className="text-ink-400 mt-0.5 text-xs font-normal">
-                        {row.effectiveFrom}
-                        {row.effectiveTo ? ` — ${row.effectiveTo}` : ' onwards'}
+                        {/* A row backfilled when wages gained their history has
+                            no true start — showing somebody 1900 reads as a
+                            bug rather than as "this has always applied". */}
+                        {isFromTheStart(row) ? 'from the start' : row.effectiveFrom}
+                        {row.effectiveTo
+                          ? ` — ${row.effectiveTo}`
+                          : isFromTheStart(row)
+                            ? ''
+                            : ' onwards'}
                       </div>
                     </td>
                     <td className="text-ink-600 px-4 py-3">{MACHINE_KIND_LABELS[row.process]}</td>

@@ -20,6 +20,20 @@
  * narrows with SQL and then filters with this, so the two cannot drift: if they
  * ever disagreed, this one wins, and it is the one with the tests.
  */
+/**
+ * The day a figure that has always applied is dated from.
+ *
+ * Not a real date and not meant to be read as one. When wages gained their
+ * history, every row that was live had to be given a start, and there was
+ * nothing in the data to say when it truly began — only that every document on
+ * file had been priced with it. So they start before the works did, and the
+ * screens say "from the start" rather than showing somebody 1900.
+ */
+export const COSTING_EPOCH = '1900-01-01';
+
+/** Whether this row is one of those. */
+export const isFromTheStart = (row: DatedRow): boolean => row.effectiveFrom <= COSTING_EPOCH;
+
 export interface DatedRow {
   /** ISO yyyy-mm-dd. The first day this figure applies. */
   effectiveFrom: string;

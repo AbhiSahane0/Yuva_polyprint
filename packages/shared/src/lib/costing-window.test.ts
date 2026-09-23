@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isLiveOn, liveOn } from './costing-window.js';
+import { COSTING_EPOCH, isFromTheStart, isLiveOn, liveOn } from './costing-window.js';
 
 /**
  * **The rule that lets the works add an overhead without disturbing anything.**
@@ -107,5 +107,26 @@ describe('taking a crew back on', () => {
     for (const date of ['1899-12-31', '1900-01-01', '2022-03-23', '2026-09-23']) {
       expect(isLiveOn(neverLive, date)).toBe(false);
     }
+  });
+});
+
+describe('a figure that has always applied', () => {
+  it('is recognised from its backfilled start', () => {
+    expect(isFromTheStart({ effectiveFrom: COSTING_EPOCH, effectiveTo: null })).toBe(true);
+  });
+
+  it('does not mistake a real start date for one', () => {
+    /*
+     * The whole point of telling them apart: "from the start" is a row nobody
+     * chose a date for, and "2026-09-23" is a decision somebody made.
+     */
+    expect(isFromTheStart({ effectiveFrom: '2026-09-23', effectiveTo: null })).toBe(false);
+  });
+
+  it('still applies on every real day', () => {
+    // It is a presentation detail, not a different rule.
+    const always = { effectiveFrom: COSTING_EPOCH, effectiveTo: null };
+    expect(isLiveOn(always, '2022-03-23')).toBe(true);
+    expect(isLiveOn(always, '2026-09-23')).toBe(true);
   });
 });
