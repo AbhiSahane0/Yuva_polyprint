@@ -2,6 +2,7 @@ import {
   canMoveProductionTo,
   productionProgress,
   PRODUCTION_STATUS_LABELS,
+  nextStageToStart,
   requiredStages,
   stageWasteKg,
   type AddProductionStageInput,
@@ -492,8 +493,19 @@ export async function updateStage(
      * than trusted from when the card was raised, because in between it may
      * have gone to another job, and a claim made on Monday is not a guarantee
      * on Thursday.
+     *
+     * **Only on the first machine the job reaches**, though. Once a card is
+     * running its film is committed and partly consumed, and refusing the
+     * laminator does not save a gram of it — it strands a printed reel between
+     * two machines. The question this guard exists to ask is "should this job
+     * begin", and a job three stages in has begun.
      */
-    if (movedTo === 'RUNNING' && !(await materialIsSettled(tx, existing.productionOrderId))) {
+    const cardAlreadyRunning = existing.productionOrder.status === 'RUNNING';
+    if (
+      movedTo === 'RUNNING' &&
+      !cardAlreadyRunning &&
+      !(await materialIsSettled(tx, existing.productionOrderId))
+    ) {
       refuseUnlessOverridden(
         await availabilityForCard(tx, cardForStock(existing.productionOrder)),
         existing.productionOrder,
@@ -540,6 +552,45 @@ export async function updateStage(
           data: { status: 'RUNNING', ...(card.startedAt ? {} : { startedAt: new Date() }) },
         });
         await startTheOrder(tx, card.orderId);
+      }
+    }
+
+    /*
+     * **The reel goes to the next machine.**
+     *
+     * A job does not stop between stages, and the floor should not have to say
+     * so twice: finishing one picks up the next one nobody has started, and
+     * carries the weight across — what came off this machine is what goes onto
+     * that one. The operator and the machine are left blank, because they are
+     * a different person at a different machine.
+     *
+     * Not done for a stage marked SKIPPED or put back to pending: neither is
+     * work finishing, and neither moves the reel anywhere.
+     */
+    if (movedTo === 'DONE') {
+      const stages = await tx.productionStage.findMany({
+        where: { productionOrderId: existing.productionOrderId },
+        select: { id: true, position: true, status: true, outputKg: true },
+      });
+      const finished = stages.find((stage) => stage.id === stageId);
+      const next = finished ? nextStageToStart(stages, finished.position) : null;
+
+      if (next && finished) {
+        /*
+         * Read back off the stage, not out of this request. The floor types the
+         * weight, it saves as they leave the box, and Finish is a separate
+         * press — so the figure that matters is the one on the row, not the one
+         * that happened to travel with the button.
+         */
+        const cameOff = toNumber(finished.outputKg);
+        await tx.productionStage.update({
+          where: { id: next.id },
+          data: {
+            status: 'RUNNING',
+            startedAt: new Date(),
+            ...(cameOff > 0 ? { inputKg: cameOff } : {}),
+          },
+        });
       }
     }
 

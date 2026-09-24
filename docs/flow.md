@@ -304,6 +304,28 @@ the system to get on with the job — but it should have to say so.
 Starting a stage also **starts the card and moves the order to In production**.
 The floor starts a stage, not three things.
 
+### Finishing a stage hands the reel on
+
+Press **Finish** when the stage is done, and the job moves by itself:
+
+- the **next stage starts**, because that is where the reel now is
+- its **In, kg is filled with what came off the last machine** — 629 kg off the
+  press is 629 kg onto the laminator, and nobody retypes it
+
+A stage marked _Not needed_ is stepped over, because the reel cannot be waiting
+at a machine the job never goes near. The machine and the operator are left
+blank on the new stage, because those are a different person at a different
+machine, and they are the two things worth asking.
+
+**The material check does not apply here.** It asks whether a job should
+_begin_, and a job three stages in has begun — refusing the laminator would not
+save a gram of film, it would strand a printed reel between two machines. The
+check runs on the first machine the job reaches and nowhere else.
+
+Finishing the last stage does **not** complete the card. The card sits at 100%
+with **Completed** waiting to be pressed, because completing it releases the
+job's claim on its film and that is worth one deliberate press.
+
 ### The stages themselves
 
 **1 · Rotogravure printing.** The design is printed onto the first film. Weigh
@@ -348,9 +370,10 @@ job.
 **4 · Pouch making.** Only where the job is a pouch. The slit reel is formed,
 sealed and cut into bags. A job sold on the reel skips this entirely.
 
-Press **Finish** on each stage as it is done. The progress bar on the card and
-in the list is worked out from the stages — done, out of the ones that apply —
-so the two screens can never disagree.
+Press **Finish** on each stage as it is done, and the next one picks up on its
+own with the weight carried across. The progress bar on the card and in the list
+is worked out from the stages — done, out of the ones that apply — so the two
+screens can never disagree.
 
 ## Step 7 — the card is finished
 

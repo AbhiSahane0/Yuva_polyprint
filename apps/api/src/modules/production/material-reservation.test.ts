@@ -170,3 +170,46 @@ describe('nothing re-claims film that has already been issued', () => {
     expect(guard).toBeLessThan(hold);
   });
 });
+
+/**
+ * **Finishing a stage hands the reel to the next machine.**
+ *
+ * A job does not stop between stages. The floor should say once that printing
+ * is done, not once to close the press and again to open the laminator.
+ */
+describe('the hand-off between stages', () => {
+  it('happens when a stage is finished, and only then', () => {
+    /*
+     * Not on SKIPPED and not on a stage put back to pending: neither is work
+     * finishing, and neither moves a reel anywhere.
+     */
+    const advance = SERVICE.indexOf('nextStageToStart(');
+    const guard = SERVICE.lastIndexOf("if (movedTo === 'DONE')", advance);
+    expect(advance).toBeGreaterThan(-1);
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(advance);
+  });
+
+  it('carries the weight off the row, not out of the request', () => {
+    /*
+     * The floor types the weight, it saves as they leave the box, and Finish is
+     * a separate press — so the figure that matters is the one on the stage.
+     */
+    expect(SERVICE).toMatch(/const cameOff = toNumber\(finished\.outputKg\)/);
+  });
+});
+
+describe('the material block applies to starting a job, not continuing one', () => {
+  it('is skipped once the card is already running', () => {
+    /*
+     * Once a card is running its film is committed and partly consumed.
+     * Refusing the laminator saves no film — it strands a printed reel between
+     * two machines. The question the guard asks is "should this job begin".
+     */
+    expect(SERVICE).toMatch(/cardAlreadyRunning/);
+    const guard = SERVICE.indexOf('!cardAlreadyRunning');
+    const refuse = SERVICE.indexOf('refuseUnlessOverridden(', guard);
+    expect(guard).toBeGreaterThan(-1);
+    expect(refuse).toBeGreaterThan(guard);
+  });
+});

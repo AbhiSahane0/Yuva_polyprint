@@ -2848,6 +2848,27 @@ job card picker listing the cards nothing else costs. Linking a blank sheet
 fills its design, name and customer from the card — blanks only, because an
 office that typed a name meant it.
 
+### Finishing a stage starts the next one
+
+A job does not stop between machines, and the floor should not have to say so
+twice. Finishing a stage picks up the next one **nobody has started** and
+carries the weight across: what came off this machine is what goes onto that
+one. Skipped stages are stepped over; a stage already running is left alone.
+
+The weight is read **off the finished row**, not out of the request that
+finished it — the floor types the figure, it saves as they leave the box, and
+Finish is a separate press.
+
+The machine and the operator are left blank on the new stage. They are a
+different person at a different machine, and they are the two things worth
+asking.
+
+**The material check does not run on a continuation.** It asks whether a job
+should _begin_; a card that is already RUNNING has begun, its film is committed
+and partly consumed, and refusing the laminator would strand a printed reel
+rather than save any film. The guard applies to the first machine the job
+reaches and nowhere else.
+
 ### Starting a stage starts everything above it
 
 The floor starts a stage, not a card. So a stage moving to RUNNING moves the
