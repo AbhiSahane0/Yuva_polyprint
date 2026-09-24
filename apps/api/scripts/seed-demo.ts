@@ -196,6 +196,10 @@ async function clear(quiet = false) {
   );
 }
 
+/** One line per job, so the run reads as the list it is. */
+const say = (level: string, what: string, detail: string) =>
+  console.log(`  ${level.padEnd(15)} ${what.padEnd(26)} ${detail}`);
+
 /* ------------------------------------------------------------------- seed */
 
 /**
@@ -206,21 +210,68 @@ async function clear(quiet = false) {
  * films the sheet can actually account for. W/O Poly is on the rates master and
  * not on the form, which is fine for a job that stops at the order.
  */
+/**
+ * Ten jobs, spread the way a real week is spread.
+ *
+ * Not one at each stage in a tidy row — a works has several quotations out that
+ * nobody has answered, one it lost, a couple waiting to start, three or four on
+ * the floor at different points, and one finished. It also, sooner or later,
+ * has a job it has not got the film for.
+ *
+ * `level` is what to do with it, and the loop below reads it:
+ *
+ *   sent          a quotation out, nobody has answered
+ *   lost          turned down, with a reason
+ *   ordered       won, on the books, nothing started
+ *   ordered-late  the same, but past the day it was promised
+ *   printing      on the press now
+ *   laminating    printed, on the laminator now
+ *   slitting      printed and laminated, on the slitter now
+ *   finished      every stage done, costed, off stock
+ *   short         raised, and the works has not got the film — the block
+ *
+ * The polys are chosen on purpose. A job that reaches a job sheet uses films
+ * the works' printed form has rows for — PET, Met PET and LDPE. The short one
+ * uses a film nothing stocks, which is what makes it short.
+ */
 const PLAN = [
+  { design: 'Maharaja Atta 5kg.', level: 'sent', kg: 800, poly: 'W/O Poly 110µm', polyMicron: 85 },
+  { design: 'Lokraja Atta 5kg.', level: 'sent', kg: 500, poly: 'W/O Poly 110µm', polyMicron: 60 },
+  { design: 'Kanik Atta 5kg.', level: 'lost', kg: 900, poly: 'W/O Poly 110µm', polyMicron: 85 },
   {
-    design: 'Maharaja Atta 5kg.',
-    level: 'quoted',
-    kg: 800,
+    design: 'Sanvi Atta 5kg.',
+    level: 'ordered',
+    kg: 1200,
     poly: 'W/O Poly 110µm',
     polyMicron: 85,
   },
-  { design: 'Sanvi Atta 5kg.', level: 'ordered', kg: 1200, poly: 'W/O Poly 110µm', polyMicron: 85 },
+  {
+    design: 'Nutrilex 500gm. (Boron)',
+    level: 'ordered-late',
+    kg: 700,
+    poly: 'W/O Poly 110µm',
+    polyMicron: 45,
+  },
   {
     design: 'Chitra Wafers 10Rs.',
-    level: 'floor',
+    level: 'printing',
     kg: 600,
     poly: 'LDPE Milky / Natural',
     polyMicron: 25,
+  },
+  {
+    design: 'Sarthak Sonpapadi Mango',
+    level: 'laminating',
+    kg: 850,
+    poly: 'LDPE Milky / Natural',
+    polyMicron: 40,
+  },
+  {
+    design: 'Mauli Bhell',
+    level: 'slitting',
+    kg: 750,
+    poly: 'LDPE Milky / Natural',
+    polyMicron: 45,
   },
   {
     design: 'Amrut Sugar Gold 1kg',
@@ -229,7 +280,22 @@ const PLAN = [
     poly: 'LDPE Milky / Natural',
     polyMicron: 60,
   },
+  {
+    design: 'Paradise Frozen Green Pease 500g.',
+    level: 'short',
+    kg: 650,
+    /* Nothing stocks this one, which is the point of the row. */
+    poly: 'PE 60µm',
+    polyMicron: 55,
+  },
 ] as const;
+
+/** Which stage each level leaves running. Everything before it is done. */
+const RUNNING_AT: Partial<Record<(typeof PLAN)[number]['level'], string>> = {
+  printing: 'PRINTING',
+  laminating: 'LAMINATION',
+  slitting: 'SLITTING',
+};
 
 async function main() {
   if (process.argv.includes('--clear')) {
@@ -288,10 +354,12 @@ async function main() {
     Number(materials.find((m) => m.name === name)?.rates[0]?.rate ?? 0);
 
   for (const [name, kg] of [
-    ['PET 12µm', 2000],
-    ['MET PET 12µm', 1000],
-    ['W/O Poly 110µm', 3000],
-    ['LDPE Milky / Natural', 2500],
+    ['PET 12µm', 4000],
+    ['MET PET 12µm', 2500],
+    ['W/O Poly 110µm', 5000],
+    ['LDPE Milky / Natural', 4000],
+    /* PE 60µm is deliberately NOT received. One job is built on it, and that
+       is what puts a real shortage on the floor to look at. */
   ] as const) {
     await receiveStock(
       receiveStockSchema.parse({
@@ -360,12 +428,16 @@ async function main() {
         date: daysAgo(14),
         customerId: design.customerId,
         customerName: design.customer.companyName,
-        mobile: design.customer.mobile,
-        /* The legacy import wrote the literal 'NA' where the sheet was blank,
-           and a quotation will not take that as an address. */
+        /*
+         * The legacy import wrote the literal 'NA' where the sheet was blank,
+         * and a quotation takes neither that as an address nor as a number.
+         * The customer's own record is left exactly as it is — this is only
+         * what travels onto the quotation.
+         */
+        mobile: /^\d{10}$/.test(design.customer.mobile) ? design.customer.mobile : '9999999999',
         email: /@/.test(design.customer.email) ? design.customer.email : 'office@example.com',
         notes: `${MARK} Demonstration data — remove with "seed:demo -- --clear".`,
-        status: plan.level === 'quoted' ? 'SENT' : 'DRAFT',
+        status: plan.level === 'sent' ? 'SENT' : 'DRAFT',
         items: [
           {
             jobId: design.id,
@@ -388,30 +460,69 @@ async function main() {
       }),
     );
 
-    if (plan.level === 'quoted') {
-      console.log(`  1. Quoted        #${quotation.number}  ${design.jobName}`);
+    if (plan.level === 'sent') {
+      say('Sent', `quotation #${quotation.number}`, design.jobName);
+      continue;
+    }
+
+    if (plan.level === 'lost') {
+      await recordOutcome(quotation.id, {
+        outcome: 'LOST',
+        lostReason: 'Went elsewhere on price — about eight rupees a kilogram under us.',
+      });
+      say('Lost', `quotation #${quotation.number}`, design.jobName);
       continue;
     }
 
     /* Winning it is what raises the order — the same path the office uses. */
     const won = await recordOutcome(quotation.id, { outcome: 'WON', lostReason: '' });
-    const orderId = await prisma.order.findFirstOrThrow({
+    const order = await prisma.order.findFirstOrThrow({
       where: { number: won.ordersCreated[0] },
       select: { id: true, number: true },
     });
+
+    /* One of them is past the day it was promised, so the floor's "past due"
+       count is not always a zero nobody has ever seen move. */
+    const due = plan.level === 'ordered-late' ? daysAgo(3) : daysAgo(-9);
     await prisma.order.update({
-      where: { id: orderId.id },
-      data: { notes: MARK, dueDate: new Date(`${daysAgo(-7)}T00:00:00.000Z`) },
+      where: { id: order.id },
+      data: { notes: MARK, dueDate: new Date(`${due}T00:00:00.000Z`) },
     });
 
-    if (plan.level === 'ordered') {
-      console.log(`  2. Ordered       #${orderId.number}  ${design.jobName}`);
+    if (plan.level === 'ordered' || plan.level === 'ordered-late') {
+      say(
+        plan.level === 'ordered-late' ? 'Ordered (late)' : 'Ordered',
+        `order #${order.number}`,
+        design.jobName,
+      );
       continue;
     }
 
-    const card = await createProduction({ orderId: orderId.id, quantityKg: plan.kg, notes: MARK });
-    const machines = await prisma.costingMachine.findMany({ select: { id: true, kind: true } });
-    const machineFor = (kind: string) => machines.find((m) => m.kind === kind)?.id ?? null;
+    const card = await createProduction({ orderId: order.id, quantityKg: plan.kg, notes: MARK });
+
+    if (plan.level === 'short') {
+      /*
+       * Left exactly where a card is when the works has not got the film: raised,
+       * flagged, and refusing to start. Nothing is faked — the poly this job is
+       * built from is simply not stocked.
+       */
+      const short = card.materials.filter((m) => m.shortBy > 0);
+      say(
+        'Short of film',
+        `card #${card.number}`,
+        `${design.jobName} — ${short.map((m) => m.name).join(', ')}`,
+      );
+      continue;
+    }
+
+    const machines = await prisma.costingMachine.findMany({
+      select: { id: true, kind: true, isDefault: true },
+    });
+    /* The machine the works actually runs, where it has said which. */
+    const machineFor = (kind: string) => {
+      const ofKind = machines.filter((m) => m.kind === kind);
+      return (ofKind.find((m) => m.isDefault) ?? ofKind[0])?.id ?? null;
+    };
     const operatorFor = (kind: string) =>
       kind === 'PRINTING'
         ? people['Rahul Patil']
@@ -420,17 +531,15 @@ async function main() {
           : people['Manoj Jadhav'];
 
     /*
-     * Weights that lose a little at each stage, which is what a real card
-     * looks like. The waste is never typed — it is the difference.
+     * Weights that lose a little at each stage, which is what a real card looks
+     * like. The waste is never typed — it is the difference between the two.
      */
     let inKg = Math.round(plan.kg * 1.08);
+    const runningAt = RUNNING_AT[plan.level];
 
-    for (const [index, stage] of card.stages.entries()) {
-      const last = plan.level === 'floor' && index >= 1;
-      const outKg = Math.round(inKg * 0.975);
-
-      if (plan.level === 'floor' && index === 1) {
-        /* Where the floor is right now: on the laminator, mid-run. */
+    for (const stage of card.stages) {
+      if (stage.stage === runningAt) {
+        /* Where the floor is right now: film on the machine, nothing off it. */
         await updateStage(stage.id, {
           machineId: machineFor(stage.stage),
           operatorId: operatorFor(stage.stage),
@@ -439,8 +548,8 @@ async function main() {
         });
         break;
       }
-      if (last) break;
 
+      const outKg = Math.round(inKg * 0.975);
       await updateStage(stage.id, {
         machineId: machineFor(stage.stage),
         operatorId: operatorFor(stage.stage),
@@ -451,8 +560,12 @@ async function main() {
       inKg = outKg;
     }
 
-    if (plan.level === 'floor') {
-      console.log(`  3. On the floor  card #${card.number}  ${design.jobName}`);
+    if (runningAt) {
+      say(
+        'On the floor',
+        `card #${card.number}`,
+        `${design.jobName} — on the ${runningAt.toLowerCase()}`,
+      );
       continue;
     }
 
@@ -500,9 +613,10 @@ async function main() {
     await costSheet(sheet.id);
     const posted = await postToStock(sheet.id, 'Demo');
 
-    console.log(
-      `  4. Finished      card #${card.number}  sheet ${sheet.number}  ` +
-        `${posted.posted} material line${posted.posted === 1 ? '' : 's'} off stock  ${design.jobName}`,
+    say(
+      'Finished',
+      `card #${card.number}, sheet ${sheet.number}`,
+      `${design.jobName} — ${posted.posted} material line${posted.posted === 1 ? '' : 's'} off stock`,
     );
   }
 

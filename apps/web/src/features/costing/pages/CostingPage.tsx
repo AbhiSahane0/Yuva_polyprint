@@ -35,6 +35,7 @@ import {
   useEndOverhead,
   useRetireLabour,
   useRetireMachine,
+  useSetDefaultMachine,
   useUpdateOverhead,
   useUpdateSettings,
 } from '../api/costing-api';
@@ -74,6 +75,7 @@ export default function CostingPage() {
   const [labour, setLabour] = useState<Labour | null | undefined>(undefined);
 
   const retireMachine = useRetireMachine();
+  const setDefaultMachine = useSetDefaultMachine();
   const retireLabour = useRetireLabour();
 
   /*
@@ -171,6 +173,13 @@ export default function CostingPage() {
                             Retired
                           </Badge>
                         ) : null}
+                        {/* Two machines of a kind and only one is run. This is
+                            the one every rate of that kind is built from. */}
+                        {row.isDefault && row.isActive ? (
+                          <Badge tone="brand" className="ml-2">
+                            Costed on this
+                          </Badge>
+                        ) : null}
                       </td>
                       <td className="text-ink-600 px-4 py-3">{MACHINE_KIND_LABELS[row.kind]}</td>
                       <td className="text-ink-600 px-4 py-3 text-right tabular-nums">
@@ -203,6 +212,25 @@ export default function CostingPage() {
                             <Button variant="ghost" size="sm" onClick={() => setMachine(row)}>
                               Edit
                             </Button>
+                            {/*
+                             * Which machine of its kind every rate is built
+                             * from. Without it the costing took whichever came
+                             * first on the list, so a works with an old
+                             * laminator and a new one priced every job on the
+                             * old one.
+                             */}
+                            {row.isActive && !row.isDefault ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setDefaultMachine.mutate({ id: row.id, isDefault: true })
+                                }
+                                title={`Cost every ${MACHINE_KIND_LABELS[row.kind].toLowerCase()} job on this machine`}
+                              >
+                                Use this one
+                              </Button>
+                            ) : null}
                             <Button
                               variant="ghost"
                               size="sm"

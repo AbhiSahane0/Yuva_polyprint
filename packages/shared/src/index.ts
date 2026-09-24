@@ -39,6 +39,7 @@ export * from './lib/pouch-making.js';
 export * from './lib/job-colours.js';
 export * from './lib/job-sheet-costing.js';
 export * from './constants/employees.js';
+export * from './lib/lamination-label.js';
 export * from './lib/material-availability.js';
 export * from './lib/operator-choices.js';
 export * from './schemas/employee.js';

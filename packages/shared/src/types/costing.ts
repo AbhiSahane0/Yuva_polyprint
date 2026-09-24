@@ -15,6 +15,17 @@ export interface Machine {
   setupPowerFactor: number;
   isActive: boolean;
   sortOrder: number;
+  /**
+   * **The one of its kind the works actually runs.**
+   *
+   * The costing charges one machine per process, and without this it charged
+   * whichever came first on the list. That is how a works with an old laminator
+   * and a new one priced every job on the old one's speed.
+   *
+   * At most one per kind. None marked means the old behaviour — first on the
+   * list — so nothing already quoted moves until somebody says which.
+   */
+  isDefault: boolean;
 }
 
 export interface Labour {

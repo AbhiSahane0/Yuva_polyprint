@@ -4,11 +4,14 @@ import { ArrowLeft, Trash2 } from 'lucide-react';
 import {
   canMoveProductionTo,
   formatNumber,
+  laminationLabel,
   PRODUCTION_STAGE_LABELS,
   PRODUCTION_STATUS_LABELS,
   PRODUCTION_STATUSES,
   STAGE_STATUS_LABELS,
   stageWasteKnown,
+  type LaminationLabel,
+  type ProductionOrder,
   type ProductionStageRow,
   type ProductionStatus,
   type StageStatus,
@@ -50,9 +53,24 @@ const STAGE_TONE: Record<StageStatus, string> = {
   SKIPPED: 'border-ink-200 bg-ink-25',
 };
 
-function stageTitle(stage: ProductionStageRow): string {
-  const label = PRODUCTION_STAGE_LABELS[stage.stage];
-  return stage.pass > 0 ? `${label} ${stage.pass}` : label;
+/**
+ * What a stage is called, and — on a lamination row — what it bonds.
+ *
+ * The works has two laminators and runs one of them, so "Lamination 1" and
+ * "Lamination 2" read as the two machines. They are not: a laminator bonds two
+ * films at a time, so a three-ply job goes through twice, on whichever machine
+ * the works uses. Naming the films is what stops the number being mistaken for
+ * a machine.
+ */
+function stageTitle(stage: ProductionStageRow, card: ProductionOrder): LaminationLabel {
+  if (stage.stage !== 'LAMINATION') {
+    return { title: PRODUCTION_STAGE_LABELS[stage.stage], bonds: '' };
+  }
+  return laminationLabel({
+    pass: stage.pass,
+    totalPasses: card.stages.filter((s) => s.stage === 'LAMINATION').length,
+    plies: card.plies,
+  });
 }
 
 /**
@@ -289,15 +307,29 @@ export default function JobCardPage() {
                   <span className="text-ink-400 text-xs font-medium tabular-nums">
                     {stage.position}
                   </span>
-                  <h3
-                    className={cn(
-                      'text-sm font-semibold',
-                      skipped ? 'text-ink-400' : 'text-ink-900',
-                    )}
-                  >
-                    {stageTitle(stage)}
-                  </h3>
-                  <span className="text-ink-500 text-xs">{STAGE_STATUS_LABELS[stage.status]}</span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <h3
+                        className={cn(
+                          'text-sm font-semibold',
+                          skipped ? 'text-ink-400' : 'text-ink-900',
+                        )}
+                      >
+                        {stageTitle(stage, card).title}
+                      </h3>
+                      <span className="text-ink-500 text-xs">
+                        {STAGE_STATUS_LABELS[stage.status]}
+                      </span>
+                    </div>
+                    {/* Which two films go on the machine for this pass. The
+                        number above is the pass, not the machine — the works
+                        runs one laminator whatever the count says. */}
+                    {stageTitle(stage, card).bonds ? (
+                      <div className="text-ink-400 mt-0.5 text-xs">
+                        {stageTitle(stage, card).bonds}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
                 {canEdit && !ended ? (

@@ -42,6 +42,7 @@ const toMachine = (row: Prisma.CostingMachineGetPayload<Record<string, never>>):
   setupPowerFactor: toNumber(row.setupPowerFactor),
   isActive: row.isActive,
   sortOrder: row.sortOrder,
+  isDefault: row.isDefault,
 });
 
 const toLabour = (row: Prisma.CostingLabourGetPayload<Record<string, never>>): Labour => ({
@@ -246,6 +247,32 @@ export async function endOverhead(id: string): Promise<CostingOverhead> {
       data: { effectiveTo: asDate(today()) },
     }),
   );
+}
+
+/**
+ * Marks one machine as the one its kind is costed on, and unmarks the rest.
+ *
+ * **At most one per kind**, kept here rather than by a database constraint,
+ * because "at most one row of this kind has a flag" is not something a unique
+ * index can say without a partial index per kind. The rule is one line and it
+ * is enforced on the one path that can break it.
+ *
+ * Passing false simply clears it, and the costing goes back to taking whichever
+ * machine of that kind comes first.
+ */
+export async function setDefaultMachine(id: string, isDefault: boolean): Promise<Machine> {
+  const existing = await prisma.costingMachine.findUnique({ where: { id } });
+  if (!existing) throw ApiError.notFound('That machine is not on record');
+
+  return prisma.$transaction(async (tx) => {
+    if (isDefault) {
+      await tx.costingMachine.updateMany({
+        where: { kind: existing.kind, id: { not: id } },
+        data: { isDefault: false },
+      });
+    }
+    return toMachine(await tx.costingMachine.update({ where: { id }, data: { isDefault } }));
+  });
 }
 
 /** A name already in use, told apart from anything else that could fail. */

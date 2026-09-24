@@ -63,6 +63,7 @@ vi.mock('../api/costing-api', () => ({
   useSaveMachine: () => ({ mutate: vi.fn(), isPending: false }),
   useSaveLabour: () => ({ mutate: vi.fn(), isPending: false }),
   useRetireMachine: () => ({ mutate: vi.fn(), isPending: false }),
+  useSetDefaultMachine: () => ({ mutate: vi.fn(), isPending: false }),
   useRetireLabour: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateSettings: () => ({ mutate: vi.fn(), isPending: false }),
   useCreateOverhead: () => ({ mutateAsync: vi.fn(), isPending: false }),

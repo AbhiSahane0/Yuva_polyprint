@@ -10,6 +10,15 @@ import { MACHINE_KINDS, OVERHEAD_BASES, type CostingInput } from '../lib/rate-co
  * from is a single figure and lives in settings.
  */
 
+/**
+ * Which machine of its kind the costing charges.
+ *
+ * Its own endpoint and its own tiny schema, so nothing about editing a speed
+ * can quietly move a job onto a different machine.
+ */
+export const defaultMachineSchema = z.object({ isDefault: z.boolean() });
+export type DefaultMachineInput = z.infer<typeof defaultMachineSchema>;
+
 export const machineSchema = z.object({
   name: z.string().trim().min(1, 'Give the machine a name').max(80),
   kind: z.enum(MACHINE_KINDS),

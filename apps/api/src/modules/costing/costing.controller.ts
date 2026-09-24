@@ -32,6 +32,12 @@ export async function updateMachine(req: Request, res: Response) {
   );
 }
 
+/** Marks the machine of its kind the works actually runs, or clears the mark. */
+export async function setDefaultMachine(req: Request, res: Response) {
+  const { isDefault } = req.body as { isDefault: boolean };
+  ok(res, await costingService.setDefaultMachine(req.params.id as string, isDefault));
+}
+
 export async function retireMachine(req: Request, res: Response) {
   ok(res, await costingService.retireMachine(req.params.id as string));
 }

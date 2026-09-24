@@ -84,6 +84,13 @@ Three parts on one screen.
 it takes to make ready. Speed is what turns a job's metres into minutes, and
 minutes are what most of the cost is built from.
 
+Where the works has **two machines of one kind and runs one of them**, mark that
+one **Use this one**. It then carries a _Costed on this_ badge, and every rate of
+that kind is built from its figures. Only one machine per process is ever
+charged — a job is not billed for two laminators it never touched — so without
+this the costing simply took whichever came first on the list, which is how an
+old machine's speed can end up pricing every job.
+
 **Wages.** Each role, which process it works on, and the monthly salary. The
 system turns that into a cost per minute using the working month set further
 down the screen.
@@ -304,9 +311,35 @@ the reel on, weigh the printed reel off. What is lost here is setting up — the
 first few hundred metres while the colours come into register.
 
 **2 · Lamination.** The printed film is bonded to the next layer with adhesive.
-**A three-ply job has two lamination rows, and they are two separate runs** —
-their own machine, their own operator, their own waste. The works' own paper
-sheet names them Lamination 1 and Lamination 2 for exactly this reason.
+
+> **The number is the pass, not the machine.** This is the one thing on the card
+> that gets misread, and it is worth saying plainly to anybody you show it to.
+>
+> A laminator bonds **two films at a time**. So a three-ply job has to go
+> through twice:
+>
+> ```
+> Lamination 1 · PET 12µm + MET PET 12µm     the first bond
+> Lamination 2 · + LDPE Milky / Natural      that, bonded to the third ply
+> ```
+>
+> **Both passes run on the same machine**, one after the other. The works having
+> two laminators has nothing to do with it — a job that needs two passes needs
+> them whether the works owns one machine or five.
+>
+> That is why each row names the films it bonds, and why a two-ply job says just
+> **Lamination** with no number at all.
+
+Each pass is its own run all the same: its own operator, its own weights, its
+own waste. The works' own paper sheet names them Lamination 1 and Lamination 2
+for the same reason.
+
+**Which laminator?** The machine box on each row offers both, so the floor
+records the one that actually ran it. For **pricing**, the works says once which
+machine it runs — the one marked _Costed on this_ on the Costing screen — and
+every quotation is built from that machine's speed. Without it the costing took
+whichever machine came first on the list, which meant a works with an old
+laminator and a new one priced every job on the old one.
 
 **3 · Slitting.** The wide laminated reel is cut down to the width the job is
 sold at. Everything is printed wider than it is sold, so this stage is on every
@@ -417,8 +450,8 @@ used them can still explain themselves.
 
 # Seeing it end to end
 
-There is a demonstration set built into the system — four jobs, one at each
-stage of the chain:
+There is a demonstration set built into the system — ten jobs, spread the way a
+real week is spread:
 
 ```bash
 npm run seed:demo -w @yuva/api

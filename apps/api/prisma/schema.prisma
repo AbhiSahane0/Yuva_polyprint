@@ -1566,6 +1566,16 @@ model CostingMachine {
   productionStages ProductionStage[]
 
   @@map("costing_machines")
+  /// **The one of its kind the works actually runs.**
+  ///
+  /// The costing charges one machine per process, and without this it charged
+  /// whichever came first on the list — which is how a works with an old
+  /// laminator and a new one priced every job on the old one's speed.
+  ///
+  /// At most one per kind, enforced in the service. None marked keeps the old
+  /// behaviour, so nothing already quoted moves until somebody says which.
+  isDefault Boolean @default(false) @map("is_default")
+
 }
 
 /// A wage, and which machine's minutes it is paid for.

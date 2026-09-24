@@ -56,6 +56,16 @@ export interface ProductionOrder {
   currentStage: MachineKind | null;
 
   /**
+   * The structure, outermost ply first, as the job was priced.
+   *
+   * Carried so a lamination row can say which two films it bonds — the number
+   * on it is the PASS, not the machine, and the works reads it as the machine
+   * unless the films are named. Empty for a card with no priced structure
+   * behind it. See `lamination-label.ts`.
+   */
+  plies: string[];
+
+  /**
    * The film this card needs, and what the works has free for it.
    *
    * Empty when nothing can be said — a card on an order typed over the phone

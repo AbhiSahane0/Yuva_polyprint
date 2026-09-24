@@ -99,6 +99,26 @@ export function useSaveMachine() {
   });
 }
 
+/**
+ * Marks the machine of its kind the works actually runs.
+ *
+ * It changes which machine every rate of that kind is built from, so it goes
+ * through the same invalidation as a speed change — the wizard prices against
+ * this master and would otherwise go on using the old machine.
+ */
+export function useSetDefaultMachine() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: ({ id, isDefault }: { id: string; isDefault: boolean }) =>
+      request<Machine>({
+        url: `/costing/machines/${id}/default`,
+        method: 'POST',
+        data: { isDefault },
+      }),
+    onSuccess: invalidate,
+  });
+}
+
 export function useRetireMachine() {
   const invalidate = useInvalidate();
   return useMutation({

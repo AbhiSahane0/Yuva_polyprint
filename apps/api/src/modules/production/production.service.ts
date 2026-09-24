@@ -41,7 +41,17 @@ const toNumber = (value: Prisma.Decimal | number): number => Number(value);
 const isoDate = (value: Date): string => value.toISOString().slice(0, 10);
 
 const WITH_ALL = {
-  order: { select: { number: true, dueDate: true } },
+  order: {
+    select: {
+      number: true,
+      dueDate: true,
+      /* The structure the job was priced on, so a lamination row can name the
+         two films it bonds. The number on it is the pass, not the machine. */
+      quotationItem: {
+        select: { layers: { orderBy: { position: 'asc' }, select: { materialName: true } } },
+      },
+    },
+  },
   stages: { orderBy: { position: 'asc' } },
   /* What this run cost, once the office starts working it out. Posting that
      sheet is what releases this card's claim on its film. */
@@ -101,6 +111,8 @@ function toProduction(row: Row, materials: MaterialAvailability[] = []): Product
     stages,
     progressPercent: productionProgress(stages),
     currentStage: current?.stage ?? null,
+
+    plies: (row.order.quotationItem?.layers ?? []).map((layer) => layer.materialName),
 
     materials,
     jobSheetId: row.jobSheet?.id ?? null,

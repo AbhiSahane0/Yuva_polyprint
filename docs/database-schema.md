@@ -293,38 +293,38 @@ erDiagram
 | `app_setting_history` | 4 | 66 |  |
 | `app_settings` | 3 | 61 | Editable rates: cylinder rate, GST %, advance %. |
 | `costing_labour` | 9 | 8 |  |
-| `costing_machines` | 14 | 4 |  |
+| `costing_machines` | 15 | 4 |  |
 | `costing_overheads` | 9 | 0 |  |
 | `customers` | 17 | 70 | Companies that order from Yuva Polyprint. |
 | `cylinder_events` | 11 | 0 |  |
 | `cylinders` | 16 | 0 |  |
-| `employees` | 12 | 0 |  |
+| `employees` | 12 | 4 |  |
 | `job_artwork` | 17 | 0 |  |
-| `job_sheet_labour` | 8 | 120 |  |
-| `job_sheet_lines` | 17 | 315 |  |
-| `job_sheet_stage_usage` | 7 | 75 |  |
-| `job_sheets` | 60 | 15 |  |
+| `job_sheet_labour` | 8 | 136 |  |
+| `job_sheet_lines` | 17 | 357 |  |
+| `job_sheet_stage_usage` | 7 | 85 |  |
+| `job_sheets` | 60 | 17 |  |
 | `jobs` | 55 | 419 | Products and their full engineering specification. |
-| `login_events` | 7 | 51 |  |
-| `material_rates` | 6 | 453 |  |
+| `login_events` | 7 | 52 |  |
+| `material_rates` | 6 | 477 |  |
 | `materials` | 13 | 24 |  |
-| `orders` | 23 | 1 |  |
-| `production_orders` | 16 | 0 |  |
-| `production_stages` | 17 | 0 |  |
+| `orders` | 23 | 8 |  |
+| `production_orders` | 16 | 5 |  |
+| `production_stages` | 17 | 23 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
 | `purchase_receipts` | 11 | 1 |  |
 | `quotation_emails` | 10 | 1 |  |
 | `quotation_item_colours` | 9 | 4 |  |
-| `quotation_item_layers` | 10 | 2 |  |
-| `quotation_item_quantities` | 13 | 3 |  |
-| `quotation_items` | 31 | 1 | One priced line on a quotation. |
-| `quotation_tiers` | 14 | 3 |  |
-| `quotations` | 33 | 1 | Customer-facing quotations, with totals frozen at save. |
-| `sessions` | 6 | 5 |  |
-| `stock_batches` | 14 | 1 |  |
-| `stock_movements` | 13 | 0 |  |
-| `stock_reservations` | 8 | 0 |  |
+| `quotation_item_layers` | 10 | 25 |  |
+| `quotation_item_quantities` | 13 | 13 |  |
+| `quotation_items` | 31 | 11 | One priced line on a quotation. |
+| `quotation_tiers` | 14 | 13 |  |
+| `quotations` | 33 | 11 | Customer-facing quotations, with totals frozen at save. |
+| `sessions` | 6 | 6 |  |
+| `stock_batches` | 14 | 4 |  |
+| `stock_movements` | 13 | 6 |  |
+| `stock_reservations` | 8 | 13 |  |
 | `suppliers` | 11 | 1 |  |
 | `users` | 10 | 3 |  |
 
@@ -465,6 +465,7 @@ erDiagram
 | `setup_power_factor` | `decimal(4,3)` |  |  |
 | `station_horsepower` | `decimal(10,2)` |  |  |
 | `station_colour_steps` | `text` |  |  |
+| `is_default` | `boolean` |  |  |
 
 ### `costing_overheads`
 
