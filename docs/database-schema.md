@@ -226,6 +226,7 @@ erDiagram
     text material_id FK
     text production_order_id FK
     ReservationStatus status
+    text batch_id FK
   }
   suppliers {
     text id PK
@@ -284,6 +285,7 @@ erDiagram
   production_orders ||--o{ job_sheets : "production_order_id"
   costing_labour ||--o{ employees : "role_id"
   employees ||--o{ production_stages : "operator_id"
+  stock_batches ||--o{ stock_reservations : "batch_id"
 ```
 
 ## Tables
@@ -300,10 +302,10 @@ erDiagram
 | `cylinders` | 16 | 0 |  |
 | `employees` | 12 | 4 |  |
 | `job_artwork` | 17 | 0 |  |
-| `job_sheet_labour` | 8 | 160 |  |
-| `job_sheet_lines` | 17 | 420 |  |
-| `job_sheet_stage_usage` | 7 | 100 |  |
-| `job_sheets` | 60 | 20 |  |
+| `job_sheet_labour` | 8 | 144 |  |
+| `job_sheet_lines` | 17 | 378 |  |
+| `job_sheet_stage_usage` | 7 | 90 |  |
+| `job_sheets` | 60 | 18 |  |
 | `jobs` | 55 | 419 | Products and their full engineering specification. |
 | `login_events` | 7 | 53 |  |
 | `material_rates` | 6 | 477 |  |
@@ -324,7 +326,7 @@ erDiagram
 | `sessions` | 6 | 7 |  |
 | `stock_batches` | 16 | 367 |  |
 | `stock_movements` | 13 | 369 |  |
-| `stock_reservations` | 8 | 13 |  |
+| `stock_reservations` | 9 | 46 |  |
 | `suppliers` | 11 | 1 |  |
 | `users` | 10 | 3 |  |
 
@@ -382,6 +384,7 @@ erDiagram
 | `job_sheets.production_order_id` | `production_orders.id` | SET NULL |  |
 | `employees.role_id` | `costing_labour.id` | RESTRICT |  |
 | `production_stages.operator_id` | `employees.id` | SET NULL |  |
+| `stock_reservations.batch_id` | `stock_batches.id` | CASCADE |  |
 
 ## Enums
 
@@ -1125,6 +1128,7 @@ erDiagram
 | `released_at` | `timestamp` | ✓ |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
+| `batch_id` | `text` | ✓ | FK → `stock_batches.id` |
 
 ### `suppliers`
 

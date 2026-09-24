@@ -5,8 +5,8 @@ import {
   flagsShort,
   shortages,
   type MaterialRequirement,
-  type ReelStock,
 } from './material-availability.js';
+import type { Reel } from './reel-allocation.js';
 
 /**
  * **Nothing is deducted twice, by construction.**
@@ -137,35 +137,39 @@ describe('whether the works has it free, and in the right size', () => {
     { materialId: 'pe', name: 'PE 60µm', quantity: 700, needsWidthMm: 650 },
   ];
 
-  const reels = (...rows: [number | null, number][]): ReelStock[] =>
-    rows.map(([widthMm, quantity]) => ({ widthMm, quantity }));
+  /** Rolls, as the stock side hands them over: what is on each and what is left. */
+  const rolls = (...rows: [string, number | null, number, number?][]): Reel[] =>
+    rows.map(([batchId, widthMm, onHand, free]) => ({
+      batchId,
+      batchCode: batchId,
+      widthMm,
+      receivedOn: '2026-09-01',
+      onHand,
+      free: free ?? onHand,
+    }));
 
-  it('measures against FREE stock, not against what is on the shelf', () => {
+  it('measures against what is left on the rolls, not what is on them', () => {
     /*
-     * 1,000 kg on hand with 800 committed to another card is 200 free — and a
-     * job needing 250 is short, however full the shelf looks.
+     * 1,000 kg on a roll with 800 of it claimed by another card is 200 to this
+     * one — and a job needing 250 is short, however full the shelf looks.
      */
     const out = availabilityFor(need, {
       reels: new Map([
-        ['pet', reels([700, 1000])],
-        ['pe', reels([700, 1000])],
+        ['pet', rolls(['p1', 700, 1000, 200])],
+        ['pe', rolls(['e1', 700, 1000])],
       ]),
-      held: new Map([['pet', 800]]),
     });
     expect(out[0]).toMatchObject({ onHand: 1000, held: 800, free: 200, usable: 200, shortBy: 50 });
     expect(out[1]).toMatchObject({ onHand: 1000, held: 0, free: 1000, usable: 1000, shortBy: 0 });
   });
 
-  it('will not run a job on reels too narrow for it', () => {
+  it('will not run a job on rolls too narrow for it', () => {
     /*
      * **The whole point of a width.** Film can be slit down and never widened,
-     * so 900 kg on 340 mm reels is no use at all to a job that runs at 650 —
+     * so 900 kg on 340 mm rolls is no use at all to a job that runs at 650 —
      * and a works told it has 900 kg free sends the job to the machine.
      */
-    const out = availabilityFor([need[0]!], {
-      reels: new Map([['pet', reels([340, 900])]]),
-      held: new Map(),
-    });
+    const out = availabilityFor([need[0]!], { reels: new Map([['pet', rolls(['n1', 340, 900])]]) });
     expect(out[0]).toMatchObject({
       onHand: 900,
       free: 900,
@@ -173,14 +177,22 @@ describe('whether the works has it free, and in the right size', () => {
       tooNarrowKg: 900,
       shortBy: 250,
     });
+    expect(out[0]!.reels).toEqual([]);
   });
 
-  it('counts a wider reel, because film is slit down', () => {
+  it('names the rolls the job takes', () => {
+    /*
+     * The thing a quantity could never do: tell the floor which rolls to fetch,
+     * and stop two cards being promised one roll.
+     */
     const out = availabilityFor([need[0]!], {
-      reels: new Map([['pet', reels([1040, 300])]]),
-      held: new Map(),
+      reels: new Map([['pet', rolls(['wide', 900, 400], ['fits', 700, 150])]]),
     });
-    expect(out[0]).toMatchObject({ usable: 300, tooNarrowKg: 0, shortBy: 0 });
+    expect(out[0]!.reels).toEqual([
+      { batchId: 'fits', batchCode: 'fits', widthMm: 700, quantity: 150 },
+      { batchId: 'wide', batchCode: 'wide', widthMm: 900, quantity: 100 },
+    ]);
+    expect(out[0]!.shortBy).toBe(0);
   });
 
   it('separates the film that is the wrong size from the film that is missing', () => {
@@ -189,8 +201,7 @@ describe('whether the works has it free, and in the right size', () => {
      * buying more, the other by buying differently.
      */
     const out = availabilityFor([need[0]!], {
-      reels: new Map([['pet', reels([340, 2100], [700, 800])]]),
-      held: new Map(),
+      reels: new Map([['pet', rolls(['narrow', 340, 2100], ['wide', 700, 800])]]),
     });
     expect(out[0]).toMatchObject({
       onHand: 2900,
@@ -201,53 +212,32 @@ describe('whether the works has it free, and in the right size', () => {
     });
   });
 
-  it('takes claims off the wide reels first', () => {
-    /*
-     * Nothing records which reel a claim is against, so this has to assume.
-     * Assuming the widest suitable reels went first understates what is left,
-     * and of the two ways to be wrong it is the one that does not send a job to
-     * a machine it cannot run on.
-     */
-    const out = availabilityFor([need[0]!], {
-      reels: new Map([['pet', reels([340, 400], [700, 600])]]),
-      held: new Map([['pet', 300]]),
-    });
-    expect(out[0]).toMatchObject({ free: 700, usable: 300, tooNarrowKg: 400 });
-  });
-
-  it('counts a reel whose width nobody recorded', () => {
+  it('counts a roll whose width nobody recorded', () => {
     /*
      * Not a claim that it fits — an admission that nothing here can say it does
      * not. A works that has never recorded a width is left exactly where it was
      * before widths existed.
      */
-    const out = availabilityFor([need[0]!], {
-      reels: new Map([['pet', reels([null, 900])]]),
-      held: new Map(),
-    });
+    const out = availabilityFor([need[0]!], { reels: new Map([['pet', rolls(['u', null, 900])]]) });
     expect(out[0]).toMatchObject({ usable: 900, tooNarrowKg: 0, shortBy: 0 });
   });
 
   it('turns the width test off when the job’s geometry is unknown', () => {
     // A card on an order typed over the phone. Better no test than a wrong one.
     const out = availabilityFor([{ ...need[0]!, needsWidthMm: 0 }], {
-      reels: new Map([['pet', reels([340, 900])]]),
-      held: new Map(),
+      reels: new Map([['pet', rolls(['n', 340, 900])]]),
     });
     expect(out[0]).toMatchObject({ usable: 900, tooNarrowKg: 0, shortBy: 0 });
   });
 
   it('treats a material with no stock at all as short by the whole amount', () => {
-    const out = availabilityFor(need, { reels: new Map(), held: new Map() });
+    const out = availabilityFor(need, { reels: new Map() });
     expect(out[0]!.shortBy).toBe(250);
     expect(shortages(out)).toHaveLength(2);
   });
 
   it('never reports a negative shortage', () => {
-    const out = availabilityFor([need[0]!], {
-      reels: new Map([['pet', reels([700, 5000])]]),
-      held: new Map(),
-    });
+    const out = availabilityFor([need[0]!], { reels: new Map([['pet', rolls(['p', 700, 5000])]]) });
     expect(out[0]!.shortBy).toBe(0);
   });
 });

@@ -68,9 +68,17 @@ export interface MaterialAvailability extends MaterialRequirement {
    * differently rather than by buying more.
    */
   tooNarrowKg: number;
+  /**
+   * **The rolls this job holds**, narrowest suitable first and oldest within a
+   * width. What the floor fetches, and what stops two cards being promised one
+   * roll. See `reel-allocation.ts`.
+   */
+  reels: ReelAllocation[];
   /** How much is missing, measured against `usable`. Zero when there is enough. */
   shortBy: number;
 }
+
+import { allocateReels, type Reel, type ReelAllocation } from './reel-allocation.js';
 
 const round3 = (value: number): number =>
   Number.isFinite(value) ? Math.round(value * 1000) / 1000 : 0;
@@ -140,46 +148,38 @@ export function filmRequirements(input: {
  */
 export function availabilityFor(
   requirements: MaterialRequirement[],
-  stock: { reels: Map<string, ReelStock[]>; held: Map<string, number> },
+  stock: { reels: Map<string, Reel[]> },
 ): MaterialAvailability[] {
   return requirements.map((requirement) => {
     const reels = stock.reels.get(requirement.materialId) ?? [];
-    const onHand = round3(reels.reduce((sum, reel) => sum + reel.quantity, 0));
-    const held = round3(stock.held.get(requirement.materialId) ?? 0);
-    const free = round3(onHand - held);
+
+    const onHand = round3(reels.reduce((sum, reel) => sum + reel.onHand, 0));
+    const free = round3(reels.reduce((sum, reel) => sum + reel.free, 0));
 
     /*
-     * A reel of unknown width counts as usable.
+     * **The apportionment is gone.**
      *
-     * Not an assumption that it fits — an admission that nothing here can say
-     * it does not. A works that has never recorded a width is left exactly
-     * where it was before widths existed, which is the only honest way to
-     * degrade; recording them is what sharpens the answer.
+     * This used to subtract a material's total claims from the pool of wide
+     * reels, because nothing recorded which reel any claim was against — a
+     * guess, made deliberately towards saying no. Claims now name the roll they
+     * are on, so what is left of a roll is a fact about that roll, and the job
+     * is fitted onto real rolls rather than against an apportioned total.
      */
-    const wideEnough = round3(
-      reels
-        .filter((reel) => reel.widthMm === null || reel.widthMm >= requirement.needsWidthMm)
-        .reduce((sum, reel) => sum + reel.quantity, 0),
-    );
-
-    /*
-     * Claims come off the wide pool first.
-     *
-     * Nothing records WHICH reel a claim is against, so this has to assume
-     * something. Assuming the widest suitable reels were taken understates what
-     * is left, and of the two ways to be wrong that is the one that does not
-     * send a job to a machine it cannot run on.
-     */
-    const usable = round3(Math.max(0, wideEnough - held));
+    const pick = allocateReels({
+      needKg: requirement.quantity,
+      needsWidthMm: requirement.needsWidthMm,
+      reels,
+    });
 
     return {
       ...requirement,
       onHand,
-      held,
+      held: round3(onHand - free),
       free,
-      usable,
-      tooNarrowKg: round3(Math.max(0, onHand - wideEnough)),
-      shortBy: round3(Math.max(0, requirement.quantity - usable)),
+      usable: pick.usable,
+      tooNarrowKg: pick.tooNarrowKg,
+      reels: pick.taken,
+      shortBy: pick.shortBy,
     };
   });
 }

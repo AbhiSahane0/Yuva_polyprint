@@ -360,7 +360,7 @@ Table job_sheet_labour {
   days decimal(8,3) [not null, default: `0`]
   amount decimal(12,2) [not null, default: `0`]
 
-  Note: '160 row(s) at time of generation'
+  Note: '144 row(s) at time of generation'
 }
 
 Table job_sheet_lines {
@@ -382,7 +382,7 @@ Table job_sheet_lines {
   rate_per_kg decimal(12,4) [not null, default: `0`]
   amount decimal(14,2) [not null, default: `0`]
 
-  Note: '420 row(s) at time of generation'
+  Note: '378 row(s) at time of generation'
 }
 
 Table job_sheet_stage_usage {
@@ -394,7 +394,7 @@ Table job_sheet_stage_usage {
   shifts decimal(6,2) [not null, default: `1`]
   amount decimal(12,2) [not null, default: `0`]
 
-  Note: '100 row(s) at time of generation'
+  Note: '90 row(s) at time of generation'
 }
 
 Table job_sheets {
@@ -459,7 +459,7 @@ Table job_sheets {
   updated_at timestamp [not null]
   production_order_id text [unique]
 
-  Note: '20 row(s) at time of generation'
+  Note: '18 row(s) at time of generation'
 }
 
 Table jobs {
@@ -886,15 +886,16 @@ Table stock_movements {
 
 Table stock_reservations {
   id text [pk]
-  material_id text [unique, not null]
+  material_id text [not null]
   production_order_id text [unique, not null]
   quantity decimal(14,3) [not null]
   status ReservationStatus [not null, default: `'HELD'::"ReservationStatus"`]
   released_at timestamp
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
+  batch_id text [unique]
 
-  Note: '13 row(s) at time of generation'
+  Note: '46 row(s) at time of generation'
 }
 
 Table suppliers {
@@ -978,3 +979,4 @@ Ref: stock_reservations.production_order_id > production_orders.id [delete: casc
 Ref: job_sheets.production_order_id > production_orders.id [delete: set null]
 Ref: employees.role_id > costing_labour.id [delete: restrict]
 Ref: production_stages.operator_id > employees.id [delete: set null]
+Ref: stock_reservations.batch_id > stock_batches.id [delete: cascade]

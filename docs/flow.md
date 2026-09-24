@@ -278,6 +278,26 @@ A job can therefore be short of a film the stock screen shows plenty of, for
 either reason: the rest is promised to another job, or the rest is the wrong
 size. The card says which.
 
+### It claims particular rolls
+
+The claim is not "781 kg of LDPE". It is **these rolls**, listed under each film
+on the card:
+
+```
+LDPE Milky / Natural       452.241 kg     17,737.800 kg
+on a reel 615 mm or wider                 10,765 kg too narrow
+ [615 mm · 41.5 kg] [615 mm · 20.5 kg] [615 mm · 124.4 kg] [615 mm · 51.5 kg] …
+```
+
+That is what the floor fetches, and it is what stops two cards being promised
+the same roll — what is left of a roll is what is on it less what other cards
+hold **of that roll**.
+
+The rolls are chosen **narrowest suitable first, then oldest**. Narrowest
+because a 1040 mm roll spent on a 360 mm job is a wide roll the works no longer
+has for a wide job, and wide rolls are the scarce ones. Oldest within a width
+because film ages on a shelf. Hovering a roll shows its batch code.
+
 > **A shortage does not stop the card being raised.** Raising it is how the
 > floor finds out what is missing and how purchasing finds out what to order.
 > The stop comes at the machine — Step 6.

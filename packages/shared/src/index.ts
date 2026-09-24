@@ -42,6 +42,7 @@ export * from './constants/employees.js';
 export * from './lib/lamination-label.js';
 export * from './lib/material-availability.js';
 export * from './lib/next-stage.js';
+export * from './lib/reel-allocation.js';
 export * from './lib/operator-choices.js';
 export * from './schemas/employee.js';
 export * from './types/employee.js';

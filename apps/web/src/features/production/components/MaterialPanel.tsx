@@ -105,7 +105,7 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
             </tr>
           </thead>
           <tbody className="divide-ink-100 divide-y">
-            {card.materials.map((line) => (
+            {card.materials.flatMap((line) => [
               <tr key={line.materialId}>
                 <td className="text-ink-800 px-4 py-2 sm:pl-0">
                   {line.name}
@@ -155,8 +155,35 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
                     <span className="text-ink-300">—</span>
                   )}
                 </td>
-              </tr>
-            ))}
+              </tr>,
+              /*
+               * The rolls themselves — which is the thing a quantity could
+               * never tell anybody. This is what the floor fetches, and what
+               * stops two cards being promised one roll.
+               *
+               * Not shown once the sheet has posted: the claim is released by
+               * then and these rolls are no longer spoken for.
+               */
+              line.reels.length > 0 && !posted ? (
+                <tr key={`${line.materialId}-reels`}>
+                  <td colSpan={4} className="px-4 pb-2 sm:px-0">
+                    <div className="flex flex-wrap gap-1.5">
+                      {line.reels.map((reel) => (
+                        <span
+                          key={reel.batchId}
+                          className="border-ink-200 text-ink-600 rounded-full border bg-white px-2 py-0.5 text-xs whitespace-nowrap tabular-nums"
+                          title={`${reel.batchCode} — ${formatNumber(reel.quantity, 3)} kg of this roll is held for this job`}
+                        >
+                          {reel.widthMm ? `${formatNumber(reel.widthMm, 0)} mm` : 'width ?'}
+                          <span className="text-ink-400"> · </span>
+                          {formatNumber(reel.quantity, 1)} kg
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ) : null,
+            ])}
           </tbody>
         </table>
       </div>

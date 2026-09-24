@@ -26,7 +26,6 @@ import {
   materialIsSettled,
   refuseUnlessOverridden,
   releaseFor,
-  requirementsFor,
 } from './material-reservation.js';
 
 /**
@@ -332,8 +331,10 @@ export async function createProduction(
       include: WITH_ALL,
     });
 
-    const needs = await requirementsFor(tx, cardForStock(card));
-    await holdFor(tx, card.id, needs);
+    /* What the card needs, fitted onto the actual rolls — so the claim names
+       the rolls the floor will fetch rather than a quantity of nothing. */
+    const fitted = await availabilityForCard(tx, cardForStock(card));
+    await holdFor(tx, card.id, fitted);
 
     return toProduction(card, await availabilityForCard(tx, cardForStock(card)));
   });
@@ -390,7 +391,7 @@ export async function updateProduction(
          the issue, and the same film would leave free stock twice. */
       !(await materialIsSettled(tx, row.id))
     ) {
-      await holdFor(tx, row.id, await requirementsFor(tx, cardForStock(row)));
+      await holdFor(tx, row.id, await availabilityForCard(tx, cardForStock(row)));
     }
 
     /*
@@ -541,19 +542,7 @@ export async function updateStage(
      * once here rather than asked of whoever clicks: the floor starts a stage,
      * not a card, and it should not have to remember to start both.
      */
-    if (movedTo === 'RUNNING') {
-      const card = await tx.productionOrder.findUnique({
-        where: { id: existing.productionOrderId },
-        select: { status: true, startedAt: true, orderId: true },
-      });
-      if (card && (card.status === 'PLANNED' || card.status === 'ON_HOLD')) {
-        await tx.productionOrder.update({
-          where: { id: existing.productionOrderId },
-          data: { status: 'RUNNING', ...(card.startedAt ? {} : { startedAt: new Date() }) },
-        });
-        await startTheOrder(tx, card.orderId);
-      }
-    }
+    if (movedTo === 'RUNNING') await startTheCard(tx, existing.productionOrderId);
 
     /*
      * **The reel goes to the next machine.**
@@ -591,6 +580,9 @@ export async function updateStage(
             ...(cameOff > 0 ? { inputKg: cameOff } : {}),
           },
         });
+        /* The reel moving to the next machine starts the card exactly as
+           pressing Start would. The floor is not doing anything different. */
+        await startTheCard(tx, existing.productionOrderId);
       }
     }
 
@@ -636,6 +628,28 @@ export async function overrideMaterials(
     include: WITH_ALL,
   });
   return toProduction(row, await availabilityForCard(prisma, cardForStock(row)));
+}
+
+/**
+ * A stage running means the card is running, and the order with it.
+ *
+ * In one place because two things start a stage: somebody pressing Start, and
+ * a stage finishing and handing the reel on. The second used to write the new
+ * stage's status straight to the row and skip all of this, which left a card
+ * reading "Planned" with one stage done and another running.
+ */
+async function startTheCard(tx: Prisma.TransactionClient, cardId: string): Promise<void> {
+  const card = await tx.productionOrder.findUnique({
+    where: { id: cardId },
+    select: { status: true, startedAt: true, orderId: true },
+  });
+  if (!card || (card.status !== 'PLANNED' && card.status !== 'ON_HOLD')) return;
+
+  await tx.productionOrder.update({
+    where: { id: cardId },
+    data: { status: 'RUNNING', ...(card.startedAt ? {} : { startedAt: new Date() }) },
+  });
+  await startTheOrder(tx, card.orderId);
 }
 
 /** Puts a stage back on a card the derivation left it off. */

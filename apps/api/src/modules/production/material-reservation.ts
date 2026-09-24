@@ -5,7 +5,7 @@ import {
   wastagePercentFor,
   type MaterialAvailability,
   type MaterialRequirement,
-  type ReelStock,
+  type Reel,
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
 import { getSettings } from '../settings/settings.service.js';
@@ -175,53 +175,100 @@ export async function availabilityForCards(
 
   const [batches, held] = await Promise.all([
     /*
-     * Grouped by WIDTH as well as material, because film is not fungible by
-     * weight: a job running at 650 mm cannot use a 340 mm reel however many
-     * kilograms are on it. One row per (material, width) keeps this to a few
-     * dozen rows rather than one per batch — the works has 266 batches of LDPE
-     * across fourteen widths.
+     * Every roll, not a sum. A claim names the roll it is on now, so what is
+     * left of a roll is a fact about that roll rather than a share of a total —
+     * and that is what lets the floor be told which rolls to fetch.
      */
-    tx.stockBatch.groupBy({
-      by: ['materialId', 'widthMm'],
-      where: { materialId: { in: materialIds } },
-      _sum: { quantity: true },
+    tx.stockBatch.findMany({
+      where: { materialId: { in: materialIds }, quantity: { gt: 0 } },
+      select: {
+        id: true,
+        materialId: true,
+        batchCode: true,
+        widthMm: true,
+        receivedOn: true,
+        quantity: true,
+      },
     }),
-    /* Grouped by card as well as material, so each card can be measured
-       against everyone ELSE's claims. */
+    /*
+     * Claims, by roll and by card, so each card can be measured against
+     * everyone ELSE's. The rows written before reels were named have no batch
+     * and are counted against the material as a whole — see below.
+     */
     tx.stockReservation.groupBy({
-      by: ['materialId', 'productionOrderId'],
+      by: ['materialId', 'batchId', 'productionOrderId'],
       where: { materialId: { in: materialIds }, status: 'HELD' },
       _sum: { quantity: true },
     }),
   ]);
 
-  const reels = new Map<string, ReelStock[]>();
-  for (const row of batches) {
-    const rows = reels.get(row.materialId) ?? [];
-    rows.push({
-      widthMm: row.widthMm === null ? null : toNumber(row.widthMm),
-      quantity: toNumber(row._sum.quantity),
-    });
-    reels.set(row.materialId, rows);
-  }
-  const heldTotal = new Map<string, number>();
-  const heldByCard = new Map<string, number>();
+  /** What each roll is claimed for, and by whom. */
+  const onRoll = new Map<string, number>();
+  /** Claims from before reels were named: material-wide, roll unknown. */
+  const looseByMaterial = new Map<string, number>();
+
   for (const row of held) {
     const quantity = toNumber(row._sum.quantity);
-    heldTotal.set(row.materialId, (heldTotal.get(row.materialId) ?? 0) + quantity);
-    heldByCard.set(`${row.productionOrderId}:${row.materialId}`, quantity);
+    if (row.batchId) onRoll.set(`${row.productionOrderId}:${row.batchId}`, quantity);
+    else {
+      const key = `${row.productionOrderId}:${row.materialId}`;
+      looseByMaterial.set(key, (looseByMaterial.get(key) ?? 0) + quantity);
+    }
+  }
+
+  const heldOnRoll = new Map<string, number>();
+  for (const [key, quantity] of onRoll) {
+    const batchId = key.slice(key.indexOf(':') + 1);
+    heldOnRoll.set(batchId, (heldOnRoll.get(batchId) ?? 0) + quantity);
   }
 
   for (const card of cards) {
     const lines = requirements.get(card.id) ?? [];
-    const others = new Map(
-      lines.map((line) => [
-        line.materialId,
-        (heldTotal.get(line.materialId) ?? 0) -
-          (heldByCard.get(`${card.id}:${line.materialId}`) ?? 0),
-      ]),
-    );
-    out.set(card.id, availabilityFor(lines, { reels, held: others }));
+
+    const reels = new Map<string, Reel[]>();
+    for (const batch of batches) {
+      const rows = reels.get(batch.materialId) ?? [];
+      const onHand = toNumber(batch.quantity);
+      /* Everyone else's claims on THIS roll — this card's own are left out, or
+         a card would report itself short against itself. */
+      const mine = onRoll.get(`${card.id}:${batch.id}`) ?? 0;
+      const others = (heldOnRoll.get(batch.id) ?? 0) - mine;
+      rows.push({
+        batchId: batch.id,
+        batchCode: batch.batchCode,
+        widthMm: batch.widthMm === null ? null : toNumber(batch.widthMm),
+        receivedOn: batch.receivedOn.toISOString().slice(0, 10),
+        onHand,
+        free: Math.max(0, onHand - others),
+      });
+      reels.set(batch.materialId, rows);
+    }
+
+    /*
+     * A claim from before reels were named cannot be taken off the roll it is
+     * on, because nothing knows which. It comes off the material's oldest rolls
+     * instead — the same order a claim would have been allocated in — so it
+     * still counts and still cannot be double-spent.
+     */
+    for (const line of lines) {
+      let loose = 0;
+      for (const [key, quantity] of looseByMaterial) {
+        if (key.endsWith(`:${line.materialId}`) && !key.startsWith(`${card.id}:`))
+          loose += quantity;
+      }
+      if (loose <= 0) continue;
+      const rows = (reels.get(line.materialId) ?? []).sort((a, b) =>
+        a.receivedOn < b.receivedOn ? -1 : 1,
+      );
+      for (const row of rows) {
+        if (loose <= 0) break;
+        const take = Math.min(row.free, loose);
+        row.free = Math.max(0, row.free - take);
+        loose -= take;
+      }
+    }
+
+    out.set(card.id, availabilityFor(lines, { reels }));
   }
 
   return out;
@@ -246,48 +293,47 @@ export async function availabilityForCard(
 export async function holdFor(
   tx: Prisma.TransactionClient,
   cardId: string,
-  requirements: MaterialRequirement[],
+  lines: MaterialAvailability[],
 ): Promise<void> {
-  for (const requirement of requirements) {
-    await tx.stockReservation.upsert({
-      where: {
-        productionOrderId_materialId: {
-          productionOrderId: cardId,
-          materialId: requirement.materialId,
-        },
-      },
-      create: {
-        productionOrderId: cardId,
-        materialId: requirement.materialId,
-        quantity: requirement.quantity,
-        status: 'HELD',
-      },
-      update: { quantity: requirement.quantity, status: 'HELD', releasedAt: null },
-    });
-  }
-
-  /* A ply edited off the line, or a quantity dropped to nothing: whatever this
-     card no longer needs stops being held. */
+  /*
+   * Cleared and rewritten rather than reconciled.
+   *
+   * A card's claim is a set of rolls, and which rolls it should be on changes
+   * whenever the quantity changes or somebody else takes a roll first. Working
+   * out the difference between two sets of rolls is a great deal of code for a
+   * card that holds three of them, and the state it produces is the same.
+   *
+   * The release is a status change rather than a delete: a claim that was
+   * standing yesterday is worth being able to read.
+   */
   await tx.stockReservation.updateMany({
-    where: {
-      productionOrderId: cardId,
-      status: 'HELD',
-      materialId: { notIn: requirements.map((r) => r.materialId) },
-    },
+    where: { productionOrderId: cardId, status: 'HELD' },
     data: { status: 'RELEASED', releasedAt: new Date() },
   });
+
+  for (const line of lines) {
+    for (const reel of line.reels) {
+      /*
+       * Upserted rather than created: the row just released may be this exact
+       * (card, roll) pair, and the unique key would refuse a second one.
+       */
+      await tx.stockReservation.upsert({
+        where: {
+          productionOrderId_batchId: { productionOrderId: cardId, batchId: reel.batchId },
+        },
+        create: {
+          productionOrderId: cardId,
+          materialId: line.materialId,
+          batchId: reel.batchId,
+          quantity: reel.quantity,
+          status: 'HELD',
+        },
+        update: { quantity: reel.quantity, status: 'HELD', releasedAt: null },
+      });
+    }
+  }
 }
 
-/**
- * Lets the film go.
- *
- * Called when a card completes and when one is deleted. **The completing card
- * is where the two halves meet**: the job sheet posts what the run actually
- * took off stock, and the claim that was standing in for it until then stops
- * counting. Releasing before the sheet is posted would let a second card
- * promise film this one has already used; not releasing at all would hold it
- * for ever.
- */
 export async function releaseFor(tx: Prisma.TransactionClient, cardId: string): Promise<void> {
   await tx.stockReservation.updateMany({
     where: { productionOrderId: cardId, status: 'HELD' },

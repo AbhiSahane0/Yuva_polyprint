@@ -1007,6 +1007,9 @@ model StockBatch {
    */
   micron Decimal? @db.Decimal(10, 2)
 
+  /// Job cards holding some of this roll. See StockReservation.
+  reservations StockReservation[]
+
   /**
    * Rupees per unit actually paid for this delivery.
    * Null when nobody recorded it, in which case the material's current rate
@@ -2013,6 +2016,21 @@ model StockReservation {
   productionOrderId String          @map("production_order_id")
   productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
 
+  /**
+   * **The roll this claim is on.**
+   *
+   * A claim on "781 kg of LDPE" is a claim on nothing in particular: it cannot
+   * tell the floor which rolls to fetch, it cannot stop two cards being
+   * promised one roll, and it forced the availability sum to GUESS which reels
+   * a claim had come off. Naming the roll removes the guess — what is left of
+   * a roll is what is on it less what other cards hold of that roll.
+   *
+   * Null only on rows written before reels were named. Nothing writes one now.
+   * Cascades: a claim against a roll that no longer exists is not a claim.
+   */
+  batchId String?     @map("batch_id")
+  batch   StockBatch? @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
   /// In the material's own unit, as the batches are.
   quantity Decimal           @db.Decimal(14, 3)
   status   ReservationStatus @default(HELD)
@@ -2024,8 +2042,11 @@ model StockReservation {
 
   /// One row per material per card: raising a card twice for the same film
   /// should correct the figure, not hold it twice.
-  @@unique([productionOrderId, materialId])
+  /* One row per card per ROLL. A job spanning three rolls holds three of them,
+     which is the point — the old key allowed one row per material. */
+  @@unique([productionOrderId, batchId])
   @@index([materialId, status])
+  @@index([batchId, status])
   @@map("stock_reservations")
 }
 
