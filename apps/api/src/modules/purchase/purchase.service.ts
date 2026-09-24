@@ -536,6 +536,10 @@ export async function receivePurchaseLine(
           batchCode: input.batchCode.trim(),
           quantity: input.acceptedQuantity,
           location: input.location,
+          /* The reel that arrived. Straight off the delivery note — nothing
+             downstream can work a width out. */
+          widthMm: input.widthMm,
+          micron: input.micron,
           receivedOn: input.receivedOn,
           // What the order agreed, per the unit it was ordered in. The stock
           // module converts it to the stocked unit alongside the quantity.

@@ -235,12 +235,21 @@ export default function InventoryPage() {
                     <td
                       className={cn(
                         'px-4 py-3 text-right font-medium',
-                        item.committed > 0 ? 'text-warning-700' : 'text-ink-500',
+                        /* Below zero means more has been promised to job cards
+                           than the works holds. Not clamped: hiding it behind a
+                           zero is how a works finds out at the machine. */
+                        item.free < 0
+                          ? 'text-danger-700'
+                          : item.committed > 0
+                            ? 'text-warning-700'
+                            : 'text-ink-500',
                       )}
                       title={
-                        item.committed > 0
-                          ? `${formatNumber(item.committed, 3)} ${item.unit} claimed by open job cards`
-                          : 'Nothing is claimed against this material'
+                        item.free < 0
+                          ? `Promised ${formatNumber(-item.free, 3)} ${item.unit} more than the works holds`
+                          : item.committed > 0
+                            ? `${formatNumber(item.committed, 3)} ${item.unit} claimed by open job cards`
+                            : 'Nothing is claimed against this material'
                       }
                     >
                       <Quantity value={item.free} unit={item.unit} />

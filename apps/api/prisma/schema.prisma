@@ -985,6 +985,29 @@ model StockBatch {
   quantity Decimal @db.Decimal(14, 3)
 
   /**
+   * **The reel this batch is, where the material comes on reels.**
+   *
+   * A film is not fungible by weight. The works' own stock register is kept by
+   * width for exactly this reason: PET 12µm sits in twenty-three widths from
+   * 340 mm to 1040 mm, and a job that needs 650 mm cannot be run on a 340 mm
+   * reel however many kilograms of it there are.
+   *
+   * Null for anything not bought as a reel — ink, adhesive, solvent — and for a
+   * film delivery nobody recorded the width of.
+   */
+  widthMm Decimal? @map("width_mm") @db.Decimal(10, 2)
+
+  /**
+   * The gauge of this particular delivery.
+   *
+   * On the material as well, in its name, but the works prices a film by TYPE
+   * and buys it in many gauges — their register carries LDPE in fourteen of
+   * them under one rate. So the gauge belongs to the delivery, not to the
+   * catalogue row.
+   */
+  micron Decimal? @db.Decimal(10, 2)
+
+  /**
    * Rupees per unit actually paid for this delivery.
    * Null when nobody recorded it, in which case the material's current rate
    * stands in for valuation. Stored per batch because that is what the stock is

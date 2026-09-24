@@ -1094,6 +1094,50 @@ has no such line.
 With those off, the workbook reconciles **exactly** — Rs 263.40 a kilogram and
 Rs 13.83 a pouch, on local and on Neon alike.
 
+### The works' own stock register
+
+```bash
+npm run import:stock -w @yuva/api -- --file "Stock Record September Month 2026.xlsx"
+npm run import:stock -w @yuva/api -- --file "..." --dry-run
+npm run import:stock -w @yuva/api -- --clear
+```
+
+Eight sheets, one per film, every row a reel: a width, a gauge, and what is left
+of it. **363 reels, 38,654 kg**, and the bookkeeping is sound — opening plus
+inward less outward equals closing on all 392 of its real rows, exactly.
+
+What the spreadsheet cannot do is the reason to load it:
+
+|                   |                                                       |
+| ----------------- | ----------------------------------------------------- |
+| **Value**         | the Rate and Amount columns are empty on all 435 rows |
+| **Age**           | 48 dates across 435 rows — no FIFO, no ageing         |
+| **Where it went** | outward is a number with no job beside it             |
+
+Loaded, the same stock is worth **Rs 87.9 lakh** on the Inventory screen, a
+figure the sheet was never able to produce.
+
+**It is kept by WIDTH, and it is right to be.** That is the one thing the
+spreadsheet models and the app did not: film is not fungible by weight. PET 12µm
+sits in 23 widths from 340 mm to 1040 mm, and a job needing 650 mm cannot run on
+a 340 mm reel however many kilograms are behind it. Stock batches carry
+`widthMm` and `micron` because of this register.
+
+The gauge is on the batch rather than the material for the same reason the works
+gave for their rates: they price a film by TYPE — one PET rate covers every
+gauge — and their register carries LDPE in fourteen gauges under one name.
+
+Four sheets land on one material, so a batch's code carries the sheet it came
+off and the row it was on: `STK-NAT-114` is row 114 of Natural LDPE. Anything
+the import will not swallow is named at the end of the run rather than dropped
+silently — `600800 mm` in Polyster row 63 is 600 and 800 typed together, and the
+102 kg behind it is loaded with no width rather than lost to punish a typo.
+
+It also adds **PP Film** and **Nylon Poly**, which their register carries and the
+catalogue did not — 3,254 kg that could not previously be counted. Neither gets
+a rate or a density: a rate is the works' commercial business, and a pearlised
+BOPP is not the density of a plain one.
+
 ### Four jobs to look at
 
 ```bash

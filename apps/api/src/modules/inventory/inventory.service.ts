@@ -92,6 +92,8 @@ function toBatch(row: BatchRow, currentRate: number | null): StockBatch {
     unit: row.material.unit,
     batchCode: row.batchCode,
     location: row.location,
+    widthMm: toNullableNumber(row.widthMm),
+    micron: toNullableNumber(row.micron),
     receivedOn: toISODate(row.receivedOn),
     initialQuantity: toNumber(row.initialQuantity),
     quantity,
@@ -326,6 +328,9 @@ export async function receiveStock(
         materialId: material.id,
         batchCode: input.batchCode,
         location: input.location,
+        /* The reel this is. Film is not fungible by weight — see the schema. */
+        widthMm: input.widthMm,
+        micron: input.micron,
         receivedOn: parseDate(input.receivedOn),
         initialQuantity: quantity,
         // Only when it differs — recording "3000 KG arrived as 3000 KG" on

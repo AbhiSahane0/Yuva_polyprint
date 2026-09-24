@@ -300,14 +300,14 @@ erDiagram
 | `cylinders` | 16 | 0 |  |
 | `employees` | 12 | 4 |  |
 | `job_artwork` | 17 | 0 |  |
-| `job_sheet_labour` | 8 | 136 |  |
-| `job_sheet_lines` | 17 | 357 |  |
-| `job_sheet_stage_usage` | 7 | 85 |  |
-| `job_sheets` | 60 | 17 |  |
+| `job_sheet_labour` | 8 | 160 |  |
+| `job_sheet_lines` | 17 | 420 |  |
+| `job_sheet_stage_usage` | 7 | 100 |  |
+| `job_sheets` | 60 | 20 |  |
 | `jobs` | 55 | 419 | Products and their full engineering specification. |
-| `login_events` | 7 | 52 |  |
+| `login_events` | 7 | 53 |  |
 | `material_rates` | 6 | 477 |  |
-| `materials` | 13 | 24 |  |
+| `materials` | 13 | 26 |  |
 | `orders` | 23 | 8 |  |
 | `production_orders` | 16 | 5 |  |
 | `production_stages` | 17 | 23 |  |
@@ -321,9 +321,9 @@ erDiagram
 | `quotation_items` | 31 | 11 | One priced line on a quotation. |
 | `quotation_tiers` | 14 | 13 |  |
 | `quotations` | 33 | 11 | Customer-facing quotations, with totals frozen at save. |
-| `sessions` | 6 | 6 |  |
-| `stock_batches` | 14 | 4 |  |
-| `stock_movements` | 13 | 6 |  |
+| `sessions` | 6 | 7 |  |
+| `stock_batches` | 16 | 367 |  |
+| `stock_movements` | 13 | 369 |  |
 | `stock_reservations` | 8 | 13 |  |
 | `suppliers` | 11 | 1 |  |
 | `users` | 10 | 3 |  |
@@ -1092,6 +1092,8 @@ erDiagram
 | `updated_at` | `timestamp` |  |  |
 | `purchase_quantity` | `decimal(14,3)` | ✓ |  |
 | `purchase_unit` | `text` | ✓ |  |
+| `width_mm` | `decimal(10,2)` | ✓ |  |
+| `micron` | `decimal(10,2)` | ✓ |  |
 
 ### `stock_movements`
 

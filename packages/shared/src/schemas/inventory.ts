@@ -50,6 +50,15 @@ export const newMaterialSchema = z.object({
 
 export const receiveStockSchema = z
   .object({
+    /**
+     * The reel this delivery is, where it came on one.
+     *
+     * Optional, because ink and adhesive do not come on reels and a delivery
+     * nobody measured is still a delivery — but a film without a width is a
+     * film the system cannot tell apart from any other width of it.
+     */
+    widthMm: z.coerce.number().min(0).max(10_000).nullable().default(null),
+    micron: z.coerce.number().min(0).max(1_000).nullable().default(null),
     /** One of these two. See the refinement below. */
     materialId: z.string().min(1).nullable().default(null),
     newMaterial: newMaterialSchema.nullable().default(null),
