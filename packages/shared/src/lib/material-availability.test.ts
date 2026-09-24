@@ -5,6 +5,7 @@ import {
   flagsShort,
   shortages,
   type MaterialRequirement,
+  type ReelStock,
 } from './material-availability.js';
 
 /**
@@ -30,6 +31,7 @@ describe('what a run needs off the shelf', () => {
       quantityKg: 1000,
       structureGsm: 68.6,
       wastagePercent: 0,
+      needsWidthMm: 0,
     });
     expect(need.map((n) => n.materialId)).toEqual(['pet', 'pe']);
     expect(need[0]!.quantity).toBeCloseTo((16.8 / 68.6) * 1000, 2);
@@ -48,6 +50,7 @@ describe('what a run needs off the shelf', () => {
       quantityKg: 1000,
       structureGsm: 68.6,
       wastagePercent: 0,
+      needsWidthMm: 0,
     });
     const total = need.reduce((sum, n) => sum + n.quantity, 0);
     expect(total).toBeLessThan(1000);
@@ -60,6 +63,7 @@ describe('what a run needs off the shelf', () => {
       quantityKg: 1000,
       structureGsm: 68.6,
       wastagePercent: 0,
+      needsWidthMm: 0,
     });
     const withWaste = filmRequirements({
       layers,
@@ -83,6 +87,7 @@ describe('what a run needs off the shelf', () => {
       quantityKg: 1000,
       structureGsm: 68.6,
       wastagePercent: 0,
+      needsWidthMm: 0,
     });
     expect(need).toHaveLength(1);
     expect(need[0]!.quantity).toBeCloseTo((33.6 / 68.6) * 1000, 2);
@@ -95,10 +100,22 @@ describe('what a run needs off the shelf', () => {
       filmRequirements({ layers, quantityKg: 1000, structureGsm: 0, wastagePercent: 8 }),
     ).toEqual([]);
     expect(
-      filmRequirements({ layers, quantityKg: 0, structureGsm: 68.6, wastagePercent: 8 }),
+      filmRequirements({
+        layers,
+        quantityKg: 0,
+        structureGsm: 68.6,
+        wastagePercent: 8,
+        needsWidthMm: 0,
+      }),
     ).toEqual([]);
     expect(
-      filmRequirements({ layers: [], quantityKg: 1000, structureGsm: 68.6, wastagePercent: 0 }),
+      filmRequirements({
+        layers: [],
+        quantityKg: 1000,
+        structureGsm: 68.6,
+        wastagePercent: 0,
+        needsWidthMm: 0,
+      }),
     ).toEqual([]);
   });
 
@@ -108,54 +125,129 @@ describe('what a run needs off the shelf', () => {
       quantityKg: 1000,
       structureGsm: 68.6,
       wastagePercent: 0,
+      needsWidthMm: 0,
     });
     expect(need.map((n) => n.materialId)).toEqual(['pet', 'pe']);
   });
 });
 
-describe('whether the works has it free', () => {
+describe('whether the works has it free, and in the right size', () => {
   const need: MaterialRequirement[] = [
-    { materialId: 'pet', name: 'PET 12µm', quantity: 250 },
-    { materialId: 'pe', name: 'PE 60µm', quantity: 700 },
+    { materialId: 'pet', name: 'PET 12µm', quantity: 250, needsWidthMm: 650 },
+    { materialId: 'pe', name: 'PE 60µm', quantity: 700, needsWidthMm: 650 },
   ];
+
+  const reels = (...rows: [number | null, number][]): ReelStock[] =>
+    rows.map(([widthMm, quantity]) => ({ widthMm, quantity }));
 
   it('measures against FREE stock, not against what is on the shelf', () => {
     /*
-     * The whole point. 1,000 kg on hand with 800 committed to another card is
-     * 200 free — and a job needing 250 is short, however full the shelf looks.
+     * 1,000 kg on hand with 800 committed to another card is 200 free — and a
+     * job needing 250 is short, however full the shelf looks.
      */
     const out = availabilityFor(need, {
-      onHand: new Map([
-        ['pet', 1000],
-        ['pe', 1000],
+      reels: new Map([
+        ['pet', reels([700, 1000])],
+        ['pe', reels([700, 1000])],
       ]),
       held: new Map([['pet', 800]]),
     });
-    expect(out[0]).toMatchObject({ onHand: 1000, held: 800, free: 200, shortBy: 50 });
-    expect(out[1]).toMatchObject({ onHand: 1000, held: 0, free: 1000, shortBy: 0 });
+    expect(out[0]).toMatchObject({ onHand: 1000, held: 800, free: 200, usable: 200, shortBy: 50 });
+    expect(out[1]).toMatchObject({ onHand: 1000, held: 0, free: 1000, usable: 1000, shortBy: 0 });
   });
 
-  it('reports nothing short when there is enough', () => {
-    const out = availabilityFor(need, {
-      onHand: new Map([
-        ['pet', 500],
-        ['pe', 900],
-      ]),
+  it('will not run a job on reels too narrow for it', () => {
+    /*
+     * **The whole point of a width.** Film can be slit down and never widened,
+     * so 900 kg on 340 mm reels is no use at all to a job that runs at 650 —
+     * and a works told it has 900 kg free sends the job to the machine.
+     */
+    const out = availabilityFor([need[0]!], {
+      reels: new Map([['pet', reels([340, 900])]]),
       held: new Map(),
     });
-    expect(shortages(out)).toEqual([]);
+    expect(out[0]).toMatchObject({
+      onHand: 900,
+      free: 900,
+      usable: 0,
+      tooNarrowKg: 900,
+      shortBy: 250,
+    });
+  });
+
+  it('counts a wider reel, because film is slit down', () => {
+    const out = availabilityFor([need[0]!], {
+      reels: new Map([['pet', reels([1040, 300])]]),
+      held: new Map(),
+    });
+    expect(out[0]).toMatchObject({ usable: 300, tooNarrowKg: 0, shortBy: 0 });
+  });
+
+  it('separates the film that is the wrong size from the film that is missing', () => {
+    /*
+     * Two different problems with two different answers: one is solved by
+     * buying more, the other by buying differently.
+     */
+    const out = availabilityFor([need[0]!], {
+      reels: new Map([['pet', reels([340, 2100], [700, 800])]]),
+      held: new Map(),
+    });
+    expect(out[0]).toMatchObject({
+      onHand: 2900,
+      free: 2900,
+      usable: 800,
+      tooNarrowKg: 2100,
+      shortBy: 0,
+    });
+  });
+
+  it('takes claims off the wide reels first', () => {
+    /*
+     * Nothing records which reel a claim is against, so this has to assume.
+     * Assuming the widest suitable reels went first understates what is left,
+     * and of the two ways to be wrong it is the one that does not send a job to
+     * a machine it cannot run on.
+     */
+    const out = availabilityFor([need[0]!], {
+      reels: new Map([['pet', reels([340, 400], [700, 600])]]),
+      held: new Map([['pet', 300]]),
+    });
+    expect(out[0]).toMatchObject({ free: 700, usable: 300, tooNarrowKg: 400 });
+  });
+
+  it('counts a reel whose width nobody recorded', () => {
+    /*
+     * Not a claim that it fits — an admission that nothing here can say it does
+     * not. A works that has never recorded a width is left exactly where it was
+     * before widths existed.
+     */
+    const out = availabilityFor([need[0]!], {
+      reels: new Map([['pet', reels([null, 900])]]),
+      held: new Map(),
+    });
+    expect(out[0]).toMatchObject({ usable: 900, tooNarrowKg: 0, shortBy: 0 });
+  });
+
+  it('turns the width test off when the job’s geometry is unknown', () => {
+    // A card on an order typed over the phone. Better no test than a wrong one.
+    const out = availabilityFor([{ ...need[0]!, needsWidthMm: 0 }], {
+      reels: new Map([['pet', reels([340, 900])]]),
+      held: new Map(),
+    });
+    expect(out[0]).toMatchObject({ usable: 900, tooNarrowKg: 0, shortBy: 0 });
   });
 
   it('treats a material with no stock at all as short by the whole amount', () => {
-    const out = availabilityFor(need, { onHand: new Map(), held: new Map() });
+    const out = availabilityFor(need, { reels: new Map(), held: new Map() });
     expect(out[0]!.shortBy).toBe(250);
     expect(shortages(out)).toHaveLength(2);
   });
 
   it('never reports a negative shortage', () => {
-    // Plenty free is not "short by minus 250", which would sort oddly and read
-    // as a shortage to anything checking truthiness.
-    const out = availabilityFor(need, { onHand: new Map([['pet', 5000]]), held: new Map() });
+    const out = availabilityFor([need[0]!], {
+      reels: new Map([['pet', reels([700, 5000])]]),
+      held: new Map(),
+    });
     expect(out[0]!.shortBy).toBe(0);
   });
 });

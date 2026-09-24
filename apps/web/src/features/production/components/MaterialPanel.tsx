@@ -98,14 +98,25 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
             <tr className="text-ink-500 text-left text-xs tracking-wide uppercase">
               <th className="px-4 pb-1.5 font-medium sm:pl-0">Film</th>
               <th className="px-4 pb-1.5 text-right font-medium">Needs</th>
-              <th className="px-4 pb-1.5 text-right font-medium">Free</th>
+              {/* Not "free" — free counts reels too narrow to run this job, and
+                  kilograms on a 340 mm reel are no use at 650. */}
+              <th className="px-4 pb-1.5 text-right font-medium">Usable</th>
               <th className="px-4 pb-1.5 text-right font-medium sm:pr-0">Short by</th>
             </tr>
           </thead>
           <tbody className="divide-ink-100 divide-y">
             {card.materials.map((line) => (
               <tr key={line.materialId}>
-                <td className="text-ink-800 px-4 py-2 sm:pl-0">{line.name}</td>
+                <td className="text-ink-800 px-4 py-2 sm:pl-0">
+                  {line.name}
+                  {/* The web this job runs at. A reel narrower than this cannot
+                      run it at all — film is slit down, never widened. */}
+                  {line.needsWidthMm > 0 ? (
+                    <div className="text-ink-400 text-xs">
+                      on a reel {formatNumber(line.needsWidthMm, 0)} mm or wider
+                    </div>
+                  ) : null}
+                </td>
                 <td className="text-ink-800 px-4 py-2 text-right tabular-nums">
                   {formatNumber(line.quantity, 3)} kg
                 </td>
@@ -117,11 +128,23 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
                       : 'text-ink-600',
                   )}
                   /* On hand is the number somebody will check this against on
-                     the stock screen, so the gap between the two is explained
-                     here rather than left to be discovered. */
-                  title={`${formatNumber(line.onHand, 3)} kg on hand, ${formatNumber(line.held, 3)} kg claimed by other job cards`}
+                     the stock screen, so every step between the two is spelled
+                     out here rather than left to be discovered. */
+                  title={
+                    `${formatNumber(line.onHand, 3)} kg on hand · ` +
+                    `${formatNumber(line.held, 3)} kg claimed by other job cards · ` +
+                    `${formatNumber(line.tooNarrowKg, 3)} kg on reels too narrow for this job`
+                  }
                 >
-                  {formatNumber(line.free, 3)} kg
+                  {formatNumber(line.usable, 3)} kg
+                  {/* The actionable half of a shortage: the right film in the
+                      wrong size is a different problem from none at all, and it
+                      is solved by buying differently rather than by buying more. */}
+                  {line.tooNarrowKg > 0 ? (
+                    <div className="text-warning-700 text-xs font-normal">
+                      {formatNumber(line.tooNarrowKg, 0)} kg too narrow
+                    </div>
+                  ) : null}
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums sm:pr-0">
                   {line.shortBy > 0 && short.length > 0 ? (
@@ -148,8 +171,9 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
 
       {short.length > 0 && !posted && !overridden ? (
         <p className="text-danger-800 mt-3 text-sm">
-          This job cannot be started until the film is in. Free stock is what is on hand less what
-          other open job cards have claimed.
+          This job cannot be started until the film is in. Usable stock is what is on hand, less
+          what other open job cards have claimed, less anything on a reel too narrow to run this job
+          — film can be slit down but never widened.
         </p>
       ) : null}
 

@@ -2782,6 +2782,37 @@ caught by the fact that it _exists_. The module may not name `stockMovement` at
 all, may not create, update or delete a `stockBatch`, and reads on-hand stock
 only as a `groupBy` sum.
 
+#### Wide enough, not just enough
+
+```
+free    =  on hand  −  held by other open cards
+usable  =  free     −  anything on a reel narrower than this job's web
+```
+
+**Film is slit down and never widened**, so kilograms on a 340 mm reel are no
+use to a job running at 715. The web is the job's own geometry —
+`film width × lanes + trim` — and it comes off the quotation line the card was
+raised from. Zero turns the test off rather than failing everything, which is
+what a card with no priced structure behind it gets.
+
+Stock is read grouped by `(materialId, widthMm)`, so the whole page costs a few
+dozen rows rather than one per batch — the works holds 266 batches of LDPE
+across fourteen widths.
+
+Two judgement calls, both made towards saying _no_ rather than _yes_:
+
+- **A reel whose width nobody recorded counts as usable.** Not a claim that it
+  fits — an admission that nothing here can say it does not. A works that has
+  never recorded a width is left exactly where it was before widths existed.
+- **Claims come off the wide pool first.** Nothing records which reel a claim is
+  against, so this has to assume something; assuming the widest suitable reels
+  went first understates what is left, and that is the error that does not send
+  a job to a machine it cannot run on.
+
+`tooNarrowKg` is reported separately because it is a different problem with a
+different answer: the right film in the wrong size is solved by buying
+differently, not by buying more.
+
 #### What a card needs
 
 The same arithmetic the costing charges for, so a job card and the quotation

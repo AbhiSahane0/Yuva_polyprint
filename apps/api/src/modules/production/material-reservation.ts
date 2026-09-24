@@ -5,6 +5,7 @@ import {
   wastagePercentFor,
   type MaterialAvailability,
   type MaterialRequirement,
+  type ReelStock,
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
 import { getSettings } from '../settings/settings.service.js';
@@ -27,6 +28,7 @@ import { ApiError } from '../../utils/api-error.js';
  */
 
 const toNumber = (value: Prisma.Decimal | number | null): number => Number(value ?? 0);
+const round2 = (value: number): number => Math.round(value * 100) / 100;
 
 /** A card, as everything here needs to see one. */
 export interface CardForStock {
@@ -67,6 +69,11 @@ export async function requirementsForCards(
         select: {
           pouchType: true,
           compositeGsm: true,
+          /* The web this job runs at: film width × lanes + trim. A reel
+             narrower than that cannot run it — film is slit down, never
+             widened. */
+          filmWidthMm: true,
+          repeatWidth: true,
           quotation: { select: { wastagePercent: true, date: true } },
           layers: {
             orderBy: { position: 'asc' },
@@ -118,6 +125,10 @@ export async function requirementsForCards(
         })),
         quantityKg: card.quantityKg,
         structureGsm: toNumber(item.compositeGsm),
+        needsWidthMm: round2(
+          toNumber(item.filmWidthMm) * Math.max(1, toNumber(item.repeatWidth)) +
+            settings.defaultTrimMm,
+        ),
         wastagePercent: wastagePercentFor({
           pouchType: item.pouchType,
           override:
@@ -163,8 +174,15 @@ export async function availabilityForCards(
   }
 
   const [batches, held] = await Promise.all([
+    /*
+     * Grouped by WIDTH as well as material, because film is not fungible by
+     * weight: a job running at 650 mm cannot use a 340 mm reel however many
+     * kilograms are on it. One row per (material, width) keeps this to a few
+     * dozen rows rather than one per batch — the works has 266 batches of LDPE
+     * across fourteen widths.
+     */
     tx.stockBatch.groupBy({
-      by: ['materialId'],
+      by: ['materialId', 'widthMm'],
       where: { materialId: { in: materialIds } },
       _sum: { quantity: true },
     }),
@@ -177,7 +195,15 @@ export async function availabilityForCards(
     }),
   ]);
 
-  const onHand = new Map(batches.map((row) => [row.materialId, toNumber(row._sum.quantity)]));
+  const reels = new Map<string, ReelStock[]>();
+  for (const row of batches) {
+    const rows = reels.get(row.materialId) ?? [];
+    rows.push({
+      widthMm: row.widthMm === null ? null : toNumber(row.widthMm),
+      quantity: toNumber(row._sum.quantity),
+    });
+    reels.set(row.materialId, rows);
+  }
   const heldTotal = new Map<string, number>();
   const heldByCard = new Map<string, number>();
   for (const row of held) {
@@ -195,7 +221,7 @@ export async function availabilityForCards(
           (heldByCard.get(`${card.id}:${line.materialId}`) ?? 0),
       ]),
     );
-    out.set(card.id, availabilityFor(lines, { onHand, held: others }));
+    out.set(card.id, availabilityFor(lines, { reels, held: others }));
   }
 
   return out;
@@ -291,8 +317,19 @@ export async function materialIsSettled(
 /** The sentence the floor reads when a job cannot be made. */
 export function shortageMessage(lines: MaterialAvailability[]): string {
   const short = shortages(lines);
+  /*
+   * The sentence names the SIZE problem where there is one, because "2,900 kg
+   * free and none of it usable" reads as a bug otherwise — and because the two
+   * problems have different answers. One is solved by buying more film, the
+   * other by buying it differently.
+   */
   const said = short
-    .map((line) => `${line.name} — needs ${line.quantity} kg, ${line.free} kg free`)
+    .map((line) =>
+      line.tooNarrowKg > 0
+        ? `${line.name} — needs ${line.quantity} kg on a reel ${line.needsWidthMm} mm or wider, ` +
+          `${line.usable} kg usable (${line.tooNarrowKg} kg is too narrow)`
+        : `${line.name} — needs ${line.quantity} kg, ${line.usable} kg free`,
+    )
     .join('; ');
   return `Not enough material for this job: ${said}`;
 }

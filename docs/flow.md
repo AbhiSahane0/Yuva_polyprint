@@ -252,14 +252,31 @@ The card works out how much of each film the run needs — the same arithmetic t
 price was built from — and **claims** it.
 
 A claim is not an issue. The film is still on the shelf and still counted as on
-hand. What changes is what the **next** job sees as free:
+hand. What changes is what the **next** job sees:
 
 ```
-free  =  on hand  −  what open job cards have already claimed
+free    =  on hand  −  what open job cards have already claimed
+usable  =  free     −  anything on a reel too narrow to run THIS job
 ```
 
-This is why a job can be short of a film the stock screen shows plenty of: the
-rest of it is promised to another job. The card says so in those words.
+That second line is the one that surprises people. **Film can be slit down and
+never widened**, so a job running at 715 mm cannot use a 340 mm reel however
+many kilograms are on it. The card shows the width it needs under each film, and
+says how much of the free stock is the right film in the wrong size:
+
+```
+FILM                      NEEDS        USABLE
+LDPE Milky / Natural      781 kg       8,008 kg
+on a reel 715 mm or wider              20,465 kg too narrow
+```
+
+Twenty-eight tonnes of LDPE free, eight of them able to run this job. That is a
+real figure off the works' own stock, and it is a different problem from having
+none — it is solved by buying differently rather than by buying more.
+
+A job can therefore be short of a film the stock screen shows plenty of, for
+either reason: the rest is promised to another job, or the rest is the wrong
+size. The card says which.
 
 > **A shortage does not stop the card being raised.** Raising it is how the
 > floor finds out what is missing and how purchasing finds out what to order.
