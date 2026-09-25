@@ -2834,11 +2834,35 @@ The wastage is read on the **quotation's own date** and honours that quotation's
 override, so a card raised today against a line quoted in March asks for the
 film that line was costed on.
 
-**Films only.** Only a quotation line names actual material rows per ply, which
-is what makes a requirement a fact rather than a guess. A card on an order typed
-over the phone reserves nothing and says so — reserving the wrong film would be
-worse than reserving none. Ink and adhesive are costed at blended rates against
-rows that are not real drums, so there is nothing there to reserve against.
+**Ink and adhesive too**, since the quotation lines started naming their
+colours. `consumable-requirements.ts` mirrors the costing's own arithmetic:
+
+- **Ink at its WET weight.** The laydown is what stays on the film once dry; the
+  tin is bought wet. Claiming the dry figure would under-claim every job by the
+  solids — four times over on an ink at 23%.
+- **The solvents it is thinned with**, 100:80, split on the works' own ethyl
+  acetate percentage. Ethyl acetate is the biggest consumable after film,
+  because the adhesive is let down with it as well and the two are one claim on
+  one drum.
+- **The adhesive as the batch it is mixed as** — 100:146:15 — spread over the
+  **substrate** rather than the laminate, because it goes between the plies and
+  not over itself or the ink.
+
+Written out rather than taken from `costRate` because material quantities depend
+on none of what makes a rate: not the machines, not the wages, not the
+overheads. A kilogram of ink is a kilogram of ink whatever the press costs to
+run.
+
+**A special colour nobody has chosen the ink for holds no drum.** Its solvent
+still counts — the works mixes something — but there is nothing to claim. Once
+the ink is named on the line it is reserved like any other.
+
+Nothing bought in a drum comes on a reel, so `needsWidthMm` is zero for all of
+it and the width test does not apply.
+
+A card on an order typed over the phone still reserves nothing: only a quotation
+line names actual material rows, which is what makes a requirement a fact rather
+than a guess.
 
 #### When it is checked, and what it stops
 

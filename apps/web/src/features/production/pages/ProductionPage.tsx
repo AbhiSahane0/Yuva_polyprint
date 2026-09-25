@@ -225,7 +225,7 @@ export default function ProductionPage() {
                         {flagsShort(card).length > 0 ? (
                           <Badge tone="danger" className="ml-2 align-middle">
                             <AlertTriangle className="mr-1 size-3" />
-                            {card.materialOverrideReason ? 'Short — allowed' : 'Short of film'}
+                            {card.materialOverrideReason ? 'Short — allowed' : 'Short of material'}
                           </Badge>
                         ) : null}
                       </td>

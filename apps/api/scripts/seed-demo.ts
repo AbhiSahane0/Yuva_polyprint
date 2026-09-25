@@ -265,6 +265,8 @@ const PLAN = [
     kg: 850,
     poly: 'LDPE Milky / Natural',
     polyMicron: 40,
+    /* Five colours: CMYK and the brand's own orange on the fifth station. */
+    spot: { name: 'Mango Orange (spot)', ink: 'Ink — Orange', laydownGsm: 0.22 },
   },
   {
     design: 'Mauli Bhell',
@@ -289,6 +291,31 @@ const PLAN = [
     polyMicron: 55,
   },
 ] as const;
+
+/**
+ * What each job prints.
+ *
+ * Four process colours is the ordinary job. **A five-colour job is CMYK plus a
+ * spot**, and the spot is the interesting one: at quotation time the office
+ * does not know which ink it will be, so the wizard prices "Special colour" at
+ * the dearest ink on the list and names no drum. By the time it is a job card
+ * the works has chosen — and once it has, the card can hold that drum like any
+ * other.
+ *
+ * Sarthak Sonpapadi Mango carries the spot: a mango sweet in an orange the
+ * brand owns, run on the fifth station.
+ *
+ * Laydown and solids are the works' own — their four process inks sit at 23%
+ * solids, and a spot laid solid goes on heavier than a process screen.
+ */
+const CMYK = [
+  { name: 'Cyan', ink: 'Ink — Cyan', laydownGsm: 0.14 },
+  { name: 'Magenta', ink: 'Ink — Magenta', laydownGsm: 0.13 },
+  { name: 'Yellow', ink: 'Ink — Yellow', laydownGsm: 0.13 },
+  { name: 'Black', ink: 'Ink — Black', laydownGsm: 0.15 },
+] as const;
+
+const SOLIDS_PERCENT = 23;
 
 /** Which stage each level leaves running. Everything before it is done. */
 const RUNNING_AT: Partial<Record<(typeof PLAN)[number]['level'], string>> = {
@@ -344,6 +371,7 @@ async function main() {
     select: {
       id: true,
       name: true,
+      unit: true,
       density: true,
       rates: { orderBy: { effectiveDate: 'desc' }, take: 1, select: { rate: true } },
     },
@@ -352,6 +380,7 @@ async function main() {
   const densityOf = (name: string) => Number(materials.find((m) => m.name === name)?.density ?? 1);
   const rateOf = (name: string) =>
     Number(materials.find((m) => m.name === name)?.rates[0]?.rate ?? 0);
+  const unitOf = (name: string) => materials.find((m) => m.name === name)?.unit ?? 'KG';
 
   for (const [name, kg] of [
     ['PET 12µm', 4000],
@@ -360,6 +389,25 @@ async function main() {
     ['LDPE Milky / Natural', 4000],
     /* PE 60µm is deliberately NOT received. One job is built on it, and that
        is what puts a real shortage on the floor to look at. */
+
+    /*
+     * The ink store. Drums, not reels — no width, and none is asked for.
+     *
+     * The four process colours go further than the spots because every printed
+     * job uses them; a spot colour is one brand's. The solvents dwarf both:
+     * ink is thinned 100:80 and the adhesive is let down 100:146:15, so ethyl
+     * acetate is the thing the works actually gets through.
+     */
+    ['Ink — Cyan', 180],
+    ['Ink — Magenta', 180],
+    ['Ink — Yellow', 180],
+    ['Ink — Black', 220],
+    ['Ink — Orange', 60],
+    ['Ink — White', 140],
+    ['Solvent — Ethyl Acetate', 1200],
+    ['Solvent — Toluene', 500],
+    ['Adhesive — PU', 400],
+    ['Adhesive — Hardener', 90],
   ] as const) {
     await receiveStock(
       receiveStockSchema.parse({
@@ -369,7 +417,9 @@ async function main() {
           .replace(/-+$/, '')
           .toUpperCase()}`,
         quantity: kg,
-        unit: 'KG',
+        /* Each material's own unit: the solvents are stocked in litres, and the
+           server refuses a unit it cannot convert rather than guessing. */
+        unit: unitOf(name),
         receivedOn: daysAgo(20),
         location: 'Warehouse A',
         notes: MARK,
@@ -448,6 +498,29 @@ async function main() {
             widthMm: Number(design.designOpenWidth),
             heightMm: Number(design.designHeight),
             layers,
+            colours: [
+              ...CMYK.map((colour) => ({
+                name: colour.name,
+                kind: 'PROCESS' as const,
+                materialId: materialId(colour.ink),
+                laydownGsm: colour.laydownGsm,
+                solidsPercent: SOLIDS_PERCENT,
+                ratePerKg: rateOf(colour.ink),
+              })),
+              /* The fifth station, on the one job that has one. */
+              ...(plan.spot
+                ? [
+                    {
+                      name: plan.spot.name,
+                      kind: 'SPECIAL' as const,
+                      materialId: materialId(plan.spot.ink),
+                      laydownGsm: plan.spot.laydownGsm,
+                      solidsPercent: SOLIDS_PERCENT,
+                      ratePerKg: rateOf(plan.spot.ink),
+                    },
+                  ]
+                : []),
+            ],
             quantities: [{ quantityKg: plan.kg, ratePerKg, quantityPouches: 0, ratePerPouch: 0 }],
             repeatWidth: Number(design.ups ?? 1),
             repeatHeight: 1,

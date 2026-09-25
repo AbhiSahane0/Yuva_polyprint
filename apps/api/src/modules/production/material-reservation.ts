@@ -1,6 +1,9 @@
 import {
+  adhesiveGsmFor,
+  adhesiveRequirements,
   availabilityFor,
   filmRequirements,
+  inkRequirements,
   shortages,
   wastagePercentFor,
   type MaterialAvailability,
@@ -29,6 +32,7 @@ import { ApiError } from '../../utils/api-error.js';
 
 const toNumber = (value: Prisma.Decimal | number | null): number => Number(value ?? 0);
 const round2 = (value: number): number => Math.round(value * 100) / 100;
+const round3 = (value: number): number => Math.round(value * 1000) / 1000;
 
 /** A card, as everything here needs to see one. */
 export interface CardForStock {
@@ -74,10 +78,24 @@ export async function requirementsForCards(
              widened. */
           filmWidthMm: true,
           repeatWidth: true,
+          /* What the run also takes off the shelf: the inks, and the adhesive
+             the plies are bonded with. Same arithmetic as the costing. */
+          colours: {
+            orderBy: { position: 'asc' },
+            select: { materialId: true, name: true, laydownGsm: true, solidsPercent: true },
+          },
           quotation: { select: { wastagePercent: true, date: true } },
           layers: {
             orderBy: { position: 'asc' },
-            select: { materialId: true, materialName: true, gsm: true },
+            /* micron and density for the adhesive coat weight, which depends
+               on how thick the plies are — see adhesiveGsmFor. */
+            select: {
+              materialId: true,
+              materialName: true,
+              gsm: true,
+              micron: true,
+              density: true,
+            },
           },
         },
       },
@@ -103,6 +121,15 @@ export async function requirementsForCards(
     await Promise.all(dates.map(async (date) => [date, await getSettings(date)] as const)),
   );
 
+  /*
+   * The settings name the ink solvents, the adhesive and its hardener by NAME
+   * — the works can rename a material without a migration — so they are looked
+   * up once for the page rather than per card.
+   */
+  const byName = new Map(
+    (await tx.material.findMany({ select: { id: true, name: true } })).map((m) => [m.name, m.id]),
+  );
+
   for (const card of cards) {
     const item = byOrder.get(card.orderId);
     if (!item) {
@@ -115,29 +142,98 @@ export async function requirementsForCards(
       continue;
     }
 
-    out.set(
-      card.id,
-      filmRequirements({
-        layers: item.layers.map((layer) => ({
-          materialId: layer.materialId,
-          name: layer.materialName,
-          gsm: toNumber(layer.gsm),
+    const wastagePercent = wastagePercentFor({
+      pouchType: item.pouchType,
+      override:
+        item.quotation.wastagePercent === null ? null : toNumber(item.quotation.wastagePercent),
+      defaultWastagePercent: settings.defaultWastagePercent,
+      pouchWastagePercent: settings.pouchWastagePercent,
+    });
+    const structureGsm = toNumber(item.compositeGsm);
+    const consumedKg = card.quantityKg * (1 + wastagePercent / 100);
+
+    const film = filmRequirements({
+      layers: item.layers.map((layer) => ({
+        materialId: layer.materialId,
+        name: layer.materialName,
+        gsm: toNumber(layer.gsm),
+      })),
+      quantityKg: card.quantityKg,
+      structureGsm,
+      /* The web this job runs at. Ink and adhesive get zero — neither comes on
+         a reel, so no width can be asked of them. */
+      needsWidthMm: round2(
+        toNumber(item.filmWidthMm) * Math.max(1, toNumber(item.repeatWidth)) +
+          settings.defaultTrimMm,
+      ),
+      wastagePercent,
+    });
+
+    /*
+     * The ink is laid on the printed ply's area, and the adhesive is spread
+     * over the substrate — so both need figures the film lines already imply
+     * but do not carry.
+     */
+    const printed = item.layers[0];
+    const substrateGsm = item.layers.reduce((sum, layer) => sum + toNumber(layer.gsm), 0);
+
+    const ink =
+      printed && structureGsm > 0
+        ? inkRequirements({
+            colours: item.colours.map((colour) => ({
+              materialId: colour.materialId,
+              name: colour.name,
+              laydownGsm: toNumber(colour.laydownGsm),
+              solidsPercent: toNumber(colour.solidsPercent),
+            })),
+            printedLayerKg: (toNumber(printed.gsm) / structureGsm) * consumedKg,
+            printedLayerGsm: toNumber(printed.gsm),
+            inkParts: 100,
+            solventParts: settings.inkSolventParts,
+            ethylAcetatePercent: settings.ethylAcetatePercent,
+            ethylAcetateMaterialId: byName.get(settings.defaultEthylAcetateMaterial) ?? null,
+            ethylAcetateName: settings.defaultEthylAcetateMaterial,
+            tolueneMaterialId: byName.get(settings.defaultTolueneMaterial) ?? null,
+            tolueneName: settings.defaultTolueneMaterial,
+          })
+        : [];
+
+    const adhesive = adhesiveRequirements({
+      adhesiveGsm: adhesiveGsmFor(
+        item.layers.map((layer) => ({
+          micron: toNumber(layer.micron),
+          density: toNumber(layer.density),
         })),
-        quantityKg: card.quantityKg,
-        structureGsm: toNumber(item.compositeGsm),
-        needsWidthMm: round2(
-          toNumber(item.filmWidthMm) * Math.max(1, toNumber(item.repeatWidth)) +
-            settings.defaultTrimMm,
-        ),
-        wastagePercent: wastagePercentFor({
-          pouchType: item.pouchType,
-          override:
-            item.quotation.wastagePercent === null ? null : toNumber(item.quotation.wastagePercent),
-          defaultWastagePercent: settings.defaultWastagePercent,
-          pouchWastagePercent: settings.pouchWastagePercent,
-        }),
-      }),
-    );
+        {
+          thinGsm: settings.adhesiveCoatThinGsm,
+          thickGsm: settings.adhesiveCoatThickGsm,
+          thickPlyMicron: settings.adhesiveThickPlyMicron,
+        },
+      ),
+      substrateGsm,
+      consumedKg,
+      splitRatio: settings.adhesiveSplitRatio,
+      adhesiveMaterialId: byName.get(settings.defaultAdhesiveMaterial) ?? null,
+      adhesiveName: settings.defaultAdhesiveMaterial,
+      ethylAcetateMaterialId: byName.get(settings.defaultEthylAcetateMaterial) ?? null,
+      ethylAcetateName: settings.defaultEthylAcetateMaterial,
+      hardenerMaterialId: byName.get(settings.defaultHardenerMaterial) ?? null,
+      hardenerName: settings.defaultHardenerMaterial,
+    });
+
+    /*
+     * Ethyl acetate is thinned into the ink AND into the adhesive, so the two
+     * are one claim on one drum. Two rows for one material would each be
+     * measured against the whole of it.
+     */
+    const merged = new Map<string, MaterialRequirement>();
+    for (const line of [...film, ...ink, ...adhesive]) {
+      const held = merged.get(line.materialId);
+      if (held) held.quantity = round3(held.quantity + line.quantity);
+      else merged.set(line.materialId, { ...line });
+    }
+
+    out.set(card.id, [...merged.values()]);
   }
 
   return out;

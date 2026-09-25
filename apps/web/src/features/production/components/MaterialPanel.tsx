@@ -40,8 +40,9 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
       <section className="border-ink-200 mb-5 rounded-[var(--radius-lg)] border bg-white p-4 shadow-[var(--shadow-card)] sm:p-5">
         <h2 className="text-ink-800 text-xs font-semibold tracking-wider uppercase">Material</h2>
         <p className="text-ink-500 mt-2 text-sm">
-          This order was not priced from a quotation, so there is no structure to work the film out
-          from. Nothing has been reserved for this card — check the stock by hand before it runs.
+          This order was not priced from a quotation, so there is no structure to work the material
+          out from. Nothing has been reserved for this card — check the stock by hand before it
+          runs.
         </p>
       </section>
     );
@@ -96,7 +97,7 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
         <table className="w-full min-w-[26rem] text-sm">
           <thead>
             <tr className="text-ink-500 text-left text-xs tracking-wide uppercase">
-              <th className="px-4 pb-1.5 font-medium sm:pl-0">Film</th>
+              <th className="px-4 pb-1.5 font-medium sm:pl-0">Material</th>
               <th className="px-4 pb-1.5 text-right font-medium">Needs</th>
               {/* Not "free" — free counts reels too narrow to run this job, and
                   kilograms on a 340 mm reel are no use at 650. */}
@@ -174,7 +175,13 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
                           className="border-ink-200 text-ink-600 rounded-full border bg-white px-2 py-0.5 text-xs whitespace-nowrap tabular-nums"
                           title={`${reel.batchCode} — ${formatNumber(reel.quantity, 3)} kg of this roll is held for this job`}
                         >
-                          {reel.widthMm ? `${formatNumber(reel.widthMm, 0)} mm` : 'width ?'}
+                          {/*
+                           * A reel is known by its width — that is what
+                           * decides whether it can run the job. A drum is not:
+                           * ink and solvent have no width and none is asked
+                           * for, so it is known by its batch instead.
+                           */}
+                          {reel.widthMm ? `${formatNumber(reel.widthMm, 0)} mm` : reel.batchCode}
                           <span className="text-ink-400"> · </span>
                           {formatNumber(reel.quantity, 1)} kg
                         </span>

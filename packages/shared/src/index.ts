@@ -47,6 +47,7 @@ export * from './lib/operator-choices.js';
 export * from './schemas/employee.js';
 export * from './types/employee.js';
 export * from './lib/material-cost.js';
+export * from './lib/consumable-requirements.js';
 export * from './lib/costing-window.js';
 export * from './lib/phone.js';
 export * from './lib/inventory.js';

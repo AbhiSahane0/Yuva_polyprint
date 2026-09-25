@@ -278,6 +278,25 @@ A job can therefore be short of a film the stock screen shows plenty of, for
 either reason: the rest is promised to another job, or the rest is the wrong
 size. The card says which.
 
+### It claims the ink and the adhesive too
+
+Not only film. A card holds everything the run takes off the shelf, worked out
+the same way the price was:
+
+|                                   |                                                                                                                                                                        |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Each ink**                      | at its **wet** weight — the laydown is what stays on the film once dry, but the tin is bought wet, so an ink at 23% solids is claimed four times heavier than it looks |
+| **The solvents**                  | ink is thinned 100:80, and the adhesive let down 100:146:15 — so ethyl acetate is the biggest consumable after film                                                    |
+| **The adhesive and its hardener** | spread over the **films**, not the whole laminate: it goes between the plies, not over itself or the ink                                                               |
+
+A five-colour job — CMYK plus a spot on the fifth station — holds five ink
+drums. **A spot colour nobody has chosen the ink for yet** still counts its
+solvent, because the works mixes something, but holds no drum: there is nothing
+to hold. Once somebody names the ink, it is claimed like any other.
+
+Ink and adhesive come in drums, so **no width is asked of them**. The chip under
+each names the drum instead of a width.
+
 ### It claims particular rolls
 
 The claim is not "781 kg of LDPE". It is **these rolls**, listed under each film
