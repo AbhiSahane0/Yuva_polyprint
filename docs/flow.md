@@ -23,6 +23,8 @@ technical knowledge.
                                           │
                                           ▼
                                       JOB CARD        what the floor will do
+                                          │             + claims the film, ink
+                                          │               and adhesive it needs
                                           │
                          ┌────────────────┼────────────────┐
                          ▼                ▼                ▼
@@ -127,6 +129,11 @@ This is deliberately not a personnel system: no attendance, no leave, no
 payroll. It exists so that the floor **picks** a name on a job card instead of
 typing one — which is how the same person ends up recorded five different ways.
 
+On a job card the operator box lists the people whose role belongs to that
+machine first, under **On this machine**, and everybody else under **Anyone
+else**. Nobody is hidden: the day the slitting man covers the press is exactly
+the day worth recording.
+
 The screen also shows who is on a machine right now. That is not stored anywhere
 and nobody has to keep it up to date: if a job card stage is running with
 somebody's name on it, they are working, and that is the only thing that can
@@ -142,6 +149,16 @@ Film can also be taken straight in with **Receive material** on the Inventory
 screen, for a delivery nobody raised an order for. Either way it is a batch, and
 a batch is what stock is counted in.
 
+A film delivery records **how wide the reel runs** and **its gauge**. Part two
+says why that matters more than it sounds.
+
+The works' existing stock register loads in one go — 363 reels and 38.6 tonnes
+off their own September workbook:
+
+```bash
+npm run import:stock -w @yuva/api -- --file "Stock Record September Month 2026.xlsx"
+```
+
 The Inventory screen then shows, for every material:
 
 |             |                                        |
@@ -151,7 +168,9 @@ The Inventory screen then shows, for every material:
 
 They differ by what open job cards have already claimed. This is the figure
 everything downstream is measured against, and it is explained properly in Part
-two.
+two. **Free below zero** means more has been promised to job cards than the
+works holds — it is shown in red rather than hidden behind a nought, because a
+works that finds that out at the machine finds out too late.
 
 ## Step 6 — the printing cylinders · **Design & Cylinders** _(optional)_
 
@@ -231,12 +250,12 @@ Two things happen the moment it is raised.
 
 Nobody picks them. The system reads the structure the job was priced on:
 
-| Stage                    | When it appears                                               |
-| ------------------------ | ------------------------------------------------------------- |
-| **Rotogravure printing** | unless the job prints nothing                                 |
-| **Lamination**           | once per bond — a three-ply job gets **Lamination 1 and 2**   |
-| **Slitting**             | always; everything comes off wider than it is sold            |
-| **Pouch making**         | only where pouches are made; a reel is converted into nothing |
+| Stage                    | When it appears                                                   |
+| ------------------------ | ----------------------------------------------------------------- |
+| **Rotogravure printing** | unless the job prints nothing                                     |
+| **Lamination**           | once per bond — see below, the number is the pass not the machine |
+| **Slitting**             | always; everything comes off wider than it is sold                |
+| **Pouch making**         | only where pouches are made; a reel is converted into nothing     |
 
 Because it reads the same structure the price was built from, the card and the
 quotation cannot disagree about what the job involves.
@@ -320,6 +339,17 @@ because film ages on a shelf. Hovering a roll shows its batch code.
 > **A shortage does not stop the card being raised.** Raising it is how the
 > floor finds out what is missing and how purchasing finds out what to order.
 > The stop comes at the machine — Step 6.
+
+### The panel folds away
+
+All of this lives in one **Material** panel above the stages, and it starts
+**folded** — a card with three films, five inks and the solvents runs to a dozen
+rows, and the floor opens this screen to fill in a stage. The header still says
+the state: the badge, and how many materials are behind the fold.
+
+A job that is **short with nobody having said why** opens itself. The panel is
+then the reason the job will not start, and the way past it is a button inside
+it.
 
 ## Step 6 — run it, stage by stage · **Production → the card**
 
@@ -563,6 +593,9 @@ So nobody goes looking for it:
   on top of them is not built.
 - **Reports and an overview screen.**
 - **An operator view** — a stripped-back screen for a tablet at the machine.
+- **Reserving by roll on the job sheet.** The card earmarks particular rolls;
+  the sheet still issues by weight, oldest first, and does not check that the
+  roll it took is the roll that was held.
 
 And two gaps in the works' own data worth closing:
 
@@ -571,3 +604,10 @@ And two gaps in the works' own data worth closing:
 - The **Pouch Operator** wage is a placeholder. It costs nothing until a
   pouch-making machine exists — but the day one is added, it starts pricing
   every pouch job.
+- **PP Film and Nylon Poly** came in with the stock register — 3,254 kg of them
+  — and have **no rate and no density**. Nothing can be quoted on either until
+  both are set, and a film with no density is priced as though that ply weighed
+  nothing.
+- The **new laminator's real speed**. Both are entered at 70 m/min, and
+  Laminator 2 is the one marked _Costed on this_, so every quotation is built
+  from that figure — whatever it truly runs at.
