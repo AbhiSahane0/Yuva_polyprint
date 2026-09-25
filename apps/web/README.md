@@ -430,8 +430,17 @@ own. Nobody has to remember to start three things.
 
 #### The material panel — and the one thing that stops a job
 
-Above the stages, because whether the film is there is the first question and
-its answer decides whether any of the stages below can be started at all.
+Above the stages, because whether the material is there is the first question
+and its answer decides whether any of the stages below can be started at all.
+
+**Folded away by default.** A card with three films, five inks and the solvents
+runs to a dozen rows, and the floor opens this screen to fill in a stage — the
+material is what you check once, not what you read past every time. The header
+stays: the badge, and how many materials are folded behind it.
+
+The exception is a job that is **short and has no override**. The panel is then
+the reason the job will not start, and the way past it is a button inside it —
+so it opens itself.
 
 Three figures per ply, and the order they are read in is the point: what the job
 **needs**, what is **free**, and — only when those disagree — what is **short**.
