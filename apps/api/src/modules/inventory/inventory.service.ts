@@ -19,7 +19,7 @@ import {
   type TransferStockInput,
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, TX } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
 
 /**
@@ -500,7 +500,7 @@ export async function issueStock(
       select: { id: true },
     });
     return latest.id;
-  });
+  }, TX);
 
   return readMovement(movementId);
 }
@@ -539,7 +539,7 @@ export async function adjustStock(
       select: { id: true },
     });
     return latest.id;
-  });
+  }, TX);
 
   return readMovement(movementId);
 }
@@ -577,7 +577,7 @@ export async function transferStock(
       select: { id: true },
     });
     return latest.id;
-  });
+  }, TX);
 
   return readMovement(movementId);
 }

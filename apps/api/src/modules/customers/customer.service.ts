@@ -8,7 +8,7 @@ import type {
   ListCustomersQuery,
   UpdateCustomerInput,
 } from '@yuva/shared';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, TX } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
 
 /** Prisma row shape plus the job count we always expose. */
@@ -306,7 +306,7 @@ export async function createCustomer(input: CreateCustomerInput): Promise<Custom
     });
     if (jobs && jobs.length > 0) await syncCustomerJobs(tx, customer.id, jobs);
     return customer.id;
-  });
+  }, TX);
 
   return getCustomerById(id);
 }
@@ -335,7 +335,7 @@ export async function updateCustomer(
     // `jobs` omitted means "leave the jobs alone"; an empty array means
     // "this customer has no jobs", which is a real instruction.
     if (jobs) await syncCustomerJobs(tx, id, jobs);
-  });
+  }, TX);
 
   return getCustomerById(id);
 }
@@ -364,7 +364,7 @@ export async function deleteCustomer(id: string): Promise<{ id: string; released
       });
     }
     await tx.customer.delete({ where: { id } });
-  });
+  }, TX);
 
   return { id, releasedJobs };
 }

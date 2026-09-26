@@ -17,7 +17,7 @@ import {
   type UpdateProductionStageInput,
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, TX } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
 import {
   availabilityForCard,
@@ -331,13 +331,20 @@ export async function createProduction(
       include: WITH_ALL,
     });
 
-    /* What the card needs, fitted onto the actual rolls — so the claim names
-       the rolls the floor will fetch rather than a quantity of nothing. */
+    /*
+     * What the card needs, fitted onto the actual rolls — so the claim names
+     * the rolls the floor will fetch rather than a quantity of nothing.
+     *
+     * Worked out once and reused for the reply. Asking again after the hold
+     * returns the same answer by construction, because a card's availability
+     * leaves its OWN claims out — and against a database across a network that
+     * second look was half the cost of raising a card.
+     */
     const fitted = await availabilityForCard(tx, cardForStock(card));
     await holdFor(tx, card.id, fitted);
 
-    return toProduction(card, await availabilityForCard(tx, cardForStock(card)));
-  });
+    return toProduction(card, fitted);
+  }, TX);
 }
 
 export async function updateProduction(
@@ -403,7 +410,7 @@ export async function updateProduction(
     if (movedTo === 'COMPLETED') await releaseFor(tx, row.id);
 
     return toProduction(row, await availabilityForCard(tx, cardForStock(row)));
-  });
+  }, TX);
 }
 
 /**
@@ -591,7 +598,7 @@ export async function updateStage(
       include: WITH_ALL,
     });
     return toProduction(row!, await availabilityForCard(tx, cardForStock(row!)));
-  });
+  }, TX);
 }
 
 /**

@@ -47,3 +47,21 @@ export async function disconnectDatabase(): Promise<void> {
   await prisma.$disconnect();
   logger.info('Database disconnected');
 }
+
+/**
+ * **How long an interactive transaction may take.**
+ *
+ * Prisma allows five seconds. That is ample against a database on the same
+ * machine and not ample at all against one across a network: a quotation writes
+ * its lines, layers and colours row by row, a job sheet writes twenty-one, a
+ * job card fits a bill of materials onto real rolls and claims each one. Every
+ * round trip inside the transaction costs the latency to the host.
+ *
+ * Seeding against the hosted database is what found this, but the deployed app
+ * talks to that same database — so it was a bug waiting for a busy afternoon
+ * rather than a seeding inconvenience.
+ *
+ * A longer limit makes nothing slower. It only stops correct work being thrown
+ * away for taking six seconds instead of four.
+ */
+export const TX = { timeout: 30_000, maxWait: 10_000 } as const;

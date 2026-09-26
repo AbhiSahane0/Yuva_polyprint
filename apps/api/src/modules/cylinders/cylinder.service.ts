@@ -18,7 +18,7 @@ import {
   type UpdateCylinderInput,
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, TX } from '../../lib/prisma.js';
 import { eraseAllForJob } from '../artwork/artwork.service.js';
 import { ApiError } from '../../utils/api-error.js';
 
@@ -299,7 +299,7 @@ export async function registerCylinders(
         },
       });
     }
-  });
+  }, TX);
 
   return getDesign(input.jobId);
 }
@@ -372,7 +372,7 @@ export async function recordEvent(
     }
 
     return created;
-  });
+  }, TX);
 
   const rows = await prisma.cylinderEvent.findMany({
     where: { id: { in: ids } },
@@ -546,7 +546,7 @@ export async function deleteDesign(jobId: string): Promise<DesignDeleted> {
     await tx.cylinder.deleteMany({ where: { jobId } });
     /* Artwork rows cascade here, and quotation lines are set null. */
     await tx.job.delete({ where: { id: jobId } });
-  });
+  }, TX);
 
   return {
     jobId,

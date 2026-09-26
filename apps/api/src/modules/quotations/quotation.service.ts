@@ -30,7 +30,7 @@ import {
   type UpdateQuotationInput,
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, TX } from '../../lib/prisma.js';
 import { ordersFromQuotation } from '../orders/order.service.js';
 import { ApiError } from '../../utils/api-error.js';
 import { getSettings } from '../settings/settings.service.js';
@@ -885,7 +885,7 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
         }
 
         return created.id;
-      });
+      }, TX);
 
       return await getQuotationById(id);
     } catch (error) {
@@ -1149,7 +1149,7 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
       const wonTierId = tierIdAt.get(wonPosition) ?? null;
       await tx.quotation.update({ where: { id }, data: { wonTierId } });
     }
-  });
+  }, TX);
 
   return getQuotationById(id);
 }
@@ -1329,7 +1329,7 @@ export async function createQuotationVersion(id: string): Promise<Quotation> {
         }
 
         return created.id;
-      });
+      }, TX);
 
       return await getQuotationById(createdId);
     } catch (error) {
@@ -1401,7 +1401,7 @@ export async function deleteQuotation(id: string): Promise<{ id: string }> {
         await tx.quotation.update({ where: { id: survivor.id }, data: { isLatest: true } });
       }
     }
-  });
+  }, TX);
 
   return { id };
 }
@@ -1659,5 +1659,5 @@ export async function recordOutcome(
       ordersCreated: orders.created,
       ordersSkipped: orders.skipped,
     };
-  });
+  }, TX);
 }

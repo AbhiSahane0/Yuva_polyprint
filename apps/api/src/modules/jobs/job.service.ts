@@ -1,5 +1,5 @@
 import type { CustomerJob, SaveQuotationJobInput } from '@yuva/shared';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, TX } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
 import { nextJobCode } from '../customers/customer.service.js';
 
@@ -123,7 +123,7 @@ export async function createJobForCustomer(
         select: SELECT,
       }),
     );
-  });
+  }, TX);
 }
 
 /** Updates a design already on record. */
