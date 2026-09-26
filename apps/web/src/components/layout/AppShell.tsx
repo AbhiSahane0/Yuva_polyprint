@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Disc3,
   Package,
+  PackageCheck,
   Truck,
   Users,
   X,
@@ -50,6 +51,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
        * API rather than by hiding the whole section.
        */
       { to: '/orders', label: 'Orders', icon: ClipboardCheck },
+      { to: '/dispatch', label: 'Dispatch', icon: PackageCheck },
     ],
   },
   {

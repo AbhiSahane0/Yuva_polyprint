@@ -18,6 +18,9 @@ const QuotationsPage = lazy(() => import('@/features/quotations/pages/Quotations
 const OrdersPage = lazy(() => import('@/features/orders/pages/OrdersPage'));
 const OrderPage = lazy(() => import('@/features/orders/pages/OrderPage'));
 const NewOrderPage = lazy(() => import('@/features/orders/pages/NewOrderPage'));
+const DispatchPage = lazy(() => import('@/features/dispatch/pages/DispatchPage'));
+const DispatchNotePage = lazy(() => import('@/features/dispatch/pages/DispatchNotePage'));
+const DispatchFormPage = lazy(() => import('@/features/dispatch/pages/DispatchFormPage'));
 const ProductionPage = lazy(() => import('@/features/production/pages/ProductionPage'));
 const JobCardPage = lazy(() => import('@/features/production/pages/JobCardPage'));
 const EmployeesPage = lazy(() => import('@/features/employees/pages/EmployeesPage'));
@@ -149,6 +152,32 @@ function AppRoutes() {
             }
           />
           <Route path="/orders/:id" element={<OrderPage />} />
+
+          {/*
+            Dispatch reads like Orders: what has gone out and what is still in
+            the godown is the whole works' question, so the list and a note are
+            open to anyone signed in. Loading a lorry needs `dispatch` — its own
+            module, because the despatch clerk is not the quotation desk and
+            sending goods completes a customer's order.
+          */}
+          <Route path="/dispatch" element={<DispatchPage />} />
+          <Route
+            path="/dispatch/new"
+            element={
+              <RequireModule module="dispatch">
+                <DispatchFormPage />
+              </RequireModule>
+            }
+          />
+          <Route path="/dispatch/:id" element={<DispatchNotePage />} />
+          <Route
+            path="/dispatch/:id/edit"
+            element={
+              <RequireModule module="dispatch">
+                <DispatchFormPage />
+              </RequireModule>
+            }
+          />
 
           {/*
             Job cards are the floor's own document, so reading needs no module —
