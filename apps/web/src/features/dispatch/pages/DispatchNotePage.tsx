@@ -285,7 +285,17 @@ export default function DispatchNotePage() {
                   <div className="text-ink-500 mt-0.5 text-xs">
                     {line.customerPoNumber ? `PO ${line.customerPoNumber} · ` : ''}
                     Order is {ORDER_STATUS_LABELS[line.orderStatus].toLowerCase()}
-                    {line.pendingKg > 0
+                    {/*
+                      The balance is only worth saying while somebody is still
+                      waiting for it. A settled order can keep a kilogram
+                      figure — a pouch order is judged on bags, so it completes
+                      with its weight short — and printing "completed · 53 kg
+                      still to go" beside it reads as the screen contradicting
+                      itself rather than as the two different things it is.
+                    */}
+                    {line.pendingKg > 0 &&
+                    line.orderStatus !== 'COMPLETED' &&
+                    line.orderStatus !== 'CANCELLED'
                       ? ` · ${formatNumber(line.pendingKg, 3)} kg still to go`
                       : ''}
                   </div>

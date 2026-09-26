@@ -125,7 +125,7 @@ export function PackagesEditor({
         </Button>
         {rows.length > 0 ? (
           <div className="text-ink-600 text-sm tabular-nums">
-            {toPackageInputs(rows).length} reels ·{' '}
+            {toPackageInputs(rows).length} reel{toPackageInputs(rows).length === 1 ? '' : 's'} ·{' '}
             <span className="text-ink-900 font-semibold">{formatNumber(total, 3)} kg</span>
           </div>
         ) : null}
