@@ -508,6 +508,109 @@ done with a stock adjustment rather than by editing history.
 
 ---
 
+## Step 10 — it goes out · **Dispatch**
+
+This is the step that finishes an order, and until it existed nothing did: a job
+card could be complete, costed and off stock while the order it was for still
+read **In production**, because for a customer complete means _delivered_ and
+nothing knew about delivery.
+
+### The godown
+
+The Dispatch screen opens on **what is waiting to go**, and nothing in that list
+is stored anywhere. It is what the finished job cards made, less what has already
+gone out:
+
+| Column            | Where it comes from                                                                                                   |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Ordered**       | what the customer committed to                                                                                        |
+| **Made**          | the finished cards' real output — the job sheet's packed weight, or the card's own quantity until the sheet is costed |
+| **Gone**          | every dispatch note already sent                                                                                      |
+| **In the godown** | made less gone. What is physically standing on the floor                                                              |
+
+An order appears here the moment a card against it is finished, and drops off on
+its own once everything has gone. There is no "ready to dispatch" tick box,
+deliberately — that is the box somebody forgets, after which the screen is wrong
+and the floor stops believing it.
+
+### One note is one lorry
+
+Press **New note** and it asks, in the order the job is actually done: who it is
+going to, what is going, and which lorry.
+
+**One note is one lorry, and one customer.** A vehicle taking three jobs to the
+same customer is one delivery, one consignment note and one signature, with a
+line for each order aboard. Three separate notes would mean typing the same lorry
+number three times and handing over three challans for one drop. Two customers
+is two notes, because each signs for their own goods.
+
+### The reels are listed, and they are the total
+
+Under each line, the reels go in one row each — the number written on the reel,
+its weight, its width. **The line's weight is their sum**, shown rather than
+asked for. A typed total sitting above rows that add up to something else is a
+challan the works and the customer read two different ways, and there is no
+settling it afterwards.
+
+A customer who weighs the load back and finds it twelve kilos light can then be
+told _which reel_. Where the office has only a total on a scrap of paper, they
+type the total and list no reels — that still works.
+
+### A draft is not a delivery
+
+Saving gives you a **draft**, and a draft counts for nothing anywhere: no order
+is credited, and the godown still shows the goods standing on the floor. Only
+**Dispatch it** settles anything, and it asks for the lorry's number then — the
+vehicle usually turns up after the paperwork is written.
+
+Two clerks can both have a draft against the same 500 kg. The check happens
+inside the same transaction as the posting, so the second one to send is refused
+against what the first one actually took.
+
+### Sending the last of an order completes it
+
+When a note is sent, every order it finishes becomes **Completed**, stamped with
+the day. Part deliveries leave the order open with the balance against it.
+
+An order is judged on the basis it was taken at: **weight for a reel job, bags
+for a pouch job**. A pouch order can have every kilogram delivered and still be
+open, because a thousand bags short is a thousand bags short.
+
+A run that made less than was ordered can never complete itself — 947 kg against
+a 1,000 kg order leaves 53 kg pending forever, and closing that short is the
+office's decision to make on the order, not something arithmetic should do
+quietly.
+
+### Sending more than was made
+
+Refused, and it says which order and by how much. Physically it cannot happen, so
+it means one of two things: a mistake, or a run that packed more than its card
+planned and has not been costed yet — 512 kg against a 500 kg card, with the job
+sheet still on somebody's desk.
+
+The lorry does not wait for the office, so the refusal takes a reason and then
+goes. The reason is recorded on the note with the name of whoever gave it.
+
+### A lorry that comes back
+
+A delivery turned back at the customer's gate is a real afternoon. **Cancel** the
+note and the goods return to the godown — and if that note was what completed the
+order, the order goes back to **In production** with its completion date cleared.
+An order completed against a delivery that never happened is the one wrong figure
+nobody finds until the customer rings.
+
+A note that has already gone cannot be edited or deleted, only cancelled with a
+reason. It is the record of a lorry that went.
+
+### Dispatch moves no stock
+
+Worth saying plainly, because it looks like it should. The material left the
+shelf when the **job sheet** was posted, which is the only thing in the system
+that reduces stock. A lorry leaving is not a stock movement, and deducting it
+here would take every delivered job off twice.
+
+---
+
 # The rules behind all of it
 
 Four ideas explain most of the system's behaviour. They are worth knowing,
@@ -549,6 +652,7 @@ used them can still explain themselves.
 | **Production**         | What is on the floor right now, and how far along    |
 | **Employees**          | Who is here, and what they are on                    |
 | **Job sheets**         | What each run actually cost                          |
+| **Dispatch**           | What has left the works, and what is waiting to go   |
 | **Inventory**          | What we hold, what it is worth, what is running out  |
 | **Purchase**           | What is on order and what has arrived                |
 | **Rates**              | Today's raw material prices                          |
@@ -566,15 +670,16 @@ real week is spread:
 npm run seed:demo -w @yuva/api
 ```
 
-| Stage            | What to look at                              |
-| ---------------- | -------------------------------------------- |
-| **Quoted**       | a quotation sent, nobody has answered        |
-| **Ordered**      | won, the order on the books, nothing started |
-| **On the floor** | printing done, lamination running            |
-| **Finished**     | every stage done, costed, taken off stock    |
+| Stage              | What to look at                                                                                                |
+| ------------------ | -------------------------------------------------------------------------------------------------------------- |
+| **Quoted**         | a quotation sent, nobody has answered                                                                          |
+| **Ordered**        | won, the order on the books, nothing started                                                                   |
+| **On the floor**   | printing done, lamination running                                                                              |
+| **Finished**       | every stage done, costed, taken off stock                                                                      |
+| **Part delivered** | half of it gone on a lorry, listed reel by reel, with the balance still in the godown and a draft note waiting |
 
-Walk Quotations → Orders → Production → Job sheets → Inventory in that order and
-the whole chain reads in one sitting. Remove it again with:
+Walk Quotations → Orders → Production → Job sheets → Dispatch → Inventory in that
+order and the whole chain reads in one sitting. Remove it again with:
 
 ```bash
 npm run seed:demo -w @yuva/api -- --clear
@@ -586,8 +691,6 @@ npm run seed:demo -w @yuva/api -- --clear
 
 So nobody goes looking for it:
 
-- **Dispatch** — what left the building, and on whose lorry. This is why
-  completing a job card does not complete the order.
 - **Planning** — scheduling work across the machines before it starts.
 - **Quality and waste analysis** — the figures are all recorded; the reporting
   on top of them is not built.
@@ -596,6 +699,16 @@ So nobody goes looking for it:
 - **Reserving by roll on the job sheet.** The card earmarks particular rolls;
   the sheet still issues by weight, oldest first, and does not check that the
   roll it took is the roll that was held.
+- **A GST tax invoice.** Dispatch raises a delivery challan, which is what goes
+  with the goods. Billing is its own document and needs groundwork the system
+  does not have yet: the works' own GSTIN and registered address, an HSN code
+  per product, place of supply, and the CGST/SGST against IGST split. The e-way
+  bill above ₹50,000 sits on top of that again.
+- **A pouch count on the job sheet.** The works weighs what it packs, so nothing
+  records how many bags a run actually made. Dispatch infers it from the weight
+  — ordered count against ordered weight — which is why a pouch order's godown
+  figure is an estimate. Nothing is blocked on it: the over-production check is
+  on weight alone.
 
 And two gaps in the works' own data worth closing:
 

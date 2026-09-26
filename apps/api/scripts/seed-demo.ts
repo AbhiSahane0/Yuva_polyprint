@@ -38,6 +38,11 @@ import {
   updateStage,
 } from '../src/modules/production/production.service.js';
 import { createEmployee } from '../src/modules/employees/employee.service.js';
+import {
+  createDispatch,
+  postDispatch,
+  readyToSend,
+} from '../src/modules/dispatch/dispatch.service.js';
 import { receiveStock } from '../src/modules/inventory/inventory.service.js';
 import {
   costSheet,
@@ -178,6 +183,18 @@ async function clear(quiet = false) {
     select: { id: true },
   });
 
+  /*
+   * Before the orders: a dispatch line points at its order with a RESTRICT, so
+   * the order cannot go while a challan still names it — which is the whole
+   * point of that constraint and exactly right outside a demo.
+   */
+  const notes = await prisma.dispatch.findMany({
+    where: { notes: { contains: MARK } },
+    select: { id: true },
+  });
+  await prisma.dispatchLine.deleteMany({ where: { dispatchId: { in: notes.map((n) => n.id) } } });
+  await prisma.dispatch.deleteMany({ where: { id: { in: notes.map((n) => n.id) } } });
+
   await prisma.stockMovement.deleteMany({ where: { batchId: { in: batches.map((b) => b.id) } } });
   await prisma.jobSheet.deleteMany({ where: { id: { in: sheets.map((s) => s.id) } } });
   await prisma.stockBatch.deleteMany({ where: { id: { in: batches.map((b) => b.id) } } });
@@ -192,7 +209,7 @@ async function clear(quiet = false) {
     `Removed ${quotations.count} quotations, ${orders.count} orders, ${cards.count} job cards,`,
   );
   console.log(
-    `        ${sheets.length} job sheets, ${batches.length} stock batches, ${people.count} employees.`,
+    `        ${sheets.length} job sheets, ${notes.length} dispatch notes, ${batches.length} stock batches, ${people.count} employees.`,
   );
 }
 
@@ -551,7 +568,9 @@ async function main() {
     const won = await recordOutcome(quotation.id, { outcome: 'WON', lostReason: '' });
     const order = await prisma.order.findFirstOrThrow({
       where: { number: won.ordersCreated[0] },
-      select: { id: true, number: true },
+      /* customerId and the snapshot name are wanted by the dispatch note at the
+         end — a challan is made out to a customer, not to an order. */
+      select: { id: true, number: true, customerId: true, customerName: true },
     });
 
     /* One of them is past the day it was promised, so the floor's "past due"
@@ -691,10 +710,112 @@ async function main() {
       `card #${card.number}, sheet ${sheet.number}`,
       `${design.jobName} — ${posted.posted} material line${posted.posted === 1 ? '' : 's'} off stock`,
     );
+
+    /* --- and then it goes out -------------------------------------------- */
+
+    /*
+     * Half of it on a lorry, the rest still on the floor.
+     *
+     * A part delivery is the state worth showing, because it is the one that
+     * exercises everything: the order stays open with a real balance against
+     * it, the godown screen has something in it, and the second note is a draft
+     * — which counts for nothing anywhere until somebody sends it. An order
+     * delivered in one go would demonstrate none of that.
+     */
+    const standing = (await readyToSend({})).find((row) => row.orderId === order.id);
+    if (standing && standing.readyKg > 0) {
+      const half = Math.round((standing.readyKg / 2) * 1000) / 1000;
+      const bags = Math.floor(standing.orderedPouches / 2);
+
+      /* Three reels, adding up to the half — the works weighs every reel it
+         packs, and the challan lists them. */
+      const each = Math.round((half / 3) * 1000) / 1000;
+      const reels = [
+        { reelNumber: 'YP-4471', netKg: each, grossKg: null, widthMm: 650 },
+        { reelNumber: 'YP-4472', netKg: each, grossKg: null, widthMm: 650 },
+        {
+          reelNumber: 'YP-4473',
+          netKg: Math.round((half - 2 * each) * 1000) / 1000,
+          grossKg: null,
+          widthMm: 650,
+        },
+      ];
+
+      const lorry = {
+        customerId: order.customerId,
+        customerName: order.customerName,
+        dispatchDate: daysAgo(1),
+        deliveryAddress: 'Godown 2, MIDC Sinnar, Nashik',
+        vehicleNumber: '',
+        transporter: 'Sai Roadlines',
+        driverName: 'Ramesh Jadhav',
+        driverPhone: '9876543210',
+        lrNumber: 'LR-5521',
+        notes: MARK,
+      };
+
+      const sent = await createDispatch(
+        {
+          ...lorry,
+          lines: [
+            {
+              orderId: order.id,
+              productionOrderId: card.id,
+              /* Left at nought on purpose: the reels are the total. */
+              quantityKg: 0,
+              quantityPouches: bags,
+              remarks: 'First half — balance to follow',
+              packages: reels,
+            },
+          ],
+        },
+        'Demo',
+      );
+      const gone = await postDispatch(
+        sent.id,
+        { vehicleNumber: 'MH 15 AB 1234', overrideReason: '' },
+        'Demo',
+      );
+      say(
+        'Delivered (part)',
+        `note #${gone.number}`,
+        `${design.jobName} — ${gone.totalKg} kg on ${gone.packageCount} reels, order still open`,
+      );
+
+      const left = (await readyToSend({})).find((row) => row.orderId === order.id);
+      if (left && left.readyKg > 0) {
+        const draft = await createDispatch(
+          {
+            ...lorry,
+            dispatchDate: daysAgo(0),
+            transporter: '',
+            driverName: '',
+            driverPhone: '',
+            lrNumber: '',
+            lines: [
+              {
+                orderId: order.id,
+                productionOrderId: card.id,
+                quantityKg: left.readyKg,
+                quantityPouches: standing.orderedPouches - bags,
+                remarks: 'Balance',
+                packages: [],
+              },
+            ],
+          },
+          'Demo',
+        );
+        say(
+          'Draft note',
+          `note #${draft.number}`,
+          `${design.jobName} — ${draft.totalKg} kg loaded but not sent`,
+        );
+      }
+    }
   }
 
   console.log(
-    '\nOpen Quotations, Orders, Production, Job sheets and Inventory to walk it through.',
+    '\nOpen Quotations, Orders, Production, Job sheets, Dispatch and Inventory to walk it through.',
   );
 }
 
