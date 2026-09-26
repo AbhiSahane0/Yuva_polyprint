@@ -106,6 +106,8 @@ model Customer {
   jobs       Job[]
   quotations Quotation[]
   orders     Order[]
+  /// Deliveries made to them. One note is one lorry.
+  dispatches Dispatch[]
 
   /// Runs costed against this customer's designs.
   jobSheets JobSheet[]
@@ -201,18 +203,18 @@ model Job {
 
   /// 1-based row number in the source CSV, so any imported row can be traced
   /// back to the exact line it came from.
-  quotationItems QuotationItem[]
+  quotationItems   QuotationItem[]
   /// Material issued against this design. Nullable on that side, so retiring a
   /// job leaves the stock ledger readable.
-  stockMovements StockMovement[]
+  stockMovements   StockMovement[]
   /// The engraved set this design prints from. A job is the design — see the
   /// Cylinder model.
-  cylinders      Cylinder[]
+  cylinders        Cylinder[]
   /// The files it prints from. See the JobArtwork model.
-  artwork        JobArtwork[]
+  artwork          JobArtwork[]
   /// Every run of this design, and what each actually cost.
-  jobSheets      JobSheet[]
-  orders         Order[]
+  jobSheets        JobSheet[]
+  orders           Order[]
   productionOrders ProductionOrder[]
 
   sourceRow Int @map("source_row")
@@ -478,11 +480,10 @@ model QuotationItem {
   quantities QuotationItemQuantity[]
 
   createdAt DateTime @default(now()) @map("created_at")
+  /// The order this line became, if the quotation was won.
+  order     Order?
 
   @@index([quotationId])
-  /// The order this line became, if the quotation was won.
-  order Order?
-
   @@map("quotation_items")
 }
 
@@ -729,13 +730,12 @@ model Material {
   /// Every job sheet line priced from this material.
   jobSheetLines JobSheetLine[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([category, sortOrder])
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
   /// Held against job cards that have not run yet.
   reservations StockReservation[]
 
+  @@index([category, sortOrder])
   @@map("materials")
 }
 
@@ -986,12 +986,10 @@ model StockBatch {
 
   /**
    * **The reel this batch is, where the material comes on reels.**
-   *
    * A film is not fungible by weight. The works' own stock register is kept by
    * width for exactly this reason: PET 12µm sits in twenty-three widths from
    * 340 mm to 1040 mm, and a job that needs 650 mm cannot be run on a 340 mm
    * reel however many kilograms of it there are.
-   *
    * Null for anything not bought as a reel — ink, adhesive, solvent — and for a
    * film delivery nobody recorded the width of.
    */
@@ -999,7 +997,6 @@ model StockBatch {
 
   /**
    * The gauge of this particular delivery.
-   *
    * On the material as well, in its name, but the works prices a film by TYPE
    * and buys it in many gauges — their register carries LDPE in fourteen of
    * them under one rate. So the gauge belongs to the delivery, not to the
@@ -1590,8 +1587,6 @@ model CostingMachine {
 
   /// Stages of a job card run on it.
   productionStages ProductionStage[]
-
-  @@map("costing_machines")
   /// **The one of its kind the works actually runs.**
   ///
   /// The costing charges one machine per process, and without this it charged
@@ -1600,8 +1595,9 @@ model CostingMachine {
   ///
   /// At most one per kind, enforced in the service. None marked keeps the old
   /// behaviour, so nothing already quoted moves until somebody says which.
-  isDefault Boolean @default(false) @map("is_default")
+  isDefault        Boolean           @default(false) @map("is_default")
 
+  @@map("costing_machines")
 }
 
 /// A wage, and which machine's minutes it is paid for.
@@ -1611,19 +1607,16 @@ model CostingMachine {
 /// which is why the setup minutes live on the machine.
 /**
  * What a process is crewed at, and from when.
- *
  * **Dated, like every other costing figure**, and it was the last one that was
  * not. A single live row with an on/off switch reached backwards: switching the
  * lamination crew on in 2026 re-priced seven quotations written in 2022, each
  * by about a rupee a kilogram, because a quotation is costed against whatever
  * the master says now. The half-open window is what stops that — see
  * `costing-window.ts`.
- *
  * The role name is **not unique**, for the same reason an overhead's is not:
  * "Lamination Operator" at Rs 18,000 until March and Rs 20,000 after it is the
  * same job twice, and both windows have to survive or the March quotations stop
  * explaining themselves.
- *
  * There is no `isActive` column either. Whether a row is live is a question
  * about a date, and holding the answer in a second place is how the two come to
  * disagree — the API derives it from `effectiveTo`.
@@ -1667,19 +1660,16 @@ enum Shift {
 
 /**
  * One of the works' people.
- *
  * **Deliberately not a personnel system.** No attendance, no leave calendar, no
  * payroll: a works of forty does not run those off a screen, and a screen that
  * asks for them is filled in once and then abandoned. What this holds is the
  * handful of facts the rest of the system needs so that a person stops being
  * typed by hand — which is how fourteen job sheets came to hold "Printing
  * operattor 2", "Operator 1" and "office 1" as though they were three roles.
- *
  * **No wage here.** It lives on the costing role this points at, dated, where
  * the costing already reads it, so a rise is typed once rather than onto forty
  * records. `roleName` carries free text for the office and the warehouse, whom
  * no costing role describes.
- *
  * What somebody is DOING is not here either. That is the one job card stage
  * running with their name on it, and it is worked out on the way out.
  */
@@ -1690,10 +1680,10 @@ model Employee {
   /// A short code, where the works uses one.
   code String @default("")
 
-  roleId String?        @map("role_id")
-  role   CostingLabour? @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  roleId   String?        @map("role_id")
+  role     CostingLabour? @relation(fields: [roleId], references: [id], onDelete: Restrict)
   /// The role's name, or free text where there is no role. Never blank.
-  roleName String @map("role_name")
+  roleName String         @map("role_name")
 
   shift Shift @default(GENERAL)
 
@@ -1798,10 +1788,10 @@ model Order {
   number Int         @unique
   status OrderStatus @default(CONFIRMED)
 
-  customerId String?   @map("customer_id")
-  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerId   String?   @map("customer_id")
+  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   /// Snapshot, so an order still reads if the customer record is renamed.
-  customerName String  @map("customer_name")
+  customerName String    @map("customer_name")
 
   jobId   String? @map("job_id")
   job     Job?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
@@ -1831,6 +1821,11 @@ model Order {
   /// The job cards raised against it. Usually one; several when a big order
   /// is run in batches, which is why this is not a one-to-one.
   productionOrders ProductionOrder[]
+
+  /// What has actually gone out against it — which is what completes it.
+  /// Restricted rather than cascaded: an order with a delivery behind it is
+  /// not deletable, because the challan would outlive what it was raised for.
+  dispatchLines DispatchLine[]
 
   completedAt     DateTime? @map("completed_at")
   cancelledAt     DateTime? @map("cancelled_at")
@@ -1913,10 +1908,12 @@ model ProductionOrder {
   materialOverrideBy     String    @default("") @map("material_override_by")
   materialOverrideAt     DateTime? @map("material_override_at")
 
-  stages       ProductionStage[]
-  reservations StockReservation[]
+  stages        ProductionStage[]
+  reservations  StockReservation[]
   /// What this run cost, once the office has worked it out. See JobSheet.
-  jobSheet     JobSheet?
+  jobSheet      JobSheet?
+  /// The deliveries the godown took out of this run.
+  dispatchLines DispatchLine[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1950,10 +1947,10 @@ model ProductionStage {
   pass     Int                   @default(0)
   status   ProductionStageStatus @default(PENDING)
 
-  machineId String?         @map("machine_id")
-  machine   CostingMachine? @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  machineId   String?         @map("machine_id")
+  machine     CostingMachine? @relation(fields: [machineId], references: [id], onDelete: SetNull)
   /// Snapshot, so a finished card still says which machine ran it.
-  machineName String        @default("") @map("machine_name")
+  machineName String          @default("") @map("machine_name")
 
   /// Who ran it.
   ///
@@ -1961,7 +1958,7 @@ model ProductionStage {
   /// beside it. The snapshot is what makes a finished card still readable — it
   /// survives the person leaving, the record being renamed, and the fourteen
   /// imported sheets that name somebody this works never registered.
-  operatorId String?   @map("operator_id")
+  operatorId  String?   @map("operator_id")
   operatorRef Employee? @relation(fields: [operatorId], references: [id], onDelete: SetNull)
   operator    String    @default("")
 
@@ -1981,6 +1978,8 @@ model ProductionStage {
 
   @@unique([productionOrderId, position])
   @@index([status])
+  /// What a given operator has run. The employee screen asks exactly this.
+  @@index([operatorId])
   @@map("production_stages")
 }
 
@@ -2018,13 +2017,11 @@ model StockReservation {
 
   /**
    * **The roll this claim is on.**
-   *
    * A claim on "781 kg of LDPE" is a claim on nothing in particular: it cannot
    * tell the floor which rolls to fetch, it cannot stop two cards being
    * promised one roll, and it forced the availability sum to GUESS which reels
    * a claim had come off. Naming the roll removes the guess — what is left of
    * a roll is what is on it less what other cards hold of that roll.
-   *
    * Null only on rows written before reels were named. Nothing writes one now.
    * Cascades: a claim against a roll that no longer exists is not a claim.
    */
@@ -2042,8 +2039,11 @@ model StockReservation {
 
   /// One row per material per card: raising a card twice for the same film
   /// should correct the figure, not hold it twice.
-  /* One row per card per ROLL. A job spanning three rolls holds three of them,
-     which is the point — the old key allowed one row per material. */
+  /**
+   * /**
+   * /* One row per card per ROLL. A job spanning three rolls holds three of them,
+   * which is the point — the old key allowed one row per material.
+   */
   @@unique([productionOrderId, batchId])
   @@index([materialId, status])
   @@index([batchId, status])
@@ -2133,10 +2133,8 @@ model JobSheet {
 
   /**
    * The job card this sheet is the costing of.
-   *
    * One run, one costing — hence unique. Two sheets against one card would each
    * claim to be what that run cost, and nothing could say which was right.
-   *
    * Nullable, because the works' own imported sheets predate job cards entirely
    * and an office keying yesterday's paper has no card to point at. But where
    * it IS set it closes a real gap: posting the sheet is the moment the run's
@@ -2361,4 +2359,152 @@ model JobSheetStageUsage {
 
   @@unique([sheetId, stage])
   @@map("job_sheet_stage_usage")
+}
+
+/// Where a delivery note has got to.
+///
+/// A draft is not a delivery: nothing it says counts against any order until it
+/// is dispatched. See `canMoveDispatchTo` for why a dispatched note can still
+/// be cancelled.
+enum DispatchStatus {
+  DRAFT
+  DISPATCHED
+  CANCELLED
+}
+
+/// **What left the building, and on whose lorry.**
+///
+/// The link that was missing, and the reason completing a job card never
+/// completed the order: for a customer, complete means delivered, and nothing
+/// knew about delivery. This does.
+///
+/// **One note is one lorry, not one order.** A vehicle taking three jobs to one
+/// customer is one delivery, one consignment note and one signature, with a
+/// line per order aboard. One note per order would mean typing the same lorry
+/// number three times and handing over three challans for one drop.
+///
+/// One note is also **one customer**, because each customer signs for their
+/// own goods.
+model Dispatch {
+  id     String         @id @default(cuid())
+  /// Sequential and human-facing. Its own series, like an order's.
+  number Int            @unique
+  status DispatchStatus @default(DRAFT)
+
+  customerId   String?   @map("customer_id")
+  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  /// Snapshot, so an old challan still reads if the customer is renamed.
+  customerName String    @map("customer_name")
+
+  dispatchDate    DateTime @map("dispatch_date") @db.Date
+  /// Snapshotted from the customer at the time. An address that moves must not
+  /// rewrite where last year's lorries went.
+  deliveryAddress String   @default("") @map("delivery_address")
+
+  /// The lorry. Asked for when the note is sent rather than when it is drafted,
+  /// because the vehicle usually turns up after the paperwork is written.
+  vehicleNumber String @default("") @map("vehicle_number")
+  transporter   String @default("")
+  driverName    String @default("") @map("driver_name")
+  driverPhone   String @default("") @map("driver_phone")
+  /// The transporter's own consignment note number.
+  lrNumber      String @default("") @map("lr_number")
+
+  notes String @default("")
+
+  lines DispatchLine[]
+
+  raisedBy     String    @default("") @map("raised_by")
+  dispatchedAt DateTime? @map("dispatched_at")
+  dispatchedBy String    @default("") @map("dispatched_by")
+
+  cancelledAt     DateTime? @map("cancelled_at")
+  /// Why it did not go, or why it came back. A cancelled delivery with no
+  /// reason is one nobody can account for to the customer.
+  cancelledReason String    @default("") @map("cancelled_reason")
+
+  /// Why it went out with more than the works had recorded making.
+  ///
+  /// Sending more than was produced is physically impossible, so the check that
+  /// refuses it is right — but it is wrong often enough to matter: a run that
+  /// made 512 kg against a 500 kg card has not said so until its job sheet is
+  /// costed, and the lorry does not wait for the office. So the block is real,
+  /// and getting past it is deliberate, named and dated.
+  overrideReason String    @default("") @map("override_reason")
+  overrideBy     String    @default("") @map("override_by")
+  overrideAt     DateTime? @map("override_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([customerId])
+  @@index([dispatchDate])
+  @@map("dispatches")
+}
+
+/// One order being delivered on one note.
+///
+/// `quantityKg` is the line's weight, but it is not necessarily the figure the
+/// office typed: where the line lists its reels, it is their sum and is written
+/// from them. See `lineNetKg` — a challan with a total that disagrees with its
+/// own rows is one the customer and the works read differently.
+model DispatchLine {
+  id         String   @id @default(cuid())
+  dispatchId String   @map("dispatch_id")
+  dispatch   Dispatch @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  /// 1..n, as printed down the challan.
+  position   Int
+
+  orderId String @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  /// Snapshot, so an old challan still names the job it carried.
+  jobName String @map("job_name")
+
+  /// Which run the godown took it out of, where it knows. Null when the goods
+  /// on the lorry came off more than one run and nobody separated them.
+  productionOrderId String?          @map("production_order_id")
+  productionOrder   ProductionOrder? @relation(fields: [productionOrderId], references: [id], onDelete: SetNull)
+
+  quantityKg      Decimal @map("quantity_kg") @db.Decimal(12, 3)
+  quantityPouches Int     @default(0) @map("quantity_pouches")
+
+  remarks String @default("")
+
+  packages DispatchPackage[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([dispatchId, position])
+  @@index([orderId])
+  @@index([productionOrderId])
+  @@map("dispatch_lines")
+}
+
+/// One reel, carton or bag on the lorry.
+///
+/// The works writes a weight on every reel it packs. Listing them is what lets
+/// a customer who weighs the load back be told *which* reel is light, instead
+/// of being told only that the total disagrees.
+model DispatchPackage {
+  id       String       @id @default(cuid())
+  lineId   String       @map("line_id")
+  line     DispatchLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  position Int
+
+  /// What is written on the reel. Blank where nothing was — a weight with no
+  /// number is still worth more than no row at all.
+  reelNumber String @default("") @map("reel_number")
+
+  netKg   Decimal  @map("net_kg") @db.Decimal(12, 3)
+  /// With the core and the wrap. Null where the works only weighed net.
+  grossKg Decimal? @map("gross_kg") @db.Decimal(12, 3)
+  /// The width it was slit to, where it is known.
+  widthMm Int?     @map("width_mm")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([lineId, position])
+  @@map("dispatch_packages")
 }

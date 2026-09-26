@@ -419,8 +419,9 @@ export async function updateProduction(
  * The one piece of automation in this module, and it earns it: an order sitting
  * at confirmed while its job card runs is exactly the disagreement between the
  * office and the floor that the system exists to end. Completing the card does
- * NOT complete the order — for a customer, complete means delivered, and
- * nothing here knows about that yet.
+ * NOT complete the order — for a customer, complete means delivered, and that
+ * is Dispatch's to say: posting the note that sends the last of an order is
+ * what completes it.
  */
 async function startTheOrder(tx: Prisma.TransactionClient, orderId: string): Promise<void> {
   const order = await tx.order.findUnique({ where: { id: orderId }, select: { status: true } });

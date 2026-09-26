@@ -12,6 +12,7 @@ import jobSheetRoutes from '../modules/job-sheets/job-sheet.routes.js';
 import materialRoutes from '../modules/materials/material.routes.js';
 import monitorRoutes from '../modules/monitor/monitor.routes.js';
 import orderRoutes from '../modules/orders/order.routes.js';
+import dispatchRoutes from '../modules/dispatch/dispatch.routes.js';
 import productionRoutes from '../modules/production/production.routes.js';
 import purchaseRoutes from '../modules/purchase/purchase.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
@@ -47,6 +48,14 @@ router.use('/quotations', authenticate, requireModule('quotations'), quotationRo
  * commitment a quotation becomes, made at the same desk.
  */
 router.use('/orders', authenticate, orderRoutes);
+
+/*
+ * What left the building. Readable by anyone signed in — what has gone and what
+ * is still in the godown is the whole works' question. Writing is its own
+ * module: the despatch clerk is not the quotation desk, and posting a note
+ * completes a customer's order.
+ */
+router.use('/dispatches', authenticate, dispatchRoutes);
 
 /*
  * Jobs are edited from two places — the customer editor and the quotation

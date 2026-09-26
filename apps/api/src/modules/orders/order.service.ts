@@ -209,16 +209,32 @@ export async function updateOrder(id: string, input: UpdateOrderInput): Promise<
 /**
  * Deletes an order nobody has started.
  *
- * Only while it is CONFIRMED. Once it has been in production there is a run
- * behind it, and a deleted order is a run nothing explains — cancelling says
- * the same thing and keeps the record, which is why it takes a reason.
+ * Only while it is CONFIRMED, and only while nothing has gone out against it.
+ * Once it has been in production there is a run behind it, and once a lorry has
+ * left there is a challan — a deleted order is a run, or a delivery, that
+ * nothing explains. Cancelling says the same thing and keeps the record, which
+ * is why it takes a reason.
  */
 export async function deleteOrder(id: string): Promise<{ id: string }> {
-  const existing = await prisma.order.findUnique({ where: { id } });
+  const existing = await prisma.order.findUnique({
+    where: { id },
+    select: { status: true, _count: { select: { dispatchLines: true } } },
+  });
   if (!existing) throw ApiError.notFound('That order is not on record');
   if (existing.status !== 'CONFIRMED') {
     throw ApiError.conflict(
       'Only a confirmed order can be deleted. Cancel it instead, so the record says what happened',
+    );
+  }
+  /*
+   * A confirmed order can still have had a lorry go out against it — part
+   * delivered, not yet complete. Deleting it would leave a challan naming an
+   * order nothing explains, so the database refuses it too; this is the same
+   * refusal in words somebody can act on.
+   */
+  if (existing._count.dispatchLines > 0) {
+    throw ApiError.conflict(
+      'Goods have already gone out against this order — cancel it instead of deleting it',
     );
   }
   await prisma.order.delete({ where: { id } });

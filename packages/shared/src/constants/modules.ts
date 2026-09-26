@@ -14,6 +14,7 @@ export const APP_MODULES = [
   'purchase',
   'cylinders',
   'jobs',
+  'dispatch',
 ] as const;
 
 export type AppModule = (typeof APP_MODULES)[number];
@@ -26,6 +27,7 @@ export const MODULE_LABELS: Record<AppModule, string> = {
   purchase: 'Purchase & Suppliers',
   cylinders: 'Design & Cylinders',
   jobs: 'Jobs',
+  dispatch: 'Dispatch',
 };
 
 /** Narrows an arbitrary string to a module key. */
