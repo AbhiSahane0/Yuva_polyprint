@@ -34,7 +34,8 @@
     "seed:second-laminator": "tsx scripts/seed-second-laminator.ts",
     "quote:job-sheets": "tsx scripts/quote-job-sheets.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
-    "import:stock": "tsx scripts/import-stock-sheet.ts"
+    "import:stock": "tsx scripts/import-stock-sheet.ts",
+    "sync:materials": "tsx scripts/sync-neon-materials.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",
