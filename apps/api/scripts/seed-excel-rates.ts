@@ -173,10 +173,25 @@ async function main() {
     );
   }
 
+  /*
+   * Wages are dated now, so retiring one closes its window from today rather
+   * than flipping a switch that reached backwards. The role name is no longer
+   * unique either — two windows of one job is the point — so this looks for the
+   * LIVE one.
+   *
+   * Note this undoes a crew taken back on by hand: the step exists to reproduce
+   * the workbook, and the workbook has no such line.
+   */
+  const endToday = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
   for (const role of RETIRE_LABOUR) {
-    const existing = await prisma.costingLabour.findUnique({ where: { role } });
-    if (!existing || !existing.isActive) continue;
-    await prisma.costingLabour.update({ where: { role }, data: { isActive: false } });
+    const existing = await prisma.costingLabour.findFirst({
+      where: { role, effectiveTo: null },
+    });
+    if (!existing) continue;
+    await prisma.costingLabour.update({
+      where: { id: existing.id },
+      data: { effectiveTo: endToday },
+    });
     console.log(
       `  RETIRED  ${role.padEnd(32)} Rs ${existing.monthlySalary}/month — the sheet has no such line`,
     );

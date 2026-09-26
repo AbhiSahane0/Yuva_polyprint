@@ -38,6 +38,15 @@ export type UpdateProductionOrderInput = z.infer<typeof updateProductionOrderSch
 export const updateProductionStageSchema = z.object({
   status: z.enum(STAGE_STATUSES).optional(),
   machineId: z.string().min(1).nullable().optional(),
+  /**
+   * Who ran it — the same shape as the machine above.
+   *
+   * The id is what the dropdown sends; the server snapshots the name beside it.
+   * `operator` on its own still works, and has to: the imported sheets name
+   * people this works never registered, and somebody covering a shift is not
+   * always on the books yet.
+   */
+  operatorId: z.string().min(1).nullable().optional(),
   operator: z.string().trim().max(120).optional(),
   inputKg: z.coerce.number().min(0).max(10_000_000).optional(),
   outputKg: z.coerce.number().min(0).max(10_000_000).optional(),

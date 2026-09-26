@@ -10,6 +10,15 @@ import { MACHINE_KINDS, OVERHEAD_BASES, type CostingInput } from '../lib/rate-co
  * from is a single figure and lives in settings.
  */
 
+/**
+ * Which machine of its kind the costing charges.
+ *
+ * Its own endpoint and its own tiny schema, so nothing about editing a speed
+ * can quietly move a job onto a different machine.
+ */
+export const defaultMachineSchema = z.object({ isDefault: z.boolean() });
+export type DefaultMachineInput = z.infer<typeof defaultMachineSchema>;
+
 export const machineSchema = z.object({
   name: z.string().trim().min(1, 'Give the machine a name').max(80),
   kind: z.enum(MACHINE_KINDS),
@@ -63,11 +72,19 @@ export type MachineInput = z.infer<typeof machineSchema>;
 export const updateMachineSchema = partialWithoutDefaults(machineSchema);
 export type UpdateMachineInput = z.infer<typeof updateMachineSchema>;
 
+/**
+ * A wage, and the process it crews.
+ *
+ * **No dates travel.** A new role is live from today and never from the
+ * beginning of time, which would reach back and change the price of every
+ * quotation anybody reprices — the same rule the works' own overheads follow.
+ * Ending one, or changing what it pays, is what opens the next window; see the
+ * costing service.
+ */
 export const labourSchema = z.object({
   role: z.string().trim().min(1, 'Give the role a name').max(80),
   process: z.enum(MACHINE_KINDS),
   monthlySalary: z.coerce.number().min(0).max(10_000_000, 'That looks wrong — check the salary'),
-  isActive: z.boolean().default(true),
   sortOrder: z.coerce.number().int().min(0).max(999).default(0),
 });
 

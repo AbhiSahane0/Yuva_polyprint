@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Yuva Polyprint ERP — REST API",
+  "description": "Yuva Polyprint ERP \u2014 REST API",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/server.ts",
@@ -32,7 +32,9 @@
     "seed:job-sheet-materials": "tsx scripts/seed-job-sheet-materials.ts",
     "restate:stage-shares": "tsx scripts/restate-stage-shares.ts",
     "seed:second-laminator": "tsx scripts/seed-second-laminator.ts",
-    "quote:job-sheets": "tsx scripts/quote-job-sheets.ts"
+    "quote:job-sheets": "tsx scripts/quote-job-sheets.ts",
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "import:stock": "tsx scripts/import-stock-sheet.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",

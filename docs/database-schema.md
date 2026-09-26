@@ -50,6 +50,10 @@ erDiagram
     integer position
     CylinderStatus status
   }
+  employees {
+    text id PK
+    text role_id FK
+  }
   job_artwork {
     text id PK
     text job_id FK
@@ -131,6 +135,7 @@ erDiagram
     integer position
     ProductionStageStatus status
     text machine_id FK
+    text operator_id FK
   }
   purchase_order_lines {
     text id PK
@@ -221,6 +226,7 @@ erDiagram
     text material_id FK
     text production_order_id FK
     ReservationStatus status
+    text batch_id FK
   }
   suppliers {
     text id PK
@@ -277,6 +283,9 @@ erDiagram
   materials ||--|{ stock_reservations : "material_id"
   production_orders ||--|{ stock_reservations : "production_order_id"
   production_orders ||--o{ job_sheets : "production_order_id"
+  costing_labour ||--o{ employees : "role_id"
+  employees ||--o{ production_stages : "operator_id"
+  stock_batches ||--o{ stock_reservations : "batch_id"
 ```
 
 ## Tables
@@ -285,38 +294,39 @@ erDiagram
 | --- | ---: | ---: | --- |
 | `app_setting_history` | 4 | 66 |  |
 | `app_settings` | 3 | 61 | Editable rates: cylinder rate, GST %, advance %. |
-| `costing_labour` | 8 | 7 |  |
-| `costing_machines` | 14 | 4 |  |
+| `costing_labour` | 9 | 8 |  |
+| `costing_machines` | 15 | 4 |  |
 | `costing_overheads` | 9 | 0 |  |
 | `customers` | 17 | 70 | Companies that order from Yuva Polyprint. |
 | `cylinder_events` | 11 | 0 |  |
 | `cylinders` | 16 | 0 |  |
+| `employees` | 12 | 4 |  |
 | `job_artwork` | 17 | 0 |  |
-| `job_sheet_labour` | 8 | 120 |  |
-| `job_sheet_lines` | 17 | 315 |  |
-| `job_sheet_stage_usage` | 7 | 75 |  |
-| `job_sheets` | 60 | 15 |  |
+| `job_sheet_labour` | 8 | 144 |  |
+| `job_sheet_lines` | 17 | 378 |  |
+| `job_sheet_stage_usage` | 7 | 90 |  |
+| `job_sheets` | 60 | 18 |  |
 | `jobs` | 55 | 419 | Products and their full engineering specification. |
-| `login_events` | 7 | 51 |  |
-| `material_rates` | 6 | 453 |  |
-| `materials` | 13 | 24 |  |
-| `orders` | 23 | 1 |  |
-| `production_orders` | 16 | 0 |  |
-| `production_stages` | 16 | 0 |  |
+| `login_events` | 7 | 53 |  |
+| `material_rates` | 6 | 477 |  |
+| `materials` | 13 | 26 |  |
+| `orders` | 23 | 8 |  |
+| `production_orders` | 16 | 5 |  |
+| `production_stages` | 17 | 23 |  |
 | `purchase_order_lines` | 9 | 2 |  |
 | `purchase_orders` | 10 | 1 |  |
 | `purchase_receipts` | 11 | 1 |  |
 | `quotation_emails` | 10 | 1 |  |
 | `quotation_item_colours` | 9 | 4 |  |
-| `quotation_item_layers` | 10 | 2 |  |
-| `quotation_item_quantities` | 13 | 3 |  |
-| `quotation_items` | 31 | 1 | One priced line on a quotation. |
-| `quotation_tiers` | 14 | 3 |  |
-| `quotations` | 33 | 1 | Customer-facing quotations, with totals frozen at save. |
-| `sessions` | 6 | 5 |  |
-| `stock_batches` | 14 | 1 |  |
-| `stock_movements` | 13 | 0 |  |
-| `stock_reservations` | 8 | 0 |  |
+| `quotation_item_layers` | 10 | 25 |  |
+| `quotation_item_quantities` | 13 | 13 |  |
+| `quotation_items` | 31 | 11 | One priced line on a quotation. |
+| `quotation_tiers` | 14 | 13 |  |
+| `quotations` | 33 | 11 | Customer-facing quotations, with totals frozen at save. |
+| `sessions` | 6 | 7 |  |
+| `stock_batches` | 16 | 367 |  |
+| `stock_movements` | 13 | 369 |  |
+| `stock_reservations` | 9 | 46 |  |
 | `suppliers` | 11 | 1 |  |
 | `users` | 10 | 3 |  |
 
@@ -372,6 +382,9 @@ erDiagram
 | `stock_reservations.material_id` | `materials.id` | RESTRICT |  |
 | `stock_reservations.production_order_id` | `production_orders.id` | CASCADE |  |
 | `job_sheets.production_order_id` | `production_orders.id` | SET NULL |  |
+| `employees.role_id` | `costing_labour.id` | RESTRICT |  |
+| `production_stages.operator_id` | `employees.id` | SET NULL |  |
+| `stock_reservations.batch_id` | `stock_batches.id` | CASCADE |  |
 
 ## Enums
 
@@ -401,6 +414,7 @@ erDiagram
 | `PurchaseOrderStatus` | `ORDERED`, `IN_TRANSIT`, `PARTIALLY_RECEIVED`, `RECEIVED`, `CANCELLED` |
 | `QuotationStatus` | `DRAFT`, `SENT`, `WON`, `LOST` |
 | `ReservationStatus` | `HELD`, `RELEASED` |
+| `Shift` | `MORNING`, `AFTERNOON`, `NIGHT`, `GENERAL` |
 | `StockMovementKind` | `RECEIPT`, `ISSUE`, `WASTE`, `ADJUSTMENT`, `TRANSFER` |
 
 ## Full column reference
@@ -427,13 +441,14 @@ erDiagram
 | Column | Type | Null | Key |
 | --- | --- | :-: | --- |
 | `id` | `text` |  | PK |
-| `role` | `text` |  | unique |
+| `role` | `text` |  |  |
 | `process` | `MachineKind` (enum) |  |  |
 | `monthly_salary` | `decimal(12,2)` |  |  |
-| `is_active` | `boolean` |  |  |
 | `sort_order` | `integer` |  |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
+| `effective_from` | `date` |  |  |
+| `effective_to` | `date` | ✓ |  |
 
 ### `costing_machines`
 
@@ -453,6 +468,7 @@ erDiagram
 | `setup_power_factor` | `decimal(4,3)` |  |  |
 | `station_horsepower` | `decimal(10,2)` |  |  |
 | `station_colour_steps` | `text` |  |  |
+| `is_default` | `boolean` |  |  |
 
 ### `costing_overheads`
 
@@ -523,6 +539,23 @@ erDiagram
 | `cost` | `decimal(12,2)` | ✓ |  |
 | `engraver` | `text` |  |  |
 | `engraved_on` | `date` | ✓ |  |
+| `notes` | `text` |  |  |
+| `created_at` | `timestamp` |  |  |
+| `updated_at` | `timestamp` |  |  |
+
+### `employees`
+
+| Column | Type | Null | Key |
+| --- | --- | :-: | --- |
+| `id` | `text` |  | PK |
+| `name` | `text` |  |  |
+| `code` | `text` |  |  |
+| `role_id` | `text` | ✓ | FK → `costing_labour.id` |
+| `role_name` | `text` |  |  |
+| `shift` | `Shift` (enum) |  |  |
+| `phone` | `text` |  |  |
+| `joined_on` | `date` | ✓ |  |
+| `is_active` | `boolean` |  |  |
 | `notes` | `text` |  |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
@@ -831,6 +864,7 @@ erDiagram
 | `notes` | `text` |  |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
+| `operator_id` | `text` | ✓ | FK → `employees.id` |
 
 ### `purchase_order_lines`
 
@@ -1061,6 +1095,8 @@ erDiagram
 | `updated_at` | `timestamp` |  |  |
 | `purchase_quantity` | `decimal(14,3)` | ✓ |  |
 | `purchase_unit` | `text` | ✓ |  |
+| `width_mm` | `decimal(10,2)` | ✓ |  |
+| `micron` | `decimal(10,2)` | ✓ |  |
 
 ### `stock_movements`
 
@@ -1092,6 +1128,7 @@ erDiagram
 | `released_at` | `timestamp` | ✓ |  |
 | `created_at` | `timestamp` |  |  |
 | `updated_at` | `timestamp` |  |  |
+| `batch_id` | `text` | ✓ | FK → `stock_batches.id` |
 
 ### `suppliers`
 

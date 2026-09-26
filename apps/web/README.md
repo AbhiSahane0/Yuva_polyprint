@@ -347,6 +347,38 @@ here would make this the slower path to the same place. The **amount** updates
 as you type, through the same `orderAmount` the server stores it with, so the
 figure on the screen and the figure on the record cannot differ.
 
+### Employees — `/employees`
+
+**Who is here, and what they are on right now.**
+
+Four figures across the top — on the books, working now, available, on a
+machine — counted over everything the filters matched rather than over a page,
+because a count that changes when you click a filter is not a count.
+
+Every live column is **derived from the job cards, not stored**. If a stage is
+running with somebody's name on it they are working, on that machine, on that
+card; nothing else can make it true, and the job cell links straight to the card.
+A status somebody has to remember to change is wrong most of the time, which is
+why this system works out a card's progress and an order's lateness the same
+way.
+
+Deliberately not a personnel system: no attendance, no leave calendar, no
+payroll. **The wage is not here either** — it lives on the costing role a person
+points at, so a rise is typed once on the Costing screen rather than onto forty
+records. Choosing that role is also what tells a job card to offer this person
+for a printing stage.
+
+The form asks for two things and offers the rest. A supervisor adding an
+operator at the machine knows their name and what they do; a form that also
+demands a phone number and a joining date before it will save is one they
+abandon — and then the name goes on being typed by hand, which is the whole
+problem.
+
+**Leaving is a switch, not a delete.** Clearing "Still here" takes somebody out
+of the dropdowns and out of the default list; the cards they ran go on naming
+them. Deleting is refused by the server once they have run anything, and the
+message says so — it is there for a row typed by mistake this morning.
+
 ### Production — `/production`, `/production/:id`
 
 **What is on the floor right now.** Running first, then planned, then finished —
@@ -372,6 +404,18 @@ a row. Each has a machine (only machines of that **kind** — a slitter is not a
 choice for the press), an operator, weight in, weight out, and the waste those
 two come to.
 
+**The operator is picked, not typed.** The people whose costing role belongs to
+this stage's process come first under "On this machine", and everybody else sits
+under "Anyone else" with their role shown. Nobody is hidden: the day the
+slitting man covers the press is exactly the day worth recording, and a list
+that cannot say so gets the wrong name picked instead.
+
+A stage filled in before this existed keeps its typed name, shown as
+"Somebody (typed)" so it is not silently dropped — it is a record of who ran a
+job. Somebody who has since left stays selectable on the stage that names them,
+because a dropdown that cannot show its own value shows a blank, and a blank
+reads as nobody ran it.
+
 **Waste is shown, never typed.** A third figure that can disagree with the two
 it comes from is one nobody can trust. A negative one is called out in amber —
 more off a machine than went onto it means one of the two weights is wrong, and
@@ -386,8 +430,17 @@ own. Nobody has to remember to start three things.
 
 #### The material panel — and the one thing that stops a job
 
-Above the stages, because whether the film is there is the first question and
-its answer decides whether any of the stages below can be started at all.
+Above the stages, because whether the material is there is the first question
+and its answer decides whether any of the stages below can be started at all.
+
+**Folded away by default.** A card with three films, five inks and the solvents
+runs to a dozen rows, and the floor opens this screen to fill in a stage — the
+material is what you check once, not what you read past every time. The header
+stays: the badge, and how many materials are folded behind it.
+
+The exception is a job that is **short and has no override**. The panel is then
+the reason the job will not start, and the way past it is a button inside it —
+so it opens itself.
 
 Three figures per ply, and the order they are read in is the point: what the job
 **needs**, what is **free**, and — only when those disagree — what is **short**.

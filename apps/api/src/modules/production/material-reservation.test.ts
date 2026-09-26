@@ -54,10 +54,24 @@ describe('production reserves material — it never issues it', () => {
     }
   });
 
-  it('reads on-hand stock only as a sum of the batches', () => {
-    // A groupBy, which cannot write. The only stockBatch call in the module.
-    const calls = RESERVATION.match(/stockBatch\.\w+/g) ?? [];
-    expect(calls).toEqual(['stockBatch.groupBy']);
+  it('only ever READS the batches', () => {
+    /*
+     * Named individually rather than by counting calls: the module fetches
+     * rolls one way today and may sum them another way tomorrow, and neither
+     * is the thing being guarded. What matters is that every method it reaches
+     * for is one that cannot change a batch.
+     */
+    const calls = [...new Set(RESERVATION.match(/stockBatch\.(\w+)/g) ?? [])];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      expect([
+        'stockBatch.findMany',
+        'stockBatch.findFirst',
+        'stockBatch.groupBy',
+        'stockBatch.aggregate',
+        'stockBatch.count',
+      ]).toContain(call);
+    }
   });
 
   it('counts only HELD reservations against free stock', () => {
@@ -168,5 +182,93 @@ describe('nothing re-claims film that has already been issued', () => {
     const guard = update.indexOf('materialIsSettled');
     expect(guard).toBeGreaterThan(-1);
     expect(guard).toBeLessThan(hold);
+  });
+});
+
+/**
+ * **Finishing a stage hands the reel to the next machine.**
+ *
+ * A job does not stop between stages. The floor should say once that printing
+ * is done, not once to close the press and again to open the laminator.
+ */
+describe('the hand-off between stages', () => {
+  it('happens when a stage is finished, and only then', () => {
+    /*
+     * Not on SKIPPED and not on a stage put back to pending: neither is work
+     * finishing, and neither moves a reel anywhere.
+     */
+    const advance = SERVICE.indexOf('nextStageToStart(');
+    const guard = SERVICE.lastIndexOf("if (movedTo === 'DONE')", advance);
+    expect(advance).toBeGreaterThan(-1);
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(advance);
+  });
+
+  it('starts the card, exactly as pressing Start would', () => {
+    /*
+     * The hand-off writes the next stage's status straight to the row, so it
+     * skipped the logic that moves a card to running and its order into
+     * production. A card read "Planned" with one stage done and another
+     * running. Both paths go through the one function now.
+     */
+    const starts = SERVICE.match(/await startTheCard\(/g) ?? [];
+    expect(starts).toHaveLength(2);
+  });
+
+  it('carries the weight off the row, not out of the request', () => {
+    /*
+     * The floor types the weight, it saves as they leave the box, and Finish is
+     * a separate press — so the figure that matters is the one on the stage.
+     */
+    expect(SERVICE).toMatch(/const cameOff = toNumber\(finished\.outputKg\)/);
+  });
+});
+
+describe('the material block applies to starting a job, not continuing one', () => {
+  it('is skipped once the card is already running', () => {
+    /*
+     * Once a card is running its film is committed and partly consumed.
+     * Refusing the laminator saves no film — it strands a printed reel between
+     * two machines. The question the guard asks is "should this job begin".
+     */
+    expect(SERVICE).toMatch(/cardAlreadyRunning/);
+    const guard = SERVICE.indexOf('!cardAlreadyRunning');
+    const refuse = SERVICE.indexOf('refuseUnlessOverridden(', guard);
+    expect(guard).toBeGreaterThan(-1);
+    expect(refuse).toBeGreaterThan(guard);
+  });
+});
+
+/**
+ * **A claim names the roll it is on.**
+ *
+ * A claim on "781 kg of LDPE" is a claim on nothing in particular: it cannot
+ * tell the floor which rolls to fetch, it cannot stop two cards being promised
+ * one roll, and it forced the availability sum to guess which reels a claim had
+ * come off.
+ */
+describe('reservations hold rolls, not quantities', () => {
+  it('writes a row per roll, against the roll', () => {
+    expect(RESERVATION).toMatch(/productionOrderId_batchId/);
+    expect(RESERVATION).toMatch(/batchId: reel\.batchId/);
+  });
+
+  it('measures a roll against everyone else’s claims on THAT roll', () => {
+    /*
+     * The apportionment is gone. What is left of a roll is what is on it less
+     * what other cards hold of it — a fact about the roll rather than a share
+     * of a material's total.
+     */
+    expect(RESERVATION).toMatch(/onRoll\.get\(`\$\{card\.id\}:\$\{batch\.id\}`\)/);
+    expect(RESERVATION).not.toMatch(/wideEnough - held/);
+  });
+
+  it('still counts the claims written before rolls were named', () => {
+    /*
+     * They cannot say which roll they are on, so they come off the oldest —
+     * the order they would have been allocated in. Ignoring them would make
+     * film look free that somebody has already been promised.
+     */
+    expect(RESERVATION).toMatch(/looseByMaterial/);
   });
 });

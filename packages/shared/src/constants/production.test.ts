@@ -5,6 +5,8 @@ import {
   PRODUCTION_STATUSES,
   requiredStages,
   stageWasteKg,
+  stageWasteKnown,
+  type StageStatus,
 } from './production.js';
 
 /**
@@ -153,5 +155,40 @@ describe('moving a job card along', () => {
   it('lets a status stay where it is', () => {
     for (const status of PRODUCTION_STATUSES)
       expect(canMoveProductionTo(status, status)).toBe(true);
+  });
+});
+
+describe('whether a stage’s waste means anything yet', () => {
+  const stage = (inputKg: number, outputKg: number, status: StageStatus) => ({
+    inputKg,
+    outputKg,
+    status,
+  });
+
+  it('says nothing about a stage with film on the machine and none off it', () => {
+    /*
+     * The bug this exists for: a running stage with 632 kg in and nothing out
+     * reported 632 kg of waste — the run has lost everything, which is the
+     * opposite of what is happening.
+     */
+    expect(stageWasteKnown(stage(632, 0, 'RUNNING'))).toBe(false);
+  });
+
+  it('says nothing about a stage nobody has touched', () => {
+    expect(stageWasteKnown(stage(0, 0, 'PENDING'))).toBe(false);
+  });
+
+  it('knows it once something has come off the machine', () => {
+    expect(stageWasteKnown(stage(632, 620, 'RUNNING'))).toBe(true);
+    expect(stageWasteKnown(stage(632, 620, 'DONE'))).toBe(true);
+  });
+
+  it('still reports a finished stage that produced nothing', () => {
+    /*
+     * Left loud on purpose. That really is a run that made nothing, and hiding
+     * it behind a dash is how it goes unnoticed.
+     */
+    expect(stageWasteKnown(stage(632, 0, 'DONE'))).toBe(true);
+    expect(stageWasteKg(stage(632, 0, 'DONE'))).toBe(632);
   });
 });

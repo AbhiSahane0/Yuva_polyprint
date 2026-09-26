@@ -51,6 +51,8 @@ describe('the OpenAPI document', () => {
       '/api/production/stages/{stageId}',
       '/api/production/{id}/stages',
       '/api/production/{id}/override',
+      '/api/employees',
+      '/api/employees/{id}',
       '/api/materials',
       '/api/materials/rates',
       '/api/materials/{id}/history',

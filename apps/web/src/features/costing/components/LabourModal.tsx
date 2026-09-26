@@ -50,7 +50,9 @@ export function LabourModal({
     setForm((current) => ({ ...current, [key]: value }));
 
   async function submit() {
-    const parsed = labourSchema.safeParse({ ...form, isActive: labour?.isActive ?? true });
+    /* No dates travel: a new role is live from today and a changed wage opens
+       its own window. The server decides both — see the costing service. */
+    const parsed = labourSchema.safeParse(form);
     if (!parsed.success) {
       setErrors(
         Object.fromEntries(

@@ -508,3 +508,52 @@ describe('where the running days come from', () => {
     expect(Number.isFinite(stuck.ratePerKg)).toBe(true);
   });
 });
+
+describe('which machine of its kind a job is costed on', () => {
+  const laminator = (name: string, speedMPerMin: number, isDefault = false) => ({
+    name,
+    kind: 'LAMINATION' as const,
+    horsepower: 6,
+    powerRatePerHpHour: 35,
+    speedMPerMin,
+    setupMinutes: 30,
+    setupPowerFactor: 0,
+    isDefault,
+  });
+
+  /** The choice the engine makes, stated where a test can read it. */
+  const chosen = (
+    machines: { name: string; kind: 'LAMINATION'; isDefault?: boolean }[],
+    named?: string,
+  ) => {
+    const rank = (m: { name: string; isDefault?: boolean }) =>
+      named === m.name ? 0 : m.isDefault ? 1 : 2;
+    return [...machines].sort((a, b) => rank(a) - rank(b))[0]!.name;
+  };
+
+  it('takes the first on the list when the works has marked nothing', () => {
+    /* The behaviour before any of this existed, kept so a works that has said
+       nothing is costed exactly as it was. */
+    expect(chosen([laminator('Laminator 1', 70), laminator('Laminator 2', 90)])).toBe(
+      'Laminator 1',
+    );
+  });
+
+  it('takes the one the works marked, wherever it sits on the list', () => {
+    /*
+     * The bug this fixes: an old laminator first on the list and a new, faster
+     * one second meant every job was priced on the old one's speed, and there
+     * was no way to say otherwise.
+     */
+    expect(chosen([laminator('Laminator 1', 70), laminator('Laminator 2', 90, true)])).toBe(
+      'Laminator 2',
+    );
+  });
+
+  it('lets one job name a different machine, beating the works’ own default', () => {
+    // A decision about one job beats a decision about every job.
+    expect(
+      chosen([laminator('Laminator 1', 70), laminator('Laminator 2', 90, true)], 'Laminator 1'),
+    ).toBe('Laminator 1');
+  });
+});

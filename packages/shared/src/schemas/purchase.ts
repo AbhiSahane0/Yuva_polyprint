@@ -125,6 +125,16 @@ export const receivePurchaseLineSchema = z
     /** Needed only when something was accepted — rejected goods open no batch. */
     batchCode: z.string().trim().max(60).default(''),
     location: z.string().trim().max(80).default(''),
+    /**
+     * The reel that arrived, where it came on one.
+     *
+     * This is where a width is first known — the delivery note says it and
+     * nothing downstream can work it out. Optional because ink and adhesive do
+     * not come on reels, and because a works that has not started recording it
+     * should not be stopped from booking a delivery.
+     */
+    widthMm: z.coerce.number().min(0).max(10_000).nullable().default(null),
+    micron: z.coerce.number().min(0).max(1_000).nullable().default(null),
     notes: optionalText(500),
   })
   .refine((value) => value.acceptedQuantity > 0 || value.rejectedQuantity > 0, {

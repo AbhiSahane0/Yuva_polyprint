@@ -26,6 +26,22 @@ export interface MaterialRequirement {
   name: string;
   /** In the material's own unit. */
   quantity: number;
+  /**
+   * **How wide the reel has to be** — the web this job runs at.
+   *
+   * `film width × lanes + trim`. A reel narrower than this cannot run the job
+   * at all: film can be slit down and never widened. Zero where the job's
+   * geometry is not known, which turns the width test off rather than failing
+   * everything.
+   */
+  needsWidthMm: number;
+}
+
+/** What the works holds of one material, reel by reel. */
+export interface ReelStock {
+  /** Null where nobody recorded it — ink and adhesive, or an old delivery. */
+  widthMm: number | null;
+  quantity: number;
 }
 
 /** The same, with what the works can actually put against it. */
@@ -34,11 +50,35 @@ export interface MaterialAvailability extends MaterialRequirement {
   onHand: number;
   /** Committed to other job cards that have not finished. */
   held: number;
-  /** `onHand − held`. What this job could actually draw on. */
+  /** `onHand − held`. Everything not promised, at any width. */
   free: number;
-  /** How much is missing. Zero when there is enough. */
+  /**
+   * **What this job could actually be given.**
+   *
+   * Free stock, less whatever sits on reels too narrow to run it. This is the
+   * figure a shortage is measured against, because kilograms on a 340 mm reel
+   * are no use to a job that runs at 650.
+   */
+  usable: number;
+  /**
+   * Free stock that is the right film and the wrong size.
+   *
+   * Worth its own figure: "you have 2,900 kg and 2,100 kg of it is too narrow"
+   * is a different problem from "you have none", and it is solved by buying
+   * differently rather than by buying more.
+   */
+  tooNarrowKg: number;
+  /**
+   * **The rolls this job holds**, narrowest suitable first and oldest within a
+   * width. What the floor fetches, and what stops two cards being promised one
+   * roll. See `reel-allocation.ts`.
+   */
+  reels: ReelAllocation[];
+  /** How much is missing, measured against `usable`. Zero when there is enough. */
   shortBy: number;
 }
+
+import { allocateReels, type Reel, type ReelAllocation } from './reel-allocation.js';
 
 const round3 = (value: number): number =>
   Number.isFinite(value) ? Math.round(value * 1000) / 1000 : 0;
@@ -68,6 +108,8 @@ export function filmRequirements(input: {
   /** The structure's own GSM — plies plus ink plus adhesive. */
   structureGsm: number;
   wastagePercent: number;
+  /** The web this job runs at. Zero turns the width test off. */
+  needsWidthMm: number;
 }): MaterialRequirement[] {
   const consumed = input.quantityKg * (1 + (input.wastagePercent || 0) / 100);
   const structure = input.structureGsm > 0 ? input.structureGsm : 0;
@@ -88,6 +130,9 @@ export function filmRequirements(input: {
         materialId: layer.materialId,
         name: layer.name,
         quantity: round3(kg),
+        /* Every ply of one job runs at the same web — they go through the
+           laminator together. */
+        needsWidthMm: input.needsWidthMm,
       });
   }
 
@@ -103,18 +148,38 @@ export function filmRequirements(input: {
  */
 export function availabilityFor(
   requirements: MaterialRequirement[],
-  stock: { onHand: Map<string, number>; held: Map<string, number> },
+  stock: { reels: Map<string, Reel[]> },
 ): MaterialAvailability[] {
   return requirements.map((requirement) => {
-    const onHand = round3(stock.onHand.get(requirement.materialId) ?? 0);
-    const held = round3(stock.held.get(requirement.materialId) ?? 0);
-    const free = round3(onHand - held);
+    const reels = stock.reels.get(requirement.materialId) ?? [];
+
+    const onHand = round3(reels.reduce((sum, reel) => sum + reel.onHand, 0));
+    const free = round3(reels.reduce((sum, reel) => sum + reel.free, 0));
+
+    /*
+     * **The apportionment is gone.**
+     *
+     * This used to subtract a material's total claims from the pool of wide
+     * reels, because nothing recorded which reel any claim was against — a
+     * guess, made deliberately towards saying no. Claims now name the roll they
+     * are on, so what is left of a roll is a fact about that roll, and the job
+     * is fitted onto real rolls rather than against an apportioned total.
+     */
+    const pick = allocateReels({
+      needKg: requirement.quantity,
+      needsWidthMm: requirement.needsWidthMm,
+      reels,
+    });
+
     return {
       ...requirement,
       onHand,
-      held,
+      held: round3(onHand - free),
       free,
-      shortBy: round3(Math.max(0, requirement.quantity - free)),
+      usable: pick.usable,
+      tooNarrowKg: pick.tooNarrowKg,
+      reels: pick.taken,
+      shortBy: pick.shortBy,
     };
   });
 }

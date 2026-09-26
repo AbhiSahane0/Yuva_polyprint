@@ -172,6 +172,13 @@ Enum ReservationStatus {
   RELEASED
 }
 
+Enum Shift {
+  MORNING
+  AFTERNOON
+  NIGHT
+  GENERAL
+}
+
 Enum StockMovementKind {
   RECEIPT
   ISSUE
@@ -199,15 +206,16 @@ Table app_settings {
 
 Table costing_labour {
   id text [pk]
-  role text [unique, not null]
+  role text [not null]
   process MachineKind [not null]
   monthly_salary decimal(12,2) [not null]
-  is_active boolean [not null, default: `true`]
   sort_order integer [not null, default: `0`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
+  effective_from date [not null]
+  effective_to date
 
-  Note: '7 row(s) at time of generation'
+  Note: '8 row(s) at time of generation'
 }
 
 Table costing_machines {
@@ -225,6 +233,7 @@ Table costing_machines {
   setup_power_factor decimal(4,3) [not null, default: `0`]
   station_horsepower decimal(10,2) [not null, default: `0`]
   station_colour_steps text [not null, default: `''`]
+  is_default boolean [not null, default: `false`]
 
   Note: '4 row(s) at time of generation'
 }
@@ -302,6 +311,23 @@ Table cylinders {
   Note: '0 row(s) at time of generation'
 }
 
+Table employees {
+  id text [pk]
+  name text [not null]
+  code text [not null, default: `''`]
+  role_id text
+  role_name text [not null]
+  shift Shift [not null, default: `'GENERAL'::"Shift"`]
+  phone text [not null, default: `''`]
+  joined_on date
+  is_active boolean [not null, default: `true`]
+  notes text [not null, default: `''`]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null]
+
+  Note: '4 row(s) at time of generation'
+}
+
 Table job_artwork {
   id text [pk]
   job_id text [not null]
@@ -334,7 +360,7 @@ Table job_sheet_labour {
   days decimal(8,3) [not null, default: `0`]
   amount decimal(12,2) [not null, default: `0`]
 
-  Note: '120 row(s) at time of generation'
+  Note: '144 row(s) at time of generation'
 }
 
 Table job_sheet_lines {
@@ -356,7 +382,7 @@ Table job_sheet_lines {
   rate_per_kg decimal(12,4) [not null, default: `0`]
   amount decimal(14,2) [not null, default: `0`]
 
-  Note: '315 row(s) at time of generation'
+  Note: '378 row(s) at time of generation'
 }
 
 Table job_sheet_stage_usage {
@@ -368,7 +394,7 @@ Table job_sheet_stage_usage {
   shifts decimal(6,2) [not null, default: `1`]
   amount decimal(12,2) [not null, default: `0`]
 
-  Note: '75 row(s) at time of generation'
+  Note: '90 row(s) at time of generation'
 }
 
 Table job_sheets {
@@ -433,7 +459,7 @@ Table job_sheets {
   updated_at timestamp [not null]
   production_order_id text [unique]
 
-  Note: '15 row(s) at time of generation'
+  Note: '18 row(s) at time of generation'
 }
 
 Table jobs {
@@ -505,7 +531,7 @@ Table login_events {
   user_agent text
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '51 row(s) at time of generation'
+  Note: '53 row(s) at time of generation'
 }
 
 Table material_rates {
@@ -516,7 +542,7 @@ Table material_rates {
   entered_by text [not null, default: `'Office'`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '453 row(s) at time of generation'
+  Note: '477 row(s) at time of generation'
 }
 
 Table materials {
@@ -534,7 +560,7 @@ Table materials {
   solids_percent decimal(6,3)
   ink_kind InkKind
 
-  Note: '24 row(s) at time of generation'
+  Note: '26 row(s) at time of generation'
 }
 
 Table orders {
@@ -562,7 +588,7 @@ Table orders {
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
 
-  Note: '1 row(s) at time of generation'
+  Note: '8 row(s) at time of generation'
 }
 
 Table production_orders {
@@ -583,7 +609,7 @@ Table production_orders {
   material_override_by text [not null, default: `''`]
   material_override_reason text [not null, default: `''`]
 
-  Note: '0 row(s) at time of generation'
+  Note: '5 row(s) at time of generation'
 }
 
 Table production_stages {
@@ -603,8 +629,9 @@ Table production_stages {
   notes text [not null, default: `''`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
+  operator_id text
 
-  Note: '0 row(s) at time of generation'
+  Note: '23 row(s) at time of generation'
 }
 
 Table purchase_order_lines {
@@ -693,7 +720,7 @@ Table quotation_item_layers {
   gsm decimal(10,3) [not null]
   rate_override decimal(12,2)
 
-  Note: '2 row(s) at time of generation'
+  Note: '25 row(s) at time of generation'
 }
 
 Table quotation_item_quantities {
@@ -711,7 +738,7 @@ Table quotation_item_quantities {
   material_cost decimal(14,2)
   margin_percent decimal(6,2)
 
-  Note: '3 row(s) at time of generation'
+  Note: '13 row(s) at time of generation'
 }
 
 Table quotation_items {
@@ -747,7 +774,7 @@ Table quotation_items {
   film_width_mm decimal(10,2) [not null]
   film_height_mm decimal(10,2) [not null]
 
-  Note: '1 row(s) at time of generation'
+  Note: '11 row(s) at time of generation'
 }
 
 Table quotation_tiers {
@@ -766,7 +793,7 @@ Table quotation_tiers {
   total_quantity_kg decimal(14,3) [not null]
   total_pouches decimal(14,2) [not null]
 
-  Note: '3 row(s) at time of generation'
+  Note: '13 row(s) at time of generation'
 }
 
 Table quotations {
@@ -804,7 +831,7 @@ Table quotations {
   wastage_percent decimal(5,2)
   referred_by text [not null, default: `''`]
 
-  Note: '1 row(s) at time of generation'
+  Note: '11 row(s) at time of generation'
 }
 
 Table sessions {
@@ -815,7 +842,7 @@ Table sessions {
   last_seen_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '5 row(s) at time of generation'
+  Note: '7 row(s) at time of generation'
 }
 
 Table stock_batches {
@@ -833,8 +860,10 @@ Table stock_batches {
   updated_at timestamp [not null]
   purchase_quantity decimal(14,3)
   purchase_unit text
+  width_mm decimal(10,2)
+  micron decimal(10,2)
 
-  Note: '1 row(s) at time of generation'
+  Note: '367 row(s) at time of generation'
 }
 
 Table stock_movements {
@@ -852,20 +881,21 @@ Table stock_movements {
   entered_by text [not null]
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 
-  Note: '0 row(s) at time of generation'
+  Note: '369 row(s) at time of generation'
 }
 
 Table stock_reservations {
   id text [pk]
-  material_id text [unique, not null]
+  material_id text [not null]
   production_order_id text [unique, not null]
   quantity decimal(14,3) [not null]
   status ReservationStatus [not null, default: `'HELD'::"ReservationStatus"`]
   released_at timestamp
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null]
+  batch_id text [unique]
 
-  Note: '0 row(s) at time of generation'
+  Note: '46 row(s) at time of generation'
 }
 
 Table suppliers {
@@ -947,3 +977,6 @@ Ref: production_stages.machine_id > costing_machines.id [delete: set null]
 Ref: stock_reservations.material_id > materials.id [delete: restrict]
 Ref: stock_reservations.production_order_id > production_orders.id [delete: cascade]
 Ref: job_sheets.production_order_id > production_orders.id [delete: set null]
+Ref: employees.role_id > costing_labour.id [delete: restrict]
+Ref: production_stages.operator_id > employees.id [delete: set null]
+Ref: stock_reservations.batch_id > stock_batches.id [delete: cascade]

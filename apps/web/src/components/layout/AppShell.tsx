@@ -17,6 +17,7 @@ import {
   ClipboardList,
   ClipboardCheck,
   Factory,
+  HardHat,
 } from 'lucide-react';
 import type { AppModule } from '@yuva/shared';
 import { cn } from '@/lib/utils';
@@ -68,6 +69,10 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: '/production', label: 'Production', icon: Factory },
       { to: '/cylinders', label: 'Design & Cylinders', icon: Disc3, module: 'cylinders' },
       { to: '/job-sheets', label: 'Job sheets', icon: ClipboardList, module: 'jobs' },
+      /* No module, for the same reason as Production: the operator dropdown on
+         a job card is what this is for, and the floor has to be able to read
+         it. Adding somebody needs `jobs`, enforced on the API. */
+      { to: '/employees', label: 'Employees', icon: HardHat },
       { to: '/jobs', label: 'Jobs', icon: Boxes, module: 'jobs', disabled: true },
     ],
   },

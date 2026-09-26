@@ -15,6 +15,17 @@ export interface Machine {
   setupPowerFactor: number;
   isActive: boolean;
   sortOrder: number;
+  /**
+   * **The one of its kind the works actually runs.**
+   *
+   * The costing charges one machine per process, and without this it charged
+   * whichever came first on the list. That is how a works with an old laminator
+   * and a new one priced every job on the old one's speed.
+   *
+   * At most one per kind. None marked means the old behaviour — first on the
+   * list — so nothing already quoted moves until somebody says which.
+   */
+  isDefault: boolean;
 }
 
 export interface Labour {
@@ -22,6 +33,26 @@ export interface Labour {
   role: string;
   process: MachineKind;
   monthlySalary: number;
+
+  /**
+   * **Dated, like every other costing figure**, and the last one that was not.
+   *
+   * A single live row with an on/off switch reached backwards: switching the
+   * lamination crew on in 2026 re-priced seven quotations written in 2022,
+   * because a quotation is costed against whatever the master says now. The
+   * half-open window — on or after `effectiveFrom`, strictly before
+   * `effectiveTo` — is what stops that.
+   */
+  effectiveFrom: string;
+  /** ISO date, or null while it is still live. The first day it does NOT apply. */
+  effectiveTo: string | null;
+
+  /**
+   * Derived from `effectiveTo`, never stored.
+   *
+   * Whether a wage is live is a question about a date, and holding the answer
+   * in a second place is how the two come to disagree.
+   */
   isActive: boolean;
   sortOrder: number;
 }

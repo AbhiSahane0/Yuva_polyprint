@@ -985,6 +985,32 @@ model StockBatch {
   quantity Decimal @db.Decimal(14, 3)
 
   /**
+   * **The reel this batch is, where the material comes on reels.**
+   *
+   * A film is not fungible by weight. The works' own stock register is kept by
+   * width for exactly this reason: PET 12µm sits in twenty-three widths from
+   * 340 mm to 1040 mm, and a job that needs 650 mm cannot be run on a 340 mm
+   * reel however many kilograms of it there are.
+   *
+   * Null for anything not bought as a reel — ink, adhesive, solvent — and for a
+   * film delivery nobody recorded the width of.
+   */
+  widthMm Decimal? @map("width_mm") @db.Decimal(10, 2)
+
+  /**
+   * The gauge of this particular delivery.
+   *
+   * On the material as well, in its name, but the works prices a film by TYPE
+   * and buys it in many gauges — their register carries LDPE in fourteen of
+   * them under one rate. So the gauge belongs to the delivery, not to the
+   * catalogue row.
+   */
+  micron Decimal? @db.Decimal(10, 2)
+
+  /// Job cards holding some of this roll. See StockReservation.
+  reservations StockReservation[]
+
+  /**
    * Rupees per unit actually paid for this delivery.
    * Null when nobody recorded it, in which case the material's current rate
    * stands in for valuation. Stored per batch because that is what the stock is
@@ -1566,6 +1592,16 @@ model CostingMachine {
   productionStages ProductionStage[]
 
   @@map("costing_machines")
+  /// **The one of its kind the works actually runs.**
+  ///
+  /// The costing charges one machine per process, and without this it charged
+  /// whichever came first on the list — which is how a works with an old
+  /// laminator and a new one priced every job on the old one's speed.
+  ///
+  /// At most one per kind, enforced in the service. None marked keeps the old
+  /// behaviour, so nothing already quoted moves until somebody says which.
+  isDefault Boolean @default(false) @map("is_default")
+
 }
 
 /// A wage, and which machine's minutes it is paid for.
@@ -1573,21 +1609,111 @@ model CostingMachine {
 /// Salaries are monthly; the working month in settings turns them into a rate
 /// per minute. Somebody is paid for the setup time as well as the run time,
 /// which is why the setup minutes live on the machine.
+/**
+ * What a process is crewed at, and from when.
+ *
+ * **Dated, like every other costing figure**, and it was the last one that was
+ * not. A single live row with an on/off switch reached backwards: switching the
+ * lamination crew on in 2026 re-priced seven quotations written in 2022, each
+ * by about a rupee a kilogram, because a quotation is costed against whatever
+ * the master says now. The half-open window is what stops that — see
+ * `costing-window.ts`.
+ *
+ * The role name is **not unique**, for the same reason an overhead's is not:
+ * "Lamination Operator" at Rs 18,000 until March and Rs 20,000 after it is the
+ * same job twice, and both windows have to survive or the March quotations stop
+ * explaining themselves.
+ *
+ * There is no `isActive` column either. Whether a row is live is a question
+ * about a date, and holding the answer in a second place is how the two come to
+ * disagree — the API derives it from `effectiveTo`.
+ */
 model CostingLabour {
   id String @id @default(cuid())
 
-  role    String      @unique
+  role    String
   process MachineKind
 
   monthlySalary Decimal @map("monthly_salary") @db.Decimal(12, 2)
 
-  isActive  Boolean @default(true) @map("is_active")
-  sortOrder Int     @default(0) @map("sort_order")
+  /// The first day this wage applies.
+  effectiveFrom DateTime  @map("effective_from") @db.Date
+  /// The first day it does NOT. Null while it is still live.
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+
+  sortOrder Int @default(0) @map("sort_order")
+
+  /// The people paid as this. Restricted rather than cascaded: a role with
+  /// somebody on it is a role the works still has, and deleting it out from
+  /// under them would leave a person nothing describes.
+  employees Employee[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([effectiveFrom])
+  @@index([effectiveTo])
   @@map("costing_labour")
+}
+
+/// When somebody is normally in.
+enum Shift {
+  MORNING
+  AFTERNOON
+  NIGHT
+  /// Office hours — the people who are not on a shift rota at all.
+  GENERAL
+}
+
+/**
+ * One of the works' people.
+ *
+ * **Deliberately not a personnel system.** No attendance, no leave calendar, no
+ * payroll: a works of forty does not run those off a screen, and a screen that
+ * asks for them is filled in once and then abandoned. What this holds is the
+ * handful of facts the rest of the system needs so that a person stops being
+ * typed by hand — which is how fourteen job sheets came to hold "Printing
+ * operattor 2", "Operator 1" and "office 1" as though they were three roles.
+ *
+ * **No wage here.** It lives on the costing role this points at, dated, where
+ * the costing already reads it, so a rise is typed once rather than onto forty
+ * records. `roleName` carries free text for the office and the warehouse, whom
+ * no costing role describes.
+ *
+ * What somebody is DOING is not here either. That is the one job card stage
+ * running with their name on it, and it is worked out on the way out.
+ */
+model Employee {
+  id String @id @default(cuid())
+
+  name String
+  /// A short code, where the works uses one.
+  code String @default("")
+
+  roleId String?        @map("role_id")
+  role   CostingLabour? @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  /// The role's name, or free text where there is no role. Never blank.
+  roleName String @map("role_name")
+
+  shift Shift @default(GENERAL)
+
+  phone    String    @default("")
+  joinedOn DateTime? @map("joined_on") @db.Date
+
+  /// Cleared when somebody leaves. The record stays — their runs name them.
+  isActive Boolean @default(true) @map("is_active")
+
+  notes String @default("")
+
+  /// Every stage they have run. See ProductionStage.operatorId.
+  stages ProductionStage[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, name])
+  @@index([roleId])
+  @@map("employees")
 }
 
 /// How a works-defined overhead is applied to a job.
@@ -1829,8 +1955,15 @@ model ProductionStage {
   /// Snapshot, so a finished card still says which machine ran it.
   machineName String        @default("") @map("machine_name")
 
-  /// Who ran it. Free text until there is an employee master to point at.
-  operator String @default("")
+  /// Who ran it.
+  ///
+  /// The same shape as the machine above it: a link, and a snapshot of the name
+  /// beside it. The snapshot is what makes a finished card still readable — it
+  /// survives the person leaving, the record being renamed, and the fourteen
+  /// imported sheets that name somebody this works never registered.
+  operatorId String?   @map("operator_id")
+  operatorRef Employee? @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  operator    String    @default("")
 
   /// Weighed, both of them. What it lost is the difference and is never stored
   /// — a third figure that can disagree with the two it comes from is a figure
@@ -1883,6 +2016,21 @@ model StockReservation {
   productionOrderId String          @map("production_order_id")
   productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
 
+  /**
+   * **The roll this claim is on.**
+   *
+   * A claim on "781 kg of LDPE" is a claim on nothing in particular: it cannot
+   * tell the floor which rolls to fetch, it cannot stop two cards being
+   * promised one roll, and it forced the availability sum to GUESS which reels
+   * a claim had come off. Naming the roll removes the guess — what is left of
+   * a roll is what is on it less what other cards hold of that roll.
+   *
+   * Null only on rows written before reels were named. Nothing writes one now.
+   * Cascades: a claim against a roll that no longer exists is not a claim.
+   */
+  batchId String?     @map("batch_id")
+  batch   StockBatch? @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
   /// In the material's own unit, as the batches are.
   quantity Decimal           @db.Decimal(14, 3)
   status   ReservationStatus @default(HELD)
@@ -1894,8 +2042,11 @@ model StockReservation {
 
   /// One row per material per card: raising a card twice for the same film
   /// should correct the figure, not hold it twice.
-  @@unique([productionOrderId, materialId])
+  /* One row per card per ROLL. A job spanning three rolls holds three of them,
+     which is the point — the old key allowed one row per material. */
+  @@unique([productionOrderId, batchId])
   @@index([materialId, status])
+  @@index([batchId, status])
   @@map("stock_reservations")
 }
 

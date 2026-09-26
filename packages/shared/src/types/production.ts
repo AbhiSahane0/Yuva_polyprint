@@ -13,6 +13,9 @@ export interface ProductionStageRow {
 
   machineId: string | null;
   machineName: string;
+  /** The person on the books, when the stage names one. */
+  operatorId: string | null;
+  /** Their name, snapshotted — so a finished card reads after they leave. */
   operator: string;
 
   inputKg: number;
@@ -51,6 +54,16 @@ export interface ProductionOrder {
   progressPercent: number;
   /** The one being worked, or the next one waiting. Null on a finished card. */
   currentStage: MachineKind | null;
+
+  /**
+   * The structure, outermost ply first, as the job was priced.
+   *
+   * Carried so a lamination row can say which two films it bonds — the number
+   * on it is the PASS, not the machine, and the works reads it as the machine
+   * unless the films are named. Empty for a card with no priced structure
+   * behind it. See `lamination-label.ts`.
+   */
+  plies: string[];
 
   /**
    * The film this card needs, and what the works has free for it.

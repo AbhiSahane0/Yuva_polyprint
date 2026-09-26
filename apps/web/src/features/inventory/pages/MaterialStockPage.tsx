@@ -253,6 +253,10 @@ export default function MaterialStockPage() {
               <thead>
                 <tr className="border-ink-200 bg-ink-25 text-ink-500 border-b text-left">
                   <th className="px-4 py-3 font-semibold">Batch</th>
+                  {/* Film is not fungible by weight: a job needing 650 mm cannot
+                      run on a 340 mm reel however many kilograms are behind it,
+                      which is why the works' own register is kept by width. */}
+                  <th className="px-4 py-3 font-semibold">Reel</th>
                   <th className="px-4 py-3 font-semibold">Received</th>
                   <th className="px-4 py-3 text-right font-semibold">Remaining</th>
                   <th className="px-4 py-3 text-right font-semibold">Of</th>
@@ -277,6 +281,14 @@ export default function MaterialStockPage() {
                         <span className="text-ink-400 ml-2 text-xs font-normal">
                           {batch.reference}
                         </span>
+                      ) : null}
+                    </td>
+                    <td className="text-ink-600 px-4 py-3 text-xs whitespace-nowrap tabular-nums">
+                      {batch.widthMm ? `${formatNumber(batch.widthMm, 0)} mm` : ''}
+                      {batch.widthMm && batch.micron ? ' · ' : ''}
+                      {batch.micron ? `${formatNumber(batch.micron, 0)}µ` : ''}
+                      {!batch.widthMm && !batch.micron ? (
+                        <span className="text-ink-300">—</span>
                       ) : null}
                     </td>
                     <td className="text-ink-500 px-4 py-3 tabular-nums">

@@ -58,6 +58,10 @@ export function ReceiveStockModal({
   const [quantity, setQuantity] = useState('');
   const [rate, setRate] = useState('');
   const [location, setLocation] = useState('');
+  /* The reel that arrived. Off the delivery note — nothing downstream can work
+     a width out, and a film without one cannot be told from any other width. */
+  const [widthMm, setWidthMm] = useState('');
+  const [micron, setMicron] = useState('');
   const [receivedOn, setReceivedOn] = useState(today());
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
@@ -88,6 +92,8 @@ export function ReceiveStockModal({
     setQuantity('');
     setRate('');
     setLocation('');
+    setWidthMm('');
+    setMicron('');
     setReceivedOn(today());
     setReference('');
     setNotes('');
@@ -120,6 +126,8 @@ export function ReceiveStockModal({
       batchCode,
       quantity,
       location,
+      widthMm: widthMm === '' ? null : Number(widthMm),
+      micron: micron === '' ? null : Number(micron),
       receivedOn,
       ratePerUnit: rate,
       reference,
@@ -242,6 +250,33 @@ export function ReceiveStockModal({
             />
           </Field>
         </div>
+
+        {/*
+         * The reel. Only worth asking for a film — ink and adhesive do not
+         * come on one — and worth asking every time it is, because a job
+         * needing 650 mm cannot run on a 340 mm reel however many kilograms
+         * are behind it. The works' own stock register is kept this way.
+         */}
+        {(isNew ? category === 'FILM' : matched?.category === 'FILM') ? (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Reel width (mm)" htmlFor="widthMm" hint="What it runs at">
+              <NumberInput
+                id="widthMm"
+                value={widthMm}
+                onChange={(event) => setWidthMm(event.target.value)}
+                placeholder="650"
+              />
+            </Field>
+            <Field label="Micron" htmlFor="micron" hint="The gauge of this delivery">
+              <NumberInput
+                id="micron"
+                value={micron}
+                onChange={(event) => setMicron(event.target.value)}
+                placeholder="12"
+              />
+            </Field>
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-3 gap-3">
           <div className="col-span-2">

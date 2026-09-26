@@ -4,10 +4,14 @@ import { ArrowLeft, Trash2 } from 'lucide-react';
 import {
   canMoveProductionTo,
   formatNumber,
+  laminationLabel,
   PRODUCTION_STAGE_LABELS,
   PRODUCTION_STATUS_LABELS,
   PRODUCTION_STATUSES,
   STAGE_STATUS_LABELS,
+  stageWasteKnown,
+  type LaminationLabel,
+  type ProductionOrder,
   type ProductionStageRow,
   type ProductionStatus,
   type StageStatus,
@@ -15,7 +19,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ActionMenu } from '@/components/ui/ActionMenu';
-import { Field, Input, NumberInput, Select } from '@/components/ui/Field';
+import { Field, NumberInput, Select } from '@/components/ui/Field';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -25,6 +29,8 @@ import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { useCreateJobSheet } from '@/features/job-sheets/api/job-sheet-api';
+import { useEmployees } from '@/features/employees/api/employee-api';
+import { OperatorSelect } from '../components/OperatorSelect';
 import { MaterialPanel } from '../components/MaterialPanel';
 import {
   useDeleteProduction,
@@ -47,9 +53,24 @@ const STAGE_TONE: Record<StageStatus, string> = {
   SKIPPED: 'border-ink-200 bg-ink-25',
 };
 
-function stageTitle(stage: ProductionStageRow): string {
-  const label = PRODUCTION_STAGE_LABELS[stage.stage];
-  return stage.pass > 0 ? `${label} ${stage.pass}` : label;
+/**
+ * What a stage is called, and — on a lamination row — what it bonds.
+ *
+ * The works has two laminators and runs one of them, so "Lamination 1" and
+ * "Lamination 2" read as the two machines. They are not: a laminator bonds two
+ * films at a time, so a three-ply job goes through twice, on whichever machine
+ * the works uses. Naming the films is what stops the number being mistaken for
+ * a machine.
+ */
+function stageTitle(stage: ProductionStageRow, card: ProductionOrder): LaminationLabel {
+  if (stage.stage !== 'LAMINATION') {
+    return { title: PRODUCTION_STAGE_LABELS[stage.stage], bonds: '' };
+  }
+  return laminationLabel({
+    pass: stage.pass,
+    totalPasses: card.stages.filter((s) => s.stage === 'LAMINATION').length,
+    plies: card.plies,
+  });
 }
 
 /**
@@ -69,6 +90,12 @@ export default function JobCardPage() {
 
   const { data: card, isPending, isError } = useProductionOrder(id ?? null);
   const { data: master } = useCostingMasterData();
+  /*
+   * Everybody, including those who have left: a stage filled in months ago may
+   * name somebody who has since gone, and a dropdown that cannot show its own
+   * value shows a blank — which reads as nobody ran it.
+   */
+  const { data: works } = useEmployees({ includeLeft: true });
   const update = useUpdateProduction();
   const updateStage = useUpdateStage();
   const remove = useDeleteProduction();
@@ -133,6 +160,8 @@ export default function JobCardPage() {
       toast.error(caught instanceof ApiClientError ? caught.message : 'Could not save');
     }
   }
+
+  const people = works?.items ?? [];
 
   /* Only machines of this stage's own kind. A slitter is not a choice for the
      press, and offering it is offering a mistake. */
@@ -278,15 +307,29 @@ export default function JobCardPage() {
                   <span className="text-ink-400 text-xs font-medium tabular-nums">
                     {stage.position}
                   </span>
-                  <h3
-                    className={cn(
-                      'text-sm font-semibold',
-                      skipped ? 'text-ink-400' : 'text-ink-900',
-                    )}
-                  >
-                    {stageTitle(stage)}
-                  </h3>
-                  <span className="text-ink-500 text-xs">{STAGE_STATUS_LABELS[stage.status]}</span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <h3
+                        className={cn(
+                          'text-sm font-semibold',
+                          skipped ? 'text-ink-400' : 'text-ink-900',
+                        )}
+                      >
+                        {stageTitle(stage, card).title}
+                      </h3>
+                      <span className="text-ink-500 text-xs">
+                        {STAGE_STATUS_LABELS[stage.status]}
+                      </span>
+                    </div>
+                    {/* Which two films go on the machine for this pass. The
+                        number above is the pass, not the machine — the works
+                        runs one laminator whatever the count says. */}
+                    {stageTitle(stage, card).bonds ? (
+                      <div className="text-ink-400 mt-0.5 text-xs">
+                        {stageTitle(stage, card).bonds}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
                 {canEdit && !ended ? (
@@ -351,15 +394,12 @@ export default function JobCardPage() {
                   </Field>
 
                   <Field label="Operator" htmlFor={`operator-${stage.id}`}>
-                    <Input
+                    <OperatorSelect
                       id={`operator-${stage.id}`}
-                      defaultValue={stage.operator}
+                      stage={stage}
+                      people={people}
                       disabled={locked}
-                      placeholder="Who ran it"
-                      onBlur={(event) =>
-                        event.target.value.trim() !== stage.operator &&
-                        void patchStage(stage.id, { operator: event.target.value.trim() })
-                      }
+                      onPick={(operatorId) => void patchStage(stage.id, { operatorId })}
                     />
                   </Field>
 
@@ -401,9 +441,7 @@ export default function JobCardPage() {
                         stage.wasteKg < 0 ? 'text-warning-700' : 'text-ink-800',
                       )}
                     >
-                      {stage.inputKg === 0 && stage.outputKg === 0
-                        ? '—'
-                        : `${formatNumber(stage.wasteKg, 3)} kg`}
+                      {stageWasteKnown(stage) ? `${formatNumber(stage.wasteKg, 3)} kg` : '—'}
                     </div>
                     {stage.wasteKg < 0 ? (
                       <div className="text-warning-700 mt-0.5 text-xs">

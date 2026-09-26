@@ -51,6 +51,15 @@ export interface StockBatch {
   unit: string;
   batchCode: string;
   location: string;
+  /**
+   * **The reel: how wide it runs, and its gauge.**
+   *
+   * Film is not fungible by weight. A job needing 650 mm cannot be run on a
+   * 340 mm reel however many kilograms sit behind it, which is why the works'
+   * own register is kept by width. Null for anything not bought on a reel.
+   */
+  widthMm: number | null;
+  micron: number | null;
   receivedOn: string;
   initialQuantity: number;
   quantity: number;

@@ -147,3 +147,24 @@ export function stageWasteKg(stage: { inputKg: number; outputKg: number }): numb
   if (input === 0 && output === 0) return 0;
   return Math.round((input - output) * 1000) / 1000;
 }
+
+/**
+ * Whether that figure means anything yet.
+ *
+ * Waste is the difference between two weights, so it is not a fact until both
+ * have been weighed. A stage part-way through has the film on the machine and
+ * nothing off it — reporting the whole input as waste says the run has lost
+ * everything, which is the opposite of what is happening.
+ *
+ * A FINISHED stage with nothing out is different, and is left alone to say so
+ * loudly: that really is a run that produced nothing, and it should not be
+ * hidden behind a dash.
+ */
+export function stageWasteKnown(stage: {
+  inputKg: number;
+  outputKg: number;
+  status: StageStatus;
+}): boolean {
+  if (stage.inputKg === 0 && stage.outputKg === 0) return false;
+  return stage.outputKg > 0 || stage.status === 'DONE';
+}

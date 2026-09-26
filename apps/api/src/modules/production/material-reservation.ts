@@ -1,10 +1,14 @@
 import {
+  adhesiveGsmFor,
+  adhesiveRequirements,
   availabilityFor,
   filmRequirements,
+  inkRequirements,
   shortages,
   wastagePercentFor,
   type MaterialAvailability,
   type MaterialRequirement,
+  type Reel,
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
 import { getSettings } from '../settings/settings.service.js';
@@ -27,6 +31,8 @@ import { ApiError } from '../../utils/api-error.js';
  */
 
 const toNumber = (value: Prisma.Decimal | number | null): number => Number(value ?? 0);
+const round2 = (value: number): number => Math.round(value * 100) / 100;
+const round3 = (value: number): number => Math.round(value * 1000) / 1000;
 
 /** A card, as everything here needs to see one. */
 export interface CardForStock {
@@ -67,10 +73,29 @@ export async function requirementsForCards(
         select: {
           pouchType: true,
           compositeGsm: true,
+          /* The web this job runs at: film width × lanes + trim. A reel
+             narrower than that cannot run it — film is slit down, never
+             widened. */
+          filmWidthMm: true,
+          repeatWidth: true,
+          /* What the run also takes off the shelf: the inks, and the adhesive
+             the plies are bonded with. Same arithmetic as the costing. */
+          colours: {
+            orderBy: { position: 'asc' },
+            select: { materialId: true, name: true, laydownGsm: true, solidsPercent: true },
+          },
           quotation: { select: { wastagePercent: true, date: true } },
           layers: {
             orderBy: { position: 'asc' },
-            select: { materialId: true, materialName: true, gsm: true },
+            /* micron and density for the adhesive coat weight, which depends
+               on how thick the plies are — see adhesiveGsmFor. */
+            select: {
+              materialId: true,
+              materialName: true,
+              gsm: true,
+              micron: true,
+              density: true,
+            },
           },
         },
       },
@@ -96,6 +121,15 @@ export async function requirementsForCards(
     await Promise.all(dates.map(async (date) => [date, await getSettings(date)] as const)),
   );
 
+  /*
+   * The settings name the ink solvents, the adhesive and its hardener by NAME
+   * — the works can rename a material without a migration — so they are looked
+   * up once for the page rather than per card.
+   */
+  const byName = new Map(
+    (await tx.material.findMany({ select: { id: true, name: true } })).map((m) => [m.name, m.id]),
+  );
+
   for (const card of cards) {
     const item = byOrder.get(card.orderId);
     if (!item) {
@@ -108,25 +142,98 @@ export async function requirementsForCards(
       continue;
     }
 
-    out.set(
-      card.id,
-      filmRequirements({
-        layers: item.layers.map((layer) => ({
-          materialId: layer.materialId,
-          name: layer.materialName,
-          gsm: toNumber(layer.gsm),
+    const wastagePercent = wastagePercentFor({
+      pouchType: item.pouchType,
+      override:
+        item.quotation.wastagePercent === null ? null : toNumber(item.quotation.wastagePercent),
+      defaultWastagePercent: settings.defaultWastagePercent,
+      pouchWastagePercent: settings.pouchWastagePercent,
+    });
+    const structureGsm = toNumber(item.compositeGsm);
+    const consumedKg = card.quantityKg * (1 + wastagePercent / 100);
+
+    const film = filmRequirements({
+      layers: item.layers.map((layer) => ({
+        materialId: layer.materialId,
+        name: layer.materialName,
+        gsm: toNumber(layer.gsm),
+      })),
+      quantityKg: card.quantityKg,
+      structureGsm,
+      /* The web this job runs at. Ink and adhesive get zero — neither comes on
+         a reel, so no width can be asked of them. */
+      needsWidthMm: round2(
+        toNumber(item.filmWidthMm) * Math.max(1, toNumber(item.repeatWidth)) +
+          settings.defaultTrimMm,
+      ),
+      wastagePercent,
+    });
+
+    /*
+     * The ink is laid on the printed ply's area, and the adhesive is spread
+     * over the substrate — so both need figures the film lines already imply
+     * but do not carry.
+     */
+    const printed = item.layers[0];
+    const substrateGsm = item.layers.reduce((sum, layer) => sum + toNumber(layer.gsm), 0);
+
+    const ink =
+      printed && structureGsm > 0
+        ? inkRequirements({
+            colours: item.colours.map((colour) => ({
+              materialId: colour.materialId,
+              name: colour.name,
+              laydownGsm: toNumber(colour.laydownGsm),
+              solidsPercent: toNumber(colour.solidsPercent),
+            })),
+            printedLayerKg: (toNumber(printed.gsm) / structureGsm) * consumedKg,
+            printedLayerGsm: toNumber(printed.gsm),
+            inkParts: 100,
+            solventParts: settings.inkSolventParts,
+            ethylAcetatePercent: settings.ethylAcetatePercent,
+            ethylAcetateMaterialId: byName.get(settings.defaultEthylAcetateMaterial) ?? null,
+            ethylAcetateName: settings.defaultEthylAcetateMaterial,
+            tolueneMaterialId: byName.get(settings.defaultTolueneMaterial) ?? null,
+            tolueneName: settings.defaultTolueneMaterial,
+          })
+        : [];
+
+    const adhesive = adhesiveRequirements({
+      adhesiveGsm: adhesiveGsmFor(
+        item.layers.map((layer) => ({
+          micron: toNumber(layer.micron),
+          density: toNumber(layer.density),
         })),
-        quantityKg: card.quantityKg,
-        structureGsm: toNumber(item.compositeGsm),
-        wastagePercent: wastagePercentFor({
-          pouchType: item.pouchType,
-          override:
-            item.quotation.wastagePercent === null ? null : toNumber(item.quotation.wastagePercent),
-          defaultWastagePercent: settings.defaultWastagePercent,
-          pouchWastagePercent: settings.pouchWastagePercent,
-        }),
-      }),
-    );
+        {
+          thinGsm: settings.adhesiveCoatThinGsm,
+          thickGsm: settings.adhesiveCoatThickGsm,
+          thickPlyMicron: settings.adhesiveThickPlyMicron,
+        },
+      ),
+      substrateGsm,
+      consumedKg,
+      splitRatio: settings.adhesiveSplitRatio,
+      adhesiveMaterialId: byName.get(settings.defaultAdhesiveMaterial) ?? null,
+      adhesiveName: settings.defaultAdhesiveMaterial,
+      ethylAcetateMaterialId: byName.get(settings.defaultEthylAcetateMaterial) ?? null,
+      ethylAcetateName: settings.defaultEthylAcetateMaterial,
+      hardenerMaterialId: byName.get(settings.defaultHardenerMaterial) ?? null,
+      hardenerName: settings.defaultHardenerMaterial,
+    });
+
+    /*
+     * Ethyl acetate is thinned into the ink AND into the adhesive, so the two
+     * are one claim on one drum. Two rows for one material would each be
+     * measured against the whole of it.
+     */
+    const merged = new Map<string, MaterialRequirement>();
+    for (const line of [...film, ...ink, ...adhesive]) {
+      const held = merged.get(line.materialId);
+      if (held) held.quantity = round3(held.quantity + line.quantity);
+      else merged.set(line.materialId, { ...line });
+    }
+
+    out.set(card.id, [...merged.values()]);
   }
 
   return out;
@@ -163,39 +270,101 @@ export async function availabilityForCards(
   }
 
   const [batches, held] = await Promise.all([
-    tx.stockBatch.groupBy({
-      by: ['materialId'],
-      where: { materialId: { in: materialIds } },
-      _sum: { quantity: true },
+    /*
+     * Every roll, not a sum. A claim names the roll it is on now, so what is
+     * left of a roll is a fact about that roll rather than a share of a total —
+     * and that is what lets the floor be told which rolls to fetch.
+     */
+    tx.stockBatch.findMany({
+      where: { materialId: { in: materialIds }, quantity: { gt: 0 } },
+      select: {
+        id: true,
+        materialId: true,
+        batchCode: true,
+        widthMm: true,
+        receivedOn: true,
+        quantity: true,
+      },
     }),
-    /* Grouped by card as well as material, so each card can be measured
-       against everyone ELSE's claims. */
+    /*
+     * Claims, by roll and by card, so each card can be measured against
+     * everyone ELSE's. The rows written before reels were named have no batch
+     * and are counted against the material as a whole — see below.
+     */
     tx.stockReservation.groupBy({
-      by: ['materialId', 'productionOrderId'],
+      by: ['materialId', 'batchId', 'productionOrderId'],
       where: { materialId: { in: materialIds }, status: 'HELD' },
       _sum: { quantity: true },
     }),
   ]);
 
-  const onHand = new Map(batches.map((row) => [row.materialId, toNumber(row._sum.quantity)]));
-  const heldTotal = new Map<string, number>();
-  const heldByCard = new Map<string, number>();
+  /** What each roll is claimed for, and by whom. */
+  const onRoll = new Map<string, number>();
+  /** Claims from before reels were named: material-wide, roll unknown. */
+  const looseByMaterial = new Map<string, number>();
+
   for (const row of held) {
     const quantity = toNumber(row._sum.quantity);
-    heldTotal.set(row.materialId, (heldTotal.get(row.materialId) ?? 0) + quantity);
-    heldByCard.set(`${row.productionOrderId}:${row.materialId}`, quantity);
+    if (row.batchId) onRoll.set(`${row.productionOrderId}:${row.batchId}`, quantity);
+    else {
+      const key = `${row.productionOrderId}:${row.materialId}`;
+      looseByMaterial.set(key, (looseByMaterial.get(key) ?? 0) + quantity);
+    }
+  }
+
+  const heldOnRoll = new Map<string, number>();
+  for (const [key, quantity] of onRoll) {
+    const batchId = key.slice(key.indexOf(':') + 1);
+    heldOnRoll.set(batchId, (heldOnRoll.get(batchId) ?? 0) + quantity);
   }
 
   for (const card of cards) {
     const lines = requirements.get(card.id) ?? [];
-    const others = new Map(
-      lines.map((line) => [
-        line.materialId,
-        (heldTotal.get(line.materialId) ?? 0) -
-          (heldByCard.get(`${card.id}:${line.materialId}`) ?? 0),
-      ]),
-    );
-    out.set(card.id, availabilityFor(lines, { onHand, held: others }));
+
+    const reels = new Map<string, Reel[]>();
+    for (const batch of batches) {
+      const rows = reels.get(batch.materialId) ?? [];
+      const onHand = toNumber(batch.quantity);
+      /* Everyone else's claims on THIS roll — this card's own are left out, or
+         a card would report itself short against itself. */
+      const mine = onRoll.get(`${card.id}:${batch.id}`) ?? 0;
+      const others = (heldOnRoll.get(batch.id) ?? 0) - mine;
+      rows.push({
+        batchId: batch.id,
+        batchCode: batch.batchCode,
+        widthMm: batch.widthMm === null ? null : toNumber(batch.widthMm),
+        receivedOn: batch.receivedOn.toISOString().slice(0, 10),
+        onHand,
+        free: Math.max(0, onHand - others),
+      });
+      reels.set(batch.materialId, rows);
+    }
+
+    /*
+     * A claim from before reels were named cannot be taken off the roll it is
+     * on, because nothing knows which. It comes off the material's oldest rolls
+     * instead — the same order a claim would have been allocated in — so it
+     * still counts and still cannot be double-spent.
+     */
+    for (const line of lines) {
+      let loose = 0;
+      for (const [key, quantity] of looseByMaterial) {
+        if (key.endsWith(`:${line.materialId}`) && !key.startsWith(`${card.id}:`))
+          loose += quantity;
+      }
+      if (loose <= 0) continue;
+      const rows = (reels.get(line.materialId) ?? []).sort((a, b) =>
+        a.receivedOn < b.receivedOn ? -1 : 1,
+      );
+      for (const row of rows) {
+        if (loose <= 0) break;
+        const take = Math.min(row.free, loose);
+        row.free = Math.max(0, row.free - take);
+        loose -= take;
+      }
+    }
+
+    out.set(card.id, availabilityFor(lines, { reels }));
   }
 
   return out;
@@ -220,48 +389,47 @@ export async function availabilityForCard(
 export async function holdFor(
   tx: Prisma.TransactionClient,
   cardId: string,
-  requirements: MaterialRequirement[],
+  lines: MaterialAvailability[],
 ): Promise<void> {
-  for (const requirement of requirements) {
-    await tx.stockReservation.upsert({
-      where: {
-        productionOrderId_materialId: {
-          productionOrderId: cardId,
-          materialId: requirement.materialId,
-        },
-      },
-      create: {
-        productionOrderId: cardId,
-        materialId: requirement.materialId,
-        quantity: requirement.quantity,
-        status: 'HELD',
-      },
-      update: { quantity: requirement.quantity, status: 'HELD', releasedAt: null },
-    });
-  }
-
-  /* A ply edited off the line, or a quantity dropped to nothing: whatever this
-     card no longer needs stops being held. */
+  /*
+   * Cleared and rewritten rather than reconciled.
+   *
+   * A card's claim is a set of rolls, and which rolls it should be on changes
+   * whenever the quantity changes or somebody else takes a roll first. Working
+   * out the difference between two sets of rolls is a great deal of code for a
+   * card that holds three of them, and the state it produces is the same.
+   *
+   * The release is a status change rather than a delete: a claim that was
+   * standing yesterday is worth being able to read.
+   */
   await tx.stockReservation.updateMany({
-    where: {
-      productionOrderId: cardId,
-      status: 'HELD',
-      materialId: { notIn: requirements.map((r) => r.materialId) },
-    },
+    where: { productionOrderId: cardId, status: 'HELD' },
     data: { status: 'RELEASED', releasedAt: new Date() },
   });
+
+  for (const line of lines) {
+    for (const reel of line.reels) {
+      /*
+       * Upserted rather than created: the row just released may be this exact
+       * (card, roll) pair, and the unique key would refuse a second one.
+       */
+      await tx.stockReservation.upsert({
+        where: {
+          productionOrderId_batchId: { productionOrderId: cardId, batchId: reel.batchId },
+        },
+        create: {
+          productionOrderId: cardId,
+          materialId: line.materialId,
+          batchId: reel.batchId,
+          quantity: reel.quantity,
+          status: 'HELD',
+        },
+        update: { quantity: reel.quantity, status: 'HELD', releasedAt: null },
+      });
+    }
+  }
 }
 
-/**
- * Lets the film go.
- *
- * Called when a card completes and when one is deleted. **The completing card
- * is where the two halves meet**: the job sheet posts what the run actually
- * took off stock, and the claim that was standing in for it until then stops
- * counting. Releasing before the sheet is posted would let a second card
- * promise film this one has already used; not releasing at all would hold it
- * for ever.
- */
 export async function releaseFor(tx: Prisma.TransactionClient, cardId: string): Promise<void> {
   await tx.stockReservation.updateMany({
     where: { productionOrderId: cardId, status: 'HELD' },
@@ -291,8 +459,19 @@ export async function materialIsSettled(
 /** The sentence the floor reads when a job cannot be made. */
 export function shortageMessage(lines: MaterialAvailability[]): string {
   const short = shortages(lines);
+  /*
+   * The sentence names the SIZE problem where there is one, because "2,900 kg
+   * free and none of it usable" reads as a bug otherwise — and because the two
+   * problems have different answers. One is solved by buying more film, the
+   * other by buying it differently.
+   */
   const said = short
-    .map((line) => `${line.name} — needs ${line.quantity} kg, ${line.free} kg free`)
+    .map((line) =>
+      line.tooNarrowKg > 0
+        ? `${line.name} — needs ${line.quantity} kg on a reel ${line.needsWidthMm} mm or wider, ` +
+          `${line.usable} kg usable (${line.tooNarrowKg} kg is too narrow)`
+        : `${line.name} — needs ${line.quantity} kg, ${line.usable} kg free`,
+    )
     .join('; ');
   return `Not enough material for this job: ${said}`;
 }

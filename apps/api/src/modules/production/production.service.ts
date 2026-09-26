@@ -2,6 +2,7 @@ import {
   canMoveProductionTo,
   productionProgress,
   PRODUCTION_STATUS_LABELS,
+  nextStageToStart,
   requiredStages,
   stageWasteKg,
   type AddProductionStageInput,
@@ -25,7 +26,6 @@ import {
   materialIsSettled,
   refuseUnlessOverridden,
   releaseFor,
-  requirementsFor,
 } from './material-reservation.js';
 
 /**
@@ -41,7 +41,17 @@ const toNumber = (value: Prisma.Decimal | number): number => Number(value);
 const isoDate = (value: Date): string => value.toISOString().slice(0, 10);
 
 const WITH_ALL = {
-  order: { select: { number: true, dueDate: true } },
+  order: {
+    select: {
+      number: true,
+      dueDate: true,
+      /* The structure the job was priced on, so a lamination row can name the
+         two films it bonds. The number on it is the pass, not the machine. */
+      quotationItem: {
+        select: { layers: { orderBy: { position: 'asc' }, select: { materialName: true } } },
+      },
+    },
+  },
   stages: { orderBy: { position: 'asc' } },
   /* What this run cost, once the office starts working it out. Posting that
      sheet is what releases this card's claim on its film. */
@@ -61,6 +71,7 @@ function toStage(row: Row['stages'][number]): ProductionStageRow {
     status: row.status,
     machineId: row.machineId,
     machineName: row.machineName,
+    operatorId: row.operatorId,
     operator: row.operator,
     inputKg,
     outputKg,
@@ -100,6 +111,8 @@ function toProduction(row: Row, materials: MaterialAvailability[] = []): Product
     stages,
     progressPercent: productionProgress(stages),
     currentStage: current?.stage ?? null,
+
+    plies: (row.order.quotationItem?.layers ?? []).map((layer) => layer.materialName),
 
     materials,
     jobSheetId: row.jobSheet?.id ?? null,
@@ -318,8 +331,10 @@ export async function createProduction(
       include: WITH_ALL,
     });
 
-    const needs = await requirementsFor(tx, cardForStock(card));
-    await holdFor(tx, card.id, needs);
+    /* What the card needs, fitted onto the actual rolls — so the claim names
+       the rolls the floor will fetch rather than a quantity of nothing. */
+    const fitted = await availabilityForCard(tx, cardForStock(card));
+    await holdFor(tx, card.id, fitted);
 
     return toProduction(card, await availabilityForCard(tx, cardForStock(card)));
   });
@@ -376,7 +391,7 @@ export async function updateProduction(
          the issue, and the same film would leave free stock twice. */
       !(await materialIsSettled(tx, row.id))
     ) {
-      await holdFor(tx, row.id, await requirementsFor(tx, cardForStock(row)));
+      await holdFor(tx, row.id, await availabilityForCard(tx, cardForStock(row)));
     }
 
     /*
@@ -446,6 +461,28 @@ export async function updateStage(
       machineName = '';
     }
 
+    /*
+     * The operator, exactly as the machine above: the link is what the dropdown
+     * sends and the NAME is snapshotted beside it. That snapshot is what keeps
+     * a card from March readable after somebody leaves in June — the link goes
+     * null and the name stays.
+     *
+     * A typed name with no id is still accepted, and has to be: somebody
+     * covering a shift is not always on the books yet, and refusing the record
+     * is how the works goes back to writing it on paper.
+     */
+    let operatorName: string | undefined;
+    if (input.operatorId) {
+      const person = await tx.employee.findUnique({
+        where: { id: input.operatorId },
+        select: { name: true },
+      });
+      if (!person) throw ApiError.notFound('That person is not on record');
+      operatorName = person.name;
+    } else if (input.operatorId === null) {
+      operatorName = '';
+    }
+
     const status = input.status ?? existing.status;
     const movedTo = status !== existing.status ? status : null;
 
@@ -457,8 +494,19 @@ export async function updateStage(
      * than trusted from when the card was raised, because in between it may
      * have gone to another job, and a claim made on Monday is not a guarantee
      * on Thursday.
+     *
+     * **Only on the first machine the job reaches**, though. Once a card is
+     * running its film is committed and partly consumed, and refusing the
+     * laminator does not save a gram of it — it strands a printed reel between
+     * two machines. The question this guard exists to ask is "should this job
+     * begin", and a job three stages in has begun.
      */
-    if (movedTo === 'RUNNING' && !(await materialIsSettled(tx, existing.productionOrderId))) {
+    const cardAlreadyRunning = existing.productionOrder.status === 'RUNNING';
+    if (
+      movedTo === 'RUNNING' &&
+      !cardAlreadyRunning &&
+      !(await materialIsSettled(tx, existing.productionOrderId))
+    ) {
       refuseUnlessOverridden(
         await availabilityForCard(tx, cardForStock(existing.productionOrder)),
         existing.productionOrder,
@@ -470,7 +518,14 @@ export async function updateStage(
       data: {
         ...(input.machineId !== undefined ? { machineId: input.machineId } : {}),
         ...(machineName !== undefined ? { machineName } : {}),
-        ...(input.operator !== undefined ? { operator: input.operator } : {}),
+        ...(input.operatorId !== undefined ? { operatorId: input.operatorId } : {}),
+        /* The snapshot wins over a typed name when both travel: the dropdown
+           is the one that knows how the works spells it. */
+        ...(operatorName !== undefined
+          ? { operator: operatorName }
+          : input.operator !== undefined
+            ? { operator: input.operator }
+            : {}),
         ...(input.inputKg !== undefined ? { inputKg: input.inputKg } : {}),
         ...(input.outputKg !== undefined ? { outputKg: input.outputKg } : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
@@ -487,17 +542,47 @@ export async function updateStage(
      * once here rather than asked of whoever clicks: the floor starts a stage,
      * not a card, and it should not have to remember to start both.
      */
-    if (movedTo === 'RUNNING') {
-      const card = await tx.productionOrder.findUnique({
-        where: { id: existing.productionOrderId },
-        select: { status: true, startedAt: true, orderId: true },
+    if (movedTo === 'RUNNING') await startTheCard(tx, existing.productionOrderId);
+
+    /*
+     * **The reel goes to the next machine.**
+     *
+     * A job does not stop between stages, and the floor should not have to say
+     * so twice: finishing one picks up the next one nobody has started, and
+     * carries the weight across — what came off this machine is what goes onto
+     * that one. The operator and the machine are left blank, because they are
+     * a different person at a different machine.
+     *
+     * Not done for a stage marked SKIPPED or put back to pending: neither is
+     * work finishing, and neither moves the reel anywhere.
+     */
+    if (movedTo === 'DONE') {
+      const stages = await tx.productionStage.findMany({
+        where: { productionOrderId: existing.productionOrderId },
+        select: { id: true, position: true, status: true, outputKg: true },
       });
-      if (card && (card.status === 'PLANNED' || card.status === 'ON_HOLD')) {
-        await tx.productionOrder.update({
-          where: { id: existing.productionOrderId },
-          data: { status: 'RUNNING', ...(card.startedAt ? {} : { startedAt: new Date() }) },
+      const finished = stages.find((stage) => stage.id === stageId);
+      const next = finished ? nextStageToStart(stages, finished.position) : null;
+
+      if (next && finished) {
+        /*
+         * Read back off the stage, not out of this request. The floor types the
+         * weight, it saves as they leave the box, and Finish is a separate
+         * press — so the figure that matters is the one on the row, not the one
+         * that happened to travel with the button.
+         */
+        const cameOff = toNumber(finished.outputKg);
+        await tx.productionStage.update({
+          where: { id: next.id },
+          data: {
+            status: 'RUNNING',
+            startedAt: new Date(),
+            ...(cameOff > 0 ? { inputKg: cameOff } : {}),
+          },
         });
-        await startTheOrder(tx, card.orderId);
+        /* The reel moving to the next machine starts the card exactly as
+           pressing Start would. The floor is not doing anything different. */
+        await startTheCard(tx, existing.productionOrderId);
       }
     }
 
@@ -543,6 +628,28 @@ export async function overrideMaterials(
     include: WITH_ALL,
   });
   return toProduction(row, await availabilityForCard(prisma, cardForStock(row)));
+}
+
+/**
+ * A stage running means the card is running, and the order with it.
+ *
+ * In one place because two things start a stage: somebody pressing Start, and
+ * a stage finishing and handing the reel on. The second used to write the new
+ * stage's status straight to the row and skip all of this, which left a card
+ * reading "Planned" with one stage done and another running.
+ */
+async function startTheCard(tx: Prisma.TransactionClient, cardId: string): Promise<void> {
+  const card = await tx.productionOrder.findUnique({
+    where: { id: cardId },
+    select: { status: true, startedAt: true, orderId: true },
+  });
+  if (!card || (card.status !== 'PLANNED' && card.status !== 'ON_HOLD')) return;
+
+  await tx.productionOrder.update({
+    where: { id: cardId },
+    data: { status: 'RUNNING', ...(card.startedAt ? {} : { startedAt: new Date() }) },
+  });
+  await startTheOrder(tx, card.orderId);
 }
 
 /** Puts a stage back on a card the derivation left it off. */

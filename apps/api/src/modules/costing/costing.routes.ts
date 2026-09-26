@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   costingOverheadSchema,
   costingWorkbookSchema,
+  defaultMachineSchema,
   idParamSchema,
   updateCostingOverheadSchema,
   labourSchema,
@@ -57,6 +58,18 @@ router.post(
   requireModule('rates'),
   validate({ params: idParamSchema }),
   asyncHandler(controller.retireMachine),
+);
+
+/*
+ * Which machine of its kind the costing charges. Its own endpoint rather than a
+ * field on the machine, so nothing about editing a speed can quietly move the
+ * job onto a different machine.
+ */
+router.post(
+  '/machines/:id/default',
+  requireModule('rates'),
+  validate({ params: idParamSchema, body: defaultMachineSchema }),
+  asyncHandler(controller.setDefaultMachine),
 );
 
 router.post(

@@ -3,6 +3,7 @@ import { Cog, Plus, RotateCcw, Users2 } from 'lucide-react';
 import {
   ADHESIVE_BATCHES,
   MACHINE_KINDS,
+  isFromTheStart,
   MACHINE_KIND_LABELS,
   OVERHEAD_BASES,
   OVERHEAD_BASIS_HINTS,
@@ -34,6 +35,7 @@ import {
   useEndOverhead,
   useRetireLabour,
   useRetireMachine,
+  useSetDefaultMachine,
   useUpdateOverhead,
   useUpdateSettings,
 } from '../api/costing-api';
@@ -73,6 +75,7 @@ export default function CostingPage() {
   const [labour, setLabour] = useState<Labour | null | undefined>(undefined);
 
   const retireMachine = useRetireMachine();
+  const setDefaultMachine = useSetDefaultMachine();
   const retireLabour = useRetireLabour();
 
   /*
@@ -170,6 +173,13 @@ export default function CostingPage() {
                             Retired
                           </Badge>
                         ) : null}
+                        {/* Two machines of a kind and only one is run. This is
+                            the one every rate of that kind is built from. */}
+                        {row.isDefault && row.isActive ? (
+                          <Badge tone="brand" className="ml-2">
+                            Costed on this
+                          </Badge>
+                        ) : null}
                       </td>
                       <td className="text-ink-600 px-4 py-3">{MACHINE_KIND_LABELS[row.kind]}</td>
                       <td className="text-ink-600 px-4 py-3 text-right tabular-nums">
@@ -202,6 +212,25 @@ export default function CostingPage() {
                             <Button variant="ghost" size="sm" onClick={() => setMachine(row)}>
                               Edit
                             </Button>
+                            {/*
+                             * Which machine of its kind every rate is built
+                             * from. Without it the costing took whichever came
+                             * first on the list, so a works with an old
+                             * laminator and a new one priced every job on the
+                             * old one.
+                             */}
+                            {row.isActive && !row.isDefault ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setDefaultMachine.mutate({ id: row.id, isDefault: true })
+                                }
+                                title={`Cost every ${MACHINE_KIND_LABELS[row.kind].toLowerCase()} job on this machine`}
+                              >
+                                Use this one
+                              </Button>
+                            ) : null}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -268,6 +297,23 @@ export default function CostingPage() {
                           Retired
                         </Badge>
                       ) : null}
+                      {/*
+                        The window, like the overheads carry. A wage applies to
+                        a quotation whose date falls in it, which is what lets
+                        the works take a crew on today without re-pricing what
+                        went out last year.
+                      */}
+                      <div className="text-ink-400 mt-0.5 text-xs font-normal">
+                        {/* A row backfilled when wages gained their history has
+                            no true start — showing somebody 1900 reads as a
+                            bug rather than as "this has always applied". */}
+                        {isFromTheStart(row) ? 'from the start' : row.effectiveFrom}
+                        {row.effectiveTo
+                          ? ` — ${row.effectiveTo}`
+                          : isFromTheStart(row)
+                            ? ''
+                            : ' onwards'}
+                      </div>
                     </td>
                     <td className="text-ink-600 px-4 py-3">{MACHINE_KIND_LABELS[row.process]}</td>
                     <td className="text-ink-600 px-4 py-3 text-right tabular-nums">
@@ -303,7 +349,7 @@ export default function CostingPage() {
                                 : retireLabour.mutate(row.id)
                             }
                           >
-                            {row.isActive ? 'Retire' : 'Restore'}
+                            {row.isActive ? 'Retire' : 'Take back on'}
                           </Button>
                         </>
                       ) : null}
@@ -358,11 +404,17 @@ export default function CostingPage() {
           </>
         ) : (
           <>
-            This wage stops being charged, so every rate worked out from now on drops by what this
-            person was costing. Quotations already saved keep the figures they were saved with.
+            This wage stops being charged from today, so every rate worked out from now on drops by
+            what this person was costing. <strong>Nothing already quoted moves</strong> — a wage
+            applies to a quotation whose date falls inside its window, so one written last year goes
+            on repricing with the crew it was written under.
           </>
         )}
-        <p className="mt-2">It stays on this screen, greyed, with a Restore beside it.</p>
+        <p className="mt-2">
+          {retiring?.kind === 'machine'
+            ? 'It stays on this screen, greyed, with a Restore beside it.'
+            : 'It stays on this screen, greyed. Taking it back on opens a new window from that day — it never reaches backwards.'}
+        </p>
       </ConfirmDialog>
     </div>
   );

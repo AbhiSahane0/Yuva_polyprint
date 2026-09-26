@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   changePasswordSchema,
   createCustomerSchema,
+  createEmployeeSchema,
   createMaterialSchema,
   addProductionStageSchema,
   createOrderSchema,
@@ -31,6 +32,7 @@ import {
   setReorderLevelSchema,
   transferStockSchema,
   listOrdersQuerySchema,
+  listEmployeesQuerySchema,
   listProductionQuerySchema,
   listQuotationsQuerySchema,
   loginSchema,
@@ -41,6 +43,7 @@ import {
   saveRatesSchema,
   sendQuotationSchema,
   updateCustomerSchema,
+  updateEmployeeSchema,
   updateMaterialSchema,
   updateOrderSchema,
   updateProductionOrderSchema,
@@ -1127,6 +1130,61 @@ export function buildOpenApiDocument(serverUrl: string) {
           parameters: [ID_PARAM],
           requestBody: body(overrideMaterialsSchema),
           responses: { 200: ok('The card, with the override on it.'), ...COMMON },
+        },
+      },
+
+      '/api/employees': {
+        get: {
+          tags: ['Employees'],
+          summary: 'The works\u2019 people, and what each is on right now',
+          description:
+            'Readable by anyone signed in, and it has to be \u2014 the operator dropdown on a job ' +
+            'card is what this module exists for. Every live field (working, which machine, ' +
+            'which card, which order) is derived from the one job card stage that is RUNNING ' +
+            'with that person\u2019s name on it. None of it is stored: a status somebody has to ' +
+            'remember to change is wrong most of the time. No wage is returned either \u2014 that ' +
+            'lives on the costing role an employee points at.',
+          parameters: query(listEmployeesQuerySchema),
+          responses: { 200: ok('The people, with totals.'), ...AUTH_FAILURES },
+        },
+        post: {
+          tags: ['Employees'],
+          summary: 'Add somebody to the works',
+          description:
+            'Needs the jobs module \u2014 adding an operator is a supervisor\u2019s act, and it moves ' +
+            'no money. A costing role carries the wage and the process; free text carries the ' +
+            'office and the warehouse, whom no costing role describes. One or the other is ' +
+            'required.',
+          requestBody: body(createEmployeeSchema),
+          responses: { 201: ok('The person.'), ...COMMON },
+        },
+      },
+      '/api/employees/{id}': {
+        get: {
+          tags: ['Employees'],
+          summary: 'One person',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The person.'), ...COMMON },
+        },
+        patch: {
+          tags: ['Employees'],
+          summary: 'Change them, or mark that they have left',
+          description:
+            'Clearing `isActive` is how somebody leaves. The record stays and the job cards ' +
+            'they ran go on naming them.',
+          parameters: [ID_PARAM],
+          requestBody: body(updateEmployeeSchema),
+          responses: { 200: ok('The person.'), ...COMMON },
+        },
+        delete: {
+          tags: ['Employees'],
+          summary: 'Remove somebody nobody\u2019s work names',
+          description:
+            'Refused once they have run a stage, and the message says to mark them as having ' +
+            'left instead. A leaver is history, not a mistake; a row mistyped this morning is ' +
+            'the case this exists for.',
+          parameters: [ID_PARAM],
+          responses: { 200: ok('The id that was removed.'), ...COMMON },
         },
       },
 

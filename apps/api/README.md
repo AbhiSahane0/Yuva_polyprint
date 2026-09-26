@@ -709,15 +709,52 @@ Policy:
 | POST   | `/costing/machines`            | Add a machine                                          |
 | PATCH  | `/costing/machines/:id`        | Correct one                                            |
 | POST   | `/costing/machines/:id/retire` | Retire or restore it                                   |
-| POST   | `/costing/labour`              | Add a role                                             |
-| PATCH  | `/costing/labour/:id`          | Correct one                                            |
-| POST   | `/costing/labour/:id/retire`   | Retire or restore it                                   |
+| POST   | `/costing/labour`              | Add a role, live from today                            |
+| PATCH  | `/costing/labour/:id`          | Correct one — a changed wage opens a new window        |
+| POST   | `/costing/labour/:id/retire`   | End it today, or take it back on from today            |
 
 Readable by anyone signed in, because the quotation wizard costs every line
 against it. Writing needs `requireModule('rates')` — a machine speed or a wage
 moves the price of every quotation raised afterwards, which is the same
 authority a rate change carries. Retire rather than delete, for the same reason
 a retired material stays: quotations were costed against it.
+
+### Wages are dated, and this is why
+
+Every costing figure that can move has a history — a material's rates, the
+settings, the works' own overheads — so that **a quotation is costed against the
+master as it stood on its own date**. Wages were the last one that were not:
+one live row with an on/off switch.
+
+That switch reached backwards. Taking the lamination crew back on in September
+2026 re-priced all seven verified 2022 quotations, each by roughly a rupee a
+kilogram, because there was nothing in the data to say the crew had not been
+there in 2022. Measured, not guessed: `0 of 7 exact` the moment the switch went
+on.
+
+So `costing_labour` now carries the same half-open window the overheads do —
+on or after `effectiveFrom`, strictly before `effectiveTo` — decided by
+`isLiveOn` in `costing-window.ts`, the one rule both of them share. A role is
+live from the day it is added; changing what it pays ends that window and opens
+the next; ending it closes the window; taking it back on opens a **new** one
+from that day. Nothing reaches backwards, in either direction.
+
+Two consequences worth knowing:
+
+- **The role name is not unique any more.** "Lamination Operator" at Rs 18,000
+  until March and Rs 20,000 after it is the same job twice, and both windows
+  have to survive or the March quotations stop explaining themselves. A name
+  held by a _live_ row still conflicts, and the service says so.
+- **There is no `isActive` column.** Whether a wage is live is a question about
+  a date, and keeping the answer in a second place is how the two come to
+  disagree. The API derives it from `effectiveTo`, so every screen reads the
+  same as before.
+
+The migration that added this changed no price: live rows were backfilled from
+1900 and retired ones got a window that contains no day at all, which is the
+only backfill that keeps every document on file reproducing. A retired row's
+real history is not recoverable from a boolean; what is known is that the
+documents were priced without it.
 
 **A name a retired row holds is not free, and adding it back revives that row.**
 Retiring keeps the row, so the name stays taken — and the row is off the screen
@@ -727,6 +764,11 @@ see. It now reactivates that row with whatever figures were sent, which is what
 was being asked for and beats a second row: the id survives, so everything
 already pointing at it still does. A name held by a row that is still active
 conflicts as before. `POST /materials` follows the same rule.
+
+For wages this is narrower, because they are dated: a role is revived in place
+only when its window **priced nothing** — opened and closed on the same day, or
+backfilled empty by the migration. A window that actually applied is history and
+is left alone; adding the role again opens a fresh window beside it.
 
 ### Building a rate from what it costs to make
 
@@ -1040,10 +1082,95 @@ though the laminator runs 86 minutes on the job it costs — somebody stands at
 that machine, and the sheet does not pay them. Seeded at Rs 18,000 and Rs 8,000
 they put the rate 48 paise a kilogram over the sheet; on 10 September 2026 the
 works chose the sheet. Retired rather than deleted, so the Costing screen shows
-them greyed with a Restore beside them and the decision stays visible.
+them greyed and the decision stays visible.
+
+**On 23 September 2026 the works took that crew back on**, from that day. Wages
+are dated now (see below), so the two windows sit side by side: a quotation
+dated before the 23rd is still costed without a lamination crew, and the seven
+2022 documents still reproduce to the paisa. Re-running this seed would end the
+new window again — the step exists to reproduce the workbook, and the workbook
+has no such line.
 
 With those off, the workbook reconciles **exactly** — Rs 263.40 a kilogram and
 Rs 13.83 a pouch, on local and on Neon alike.
+
+### The works' own stock register
+
+```bash
+npm run import:stock -w @yuva/api -- --file "Stock Record September Month 2026.xlsx"
+npm run import:stock -w @yuva/api -- --file "..." --dry-run
+npm run import:stock -w @yuva/api -- --clear
+```
+
+Eight sheets, one per film, every row a reel: a width, a gauge, and what is left
+of it. **363 reels, 38,654 kg**, and the bookkeeping is sound — opening plus
+inward less outward equals closing on all 392 of its real rows, exactly.
+
+What the spreadsheet cannot do is the reason to load it:
+
+|                   |                                                       |
+| ----------------- | ----------------------------------------------------- |
+| **Value**         | the Rate and Amount columns are empty on all 435 rows |
+| **Age**           | 48 dates across 435 rows — no FIFO, no ageing         |
+| **Where it went** | outward is a number with no job beside it             |
+
+Loaded, the same stock is worth **Rs 87.9 lakh** on the Inventory screen, a
+figure the sheet was never able to produce.
+
+**It is kept by WIDTH, and it is right to be.** That is the one thing the
+spreadsheet models and the app did not: film is not fungible by weight. PET 12µm
+sits in 23 widths from 340 mm to 1040 mm, and a job needing 650 mm cannot run on
+a 340 mm reel however many kilograms are behind it. Stock batches carry
+`widthMm` and `micron` because of this register.
+
+The gauge is on the batch rather than the material for the same reason the works
+gave for their rates: they price a film by TYPE — one PET rate covers every
+gauge — and their register carries LDPE in fourteen gauges under one name.
+
+Four sheets land on one material, so a batch's code carries the sheet it came
+off and the row it was on: `STK-NAT-114` is row 114 of Natural LDPE. Anything
+the import will not swallow is named at the end of the run rather than dropped
+silently — `600800 mm` in Polyster row 63 is 600 and 800 typed together, and the
+102 kg behind it is loaded with no width rather than lost to punish a typo.
+
+It also adds **PP Film** and **Nylon Poly**, which their register carries and the
+catalogue did not — 3,254 kg that could not previously be counted. Neither gets
+a rate or a density: a rate is the works' commercial business, and a pearlised
+BOPP is not the density of a plain one.
+
+### Four jobs to look at
+
+```bash
+npm run seed:demo -w @yuva/api
+npm run seed:demo -w @yuva/api -- --clear
+```
+
+Four jobs, one at each stage of the chain, so the whole thing can be walked
+through on the screens:
+
+|                  |                                                 |
+| ---------------- | ----------------------------------------------- |
+| **Quoted**       | a quotation sent, nobody has answered           |
+| **Ordered**      | won, the order is on the books, nothing started |
+| **On the floor** | printing done, lamination running               |
+| **Finished**     | every stage done, costed, and taken off stock   |
+
+**Not fixtures.** Every row is produced by the services the screens call: the
+quotation is priced by the costing engine, winning it raises the order, raising
+a card derives its stages from the structure, starting one checks the film is
+free, and the finished job's sheet posts what it actually took off stock. If any
+of that breaks, the seed breaks, which is most of why it is worth having.
+
+It uses the works' **real** customers and designs, so the screens read as they
+would in use, and it creates no customer and no design of its own. What it does
+create is marked, and it clears before it seeds — so it can be re-run after a
+change and land in a known state. `--clear` removes exactly what it made: the
+quotations, orders, job cards, job sheets, `DEMO-` stock batches and the four
+people, and nothing else.
+
+That last part goes around two refusals on purpose. A posted job sheet will not
+be deleted and a completed card will not either — both right for the works' own
+records, both wrong for a demo somebody wants to reset.
 
 Master data lives in `costing_machines`, `costing_labour`, and the `costing_*`
 keys in settings. `npm run seed:costing -w @yuva/api` loads the works' own 2022
@@ -2286,36 +2413,36 @@ indistinguishable from a bug.
 Full diagram and column reference: [`docs/database-schema.md`](../../docs/database-schema.md).
 Regenerate after any migration with `npm run schema:docs -w @yuva/api`.
 
-| Table                       | Holds                                                                                                                                                          |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `customers`                 | Companies that order. Text fields use `'NA'` where the imported sheet was blank.                                                                               |
-| `jobs`                      | Products and their full 55-column specification.                                                                                                               |
-| `quotations`                | Customer-facing documents. Totals frozen at save; carries its own date, margin, transport, pouch making and wastage; `lost_reason` says why a loss was lost.   |
-| `quotation_items`           | One priced line: its design, its gazette, its geometry and its cylinders.                                                                                      |
-| `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted. `rate_override` is the price agreed for this job, when one was.         |
-| `quotation_item_quantities` | One line's figures at one quoted quantity.                                                                                                                     |
-| `quotation_tiers`           | One quoted quantity and the document totals at it.                                                                                                             |
-| `materials`                 | The rate catalogue, with density for films.                                                                                                                    |
-| `material_rates`            | One material's price on one date — one row per active material per day.                                                                                        |
-| `app_setting_history`       | One setting's value from one date — what the works held then, the way `material_rates` answers it for a price.                                                 |
-| `stock_batches`             | One delivery of one material, and what is left of it. Unique batch code per material. Keeps the delivery note's own figure when it arrived in another unit.    |
-| `suppliers`                 | Who the works buys from. What they supply is derived from their orders, never stored.                                                                          |
-| `purchase_orders`           | One order to one supplier. Progress follows its receipts; delay is computed, not stored.                                                                       |
-| `purchase_order_lines`      | One material on an order, in the unit it was ordered in.                                                                                                       |
-| `purchase_receipts`         | One delivery against a line. Accepted stock names the batch it became; rejected stock names nothing.                                                           |
-| `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.                                                                              |
-| `job_sheets`                | One production run and what it cost. Keeps its own copy of every overhead rate, so it reads as it was costed. `stock_posted_at` is set once and never cleared. |
-| `job_sheet_lines`           | One consumable on one sheet: issued, returned, its share of a mix drum, the computed consumption and the one the office typed over it.                         |
-| `job_sheet_labour`          | One role's wages for the run — rate a day, heads, days.                                                                                                        |
-| `job_sheet_stage_usage`     | One machine's share of the day's electricity, the days it ran and the shifts. The shares divide one day, so they total 100.                                    |
-| `job_artwork`               | A design file, held in R2 with only its description here. A revision supersedes rather than overwrites; erasing the file keeps the row that describes it.      |
-| `costing_machines`          | A machine and what a minute of it costs — load, tariff, speed, setup. Retired, never deleted: quotations were costed against it.                               |
-| `costing_labour`            | A wage, and which machine's minutes it is paid for. Monthly; the working month in settings turns it into a rate per minute.                                    |
-| `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.                                                                                  |
-| `app_settings`              | Editable rates and costing defaults.                                                                                                                           |
-| `users`                     | Accounts, their password hash and which modules each may reach.                                                                                                |
-| `sessions`                  | Live sign-ins. Deleted on expiry, so this table is always "right now".                                                                                         |
-| `login_events`              | Every successful sign-in, kept permanently. Survives the account being deleted.                                                                                |
+| Table                       | Holds                                                                                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `customers`                 | Companies that order. Text fields use `'NA'` where the imported sheet was blank.                                                                                                                  |
+| `jobs`                      | Products and their full 55-column specification.                                                                                                                                                  |
+| `quotations`                | Customer-facing documents. Totals frozen at save; carries its own date, margin, transport, pouch making and wastage; `lost_reason` says why a loss was lost.                                      |
+| `quotation_items`           | One priced line: its design, its gazette, its geometry and its cylinders.                                                                                                                         |
+| `quotation_item_layers`     | One ply of a line's laminate — material, thickness, density and rate, all snapshotted. `rate_override` is the price agreed for this job, when one was.                                            |
+| `quotation_item_quantities` | One line's figures at one quoted quantity.                                                                                                                                                        |
+| `quotation_tiers`           | One quoted quantity and the document totals at it.                                                                                                                                                |
+| `materials`                 | The rate catalogue, with density for films.                                                                                                                                                       |
+| `material_rates`            | One material's price on one date — one row per active material per day.                                                                                                                           |
+| `app_setting_history`       | One setting's value from one date — what the works held then, the way `material_rates` answers it for a price.                                                                                    |
+| `stock_batches`             | One delivery of one material, and what is left of it. Unique batch code per material. Keeps the delivery note's own figure when it arrived in another unit.                                       |
+| `suppliers`                 | Who the works buys from. What they supply is derived from their orders, never stored.                                                                                                             |
+| `purchase_orders`           | One order to one supplier. Progress follows its receipts; delay is computed, not stored.                                                                                                          |
+| `purchase_order_lines`      | One material on an order, in the unit it was ordered in.                                                                                                                                          |
+| `purchase_receipts`         | One delivery against a line. Accepted stock names the batch it became; rejected stock names nothing.                                                                                              |
+| `stock_movements`           | The stock ledger — one immutable row per change, with the balance it left behind.                                                                                                                 |
+| `job_sheets`                | One production run and what it cost. Keeps its own copy of every overhead rate, so it reads as it was costed. `stock_posted_at` is set once and never cleared.                                    |
+| `job_sheet_lines`           | One consumable on one sheet: issued, returned, its share of a mix drum, the computed consumption and the one the office typed over it.                                                            |
+| `job_sheet_labour`          | One role's wages for the run — rate a day, heads, days.                                                                                                                                           |
+| `job_sheet_stage_usage`     | One machine's share of the day's electricity, the days it ran and the shifts. The shares divide one day, so they total 100.                                                                       |
+| `job_artwork`               | A design file, held in R2 with only its description here. A revision supersedes rather than overwrites; erasing the file keeps the row that describes it.                                         |
+| `costing_machines`          | A machine and what a minute of it costs — load, tariff, speed, setup. Retired, never deleted: quotations were costed against it.                                                                  |
+| `costing_labour`            | A wage, and which machine's minutes it is paid for. Monthly; the working month in settings turns it into a rate per minute. **Dated**: one row per window, and the role name repeats across them. |
+| `quotation_emails`          | One recorded attempt to email a quotation — recipients, subject, who sent it.                                                                                                                     |
+| `app_settings`              | Editable rates and costing defaults.                                                                                                                                                              |
+| `users`                     | Accounts, their password hash and which modules each may reach.                                                                                                                                   |
+| `sessions`                  | Live sign-ins. Deleted on expiry, so this table is always "right now".                                                                                                                            |
+| `login_events`              | Every successful sign-in, kept permanently. Survives the account being deleted.                                                                                                                   |
 
 Two deliberate choices:
 
@@ -2495,6 +2622,88 @@ A pouch count with **no** per-pouch rate does not zero the order. A quotation
 line carries both units whether or not it was sold per pouch, so a
 21,565-pouch order at no per-pouch rate is still worth its kilograms.
 
+## Employees — the works' own people
+
+Deliberately **not a personnel system**: no attendance, no leave calendar, no
+payroll. A works of forty does not run those off a screen, and a screen that
+asks for them is filled in once and then abandoned. This holds the handful of
+facts the rest of the system needs so that a person stops being typed by hand.
+
+| Method | Path             | Notes                                                    |
+| ------ | ---------------- | -------------------------------------------------------- |
+| GET    | `/employees`     | Everybody, with what each is on right now. Filters below |
+| GET    | `/employees/:id` | One person                                               |
+| POST   | `/employees`     | Add somebody                                             |
+| PATCH  | `/employees/:id` | Change them, or clear `isActive` when they leave         |
+| DELETE | `/employees/:id` | Only somebody nobody's work names                        |
+
+**Reading is open to anyone signed in**, and has to be: the operator dropdown on
+a job card is what this module exists for, and gating the list would leave the
+floor typing names by hand on the one screen it was built for. Writing needs
+`jobs`, the permission the floor's own records use — adding an operator is a
+supervisor's act and it moves no money.
+
+### Why it exists
+
+The works' own fourteen job sheets hold these as though they were separate
+roles:
+
+```
+"Operator 1"  "Printing operator 2"  "Printing operattor 2" (x12, a typo)
+"Lamination operattor 2"  "Slitting operator 3"  "Pouch operator"
+"helper l"  "helper g"  "Helper — lamination"  "Helper — general"
+"Office 1"  "office 1"  "Office 2"
+```
+
+Thirteen spellings for perhaps six people. Nothing can be totalled per person or
+per role from that, and no amount of care at the keyboard fixes it — only
+removing the keyboard does.
+
+### No wage lives here
+
+An employee points at a **costing role** — `CostingLabour`, the same rows the
+Costing screen maintains, which already carry the monthly salary and which
+process they belong to. So what a printing operator costs has exactly one
+answer, dated, and a rise is typed once rather than onto forty records.
+
+`roleName` carries free text for the people no costing role describes: the
+office, the warehouse, a supervisor. One or the other is required.
+
+The role's own name wins when reading, so renaming a role on the Costing screen
+renames it here too rather than leaving a stale copy behind. The copy is kept
+anyway, as the fallback for a role that is later retired.
+
+### What somebody is DOING is not stored
+
+Working, which machine, which card, which order: all four come from the **one
+job card stage that is RUNNING with their name on it**, worked out on the way
+out. A status somebody has to remember to change is wrong most of the time —
+the same reason a card's progress and an order's lateness are derived here.
+
+One query answers it for the whole list, however many people are on it. Somebody
+on two running stages at once is not an error — you set a laminator going and
+walk to the slitter — and the first by position wins the row, which is the job
+card's own order of work.
+
+| Query         | Narrows to                               |
+| ------------- | ---------------------------------------- |
+| `search`      | Name, code or role                       |
+| `process`     | The printing people, the slitting people |
+| `shift`       | Morning, afternoon, night, general       |
+| `includeLeft` | Off by default — see below               |
+| `workingOnly` | Just the people on a machine right now   |
+
+### Leaving is not deleting
+
+Clearing `isActive` is how somebody leaves. **Deleting is refused once they have
+run a stage**, and the message says so. That is not squeamishness: a stage keeps
+the name beside the link precisely so an old card survives, but a leaver is
+history, not a mistake. A row mistyped this morning is the case delete exists
+for.
+
+People who have left are out of the list by default and never gone — a card from
+March names them, and a list that hides them cannot explain it.
+
 ## Production — what the floor actually did
 
 A quotation says what a job should cost. An order says what was asked for. A job
@@ -2573,6 +2782,37 @@ caught by the fact that it _exists_. The module may not name `stockMovement` at
 all, may not create, update or delete a `stockBatch`, and reads on-hand stock
 only as a `groupBy` sum.
 
+#### Wide enough, not just enough
+
+```
+free    =  on hand  −  held by other open cards
+usable  =  free     −  anything on a reel narrower than this job's web
+```
+
+**Film is slit down and never widened**, so kilograms on a 340 mm reel are no
+use to a job running at 715. The web is the job's own geometry —
+`film width × lanes + trim` — and it comes off the quotation line the card was
+raised from. Zero turns the test off rather than failing everything, which is
+what a card with no priced structure behind it gets.
+
+Stock is read grouped by `(materialId, widthMm)`, so the whole page costs a few
+dozen rows rather than one per batch — the works holds 266 batches of LDPE
+across fourteen widths.
+
+Two judgement calls, both made towards saying _no_ rather than _yes_:
+
+- **A reel whose width nobody recorded counts as usable.** Not a claim that it
+  fits — an admission that nothing here can say it does not. A works that has
+  never recorded a width is left exactly where it was before widths existed.
+- **Claims come off the wide pool first.** Nothing records which reel a claim is
+  against, so this has to assume something; assuming the widest suitable reels
+  went first understates what is left, and that is the error that does not send
+  a job to a machine it cannot run on.
+
+`tooNarrowKg` is reported separately because it is a different problem with a
+different answer: the right film in the wrong size is solved by buying
+differently, not by buying more.
+
 #### What a card needs
 
 The same arithmetic the costing charges for, so a job card and the quotation
@@ -2594,11 +2834,35 @@ The wastage is read on the **quotation's own date** and honours that quotation's
 override, so a card raised today against a line quoted in March asks for the
 film that line was costed on.
 
-**Films only.** Only a quotation line names actual material rows per ply, which
-is what makes a requirement a fact rather than a guess. A card on an order typed
-over the phone reserves nothing and says so — reserving the wrong film would be
-worse than reserving none. Ink and adhesive are costed at blended rates against
-rows that are not real drums, so there is nothing there to reserve against.
+**Ink and adhesive too**, since the quotation lines started naming their
+colours. `consumable-requirements.ts` mirrors the costing's own arithmetic:
+
+- **Ink at its WET weight.** The laydown is what stays on the film once dry; the
+  tin is bought wet. Claiming the dry figure would under-claim every job by the
+  solids — four times over on an ink at 23%.
+- **The solvents it is thinned with**, 100:80, split on the works' own ethyl
+  acetate percentage. Ethyl acetate is the biggest consumable after film,
+  because the adhesive is let down with it as well and the two are one claim on
+  one drum.
+- **The adhesive as the batch it is mixed as** — 100:146:15 — spread over the
+  **substrate** rather than the laminate, because it goes between the plies and
+  not over itself or the ink.
+
+Written out rather than taken from `costRate` because material quantities depend
+on none of what makes a rate: not the machines, not the wages, not the
+overheads. A kilogram of ink is a kilogram of ink whatever the press costs to
+run.
+
+**A special colour nobody has chosen the ink for holds no drum.** Its solvent
+still counts — the works mixes something — but there is nothing to claim. Once
+the ink is named on the line it is reserved like any other.
+
+Nothing bought in a drum comes on a reel, so `needsWidthMm` is zero for all of
+it and the width test does not apply.
+
+A card on an order typed over the phone still reserves nothing: only a quotation
+line names actual material rows, which is what makes a requirement a fact rather
+than a guess.
 
 #### When it is checked, and what it stops
 
@@ -2683,6 +2947,27 @@ job card picker listing the cards nothing else costs. Linking a blank sheet
 fills its design, name and customer from the card — blanks only, because an
 office that typed a name meant it.
 
+### Finishing a stage starts the next one
+
+A job does not stop between machines, and the floor should not have to say so
+twice. Finishing a stage picks up the next one **nobody has started** and
+carries the weight across: what came off this machine is what goes onto that
+one. Skipped stages are stepped over; a stage already running is left alone.
+
+The weight is read **off the finished row**, not out of the request that
+finished it — the floor types the figure, it saves as they leave the box, and
+Finish is a separate press.
+
+The machine and the operator are left blank on the new stage. They are a
+different person at a different machine, and they are the two things worth
+asking.
+
+**The material check does not run on a continuation.** It asks whether a job
+should _begin_; a card that is already RUNNING has begun, its film is committed
+and partly consumed, and refusing the laminator would strand a printed reel
+rather than save any film. The guard applies to the first machine the job
+reaches and nowhere else.
+
 ### Starting a stage starts everything above it
 
 The floor starts a stage, not a card. So a stage moving to RUNNING moves the
@@ -2695,6 +2980,21 @@ the office and the floor that this exists to end.
 **Completing the card does not complete the order.** For a customer, complete
 means delivered, and nothing here knows about that yet — Dispatch will. The
 order stays in production until somebody says otherwise, which is honest.
+
+### Who ran it — a link and a snapshot
+
+Exactly the shape the machine beside it uses: `operatorId` points at an
+employee, and `operator` holds their name, written at the moment it is picked.
+
+The snapshot is what keeps a card from March readable after somebody leaves in
+June — the link goes null and the name stays. It is also why the fourteen
+imported sheets still say who ran them, naming people this works never
+registered.
+
+**A typed name with no id is still accepted**, and has to be: somebody covering
+a shift is not always on the books yet, and refusing the record is how a works
+goes back to writing it on paper. When both travel, the snapshot from the link
+wins — the dropdown is the one that knows how the works spells it.
 
 ### Waste is shown, never stored
 

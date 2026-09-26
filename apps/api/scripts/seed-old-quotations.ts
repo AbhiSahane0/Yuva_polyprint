@@ -17,6 +17,7 @@
 import { execFileSync } from 'node:child_process';
 import { prisma } from '../src/lib/prisma.js';
 import { createQuotation } from '../src/modules/quotations/quotation.service.js';
+import { labourAsAt } from '../src/modules/costing/costing.service.js';
 import { getSettings } from '../src/modules/settings/settings.service.js';
 import {
   costRate,
@@ -181,12 +182,6 @@ async function main() {
       stationColourSteps: parseStationSteps(m.stationColourSteps),
     }),
   );
-  const labour = (await prisma.costingLabour.findMany({ where: { isActive: true } })).map((l) => ({
-    role: l.role,
-    process: l.process,
-    monthlySalary: Number(l.monthlySalary),
-  }));
-
   let exact = 0;
   const out: string[] = [];
 
@@ -195,6 +190,20 @@ async function main() {
 
     /* The overheads and rates the works held on the day of this quotation. */
     const settings = await getSettings(date);
+
+    /*
+     * And the CREW it was paid for on that day.
+     *
+     * Read per quotation rather than once for the run, because wages are dated
+     * now: taking a lamination crew back on in 2026 must not reach back and
+     * re-price a document written in 2022. Reading them once, as at today, is
+     * exactly the bug the dating was added to fix.
+     */
+    const labour = (await labourAsAt(date)).map((l) => ({
+      role: l.role,
+      process: l.process,
+      monthlySalary: l.monthlySalary,
+    }));
     const rateRows = await prisma.materialRate.findMany({
       where: { effectiveDate: { lte: asDate(date) } },
       orderBy: { effectiveDate: 'desc' },

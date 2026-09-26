@@ -52,6 +52,14 @@ export interface CostingMachine {
   name: string;
   kind: MachineKind;
   /**
+   * The one of its kind the works actually runs.
+   *
+   * Without it, "one machine per kind" meant whichever came first on the list —
+   * which is how a works with an old laminator and a new one priced every job
+   * on the old one's speed. A job that names a machine still beats this.
+   */
+  isDefault?: boolean;
+  /**
    * Connected load, costed as horsepower × a rate per hour.
    *
    * On a press carrying `stationHorsepower` this is the MAIN DRIVE alone and
@@ -948,22 +956,28 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
    * lamination passes it never made — quietly, and on every quotation, because
    * nothing about the total says which machine it came from.
    *
-   * So a job runs on one of each kind: the one it names, or the first on the
-   * list, which is the works' own sortOrder.
+   * So a job runs on one of each kind, chosen in this order:
+   *
+   *   1. the machine this JOB names, which is a decision about one job
+   *   2. the machine the works has marked as the one it runs
+   *   3. the first of that kind on the list
+   *
+   * The middle one was missing, and its absence had a cost: a works whose new
+   * laminator is faster than the old one priced every job on the old one,
+   * because the old one happened to be first. Third place is kept as the
+   * fallback so a works that has marked nothing is costed exactly as before.
    */
   const chosenMachines = (() => {
     const byKind = new Map<MachineKind, CostingMachine>();
+    const rank = (machine: CostingMachine): number => {
+      if (job.machineChoice?.[machine.kind] === machine.name) return 0;
+      if (machine.isDefault) return 1;
+      return 2;
+    };
+
     for (const machine of machines) {
-      const named = job.machineChoice?.[machine.kind];
-      if (named && machine.name === named) {
-        byKind.set(machine.kind, machine);
-        continue;
-      }
-      if (!byKind.has(machine.kind)) byKind.set(machine.kind, machine);
-    }
-    /* A named machine must win even when it is not first on the list. */
-    for (const machine of machines) {
-      if (job.machineChoice?.[machine.kind] === machine.name) byKind.set(machine.kind, machine);
+      const held = byKind.get(machine.kind);
+      if (!held || rank(machine) < rank(held)) byKind.set(machine.kind, machine);
     }
     return [...byKind.values()];
   })();
