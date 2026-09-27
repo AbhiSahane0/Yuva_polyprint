@@ -530,6 +530,79 @@ own with the weight carried across. The progress bar on the card and in the list
 is worked out from the stages — done, out of the ones that apply — so the two
 screens can never disagree.
 
+## Step 6a — the same job, from the machine · **Machine screen**
+
+Everything in Step 6 can also be done from a tablet at the machine, and that
+is where it is meant to be done. `/floor` is a different screen for a
+different person: dark, no sidebar, four buttons and one job on it.
+
+### Setting a tablet up
+
+Asked twice, once each:
+
+1. **Which machine is this?** The tablet remembers, and from then on shows only
+   the work at that machine.
+2. **Who is on the machine?** That machine's own people are offered first —
+   the press's operators on the press's tablet — and the rest of the works
+   below them. One tap, and "Not you?" changes it at the start of a shift.
+
+The name matters because it is the one thing the office was guessing at. A
+stage used to be signed by whoever a supervisor remembered on Friday; now it is
+signed by whoever pressed the button.
+
+### What it shows
+
+One job: the order, the design, the customer, which stage and how far down the
+card it is, and four figures — ordered, on the machine, came off, waste. Under
+it, what is next at this machine, so an operator can see the shape of their
+shift without asking.
+
+**Only work the reel has actually reached.** A stage whose predecessor has not
+finished is never offered, so the lamination tablet cannot start a job that has
+not been printed. A stage the office has assigned to Laminator 1 does not
+appear on Laminator 2 — somebody chose, and a tablet quietly overriding that is
+how two machines start the same job. A stage with no machine yet goes to
+whichever machine of the right kind reaches it first.
+
+### The four buttons
+
+| Button           | What it does                                                  |
+| ---------------- | ------------------------------------------------------------- |
+| **Start job**    | records the weight going on, the operator and the machine     |
+| **Complete job** | records what came off, and hands the reel to the next machine |
+| **Pause**        | stops the job, and asks why                                   |
+| **Problem**      | the same, and reads as a problem rather than a break          |
+
+Start and Complete are the **same write the office screen makes** — so the
+material re-check still happens at the moment film goes on a machine, the card
+still starts itself, and the reel is still handed on with its weight. A tablet
+that recorded jobs its own way would drift from the job card within a month,
+and the job card is the document the works is paid against. A job whose film is
+not in is refused here too, in the same words.
+
+### Why a machine is standing idle
+
+This is the part nothing else recorded. A stage already says when it started,
+when it finished and what it weighed; none of it could say why the press has
+been quiet since eleven.
+
+Pause and Problem both stop the job and both insist on a reason, and each one
+is **logged rather than stored** — a shift holds four stoppages, and the fourth
+overwriting the third is how a works loses its own day. The card reads **On
+hold** on the office Production screen the moment the operator presses it,
+with no phone call, and the reason is on the tablet for whoever comes on next
+shift. **Start again** puts it back to running, and that is logged too.
+
+A held job cannot be started or finished until somebody restarts it. Held means
+held.
+
+> This log is where Quality & Waste will read from when it is built. It is not
+> that module: there is no severity and there are no categories, because
+> inventing a vocabulary the works has not asked for is how a screen ends up
+> with a dropdown nobody uses honestly.
+
+---
+
 ## Step 7 — the card is finished
 
 When every stage is done, mark the card **Completed**.
@@ -713,21 +786,22 @@ used them can still explain themselves.
 
 # The screens, at a glance
 
-| Screen                 | Answers                                              |
-| ---------------------- | ---------------------------------------------------- |
-| **Customers**          | Who we sell to, and what designs they have           |
-| **Quotations**         | What we have offered, and what came of it            |
-| **Orders**             | What customers have committed to, and when it is due |
-| **Planning**           | What can run, when it runs, and on which machine     |
-| **Production**         | What is on the floor right now, and how far along    |
-| **Employees**          | Who is here, and what they are on                    |
-| **Job sheets**         | What each run actually cost                          |
-| **Dispatch**           | What has left the works, and what is waiting to go   |
-| **Inventory**          | What we hold, what it is worth, what is running out  |
-| **Purchase**           | What is on order and what has arrived                |
-| **Rates**              | Today's raw material prices                          |
-| **Costing**            | What the works costs to run                          |
-| **Design & Cylinders** | Which designs have cylinders, and where they are     |
+| Screen                 | Answers                                                      |
+| ---------------------- | ------------------------------------------------------------ |
+| **Customers**          | Who we sell to, and what designs they have                   |
+| **Quotations**         | What we have offered, and what came of it                    |
+| **Orders**             | What customers have committed to, and when it is due         |
+| **Planning**           | What can run, when it runs, and on which machine             |
+| **Machine screen**     | One machine, one job, four buttons — the tablet on the floor |
+| **Production**         | What is on the floor right now, and how far along            |
+| **Employees**          | Who is here, and what they are on                            |
+| **Job sheets**         | What each run actually cost                                  |
+| **Dispatch**           | What has left the works, and what is waiting to go           |
+| **Inventory**          | What we hold, what it is worth, what is running out          |
+| **Purchase**           | What is on order and what has arrived                        |
+| **Rates**              | Today's raw material prices                                  |
+| **Costing**            | What the works costs to run                                  |
+| **Design & Cylinders** | Which designs have cylinders, and where they are             |
 
 ---
 
@@ -768,7 +842,6 @@ So nobody goes looking for it:
   booked onto one press on one day. The machine load card shows that happening
   rather than preventing it, which is the honest half of the job.
 - **Reports and an overview screen.**
-- **An operator view** — a stripped-back screen for a tablet at the machine.
 - **Reserving by roll on the job sheet.** The card earmarks particular rolls;
   the sheet still issues by weight, oldest first, and does not check that the
   roll it took is the roll that was held.

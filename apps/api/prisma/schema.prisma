@@ -1702,8 +1702,10 @@ model Employee {
   /// Every stage they have run. See ProductionStage.operatorId.
   stages ProductionStage[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  /// Stoppages and issues they recorded at the machine.
+  floorEvents FloorEvent[]
 
   @@index([isActive, name])
   @@index([roleId])
@@ -1941,6 +1943,8 @@ model ProductionOrder {
   jobSheet      JobSheet?
   /// The deliveries the godown took out of this run.
   dispatchLines DispatchLine[]
+  /// What the floor said about it — stopped, and why.
+  floorEvents   FloorEvent[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -2002,6 +2006,8 @@ model ProductionStage {
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
+  floorEvents FloorEvent[]
 
   @@unique([productionOrderId, position])
   @@index([status])
@@ -2067,6 +2073,7 @@ model StockReservation {
   /// One row per material per card: raising a card twice for the same film
   /// should correct the figure, not hold it twice.
   /**
+   * /**
    * /**
    * /**
    * /* One row per card per ROLL. A job spanning three rolls holds three of them,
@@ -2535,4 +2542,58 @@ model DispatchPackage {
 
   @@unique([lineId, position])
   @@map("dispatch_packages")
+}
+
+/// What the floor said, and why it stopped.
+///
+/// Only the things the machine screen can say that nothing else records. A
+/// stage already carries when it started and finished and what it weighed;
+/// what it could never say was **why a machine is standing idle** — and that
+/// is the question the office asks across the floor twenty times a day.
+enum FloorEventKind {
+  PAUSED
+  RESUMED
+  /// Something wrong with the job: a bad reel, a registration problem, a
+  /// blocked die. Stops the card in the same way a pause does — a problem
+  /// worth typing is a problem worth stopping for.
+  ISSUE
+}
+
+/// One thing the operator said at the machine.
+///
+/// Deliberately a log rather than fields on the card. A card holds one status
+/// and one reason; a shift holds four stoppages, and the fourth overwriting
+/// the third is how a works ends up unable to say where its day went.
+///
+/// This is also where Quality & Waste will read from when it is built. It is
+/// not that module — there is no severity here and no categories, because
+/// inventing a vocabulary the works has not asked for is how a screen ends up
+/// with a dropdown nobody uses honestly.
+model FloorEvent {
+  id String @id @default(cuid())
+
+  productionOrderId String          @map("production_order_id")
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+
+  /// The stage it happened on. Null where the card was stopped between them.
+  stageId String?          @map("stage_id")
+  stage   ProductionStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+
+  kind FloorEventKind
+  /// What they said. A pause with no reason teaches nothing, so the screen
+  /// insists on one.
+  note String         @default("")
+
+  /// Who said it, picked from the Employees list at the machine.
+  operatorId  String?   @map("operator_id")
+  operatorRef Employee? @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  /// Snapshotted, so an old stoppage still names somebody after they leave.
+  operator    String    @default("")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([productionOrderId])
+  @@index([stageId])
+  @@index([createdAt])
+  @@map("floor_events")
 }

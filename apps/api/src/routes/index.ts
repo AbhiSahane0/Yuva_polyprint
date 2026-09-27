@@ -14,6 +14,7 @@ import monitorRoutes from '../modules/monitor/monitor.routes.js';
 import orderRoutes from '../modules/orders/order.routes.js';
 import dispatchRoutes from '../modules/dispatch/dispatch.routes.js';
 import planningRoutes from '../modules/planning/planning.routes.js';
+import floorRoutes from '../modules/floor/floor.routes.js';
 import productionRoutes from '../modules/production/production.routes.js';
 import purchaseRoutes from '../modules/purchase/purchase.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
@@ -65,6 +66,13 @@ router.use('/dispatches', authenticate, dispatchRoutes);
  * card, which is the same desk that raises it.
  */
 router.use('/planning', authenticate, planningRoutes);
+
+/*
+ * The machine screen — one tablet, one machine, one job. Readable by anyone
+ * signed in; recording needs `jobs`, the same as recording a stage from the
+ * office, because it is the same write through the same service.
+ */
+router.use('/floor', authenticate, floorRoutes);
 
 /*
  * Jobs are edited from two places — the customer editor and the quotation

@@ -19,6 +19,7 @@ const OrdersPage = lazy(() => import('@/features/orders/pages/OrdersPage'));
 const OrderPage = lazy(() => import('@/features/orders/pages/OrderPage'));
 const NewOrderPage = lazy(() => import('@/features/orders/pages/NewOrderPage'));
 const PlanningPage = lazy(() => import('@/features/planning/pages/PlanningPage'));
+const FloorPage = lazy(() => import('@/features/floor/pages/FloorPage'));
 const DispatchPage = lazy(() => import('@/features/dispatch/pages/DispatchPage'));
 const DispatchNotePage = lazy(() => import('@/features/dispatch/pages/DispatchNotePage'));
 const DispatchFormPage = lazy(() => import('@/features/dispatch/pages/DispatchFormPage'));
@@ -324,6 +325,21 @@ export function AppRouter() {
         <Routes>
           {/* Login sits outside the shell — no sidebar to a stranger. */}
           <Route path="/login" element={<LoginRoute />} />
+          {/*
+            The machine screen sits outside it too, and for the opposite
+            reason: the operator is signed in, but a sidebar full of
+            quotations and rates is not for them. One tablet, one machine, one
+            job — nothing on it that can be pressed by mistake on the way to
+            the thing you meant.
+          */}
+          <Route
+            path="/floor"
+            element={
+              <RequireAuth>
+                <FloorPage />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/*"
             element={
