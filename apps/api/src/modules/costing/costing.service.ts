@@ -12,7 +12,7 @@ import type {
   UpdateMachineInput,
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, TX } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
 
 /**
@@ -226,7 +226,7 @@ export async function updateOverhead(
         },
       }),
     );
-  });
+  }, TX);
 }
 
 /**
@@ -272,7 +272,7 @@ export async function setDefaultMachine(id: string, isDefault: boolean): Promise
       });
     }
     return toMachine(await tx.costingMachine.update({ where: { id }, data: { isDefault } }));
-  });
+  }, TX);
 }
 
 /** A name already in use, told apart from anything else that could fail. */
@@ -431,7 +431,7 @@ export async function updateLabour(id: string, input: UpdateLabourInput): Promis
         },
       }),
     );
-  });
+  }, TX);
 }
 
 /**

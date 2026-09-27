@@ -7,15 +7,19 @@ import {
   IndianRupee,
   LogOut,
   Menu,
+  ShieldAlert,
   ShieldCheck,
+  Cog,
   Disc3,
   Package,
+  PackageCheck,
   Truck,
   Users,
   X,
   Calculator,
   ClipboardList,
   ClipboardCheck,
+  CalendarClock,
   Factory,
   HardHat,
 } from 'lucide-react';
@@ -50,6 +54,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
        * API rather than by hiding the whole section.
        */
       { to: '/orders', label: 'Orders', icon: ClipboardCheck },
+      { to: '/dispatch', label: 'Dispatch', icon: PackageCheck },
     ],
   },
   {
@@ -66,14 +71,17 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       /* No module: a job card is the floor's own document and the office
          watches it. Writing to it needs `jobs`, enforced on the API. */
+      { to: '/planning', label: 'Planning', icon: CalendarClock },
       { to: '/production', label: 'Production', icon: Factory },
       { to: '/cylinders', label: 'Design & Cylinders', icon: Disc3, module: 'cylinders' },
       { to: '/job-sheets', label: 'Job sheets', icon: ClipboardList, module: 'jobs' },
+      { to: '/quality', label: 'Quality & waste', icon: ShieldAlert },
       /* No module, for the same reason as Production: the operator dropdown on
          a job card is what this is for, and the floor has to be able to read
          it. Adding somebody needs `jobs`, enforced on the API. */
+      { to: '/machines', label: 'Machines', icon: Cog },
       { to: '/employees', label: 'Employees', icon: HardHat },
-      { to: '/jobs', label: 'Jobs', icon: Boxes, module: 'jobs', disabled: true },
+      { to: '/designs', label: 'Designs', icon: Boxes, module: 'customers' },
     ],
   },
   {
@@ -145,7 +153,15 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-/** Who is signed in, and the way out. Pinned to the bottom of the sidebar. */
+/**
+ * Who is signed in, and the way out.
+ *
+ * **A flex row at the bottom of the column, not an absolutely positioned
+ * one.** It used to be `absolute bottom-0`, and that anchors to the bottom of
+ * the SCROLLABLE CONTENT rather than the visible panel — so the day the nav
+ * grew past the height of the screen, the footer started scrolling with it and
+ * sat on top of the last items. Machines could not be reached at all.
+ */
 function SessionFooter() {
   const user = useAuthStore((state) => state.user);
   const logout = useLogout();
@@ -153,7 +169,7 @@ function SessionFooter() {
   if (!user) return null;
 
   return (
-    <div className="border-ink-200 absolute inset-x-0 bottom-0 border-t bg-white p-3">
+    <div className="border-ink-200 shrink-0 border-t bg-white p-3">
       <div className="px-2 pb-2">
         <p className="text-ink-800 truncate text-sm font-medium">{user.displayName}</p>
         <p className="text-ink-400 truncate text-xs">
@@ -179,12 +195,23 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="bg-ink-50 min-h-dvh">
       {/* Desktop sidebar */}
-      <aside className="border-ink-200 fixed inset-y-0 left-0 hidden w-60 overflow-y-auto border-r bg-white pb-28 lg:block">
-        <div className="border-ink-200 flex h-14 items-center gap-2.5 border-b px-5">
+      {/*
+        A column of three: a header that stays, a nav that scrolls, and a
+        footer that stays. Only the middle one scrolls, which is what keeps
+        the last nav item reachable however long the list grows.
+
+        `min-h-0` on the scrolling child is load-bearing — a flex item will
+        not shrink below its content without it, so the nav would push the
+        footer off the bottom instead of scrolling.
+      */}
+      <aside className="border-ink-200 fixed inset-y-0 left-0 hidden w-60 flex-col border-r bg-white lg:flex">
+        <div className="border-ink-200 flex h-14 shrink-0 items-center gap-2.5 border-b px-5">
           <Logo className="h-6" />
           <span className="text-ink-900 text-sm font-bold">Polyprint</span>
         </div>
-        <NavContent />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <NavContent />
+        </div>
         <SessionFooter />
       </aside>
 
@@ -196,8 +223,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             onClick={() => setDrawerOpen(false)}
             aria-hidden
           />
-          <aside className="absolute inset-y-0 left-0 w-64 overflow-y-auto bg-white pb-28 shadow-xl">
-            <div className="border-ink-200 flex h-14 items-center justify-between border-b px-4">
+          <aside className="absolute inset-y-0 left-0 flex w-64 flex-col bg-white shadow-xl">
+            <div className="border-ink-200 flex h-14 shrink-0 items-center justify-between border-b px-4">
               <span className="flex items-center gap-2.5">
                 <Logo className="h-6" />
                 <span className="text-ink-900 text-sm font-bold">Polyprint</span>
@@ -211,7 +238,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <X className="size-5" />
               </button>
             </div>
-            <NavContent onNavigate={() => setDrawerOpen(false)} />
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <NavContent onNavigate={() => setDrawerOpen(false)} />
+            </div>
             <SessionFooter />
           </aside>
         </div>

@@ -20,7 +20,7 @@ import {
   type UpdateSupplierInput,
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, TX } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
 import { receiveStock } from '../inventory/inventory.service.js';
 
@@ -370,7 +370,7 @@ export async function createPurchaseOrder(
     });
 
     return created.id;
-  });
+  }, TX);
 
   /*
    * Read back outside the transaction, deliberately.
@@ -569,7 +569,7 @@ export async function receivePurchaseLine(
 
     await restatus(tx, line.order.id);
     return line.order.id;
-  });
+  }, TX);
 
   return getPurchaseOrder(orderId);
 }
@@ -595,7 +595,7 @@ export async function closePurchaseLine(lineId: string, reason: string): Promise
       data: { closedAt: new Date(), closedReason: reason },
     });
     await restatus(tx, line.orderId);
-  });
+  }, TX);
 
   return getPurchaseOrder(line.orderId);
 }

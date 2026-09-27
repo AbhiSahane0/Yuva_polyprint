@@ -11,7 +11,7 @@ import {
   type JobSheetSummary,
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, TX } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
 import { issueMaterialFifo } from '../inventory/inventory.service.js';
 import { releaseFor } from '../production/material-reservation.js';
@@ -404,54 +404,66 @@ export async function recost(id: string): Promise<JobSheet> {
     expectedWastagePercent: sheet.expectedWastagePercent,
   });
 
-  await prisma.$transaction([
-    ...cost.lines.map((line, index) =>
-      prisma.jobSheetLine.update({
-        where: { id: sheet.lines[index]!.id },
+  /*
+   * The interactive form, not the array one.
+   *
+   * A re-cost rewrites twenty-one line rows, the labour, the stages and the
+   * sheet — and the ARRAY form of $transaction takes no timeout, so against a
+   * database across a network it aborted at five seconds with no way to say
+   * otherwise. Written out in order, it can be given the room it needs.
+   */
+  await prisma.$transaction(async (tx) => {
+    for (const write of [
+      ...cost.lines.map((line, index) =>
+        tx.jobSheetLine.update({
+          where: { id: sheet.lines[index]!.id },
+          data: {
+            /* Written back so the row explains itself without the sheet. */
+            mixIssuedKg: line.mixIssuedKg,
+            mixReturnedKg: line.mixReturnedKg,
+            computedKg: line.computedKg,
+            consumedKg: line.consumedKg,
+            amount: line.amount,
+          },
+        }),
+      ),
+      ...cost.labour.map((line, index) =>
+        tx.jobSheetLabour.update({
+          where: { id: sheet.labour[index]!.id },
+          data: { amount: line.amount },
+        }),
+      ),
+      ...cost.stages.map((stage, index) =>
+        tx.jobSheetStageUsage.update({
+          where: { id: sheet.stages[index]!.id },
+          data: { amount: stage.amount },
+        }),
+      ),
+      tx.jobSheet.update({
+        where: { id },
         data: {
-          /* Written back so the row explains itself without the sheet. */
-          mixIssuedKg: line.mixIssuedKg,
-          mixReturnedKg: line.mixReturnedKg,
-          computedKg: line.computedKg,
-          consumedKg: line.consumedKg,
-          amount: line.amount,
+          materialKg: cost.materialKg,
+          materialCost: cost.materialCost,
+          basicValuePerKg: cost.basicValuePerKg,
+          electricityCost: cost.electricityCost,
+          salaryCost: cost.salaryCost,
+          transportCost: cost.transportCost,
+          pouchingCost: cost.pouchingCost,
+          emiCost: cost.emiCost,
+          profit: cost.profit,
+          overheadCost: cost.overheadCost,
+          effectivePrice: cost.effectivePrice,
+          costPerKg: cost.costPerKg,
+          expectedWastageKg: cost.expectedWastageKg,
+          actualWastageKg: cost.actualWastageKg,
+          wastagePercent: cost.wastagePercent,
+          excessCost: cost.excessCost,
         },
       }),
-    ),
-    ...cost.labour.map((line, index) =>
-      prisma.jobSheetLabour.update({
-        where: { id: sheet.labour[index]!.id },
-        data: { amount: line.amount },
-      }),
-    ),
-    ...cost.stages.map((stage, index) =>
-      prisma.jobSheetStageUsage.update({
-        where: { id: sheet.stages[index]!.id },
-        data: { amount: stage.amount },
-      }),
-    ),
-    prisma.jobSheet.update({
-      where: { id },
-      data: {
-        materialKg: cost.materialKg,
-        materialCost: cost.materialCost,
-        basicValuePerKg: cost.basicValuePerKg,
-        electricityCost: cost.electricityCost,
-        salaryCost: cost.salaryCost,
-        transportCost: cost.transportCost,
-        pouchingCost: cost.pouchingCost,
-        emiCost: cost.emiCost,
-        profit: cost.profit,
-        overheadCost: cost.overheadCost,
-        effectivePrice: cost.effectivePrice,
-        costPerKg: cost.costPerKg,
-        expectedWastageKg: cost.expectedWastageKg,
-        actualWastageKg: cost.actualWastageKg,
-        wastagePercent: cost.wastagePercent,
-        excessCost: cost.excessCost,
-      },
-    }),
-  ]);
+    ]) {
+      await write;
+    }
+  }, TX);
 
   const fresh = await prisma.jobSheet.findUniqueOrThrow({ where: { id }, include: SHEET_INCLUDE });
   return toJobSheet(fresh);
@@ -600,7 +612,7 @@ export async function updateJobSheet(
         data: { sharePercent: stage.sharePercent, days: stage.days, shifts: stage.shifts },
       });
     }
-  });
+  }, TX);
 
   return recost(id);
 }
@@ -764,7 +776,8 @@ export async function postToStock(
      * completion; this is the earlier and more accurate of the two.
      */
     if (sheet.productionOrderId) await releaseFor(tx, sheet.productionOrderId);
-  });
+    /* Twenty-one rows issued FIFO across batches, and a claim released. */
+  }, TX);
 
   return { sheet: await getJobSheet(id), posted, skipped };
 }

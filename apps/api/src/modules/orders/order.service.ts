@@ -177,6 +177,26 @@ export async function updateOrder(id: string, input: UpdateOrderInput): Promise<
     ratePerPouch: input.ratePerPouch ?? toNumber(existing.ratePerPouch),
   };
 
+  /**
+   * **Only when the price actually moved.**
+   *
+   * The stored amount came from the quotation the customer accepted, worked
+   * out at full precision. The rate beside it is rounded for reading — two
+   * decimals a kilogram, four a pouch — so multiplying the rounded rate back
+   * out does not always land on the same figure: 143,090 pouches at 2.1269
+   * is Rs 304,338.12 against the Rs 304,340 that was quoted.
+   *
+   * Recomputing on every patch meant correcting an order's NOTES moved its
+   * value by a rupee or two. Small, silent, and on the one number a customer
+   * would argue about. So the total is left alone unless one of the four
+   * figures behind it was actually sent.
+   */
+  const priceMoved =
+    input.quantityKg !== undefined ||
+    input.ratePerKg !== undefined ||
+    input.quantityPouches !== undefined ||
+    input.ratePerPouch !== undefined;
+
   const movedTo = status !== existing.status ? status : null;
 
   const row = await prisma.order.update({
@@ -187,7 +207,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput): Promise<
       ...(input.jobId !== undefined ? { jobId: input.jobId } : {}),
       ...(input.jobName !== undefined ? { jobName: input.jobName } : {}),
       ...figures,
-      amount: orderAmount(figures),
+      ...(priceMoved ? { amount: orderAmount(figures) } : {}),
       ...(input.customerPoNumber !== undefined ? { customerPoNumber: input.customerPoNumber } : {}),
       ...(input.orderDate !== undefined ? { orderDate: asDate(input.orderDate) } : {}),
       ...(input.dueDate !== undefined
@@ -209,16 +229,32 @@ export async function updateOrder(id: string, input: UpdateOrderInput): Promise<
 /**
  * Deletes an order nobody has started.
  *
- * Only while it is CONFIRMED. Once it has been in production there is a run
- * behind it, and a deleted order is a run nothing explains — cancelling says
- * the same thing and keeps the record, which is why it takes a reason.
+ * Only while it is CONFIRMED, and only while nothing has gone out against it.
+ * Once it has been in production there is a run behind it, and once a lorry has
+ * left there is a challan — a deleted order is a run, or a delivery, that
+ * nothing explains. Cancelling says the same thing and keeps the record, which
+ * is why it takes a reason.
  */
 export async function deleteOrder(id: string): Promise<{ id: string }> {
-  const existing = await prisma.order.findUnique({ where: { id } });
+  const existing = await prisma.order.findUnique({
+    where: { id },
+    select: { status: true, _count: { select: { dispatchLines: true } } },
+  });
   if (!existing) throw ApiError.notFound('That order is not on record');
   if (existing.status !== 'CONFIRMED') {
     throw ApiError.conflict(
       'Only a confirmed order can be deleted. Cancel it instead, so the record says what happened',
+    );
+  }
+  /*
+   * A confirmed order can still have had a lorry go out against it — part
+   * delivered, not yet complete. Deleting it would leave a challan naming an
+   * order nothing explains, so the database refuses it too; this is the same
+   * refusal in words somebody can act on.
+   */
+  if (existing._count.dispatchLines > 0) {
+    throw ApiError.conflict(
+      'Goods have already gone out against this order — cancel it instead of deleting it',
     );
   }
   await prisma.order.delete({ where: { id } });

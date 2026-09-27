@@ -11,7 +11,7 @@ import {
   type UpdateArtworkInput,
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, TX } from '../../lib/prisma.js';
 import {
   artworkKey,
   deleteObject,
@@ -247,7 +247,7 @@ export async function confirmUpload(id: string): Promise<Artwork> {
         uploadedAt: new Date(),
       },
     });
-  });
+  }, TX);
 
   return toArtwork(updated);
 }

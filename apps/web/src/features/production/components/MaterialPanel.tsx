@@ -31,16 +31,18 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
   const [opening, setOpening] = useState(false);
 
   /*
-   * Folded away by default. A card with three films, five inks and the solvents
-   * runs to a dozen rows, and the floor opens this screen to fill in a stage —
-   * the material is the thing you check once, not the thing you read past every
-   * time.
+   * Folded away by default, always.
    *
-   * **Except when the job is short and nobody has said why.** The panel is then
-   * the reason the job will not start, and the way past it is a button inside
-   * it. Hiding that behind a click would hide the one thing that needs doing.
+   * A card with three films, five inks and the solvents runs to a dozen rows,
+   * and the floor opens this screen to fill in a stage — the material is what
+   * you check once, not what you read past every time to reach the machine.
+   *
+   * A short job is no exception, which it used to be. The header already says
+   * so in red and names what is missing, and that is the part that has to be
+   * seen; the detail behind it is for whoever is going to do something about
+   * it, and they can open it.
    */
-  const [open, setOpen] = useState(flagsShort(card).length > 0 && !card.materialOverrideReason);
+  const [open, setOpen] = useState(false);
 
   /*
    * A card with no priced structure behind it — an order typed over the phone —

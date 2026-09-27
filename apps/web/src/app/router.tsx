@@ -18,6 +18,14 @@ const QuotationsPage = lazy(() => import('@/features/quotations/pages/Quotations
 const OrdersPage = lazy(() => import('@/features/orders/pages/OrdersPage'));
 const OrderPage = lazy(() => import('@/features/orders/pages/OrderPage'));
 const NewOrderPage = lazy(() => import('@/features/orders/pages/NewOrderPage'));
+const PlanningPage = lazy(() => import('@/features/planning/pages/PlanningPage'));
+const FloorPage = lazy(() => import('@/features/floor/pages/FloorPage'));
+const QualityPage = lazy(() => import('@/features/quality/pages/QualityPage'));
+const DesignsPage = lazy(() => import('@/features/jobs/pages/DesignsPage'));
+const MachinesPage = lazy(() => import('@/features/machines/pages/MachinesPage'));
+const DispatchPage = lazy(() => import('@/features/dispatch/pages/DispatchPage'));
+const DispatchNotePage = lazy(() => import('@/features/dispatch/pages/DispatchNotePage'));
+const DispatchFormPage = lazy(() => import('@/features/dispatch/pages/DispatchFormPage'));
 const ProductionPage = lazy(() => import('@/features/production/pages/ProductionPage'));
 const JobCardPage = lazy(() => import('@/features/production/pages/JobCardPage'));
 const EmployeesPage = lazy(() => import('@/features/employees/pages/EmployeesPage'));
@@ -151,6 +159,42 @@ function AppRoutes() {
           <Route path="/orders/:id" element={<OrderPage />} />
 
           {/*
+            Planning reads like Orders: what is short of film and what each
+            machine has coming is the whole works' question, so the board is
+            open to anyone signed in. Booking one needs `jobs` — the same
+            permission as raising the card, because planning is deciding when
+            to raise it — and that guard is on the API, since the board is
+            worth reading without it.
+          */}
+          <Route path="/planning" element={<PlanningPage />} />
+
+          {/*
+            Dispatch reads like Orders: what has gone out and what is still in
+            the godown is the whole works' question, so the list and a note are
+            open to anyone signed in. Loading a lorry needs `dispatch` — its own
+            module, because the despatch clerk is not the quotation desk and
+            sending goods completes a customer's order.
+          */}
+          <Route path="/dispatch" element={<DispatchPage />} />
+          <Route
+            path="/dispatch/new"
+            element={
+              <RequireModule module="dispatch">
+                <DispatchFormPage />
+              </RequireModule>
+            }
+          />
+          <Route path="/dispatch/:id" element={<DispatchNotePage />} />
+          <Route
+            path="/dispatch/:id/edit"
+            element={
+              <RequireModule module="dispatch">
+                <DispatchFormPage />
+              </RequireModule>
+            }
+          />
+
+          {/*
             Job cards are the floor's own document, so reading needs no module —
             the office watches from the other side of the wall and the floor
             needs it open. Recording what a stage did needs `jobs`, and that
@@ -159,6 +203,33 @@ function AppRoutes() {
           */}
           <Route path="/production" element={<ProductionPage />} />
           <Route path="/production/:id" element={<JobCardPage />} />
+          {/*
+            Quality reads like Production: where material is going and what is
+            still wrong is the whole works' question, and the floor fixes most
+            of it — hiding the figures from them is how a waste rate stays
+            where it is. Raising and closing needs `jobs`, guarded on the API.
+          */}
+          <Route path="/quality" element={<QualityPage />} />
+          {/*
+            The design master. Gated on `customers`, the module that owns the
+            data — the same guard the /jobs API carries, and the same one the
+            customer page behind it needs.
+          */}
+          <Route
+            path="/designs"
+            element={
+              <RequireModule module="customers">
+                <DesignsPage />
+              </RequireModule>
+            }
+          />
+          {/*
+            Machines reads like Production: where each one is and why one is
+            standing is what the whole works asks across the floor all day.
+            Putting one down needs `jobs`, guarded on the API — what a machine
+            COSTS stays on Costing behind `rates`.
+          */}
+          <Route path="/machines" element={<MachinesPage />} />
           {/* No guard, like Production: the floor reads this to fill in a job
               card. Adding somebody is refused by the API without `jobs`. */}
           <Route path="/employees" element={<EmployeesPage />} />
@@ -284,6 +355,27 @@ export function AppRouter() {
         <Routes>
           {/* Login sits outside the shell — no sidebar to a stranger. */}
           <Route path="/login" element={<LoginRoute />} />
+          {/*
+            The machine screen sits outside it too, and for the opposite
+            reason: the operator is signed in, but a sidebar full of
+            quotations and rates is not for them. One tablet, one machine, one
+            job — nothing on it that can be pressed by mistake on the way to
+            the thing you meant.
+
+            **Deliberately not in the office sidebar.** A tablet screen is
+            reached by bookmarking /floor on the tablet, not by a menu item
+            next to Production — clicking that from a desk dropped the whole
+            app into a full-screen takeover with no way back, which is not
+            what anybody meant to do.
+          */}
+          <Route
+            path="/floor"
+            element={
+              <RequireAuth>
+                <FloorPage />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/*"
             element={

@@ -8,7 +8,7 @@ import type {
 } from '@yuva/shared';
 import { round } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, TX } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
 
 const toNumber = (value: Prisma.Decimal | number | null): number | null =>
@@ -242,7 +242,7 @@ export async function saveRates(input: SaveRatesInput): Promise<RatesSaveResult>
       if (previous === undefined) created += 1;
       else updated += 1;
     }
-  });
+  }, TX);
 
   return { effectiveDate: toISODate(effectiveDate), created, updated, unchanged };
 }
@@ -395,7 +395,7 @@ export async function deleteMaterial(
       await tx.stockBatch.deleteMany({ where: { materialId: id } });
     }
     await tx.material.delete({ where: { id } });
-  });
+  }, TX);
 
   return { id };
 }
