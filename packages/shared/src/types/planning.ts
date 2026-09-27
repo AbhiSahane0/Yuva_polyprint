@@ -24,6 +24,15 @@ export interface PlanningRow {
   plannedStart: string | null;
   plannedMachineId: string | null;
   plannedMachineName: string | null;
+  /**
+   * The machine it is booked onto is down right now.
+   *
+   * A warning, never a block: you schedule around a service, which is the
+   * whole point of knowing about one. Only ever says "right now" — nothing
+   * schedules maintenance ahead, so a claim about next Tuesday would be
+   * invented.
+   */
+  plannedMachineDown: string | null;
   planNote: string;
   plannedBy: string;
   plannedAt: string | null;

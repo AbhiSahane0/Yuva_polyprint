@@ -232,6 +232,13 @@ export default function PlanningPage() {
                     </td>
                     <td className="text-ink-700 px-4 py-2.5 text-xs">
                       {row.plannedMachineName ?? <span className="text-ink-300">—</span>}
+                      {/* A warning, never a block: you schedule around a
+                          service, which is the point of knowing about one. */}
+                      {row.plannedMachineDown ? (
+                        <div className="text-danger-700 font-medium">
+                          down — {row.plannedMachineDown}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-4 py-2.5 text-xs whitespace-nowrap">
                       {/* The plan against the promise. Only worth a line when

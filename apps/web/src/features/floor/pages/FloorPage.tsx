@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Check, CircleAlert, Pause, Play, Settings2 } from 'lucide-react';
+import { AlertTriangle, Check, CircleAlert, Pause, Play, Settings2, Wrench } from 'lucide-react';
 import {
   formatNumber,
   greeting,
@@ -181,6 +181,41 @@ export default function FloorPage() {
               onClick={() => choose(machine.id)}
             />
           ))}
+        </div>
+      </Shell>
+    );
+  }
+
+  /* ------------------------------------------------------- down for repair */
+
+  /*
+   * Before the operator picker, and that ordering is the whole point.
+   *
+   * A machine that is down offers no work and therefore no operators, so
+   * asking "who is on the machine?" first left a tablet showing an empty list
+   * with nothing to tap — the operator could not get past it to find out why.
+   */
+  if (board.machine.downFor) {
+    return (
+      <Shell>
+        <header className="mb-6 flex items-start justify-between gap-3">
+          <div className="text-2xl font-bold text-white sm:text-3xl">{board.machine.name}</div>
+          <button
+            type="button"
+            onClick={() => choose('')}
+            className="flex items-center gap-2 rounded-xl bg-white/5 px-4 py-2.5 text-white ring-1 ring-white/10 hover:bg-white/10"
+          >
+            <Settings2 className="size-4 text-white/40" />
+            Another machine
+          </button>
+        </header>
+        <div className="rounded-3xl bg-amber-500/15 p-10 text-center ring-1 ring-amber-400/30">
+          <Wrench className="mx-auto size-8 text-amber-300" />
+          <div className="mt-3 text-2xl font-bold text-white">This machine is down</div>
+          <p className="mt-2 text-white/70">{board.machine.downFor}</p>
+          <p className="mt-2 text-sm text-white/40">
+            Nothing can be started on it until the office puts it back up.
+          </p>
         </div>
       </Shell>
     );

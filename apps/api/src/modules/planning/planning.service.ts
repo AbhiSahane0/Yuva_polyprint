@@ -15,6 +15,7 @@ import { prisma } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
 import { availabilityForCards } from '../production/material-reservation.js';
 import { getSettings } from '../settings/settings.service.js';
+import { openMaintenance } from '../machines/machine.service.js';
 
 /**
  * **Planning — the gate between an order and the floor.**
@@ -80,6 +81,12 @@ async function buildRows(rows: Row[]): Promise<PlanningRow[]> {
   if (rows.length === 0) return [];
 
   const settings = await getSettings();
+  /*
+   * Which machines are down right now, from the one query that defines it.
+   * A warning on the board, never a block: you schedule around a service,
+   * which is the whole point of knowing about one.
+   */
+  const down = await openMaintenance(prisma);
 
   /*
    * The card's own material check, asked of an order.
@@ -146,6 +153,11 @@ async function buildRows(rows: Row[]): Promise<PlanningRow[]> {
         plannedStart,
         plannedMachineId: row.plannedMachineId,
         plannedMachineName: row.plannedMachine?.name ?? null,
+        /* Only ever "right now". Nothing schedules maintenance ahead, so a
+           claim about the planned day would be invented. */
+        plannedMachineDown: row.plannedMachineId
+          ? (down.get(row.plannedMachineId)?.reason ?? null)
+          : null,
         planNote: row.planNote,
         plannedBy: row.plannedBy,
         plannedAt: row.plannedAt?.toISOString() ?? null,

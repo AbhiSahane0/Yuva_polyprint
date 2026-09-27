@@ -16,6 +16,7 @@ import dispatchRoutes from '../modules/dispatch/dispatch.routes.js';
 import planningRoutes from '../modules/planning/planning.routes.js';
 import floorRoutes from '../modules/floor/floor.routes.js';
 import qualityRoutes from '../modules/quality/quality.routes.js';
+import machineRoutes from '../modules/machines/machine.routes.js';
 import productionRoutes from '../modules/production/production.routes.js';
 import purchaseRoutes from '../modules/purchase/purchase.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
@@ -81,6 +82,13 @@ router.use('/floor', authenticate, floorRoutes);
  * waste rate stays where it is. Raising and closing needs `jobs`.
  */
 router.use('/quality', authenticate, qualityRoutes);
+
+/*
+ * Where each machine is, and why one is standing. Readable by anyone signed
+ * in; putting a machine down needs `jobs`, because it stops work on it. What a
+ * machine costs to run stays on Costing behind `rates`.
+ */
+router.use('/machines', authenticate, machineRoutes);
 
 /*
  * Jobs are edited from two places — the customer editor and the quotation

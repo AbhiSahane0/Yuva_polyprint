@@ -23,6 +23,7 @@ import { ApiError } from '../../utils/api-error.js';
 import { availabilityForCards } from '../production/material-reservation.js';
 import { updateStage } from '../production/production.service.js';
 import { createIssue } from '../quality/quality.service.js';
+import { openMaintenance } from '../machines/machine.service.js';
 
 /**
  * **The machine screen.**
@@ -98,31 +99,43 @@ type StageRow = Prisma.ProductionStageGetPayload<{ select: typeof STAGE_SELECT }
 
 /** Every machine a tablet can be bolted to, with how much is waiting at it. */
 export async function listMachines(): Promise<FloorMachine[]> {
-  const machines = await prisma.costingMachine.findMany({
-    where: { isActive: true },
-    select: { id: true, name: true, kind: true },
-    orderBy: [{ kind: 'asc' }, { name: 'asc' }],
-  });
+  const [machines, rows, down] = await Promise.all([
+    prisma.costingMachine.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, kind: true },
+      orderBy: [{ kind: 'asc' }, { name: 'asc' }],
+    }),
+    prisma.productionStage.findMany({
+      where: { status: { in: ['PENDING', 'RUNNING'] }, productionOrder: LIVE_CARD },
+      select: STAGE_SELECT,
+    }),
+    openMaintenance(prisma),
+  ]);
 
-  const rows = await prisma.productionStage.findMany({
-    where: { status: { in: ['PENDING', 'RUNNING'] }, productionOrder: LIVE_CARD },
-    select: STAGE_SELECT,
-  });
-
-  return machines.map((machine) => ({
-    id: machine.id,
-    name: machine.name,
-    kind: machine.kind,
-    waiting: rows.filter(
-      (row) =>
-        machineMayRun(row, machine) &&
-        isReachable(row.productionOrder.stages, {
-          id: row.id,
-          position: row.position,
-          status: row.status,
-        }),
-    ).length,
-  }));
+  return (
+    machines
+      /*
+       * A machine that is down is not on the picker. Somebody setting a tablet
+       * up beside a press in pieces should not be offered it — and a tablet
+       * already bolted to one still reaches its own board, which says why.
+       */
+      .filter((machine) => !down.has(machine.id))
+      .map((machine) => ({
+        id: machine.id,
+        name: machine.name,
+        kind: machine.kind,
+        waiting: rows.filter(
+          (row) =>
+            machineMayRun(row, machine) &&
+            isReachable(row.productionOrder.stages, {
+              id: row.id,
+              position: row.position,
+              status: row.status,
+            }),
+        ).length,
+        downFor: null,
+      }))
+  );
 }
 
 function labelFor(row: StageRow, passes: number): string {
@@ -216,6 +229,27 @@ export async function floorBoard(query: FloorBoardQuery): Promise<FloorBoard> {
   if (query.machineId && !machine) throw ApiError.notFound('That machine is not on record');
   if (!machine) return { machine: null, current: null, waiting: [], operators: [] };
 
+  /*
+   * Down, and the tablet is bolted to it. It says so and offers nothing —
+   * better than an empty board, which reads as "no work" rather than "this
+   * machine is in pieces".
+   */
+  const down = (await openMaintenance(prisma, [machine.id])).get(machine.id) ?? null;
+  if (down) {
+    return {
+      machine: {
+        id: machine.id,
+        name: machine.name,
+        kind: machine.kind,
+        waiting: 0,
+        downFor: down.reason,
+      },
+      current: null,
+      waiting: [],
+      operators: [],
+    };
+  }
+
   const rows = await prisma.productionStage.findMany({
     where: { status: { in: ['PENDING', 'RUNNING'] }, productionOrder: LIVE_CARD },
     select: STAGE_SELECT,
@@ -301,7 +335,13 @@ export async function floorBoard(query: FloorBoardQuery): Promise<FloorBoard> {
   );
 
   return {
-    machine: { id: machine.id, name: machine.name, kind: machine.kind, waiting: jobs.length },
+    machine: {
+      id: machine.id,
+      name: machine.name,
+      kind: machine.kind,
+      waiting: jobs.length,
+      downFor: null,
+    },
     current,
     waiting: jobs.filter((job) => job.stageId !== current?.stageId),
     operators: [
@@ -355,6 +395,11 @@ export async function startJob(
   input: StartFloorJobInput,
 ): Promise<FloorBoard> {
   const { row, machine } = await stageAt(stageId, machineId);
+  /* Nothing starts on a machine that is down. */
+  const down = (await openMaintenance(prisma, [machine.id])).get(machine.id);
+  if (down) {
+    throw ApiError.conflict(`${machine.name} is down — ${down.reason}`);
+  }
   if (row.status === 'RUNNING') throw ApiError.conflict('That job is already running');
   if (row.status !== 'PENDING') throw ApiError.conflict('That job has already been done');
   if (row.productionOrder.status === 'ON_HOLD') {

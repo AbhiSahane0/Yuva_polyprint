@@ -9,6 +9,7 @@ import {
   Menu,
   ShieldAlert,
   ShieldCheck,
+  Cog,
   Disc3,
   Package,
   PackageCheck,
@@ -82,6 +83,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
       /* No module, for the same reason as Production: the operator dropdown on
          a job card is what this is for, and the floor has to be able to read
          it. Adding somebody needs `jobs`, enforced on the API. */
+      { to: '/machines', label: 'Machines', icon: Cog },
       { to: '/employees', label: 'Employees', icon: HardHat },
       { to: '/jobs', label: 'Jobs', icon: Boxes, module: 'jobs', disabled: true },
     ],

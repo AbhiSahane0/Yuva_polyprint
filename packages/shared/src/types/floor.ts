@@ -10,6 +10,12 @@ export interface FloorMachine {
   kind: MachineKind;
   /** How many jobs are waiting at it, so a tablet shows its own workload. */
   waiting: number;
+  /**
+   * Why it is down, when it is. A machine with its rollers off is kept off
+   * the picker entirely — but a tablet already bolted to it still needs to
+   * say what is wrong rather than show an empty screen.
+   */
+  downFor: string | null;
 }
 
 /** One thing the operator said at the machine. */

@@ -190,6 +190,12 @@ async function clear(quiet = false) {
    * the order cannot go while a challan still names it — which is the whole
    * point of that constraint and exactly right outside a demo.
    */
+  /* The demo's own maintenance. Matched on the reason, like everything else
+     this script leaves behind. */
+  const services = await prisma.maintenanceRecord.deleteMany({
+    where: { reason: { contains: MARK } },
+  });
+
   /* Issues cascade from the card, so they go with it — counted here so the
      line the script prints is not quietly wrong. */
   const issues = await prisma.qualityIssue.count({
@@ -219,6 +225,7 @@ async function clear(quiet = false) {
   console.log(
     `        ${sheets.length} job sheets, ${notes.length} dispatch notes, ${issues} quality issues,`,
   );
+  console.log(`        ${services.count} maintenance records,`);
   console.log(`        ${batches.length} stock batches, ${people.count} employees.`);
 }
 
@@ -453,6 +460,41 @@ async function main() {
       'Demo',
     );
   }
+  /*
+   * One service that is over.
+   *
+   * Closed on purpose, and on the machine the demo leaves idle: an OPEN
+   * record takes a machine off the floor's picker and refuses work on it,
+   * which would quietly break the production story the rest of this script
+   * sets up. A finished spell gives the Machines screen its history without
+   * touching anything else.
+   */
+  const spare = await prisma.costingMachine.findFirst({
+    where: { isActive: true, kind: 'LAMINATION' },
+    orderBy: { name: 'asc' },
+    select: { id: true },
+  });
+  if (spare) {
+    const latest = await prisma.maintenanceRecord.findFirst({
+      orderBy: { number: 'desc' },
+      select: { number: true },
+    });
+    await prisma.maintenanceRecord.create({
+      data: {
+        number: (latest?.number ?? 0) + 1,
+        machineId: spare.id,
+        kind: 'SERVICE',
+        reason: `Six-monthly service — gearbox oil and nip rollers ${MARK}`,
+        startedAt: new Date(`${daysAgo(4)}T09:00:00.000Z`),
+        endedAt: new Date(`${daysAgo(4)}T13:30:00.000Z`),
+        workDone: 'Oil changed, both nip rollers dressed, guard interlock replaced.',
+        reportedBy: 'Demo',
+        closedBy: 'Demo',
+      },
+    });
+    console.log('One machine serviced and back.');
+  }
+
   console.log('Film on the shelf.');
 
   /* --- and the four jobs ------------------------------------------------- */

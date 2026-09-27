@@ -37,6 +37,7 @@ export * from './types/dispatch.js';
 export * from './types/planning.js';
 export * from './types/floor.js';
 export * from './types/quality.js';
+export * from './types/machine.js';
 
 export * from './lib/quotation-math.js';
 export * from './lib/pouch-making.js';
@@ -65,6 +66,7 @@ export * from './lib/dispatch.js';
 export * from './lib/planning.js';
 export * from './lib/floor.js';
 export * from './lib/quality.js';
+export * from './lib/machines.js';
 
 export * from './schemas/common.js';
 export * from './schemas/partial-update.js';
@@ -84,3 +86,4 @@ export * from './schemas/dispatch.js';
 export * from './schemas/planning.js';
 export * from './schemas/floor.js';
 export * from './schemas/quality.js';
+export * from './schemas/machine.js';

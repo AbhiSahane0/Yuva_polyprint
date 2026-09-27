@@ -21,6 +21,7 @@ const NewOrderPage = lazy(() => import('@/features/orders/pages/NewOrderPage'));
 const PlanningPage = lazy(() => import('@/features/planning/pages/PlanningPage'));
 const FloorPage = lazy(() => import('@/features/floor/pages/FloorPage'));
 const QualityPage = lazy(() => import('@/features/quality/pages/QualityPage'));
+const MachinesPage = lazy(() => import('@/features/machines/pages/MachinesPage'));
 const DispatchPage = lazy(() => import('@/features/dispatch/pages/DispatchPage'));
 const DispatchNotePage = lazy(() => import('@/features/dispatch/pages/DispatchNotePage'));
 const DispatchFormPage = lazy(() => import('@/features/dispatch/pages/DispatchFormPage'));
@@ -208,6 +209,13 @@ function AppRoutes() {
             where it is. Raising and closing needs `jobs`, guarded on the API.
           */}
           <Route path="/quality" element={<QualityPage />} />
+          {/*
+            Machines reads like Production: where each one is and why one is
+            standing is what the whole works asks across the floor all day.
+            Putting one down needs `jobs`, guarded on the API — what a machine
+            COSTS stays on Costing behind `rates`.
+          */}
+          <Route path="/machines" element={<MachinesPage />} />
           {/* No guard, like Production: the floor reads this to fill in a job
               card. Adding somebody is refused by the API without `jobs`. */}
           <Route path="/employees" element={<EmployeesPage />} />

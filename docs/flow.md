@@ -670,6 +670,66 @@ outranks one raised this morning, because it is the one being ignored.
 
 ---
 
+## Step 6c — where each machine is · **Machines**
+
+Almost nothing on this screen is stored, and that is the point of it.
+
+What is **on** a machine is the stage running on it. **Who** is on it is that
+stage's operator. **Made today** and **waste** are the stages that finished on
+it today. **Stood today** is the pauses and problems the machine screen has
+been recording all along — which is what those reasons were being kept for.
+None of it is a figure anybody maintains, so none of it can go stale.
+
+### The one stored fact
+
+A machine being down. And even that has no flag: **a maintenance record with
+no end is the machine being down.** A status somebody has to remember to clear
+is a status that is wrong, and the press would read "under maintenance" for a
+fortnight after it came back.
+
+Two kinds, because the works only distinguishes two: a **service** somebody
+chose to do, and a **breakdown** nobody chose. Putting one down insists on a
+reason; bringing it back asks what was done, but does not insist — a breakdown
+that cleared itself is a real afternoon, and refusing the record would leave
+the machine reading Down on every screen while it runs.
+
+**It does not insist the job comes off first.** A press does not break down
+politely between stages. The job stays where it is and the machine reads Down,
+which is the truth; a system that demanded the stage be finished first is one
+the fitter works around.
+
+**Down sorts first**, because it is the only card asking for anything.
+
+### What being down actually does
+
+| Screen             | What happens                                                   |
+| ------------------ | -------------------------------------------------------------- |
+| **Machine screen** | the machine leaves the picker; a tablet already on it says why |
+| **Machine screen** | no job can be started on it, in the same words                 |
+| **Planning**       | the row says the machine is down — but still lets you book it  |
+
+Planning warns and does not block, deliberately: **you schedule around a
+service**, and that is the whole point of knowing about one. The warning only
+ever says "right now", because nothing schedules maintenance ahead and a claim
+about next Tuesday would be invented.
+
+Maintenance counts towards the time a machine has stood, alongside the floor's
+own stoppages. A downtime figure that counted the fitter but not the four
+pauses — or the other way round — would flatter the works exactly where it
+should not.
+
+### What this screen is not
+
+It does not edit the machines. Their names, speeds, horsepower and what they
+cost to run stay on the **Costing** screen, because that is what they are for.
+This one says where they are, not what they cost.
+
+And nothing is scheduled ahead: no intervals, no next-service dates. Those
+would need a figure per machine that the works has not given us, and an
+interval nobody set becomes a red flag everybody learns to ignore.
+
+---
+
 ## Step 7 — the card is finished
 
 When every stage is done, mark the card **Completed**.
@@ -861,6 +921,7 @@ used them can still explain themselves.
 | **Planning**           | What can run, when it runs, and on which machine             |
 | **Machine screen**     | One machine, one job, four buttons — the tablet on the floor |
 | **Quality & waste**    | Where material is going, and what is still wrong             |
+| **Machines**           | Where each machine is, and why one is standing               |
 | **Production**         | What is on the floor right now, and how far along            |
 | **Employees**          | Who is here, and what they are on                            |
 | **Job sheets**         | What each run actually cost                                  |
@@ -887,11 +948,13 @@ npm run seed:demo -w @yuva/api
 | **Quoted**         | a quotation sent, nobody has answered                                                                          |
 | **Ordered**        | won, on the books, booked onto a press — and one of the two cannot make its date                               |
 | **On the floor**   | printing done, lamination running — one issue open against it and one closed                                   |
+| **Serviced**       | one laminator down four hours and back, with what was done                                                     |
 | **Finished**       | every stage done, costed, taken off stock                                                                      |
 | **Part delivered** | half of it gone on a lorry, listed reel by reel, with the balance still in the godown and a draft note waiting |
 
-Walk Quotations → Orders → Planning → Production → Quality → Job sheets →
-Dispatch → Inventory in that order and the whole chain reads in one sitting. Remove it again with:
+Walk Quotations → Orders → Planning → Production → Machines → Quality → Job
+sheets → Dispatch → Inventory in that order and the whole chain reads in one
+sitting. Remove it again with:
 
 ```bash
 npm run seed:demo -w @yuva/api -- --clear

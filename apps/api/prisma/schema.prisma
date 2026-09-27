@@ -1531,6 +1531,8 @@ model CostingMachine {
   /// Orders booked onto it. What the machine has coming, which is the other
   /// half of a planning board.
   plannedOrders Order[]
+  /// Every time it has been down, and why.
+  maintenance   MaintenanceRecord[]
 
   /// Connected load. Power is costed as horsepower × a rate per hour.
   ///
@@ -2078,6 +2080,7 @@ model StockReservation {
   /// One row per material per card: raising a card twice for the same film
   /// should correct the figure, not hold it twice.
   /**
+   * /**
    * /**
    * /**
    * /**
@@ -2685,4 +2688,62 @@ model QualityIssue {
   @@index([productionOrderId])
   @@index([createdAt])
   @@map("quality_issues")
+}
+
+/// Why a machine is down.
+///
+/// Two, because the works only distinguishes two: something that was planned,
+/// and something that stopped working. A longer list would be a dropdown
+/// nobody uses honestly.
+enum MaintenanceKind {
+  /// Planned: a service, a regrind, a belt change somebody decided to do.
+  SERVICE
+  /// It stopped working. The distinction matters because one of these is a
+  /// choice about when, and the other is not.
+  BREAKDOWN
+}
+
+/// **A machine being down.**
+///
+/// Open-ended on purpose: a record with no `endedAt` **is** the machine being
+/// down right now. There is no status field on the machine saying so, because
+/// a status somebody has to remember to change is a status that is wrong — the
+/// press would read "under maintenance" for a fortnight after it came back.
+///
+/// Nothing here is scheduled ahead. The works records what happened and when
+/// it came back, which is what they actually do; intervals and next-service
+/// reminders would need a figure per machine that nobody has given us, and an
+/// interval nobody set becomes a red flag everybody learns to ignore.
+model MaintenanceRecord {
+  id     String @id @default(cuid())
+  /// Sequential and human-facing. Its own series.
+  number Int    @unique
+
+  machineId String         @map("machine_id")
+  machine   CostingMachine @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  kind MaintenanceKind
+
+  /// Why it went down, in the works' own words: "Rollers being reground".
+  reason String
+
+  startedAt DateTime  @map("started_at")
+  /// Null while it is still down. This is the whole state of the model.
+  endedAt   DateTime? @map("ended_at")
+
+  /// What was actually done. Asked for when it comes back, because "serviced"
+  /// on its own tells the next fitter nothing.
+  workDone String @default("") @map("work_done")
+
+  reportedBy String @default("") @map("reported_by")
+  closedBy   String @default("") @map("closed_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([machineId])
+  @@index([startedAt])
+  /// Finding what is down right now, which every screen asks.
+  @@index([endedAt])
+  @@map("maintenance_records")
 }
