@@ -177,6 +177,26 @@ export async function updateOrder(id: string, input: UpdateOrderInput): Promise<
     ratePerPouch: input.ratePerPouch ?? toNumber(existing.ratePerPouch),
   };
 
+  /**
+   * **Only when the price actually moved.**
+   *
+   * The stored amount came from the quotation the customer accepted, worked
+   * out at full precision. The rate beside it is rounded for reading — two
+   * decimals a kilogram, four a pouch — so multiplying the rounded rate back
+   * out does not always land on the same figure: 143,090 pouches at 2.1269
+   * is Rs 304,338.12 against the Rs 304,340 that was quoted.
+   *
+   * Recomputing on every patch meant correcting an order's NOTES moved its
+   * value by a rupee or two. Small, silent, and on the one number a customer
+   * would argue about. So the total is left alone unless one of the four
+   * figures behind it was actually sent.
+   */
+  const priceMoved =
+    input.quantityKg !== undefined ||
+    input.ratePerKg !== undefined ||
+    input.quantityPouches !== undefined ||
+    input.ratePerPouch !== undefined;
+
   const movedTo = status !== existing.status ? status : null;
 
   const row = await prisma.order.update({
@@ -187,7 +207,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput): Promise<
       ...(input.jobId !== undefined ? { jobId: input.jobId } : {}),
       ...(input.jobName !== undefined ? { jobName: input.jobName } : {}),
       ...figures,
-      amount: orderAmount(figures),
+      ...(priceMoved ? { amount: orderAmount(figures) } : {}),
       ...(input.customerPoNumber !== undefined ? { customerPoNumber: input.customerPoNumber } : {}),
       ...(input.orderDate !== undefined ? { orderDate: asDate(input.orderDate) } : {}),
       ...(input.dueDate !== undefined

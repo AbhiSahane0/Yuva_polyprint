@@ -35,7 +35,8 @@
     "quote:job-sheets": "tsx scripts/quote-job-sheets.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "import:stock": "tsx scripts/import-stock-sheet.ts",
-    "sync:materials": "tsx scripts/sync-neon-materials.ts"
+    "sync:materials": "tsx scripts/sync-neon-materials.ts",
+    "audit": "tsx scripts/audit.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",
