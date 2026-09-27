@@ -922,6 +922,35 @@ So nobody goes looking for it:
   figure is an estimate. Nothing is blocked on it: the over-production check is
   on weight alone.
 
+---
+
+# Deliberately not built
+
+Different from the list above: these were considered and turned down, so they
+do not get proposed again every six months.
+
+### A Warehouse module
+
+The wireframe has one — a zone map of Raw Material Storage, Ink & Chemical
+Storage, Roll Storage and Finished Goods, each showing what is in it.
+
+**Inventory is the source of truth for stock, and a second screen over the same
+rows would be a second answer to "how much have we got".** Where a thing is
+sitting is already on the batch: `location` is free text on every stock batch —
+"Warehouse A", "A-01" — typed when the delivery is booked in, and shown on the
+Inventory screens.
+
+That field is free text on purpose, and the reason is the reason there is no
+module: the works has **one building**. A managed list of zones is a list
+somebody has to maintain, and a location table nobody maintains is worse than a
+field somebody types — it goes stale, and then the screen is confidently wrong
+about where the film is.
+
+If the works ever takes a second building, the thing to add is a filter and a
+grouping on the Inventory screen, not a module.
+
+---
+
 And two gaps in the works' own data worth closing:
 
 - There is **no pouch-making machine** on the Costing screen, so that stage's
