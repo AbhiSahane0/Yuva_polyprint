@@ -1528,6 +1528,10 @@ model CostingMachine {
   name String      @unique
   kind MachineKind
 
+  /// Orders booked onto it. What the machine has coming, which is the other
+  /// half of a planning board.
+  plannedOrders Order[]
+
   /// Connected load. Power is costed as horsepower × a rate per hour.
   ///
   /// On a press with `stationHorsepower` this is the MAIN DRIVE alone — what it
@@ -1827,6 +1831,28 @@ model Order {
   /// not deletable, because the challan would outlive what it was raised for.
   dispatchLines DispatchLine[]
 
+  /// **When the works means to start it, and on what machine.**
+  ///
+  /// The one fact planning stores, and the only thing in the system that ever
+  /// held it. An order carries a due date, which is the customer's; a job card
+  /// carries stages, which are the floor's; and nothing said which press a job
+  /// was booked onto next Tuesday.
+  ///
+  /// Everything else the planning board shows — whether the film is there, how
+  /// long it will take, whether it can still make its date — is worked out from
+  /// facts that already exist. A board whose figures need maintaining is a
+  /// board nobody believes by Wednesday.
+  plannedStart     DateTime?       @map("planned_start") @db.Date
+  /// The machine it starts on. For a printed job that is the press, which is
+  /// the booking that matters — the later stages follow it down the floor.
+  plannedMachineId String?         @map("planned_machine_id")
+  plannedMachine   CostingMachine? @relation(fields: [plannedMachineId], references: [id], onDelete: SetNull)
+  /// Why it sits where it does in the queue. "Customer collecting Friday" is
+  /// the kind of thing that explains a plan nobody else would have made.
+  planNote         String          @default("") @map("plan_note")
+  plannedBy        String          @default("") @map("planned_by")
+  plannedAt        DateTime?       @map("planned_at")
+
   completedAt     DateTime? @map("completed_at")
   cancelledAt     DateTime? @map("cancelled_at")
   /// Why it was cancelled. "We lost it" teaches nothing; the reason does.
@@ -1838,6 +1864,7 @@ model Order {
   @@index([status])
   @@index([customerId])
   @@index([dueDate])
+  @@index([plannedStart])
   @@map("orders")
 }
 
@@ -2040,6 +2067,7 @@ model StockReservation {
   /// One row per material per card: raising a card twice for the same film
   /// should correct the figure, not hold it twice.
   /**
+   * /**
    * /**
    * /* One row per card per ROLL. A job spanning three rolls holds three of them,
    * which is the point — the old key allowed one row per material.

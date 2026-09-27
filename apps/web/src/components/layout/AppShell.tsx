@@ -17,6 +17,7 @@ import {
   Calculator,
   ClipboardList,
   ClipboardCheck,
+  CalendarClock,
   Factory,
   HardHat,
 } from 'lucide-react';
@@ -68,6 +69,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       /* No module: a job card is the floor's own document and the office
          watches it. Writing to it needs `jobs`, enforced on the API. */
+      { to: '/planning', label: 'Planning', icon: CalendarClock },
       { to: '/production', label: 'Production', icon: Factory },
       { to: '/cylinders', label: 'Design & Cylinders', icon: Disc3, module: 'cylinders' },
       { to: '/job-sheets', label: 'Job sheets', icon: ClipboardList, module: 'jobs' },

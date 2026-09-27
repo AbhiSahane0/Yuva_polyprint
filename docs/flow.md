@@ -239,6 +239,75 @@ production; starting work does that, in Step 6.
 Orders for work taken over the phone, with no quotation behind them, can be
 typed here directly.
 
+## Step 4a — the gate before the floor · **Planning**
+
+Between an order and a job card there is a decision nothing used to record:
+**when it runs, and on what machine.** The order carries a due date, which is
+the customer's. The job card carries stages, which are the floor's. Neither of
+them said which press a job was booked onto next Tuesday.
+
+### Can it run?
+
+The board asks the job card's own material question **early** — before a card
+exists. The check is the same one, reels and all: every ply, every ink, the
+adhesive, and a reel too narrow counted as no use whatever it weighs. Until
+now the only way to find out an order could not be made was to raise the card
+and be refused.
+
+Nothing is reserved. A plan is not a claim — holding film for a job nobody has
+scheduled would starve the one actually on the machine, and the claim would
+never be released because there is no card to release it.
+
+Four figures across the top, and only one of them changes what anybody does
+this morning:
+
+| Figure                | What it means                                         |
+| --------------------- | ----------------------------------------------------- |
+| **Short of material** | cannot run. Sorts above everything, whatever its date |
+| **Ready to schedule** | film in hand, nobody has dated it                     |
+| **Scheduled**         | booked onto a day, and usually a machine              |
+| **Landing late**      | the plan finishes after the day it was promised       |
+
+### When, and on what?
+
+Click any order not yet on the floor. Two fields, and they are independent:
+the works often knows the week before it knows the press, and sometimes gives
+a job to a press before the day is settled.
+
+As the date is typed it works out **the day the job comes off** — make-ready
+plus running, on the works' own fitted figures — and if that falls after the
+customer's date it says so **before it is saved**, and by how many days. A
+planning screen that only tells you afterwards has already let it happen.
+
+> The estimate is the kilogram fallback, not the real model. Costing drives
+> days off machine _minutes_, because a 750 mm web at eight colours is not the
+> same job as a 990 mm web at one even when they weigh the same — but minutes
+> need a costed structure and a chosen machine, and planning asks before either
+> is settled. Good enough to catch an order that cannot make its date; not good
+> enough to promise an hour.
+
+### A shortage outranks a plan
+
+An order can still be dated while it is short — "Tuesday, press 1, film
+arriving Monday" is a real plan, and a system that refuses to write it down is
+one the works keeps on paper instead. The board goes on showing it in red, and
+the job card will still refuse to start until the film is in.
+
+### What each machine has coming
+
+Underneath, a card per machine: what is booked on it, in date order, with the
+days it adds up to. The board above says what each order is waiting for; this
+says what each machine is in for, which is what stops three jobs being booked
+onto the same Tuesday.
+
+### Planning ends where the floor begins
+
+Once a job card is raised the order drops off the board. The card has real
+stages, a real claim on the film and a real operator, and a date typed here
+afterwards would be a second opinion about a job already running.
+
+---
+
 ## Step 5 — raise the job card · on the order, **Start production**
 
 A job card is what the floor works from. It is raised **from the order**, never
@@ -649,6 +718,7 @@ used them can still explain themselves.
 | **Customers**          | Who we sell to, and what designs they have           |
 | **Quotations**         | What we have offered, and what came of it            |
 | **Orders**             | What customers have committed to, and when it is due |
+| **Planning**           | What can run, when it runs, and on which machine     |
 | **Production**         | What is on the floor right now, and how far along    |
 | **Employees**          | Who is here, and what they are on                    |
 | **Job sheets**         | What each run actually cost                          |
@@ -673,13 +743,13 @@ npm run seed:demo -w @yuva/api
 | Stage              | What to look at                                                                                                |
 | ------------------ | -------------------------------------------------------------------------------------------------------------- |
 | **Quoted**         | a quotation sent, nobody has answered                                                                          |
-| **Ordered**        | won, the order on the books, nothing started                                                                   |
+| **Ordered**        | won, on the books, booked onto a press — and one of the two cannot make its date                               |
 | **On the floor**   | printing done, lamination running                                                                              |
 | **Finished**       | every stage done, costed, taken off stock                                                                      |
 | **Part delivered** | half of it gone on a lorry, listed reel by reel, with the balance still in the godown and a draft note waiting |
 
-Walk Quotations → Orders → Production → Job sheets → Dispatch → Inventory in that
-order and the whole chain reads in one sitting. Remove it again with:
+Walk Quotations → Orders → Planning → Production → Job sheets → Dispatch →
+Inventory in that order and the whole chain reads in one sitting. Remove it again with:
 
 ```bash
 npm run seed:demo -w @yuva/api -- --clear
@@ -691,9 +761,12 @@ npm run seed:demo -w @yuva/api -- --clear
 
 So nobody goes looking for it:
 
-- **Planning** — scheduling work across the machines before it starts.
 - **Quality and waste analysis** — the figures are all recorded; the reporting
   on top of them is not built.
+- **Capacity scheduling.** Planning records the day and the machine somebody
+  chose; it does not work out the sequence, and it will happily let two jobs be
+  booked onto one press on one day. The machine load card shows that happening
+  rather than preventing it, which is the honest half of the job.
 - **Reports and an overview screen.**
 - **An operator view** — a stripped-back screen for a tablet at the machine.
 - **Reserving by roll on the job sheet.** The card earmarks particular rolls;

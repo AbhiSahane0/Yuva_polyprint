@@ -18,6 +18,7 @@ const QuotationsPage = lazy(() => import('@/features/quotations/pages/Quotations
 const OrdersPage = lazy(() => import('@/features/orders/pages/OrdersPage'));
 const OrderPage = lazy(() => import('@/features/orders/pages/OrderPage'));
 const NewOrderPage = lazy(() => import('@/features/orders/pages/NewOrderPage'));
+const PlanningPage = lazy(() => import('@/features/planning/pages/PlanningPage'));
 const DispatchPage = lazy(() => import('@/features/dispatch/pages/DispatchPage'));
 const DispatchNotePage = lazy(() => import('@/features/dispatch/pages/DispatchNotePage'));
 const DispatchFormPage = lazy(() => import('@/features/dispatch/pages/DispatchFormPage'));
@@ -152,6 +153,16 @@ function AppRoutes() {
             }
           />
           <Route path="/orders/:id" element={<OrderPage />} />
+
+          {/*
+            Planning reads like Orders: what is short of film and what each
+            machine has coming is the whole works' question, so the board is
+            open to anyone signed in. Booking one needs `jobs` — the same
+            permission as raising the card, because planning is deciding when
+            to raise it — and that guard is on the API, since the board is
+            worth reading without it.
+          */}
+          <Route path="/planning" element={<PlanningPage />} />
 
           {/*
             Dispatch reads like Orders: what has gone out and what is still in

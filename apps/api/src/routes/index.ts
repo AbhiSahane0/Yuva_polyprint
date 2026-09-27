@@ -13,6 +13,7 @@ import materialRoutes from '../modules/materials/material.routes.js';
 import monitorRoutes from '../modules/monitor/monitor.routes.js';
 import orderRoutes from '../modules/orders/order.routes.js';
 import dispatchRoutes from '../modules/dispatch/dispatch.routes.js';
+import planningRoutes from '../modules/planning/planning.routes.js';
 import productionRoutes from '../modules/production/production.routes.js';
 import purchaseRoutes from '../modules/purchase/purchase.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
@@ -56,6 +57,14 @@ router.use('/orders', authenticate, orderRoutes);
  * completes a customer's order.
  */
 router.use('/dispatches', authenticate, dispatchRoutes);
+
+/*
+ * The gate between an order and the floor: what is short of film, what is
+ * dated, and what each machine has coming. Readable by anyone signed in, like
+ * Orders. Booking one needs `jobs` — planning is deciding when to raise the
+ * card, which is the same desk that raises it.
+ */
+router.use('/planning', authenticate, planningRoutes);
 
 /*
  * Jobs are edited from two places — the customer editor and the quotation

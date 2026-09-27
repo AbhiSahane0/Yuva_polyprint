@@ -43,6 +43,7 @@ import {
   postDispatch,
   readyToSend,
 } from '../src/modules/dispatch/dispatch.service.js';
+import { planOrder } from '../src/modules/planning/planning.service.js';
 import { receiveStock } from '../src/modules/inventory/inventory.service.js';
 import {
   costSheet,
@@ -582,10 +583,35 @@ async function main() {
     });
 
     if (plan.level === 'ordered' || plan.level === 'ordered-late') {
+      /*
+       * Both are booked in, and one of them cannot make its date.
+       *
+       * That second case is the whole reason planning stores a date at all: an
+       * order promised for three days ago and started next week is late the
+       * moment it is written down, and the board says so while it is still
+       * only a plan. Shown with a machine as well as a day, because "which
+       * press, and when" is one decision rather than two.
+       */
+      const press = await prisma.costingMachine.findFirst({
+        where: { isActive: true, kind: 'PRINTING' },
+        select: { id: true },
+      });
+      const late = plan.level === 'ordered-late';
+      const planned = await planOrder(
+        order.id,
+        {
+          plannedStart: daysAgo(late ? -2 : -5),
+          plannedMachineId: press?.id ?? null,
+          planNote: late
+            ? 'Promised before the film landed — first slot the press has'
+            : 'Straight onto the press when Mauli comes off',
+        },
+        'Demo',
+      );
       say(
-        plan.level === 'ordered-late' ? 'Ordered (late)' : 'Ordered',
+        late ? 'Ordered (late)' : 'Ordered',
         `order #${order.number}`,
-        design.jobName,
+        `${design.jobName} — booked ${planned.plannedStart}${planned.landsLate ? `, ${planned.daysLate}d past its date` : ''}`,
       );
       continue;
     }
