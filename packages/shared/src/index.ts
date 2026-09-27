@@ -38,6 +38,7 @@ export * from './types/planning.js';
 export * from './types/floor.js';
 export * from './types/quality.js';
 export * from './types/machine.js';
+export * from './types/job.js';
 
 export * from './lib/quotation-math.js';
 export * from './lib/pouch-making.js';
@@ -87,3 +88,4 @@ export * from './schemas/planning.js';
 export * from './schemas/floor.js';
 export * from './schemas/quality.js';
 export * from './schemas/machine.js';
+export * from './schemas/job.js';

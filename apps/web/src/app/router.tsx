@@ -21,6 +21,7 @@ const NewOrderPage = lazy(() => import('@/features/orders/pages/NewOrderPage'));
 const PlanningPage = lazy(() => import('@/features/planning/pages/PlanningPage'));
 const FloorPage = lazy(() => import('@/features/floor/pages/FloorPage'));
 const QualityPage = lazy(() => import('@/features/quality/pages/QualityPage'));
+const DesignsPage = lazy(() => import('@/features/jobs/pages/DesignsPage'));
 const MachinesPage = lazy(() => import('@/features/machines/pages/MachinesPage'));
 const DispatchPage = lazy(() => import('@/features/dispatch/pages/DispatchPage'));
 const DispatchNotePage = lazy(() => import('@/features/dispatch/pages/DispatchNotePage'));
@@ -209,6 +210,19 @@ function AppRoutes() {
             where it is. Raising and closing needs `jobs`, guarded on the API.
           */}
           <Route path="/quality" element={<QualityPage />} />
+          {/*
+            The design master. Gated on `customers`, the module that owns the
+            data — the same guard the /jobs API carries, and the same one the
+            customer page behind it needs.
+          */}
+          <Route
+            path="/designs"
+            element={
+              <RequireModule module="customers">
+                <DesignsPage />
+              </RequireModule>
+            }
+          />
           {/*
             Machines reads like Production: where each one is and why one is
             standing is what the whole works asks across the floor all day.

@@ -81,7 +81,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
          it. Adding somebody needs `jobs`, enforced on the API. */
       { to: '/machines', label: 'Machines', icon: Cog },
       { to: '/employees', label: 'Employees', icon: HardHat },
-      { to: '/jobs', label: 'Jobs', icon: Boxes, module: 'jobs', disabled: true },
+      { to: '/designs', label: 'Designs', icon: Boxes, module: 'customers' },
     ],
   },
   {
