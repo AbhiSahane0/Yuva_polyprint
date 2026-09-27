@@ -9,6 +9,11 @@ import { cn } from '@/lib/utils';
  * sometimes through a glove. Apple's 44 px and Google's 48 px touch minimums
  * are floors for a phone in a quiet room — the buttons below are 72 px, and
  * the one that does something irreversible is the largest thing on the screen.
+ *
+ * The palette is the app's own. It was dark for a while, on the reasoning
+ * that a factory tablet wants a ground that is almost black — but one screen
+ * in its own colours is a screen that looks like a different product, and
+ * size is what makes this one readable at a machine, not darkness.
  */
 
 /** One figure, big enough to read while walking past. */
@@ -24,26 +29,30 @@ export function FloorStat({
   tone?: 'plain' | 'warn' | 'good';
 }) {
   return (
-    <div className="rounded-2xl bg-white/5 px-4 py-3 ring-1 ring-white/10">
-      <div className="text-xs font-medium tracking-widest text-white/40 uppercase">{label}</div>
+    <div className="border-ink-200 rounded-2xl border bg-white px-4 py-3">
+      <div className="text-ink-500 text-xs font-medium tracking-widest uppercase">{label}</div>
       <div
         className={cn(
           'mt-1 text-2xl font-bold tabular-nums sm:text-3xl',
-          tone === 'warn' ? 'text-amber-300' : tone === 'good' ? 'text-emerald-300' : 'text-white',
+          tone === 'warn'
+            ? 'text-warning-700'
+            : tone === 'good'
+              ? 'text-success-700'
+              : 'text-ink-900',
         )}
       >
         {value}
-        {unit ? <span className="ml-1 text-base font-medium text-white/40">{unit}</span> : null}
+        {unit ? <span className="text-ink-400 ml-1 text-base font-medium">{unit}</span> : null}
       </div>
     </div>
   );
 }
 
 const TONES = {
-  start: 'bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-white',
-  finish: 'bg-brand-500 hover:bg-brand-400 active:bg-brand-600 text-white',
-  pause: 'bg-white/10 hover:bg-white/15 active:bg-white/20 text-white ring-1 ring-white/15',
-  issue: 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-ink-900',
+  start: 'bg-success-600 hover:bg-success-700 text-white',
+  finish: 'bg-brand-600 hover:bg-brand-700 text-white',
+  pause: 'bg-white text-ink-700 border border-ink-300 hover:bg-ink-50',
+  issue: 'bg-warning-500 hover:bg-warning-600 text-white',
 } as const;
 
 /** A button somebody presses with a glove on. */
@@ -68,7 +77,7 @@ export function FloorButton({
       className={cn(
         'flex min-h-[72px] items-center justify-center gap-2 rounded-2xl px-6 text-lg font-bold tracking-wide uppercase',
         'transition-colors disabled:cursor-not-allowed disabled:opacity-40',
-        'focus-visible:ring-4 focus-visible:ring-white/40 focus-visible:outline-none',
+        'focus-visible:ring-brand-300 focus-visible:ring-4 focus-visible:outline-none',
         TONES[tone],
         full ? 'w-full text-xl' : '',
       )}
@@ -96,14 +105,18 @@ export function FloorChoice({
       onClick={onClick}
       className={cn(
         'min-h-[64px] rounded-2xl px-5 py-3 text-left transition-colors',
-        'focus-visible:ring-4 focus-visible:ring-white/40 focus-visible:outline-none',
+        'focus-visible:ring-brand-300 focus-visible:ring-4 focus-visible:outline-none',
         selected
-          ? 'bg-brand-500 text-white'
-          : 'bg-white/5 text-white ring-1 ring-white/10 hover:bg-white/10',
+          ? 'bg-brand-600 text-white'
+          : 'border-ink-200 text-ink-900 hover:bg-ink-50 border bg-white',
       )}
     >
       <div className="text-lg font-semibold">{label}</div>
-      {hint ? <div className="mt-0.5 text-sm text-white/50">{hint}</div> : null}
+      {hint ? (
+        <div className={cn('mt-0.5 text-sm', selected ? 'text-white/80' : 'text-ink-500')}>
+          {hint}
+        </div>
+      ) : null}
     </button>
   );
 }
@@ -127,7 +140,7 @@ export function FloorWeight({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium tracking-widest text-white/40 uppercase">{label}</span>
+      <span className="text-ink-500 text-xs font-medium tracking-widest uppercase">{label}</span>
       <div className="mt-1 flex items-center gap-2">
         <input
           type="text"
@@ -141,12 +154,12 @@ export function FloorWeight({
             if (next === '' || /^\d*\.?\d*$/.test(next)) onChange(next);
           }}
           className={cn(
-            'w-full rounded-2xl bg-white/10 px-5 py-4 text-3xl font-bold tabular-nums text-white',
-            'ring-1 ring-white/15 focus:ring-4 focus:ring-white/40 focus:outline-none',
+            'text-ink-900 w-full rounded-2xl bg-white px-5 py-4 text-3xl font-bold tabular-nums',
+            'border-ink-300 focus:ring-brand-300 border focus:ring-4 focus:outline-none',
           )}
           placeholder="0"
         />
-        <span className="text-xl font-semibold text-white/40">kg</span>
+        <span className="text-ink-500 text-xl font-semibold">kg</span>
       </div>
     </label>
   );

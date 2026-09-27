@@ -13,7 +13,6 @@ import {
   Disc3,
   Package,
   PackageCheck,
-  Tablet,
   Truck,
   Users,
   X,
@@ -74,9 +73,6 @@ const NAV: { group: string; items: NavItem[] }[] = [
          watches it. Writing to it needs `jobs`, enforced on the API. */
       { to: '/planning', label: 'Planning', icon: CalendarClock },
       { to: '/production', label: 'Production', icon: Factory },
-      /* Leaves the shell behind — see the route. Here so the office can set a
-         tablet up and see what the floor sees. */
-      { to: '/floor', label: 'Machine screen', icon: Tablet },
       { to: '/cylinders', label: 'Design & Cylinders', icon: Disc3, module: 'cylinders' },
       { to: '/job-sheets', label: 'Job sheets', icon: ClipboardList, module: 'jobs' },
       { to: '/quality', label: 'Quality & waste', icon: ShieldAlert },

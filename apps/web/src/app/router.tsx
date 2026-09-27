@@ -347,6 +347,12 @@ export function AppRouter() {
             quotations and rates is not for them. One tablet, one machine, one
             job — nothing on it that can be pressed by mistake on the way to
             the thing you meant.
+
+            **Deliberately not in the office sidebar.** A tablet screen is
+            reached by bookmarking /floor on the tablet, not by a menu item
+            next to Production — clicking that from a desk dropped the whole
+            app into a full-screen takeover with no way back, which is not
+            what anybody meant to do.
           */}
           <Route
             path="/floor"

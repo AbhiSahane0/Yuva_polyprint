@@ -702,7 +702,13 @@ be open at any point in Part two.
 
 Everything in Step 7 can also be done from a tablet at the machine, and that
 is where it is meant to be done. `/floor` is a different screen for a
-different person: dark, no sidebar, four buttons and one job on it.
+different person: no sidebar, four big buttons and one job on it.
+
+**It is not in the office sidebar, on purpose.** A tablet screen is reached by
+bookmarking `/floor` on the tablet itself. Clicking it from a desk dropped the
+whole app into a full-screen takeover with no way back, which is nobody's
+intention — and if the works never puts a screen on the floor, this step is
+one to skip. Production covers the same ground from the office.
 
 ### Setting a tablet up
 
@@ -953,14 +959,14 @@ Grouped the way the sidebar groups them.
 
 **Production**
 
-| Screen                 | Answers                                                      |
-| ---------------------- | ------------------------------------------------------------ |
-| **Planning**           | What can run, when it runs, and on which machine             |
-| **Production**         | What is on the floor right now, and how far along            |
-| **Machine screen**     | One machine, one job, four buttons — the tablet on the floor |
-| **Design & Cylinders** | Which designs have cylinders, and where they are             |
-| **Job sheets**         | What each run actually cost                                  |
-| **Quality & waste**    | Where material is going, and what is still wrong             |
+| Screen                 | Answers                                                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **Planning**           | What can run, when it runs, and on which machine                                                                  |
+| **Production**         | What is on the floor right now, and how far along                                                                 |
+| **Machine screen**     | One machine, one job, four buttons — the tablet on the floor. Not in the sidebar: bookmark `/floor` on the tablet |
+| **Design & Cylinders** | Which designs have cylinders, and where they are                                                                  |
+| **Job sheets**         | What each run actually cost                                                                                       |
+| **Quality & waste**    | Where material is going, and what is still wrong                                                                  |
 
 **Resources**
 

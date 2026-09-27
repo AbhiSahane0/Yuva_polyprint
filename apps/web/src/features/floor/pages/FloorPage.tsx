@@ -168,8 +168,8 @@ export default function FloorPage() {
   if (!machineId || !board?.machine) {
     return (
       <Shell>
-        <h1 className="mb-1 text-3xl font-bold text-white">Which machine is this?</h1>
-        <p className="mb-6 text-white/50">
+        <h1 className="mb-1 text-ink-900 text-3xl font-bold">Which machine is this?</h1>
+        <p className="text-ink-500 mb-6">
           Asked once. This tablet will remember, and show only the work at that machine.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -199,21 +199,21 @@ export default function FloorPage() {
     return (
       <Shell>
         <header className="mb-6 flex items-start justify-between gap-3">
-          <div className="text-2xl font-bold text-white sm:text-3xl">{board.machine.name}</div>
+          <div className="text-ink-900 text-2xl font-bold sm:text-3xl">{board.machine.name}</div>
           <button
             type="button"
             onClick={() => choose('')}
-            className="flex items-center gap-2 rounded-xl bg-white/5 px-4 py-2.5 text-white ring-1 ring-white/10 hover:bg-white/10"
+            className="flex items-center gap-2 rounded-xl border-ink-200 text-ink-800 hover:bg-ink-100 border bg-white px-4 py-2.5"
           >
-            <Settings2 className="size-4 text-white/40" />
+            <Settings2 className="size-4 text-ink-400" />
             Another machine
           </button>
         </header>
-        <div className="rounded-3xl bg-amber-500/15 p-10 text-center ring-1 ring-amber-400/30">
-          <Wrench className="mx-auto size-8 text-amber-300" />
-          <div className="mt-3 text-2xl font-bold text-white">This machine is down</div>
-          <p className="mt-2 text-white/70">{board.machine.downFor}</p>
-          <p className="mt-2 text-sm text-white/40">
+        <div className="border-warning-200 bg-warning-50 rounded-3xl border p-10 text-center">
+          <Wrench className="mx-auto size-8 text-warning-600" />
+          <div className="mt-3 text-ink-900 text-2xl font-bold">This machine is down</div>
+          <p className="text-ink-700 mt-2">{board.machine.downFor}</p>
+          <p className="text-ink-500 mt-2 text-sm">
             Nothing can be started on it until the office puts it back up.
           </p>
         </div>
@@ -229,12 +229,12 @@ export default function FloorPage() {
         <button
           type="button"
           onClick={() => choose('')}
-          className="mb-6 text-sm text-white/40 hover:text-white"
+          className="text-ink-500 hover:text-ink-900 mb-6 text-sm"
         >
           ← {board.machine.name}
         </button>
-        <h1 className="mb-1 text-3xl font-bold text-white">Who is on the machine?</h1>
-        <p className="mb-6 text-white/50">
+        <h1 className="mb-1 text-ink-900 text-3xl font-bold">Who is on the machine?</h1>
+        <p className="text-ink-500 mb-6">
           Your name goes on every reel you run, so the office is not guessing on Friday.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -267,14 +267,14 @@ export default function FloorPage() {
     <Shell>
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-2xl font-bold text-white sm:text-3xl">
+          <div className="text-ink-900 text-2xl font-bold sm:text-3xl">
             {greeting(new Date().getHours())}
             {operator ? `, ${operator.name.split(' ')[0]}` : ''}
           </div>
           <button
             type="button"
             onClick={() => setPickingOperator(true)}
-            className="mt-1 text-sm text-white/40 underline-offset-4 hover:text-white hover:underline"
+            className="text-ink-500 hover:text-ink-900 mt-1 text-sm underline-offset-4 hover:underline"
           >
             Not you?
           </button>
@@ -282,42 +282,45 @@ export default function FloorPage() {
         <button
           type="button"
           onClick={() => choose('')}
-          className="flex items-center gap-2 rounded-xl bg-white/5 px-4 py-2.5 text-white ring-1 ring-white/10 hover:bg-white/10"
+          className="flex items-center gap-2 rounded-xl border-ink-200 text-ink-800 hover:bg-ink-100 border bg-white px-4 py-2.5"
         >
-          <Settings2 className="size-4 text-white/40" />
+          <Settings2 className="size-4 text-ink-400" />
           <span className="font-semibold">{board.machine.name}</span>
         </button>
       </header>
 
       {isLoading ? (
-        <p className="text-white/50">Looking for work at this machine…</p>
+        <p className="text-ink-500">Looking for work at this machine…</p>
       ) : !job ? (
-        <div className="rounded-3xl bg-white/5 p-10 text-center ring-1 ring-white/10">
-          <div className="text-2xl font-bold text-white">Nothing waiting</div>
-          <p className="mt-2 text-white/50">
+        <div className="border-ink-200 rounded-3xl border bg-white p-10 text-center">
+          <div className="text-ink-900 text-2xl font-bold">Nothing waiting</div>
+          <p className="mt-2 text-ink-500">
             No job has reached {board.machine.name} yet. The screen will pick one up on its own.
           </p>
         </div>
       ) : (
         <>
-          <div className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10 sm:p-6">
+          <div className="border-ink-200 rounded-3xl border bg-white p-5 shadow-[var(--shadow-card)] sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs font-medium tracking-widest text-white/40 uppercase">
+                <div className="text-xs font-medium tracking-widest text-ink-400 uppercase">
                   Current job
                 </div>
-                <div className="mt-1 text-3xl font-bold text-white">Order #{job.orderNumber}</div>
-                <div className="mt-0.5 text-lg text-white/70">{job.jobName}</div>
-                <div className="text-sm text-white/40">{job.customerName}</div>
+                <div className="mt-1 text-ink-900 text-3xl font-bold">Order #{job.orderNumber}</div>
+                <div className="mt-0.5 text-lg text-ink-700">{job.jobName}</div>
+                <div className="text-sm text-ink-400">{job.customerName}</div>
               </div>
               <div className="text-right">
-                <div className="text-lg font-semibold text-white">{job.stageLabel}</div>
-                <div className="text-sm text-white/40">
+                <div className="text-lg text-ink-900 font-semibold">{job.stageLabel}</div>
+                <div className="text-sm text-ink-400">
                   step {job.position} of {job.stageCount}
                 </div>
                 {job.dueDate ? (
                   <div
-                    className={cn('mt-1 text-sm', job.isOverdue ? 'text-red-300' : 'text-white/40')}
+                    className={cn(
+                      'mt-1 text-sm',
+                      job.isOverdue ? 'text-danger-600' : 'text-ink-400',
+                    )}
                   >
                     due {formatDate(job.dueDate)}
                   </div>
@@ -345,26 +348,26 @@ export default function FloorPage() {
           {/* Why it is stopped, in the operator's own words, at the top where
               the next person on shift will actually see it. */}
           {openIssue ? (
-            <div className="mt-4 flex items-start gap-3 rounded-2xl bg-amber-500/15 p-4 ring-1 ring-amber-400/30">
-              <CircleAlert className="mt-0.5 size-5 shrink-0 text-amber-300" />
+            <div className="mt-4 flex items-start gap-3 border-warning-200 bg-warning-50 rounded-2xl border p-4">
+              <CircleAlert className="mt-0.5 size-5 shrink-0 text-warning-600" />
               <div>
-                <div className="font-semibold text-amber-200">
+                <div className="font-semibold text-warning-800">
                   Problem {openIssue.number} · {ISSUE_SEVERITY_LABELS[openIssue.severity]}
                 </div>
-                <p className="mt-0.5 text-white/80">{openIssue.title}</p>
-                <p className="mt-1 text-sm text-white/40">
+                <p className="mt-0.5 text-ink-700">{openIssue.title}</p>
+                <p className="mt-1 text-sm text-ink-400">
                   {openIssue.raisedBy} · {new Date(openIssue.createdAt).toLocaleString('en-IN')} ·
                   still open
                 </p>
               </div>
             </div>
           ) : held && lastStop ? (
-            <div className="mt-4 flex items-start gap-3 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-              <Pause className="mt-0.5 size-5 shrink-0 text-white/40" />
+            <div className="mt-4 flex items-start gap-3 border-ink-200 rounded-2xl border bg-white p-4">
+              <Pause className="mt-0.5 size-5 shrink-0 text-ink-400" />
               <div>
-                <div className="font-semibold text-white">Paused</div>
-                <p className="mt-0.5 text-white/80">{lastStop.note}</p>
-                <p className="mt-1 text-sm text-white/40">
+                <div className="text-ink-900 font-semibold">Paused</div>
+                <p className="mt-0.5 text-ink-700">{lastStop.note}</p>
+                <p className="mt-1 text-sm text-ink-400">
                   {lastStop.operator} · {new Date(lastStop.createdAt).toLocaleString('en-IN')}
                 </p>
               </div>
@@ -372,11 +375,11 @@ export default function FloorPage() {
           ) : null}
 
           {blocked ? (
-            <div className="mt-4 flex items-start gap-3 rounded-2xl bg-red-500/15 p-4 ring-1 ring-red-400/30">
-              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red-300" />
+            <div className="mt-4 flex items-start gap-3 border-danger-200 bg-danger-50 rounded-2xl border p-4">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-danger-600" />
               <div>
-                <div className="font-semibold text-red-200">The film is not in</div>
-                <p className="mt-0.5 text-white/80">
+                <div className="font-semibold text-danger-800">The film is not in</div>
+                <p className="mt-0.5 text-ink-700">
                   Short of {job.shortOf.join(', ')}. Ask the office before running this.
                 </p>
               </div>
@@ -433,20 +436,20 @@ export default function FloorPage() {
 
           {board.waiting.length > 0 ? (
             <section className="mt-8">
-              <h2 className="mb-2 text-xs font-medium tracking-widest text-white/40 uppercase">
+              <h2 className="mb-2 text-xs font-medium tracking-widest text-ink-400 uppercase">
                 Next at this machine
               </h2>
-              <ul className="divide-y divide-white/5 overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10">
+              <ul className="divide-y divide-ink-100 border-ink-200 overflow-hidden rounded-2xl border bg-white">
                 {board.waiting.slice(0, 4).map((next) => (
                   <li
                     key={next.stageId}
                     className="flex items-center justify-between gap-3 px-4 py-3"
                   >
                     <span className="min-w-0">
-                      <span className="font-semibold text-white">#{next.orderNumber}</span>{' '}
-                      <span className="text-white/60">{next.jobName}</span>
+                      <span className="text-ink-900 font-semibold">#{next.orderNumber}</span>{' '}
+                      <span className="text-ink-600">{next.jobName}</span>
                     </span>
-                    <span className="shrink-0 text-sm text-white/40">
+                    <span className="shrink-0 text-sm text-ink-400">
                       {next.stageLabel}
                       {next.dueDate ? ` · ${formatDate(next.dueDate)}` : ''}
                     </span>
@@ -461,12 +464,12 @@ export default function FloorPage() {
       {/* Stopping, and saying why. A full-screen sheet rather than a dialog:
           there is one thing to do and it should fill the screen. */}
       {stopping ? (
-        <div className="bg-ink-950/80 fixed inset-0 z-50 flex items-end justify-center p-4 backdrop-blur sm:items-center">
-          <div className="bg-ink-900 w-full max-w-lg rounded-3xl p-6 ring-1 ring-white/10">
-            <h2 className="text-2xl font-bold text-white">
+        <div className="bg-ink-900/50 fixed inset-0 z-50 flex items-end justify-center p-4 backdrop-blur sm:items-center">
+          <div className="border-ink-200 w-full max-w-lg rounded-3xl border bg-white p-6 shadow-[var(--shadow-elevated)]">
+            <h2 className="text-ink-900 text-2xl font-bold">
               {stopping === 'ISSUE' ? 'What is wrong?' : 'Why are you pausing?'}
             </h2>
-            <p className="mt-1 text-white/50">
+            <p className="text-ink-500 mt-1">
               {stopping === 'ISSUE'
                 ? 'The job stops, and this stays on the quality list until somebody closes it.'
                 : 'The job stops. This is what the office will see.'}
@@ -481,11 +484,11 @@ export default function FloorPage() {
                   ? 'Registration drifting on the third colour'
                   : 'Break — back in twenty minutes'
               }
-              className="mt-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-lg text-white ring-1 ring-white/15 placeholder:text-white/30 focus:ring-4 focus:ring-white/40 focus:outline-none"
+              className="border-ink-300 text-ink-900 placeholder:text-ink-400 focus:ring-brand-300 mt-4 w-full rounded-2xl border bg-white px-4 py-3 text-lg focus:ring-4 focus:outline-none"
             />
             {stopping === 'ISSUE' ? (
               <div className="mt-4">
-                <div className="text-xs font-medium tracking-widest text-white/40 uppercase">
+                <div className="text-xs font-medium tracking-widest text-ink-400 uppercase">
                   How bad
                 </div>
                 <div className="mt-2 grid grid-cols-3 gap-2">
@@ -496,14 +499,14 @@ export default function FloorPage() {
                       onClick={() => setSeverity(value)}
                       className={cn(
                         'min-h-[56px] rounded-2xl text-base font-bold uppercase',
-                        'focus-visible:ring-4 focus-visible:ring-white/40 focus-visible:outline-none',
+                        'focus-visible:ring-brand-300 focus-visible:ring-4 focus-visible:outline-none',
                         severity === value
                           ? value === 'HIGH'
-                            ? 'bg-red-500 text-white'
+                            ? 'bg-danger-600 text-white'
                             : value === 'MEDIUM'
-                              ? 'bg-amber-500 text-ink-900'
-                              : 'bg-white/25 text-white'
-                          : 'bg-white/5 text-white/60 ring-1 ring-white/10',
+                              ? 'bg-warning-500 text-white'
+                              : 'bg-ink-600 text-white'
+                          : 'border-ink-300 text-ink-600 border bg-white',
                       )}
                     >
                       {ISSUE_SEVERITY_LABELS[value]}
@@ -542,7 +545,7 @@ export default function FloorPage() {
 /** Dark, full-bleed, and no navigation. This screen is not the office. */
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-ink-950 min-h-dvh px-4 py-6 sm:px-8 sm:py-10">
+    <div className="bg-ink-50 min-h-dvh px-4 py-6 sm:px-8 sm:py-10">
       <div className="mx-auto max-w-3xl">{children}</div>
     </div>
   );

@@ -49,10 +49,6 @@
   --color-ink-700: #374151;
   --color-ink-800: #1f2937;
   --color-ink-900: #111827;
-  /* Darker than the deepest office ink, and only the machine screen uses it:
-     a tablet under factory lighting wants a ground that is almost black, so
-     the one job on it is the brightest thing in the operator's eyeline. */
-  --color-ink-950: #030712;
 
   /* Status — success is emerald, warning amber, danger red. */
   --color-success-50: #ecfdf5;
