@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Check, CircleAlert, Pause, Play, Settings2 } from 'lucide-react';
-import { formatNumber, greeting, type FloorJob } from '@yuva/shared';
+import {
+  formatNumber,
+  greeting,
+  ISSUE_SEVERITIES,
+  ISSUE_SEVERITY_LABELS,
+  type FloorJob,
+  type IssueSeverity,
+} from '@yuva/shared';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
@@ -72,6 +79,9 @@ export default function FloorPage() {
   const [weight, setWeight] = useState('');
   const [stopping, setStopping] = useState<'PAUSED' | 'ISSUE' | null>(null);
   const [reason, setReason] = useState('');
+  /* Asked at the machine, because the operator is the one who can see whether
+     the press is making scrap. Ignored on a pause — a break is not a defect. */
+  const [severity, setSeverity] = useState<IssueSeverity>('MEDIUM');
 
   const { data: machines } = useFloorMachines();
   const { data: board, isLoading } = useFloorBoard(machineId || null);
@@ -142,11 +152,12 @@ export default function FloorPage() {
       await hold.mutateAsync({
         stageId: job.stageId,
         machineId,
-        input: { operatorId, kind: stopping, note: reason },
+        input: { operatorId, kind: stopping, note: reason, severity },
       });
       toast.success(stopping === 'ISSUE' ? 'Problem recorded — job stopped' : 'Job paused');
       setStopping(null);
       setReason('');
+      setSeverity('MEDIUM');
     } catch (caught) {
       toast.error(caught instanceof ApiClientError ? caught.message : 'Could not stop it');
     }
@@ -211,6 +222,11 @@ export default function FloorPage() {
   const held = job?.cardStatus === 'ON_HOLD';
   const blocked = Boolean(job && job.shortOf.length > 0 && !job.canStartShort);
   const lastStop = job?.events.find((event) => event.kind !== 'RESUMED') ?? null;
+  /*
+   * A defect outranks a break. The press starting again in ten minutes does
+   * not close the issue, so it is what the next shift needs to see first.
+   */
+  const openIssue = job?.issues[0] ?? null;
 
   return (
     <Shell>
@@ -293,13 +309,25 @@ export default function FloorPage() {
 
           {/* Why it is stopped, in the operator's own words, at the top where
               the next person on shift will actually see it. */}
-          {held && lastStop ? (
+          {openIssue ? (
             <div className="mt-4 flex items-start gap-3 rounded-2xl bg-amber-500/15 p-4 ring-1 ring-amber-400/30">
               <CircleAlert className="mt-0.5 size-5 shrink-0 text-amber-300" />
               <div>
                 <div className="font-semibold text-amber-200">
-                  Stopped — {lastStop.kind === 'ISSUE' ? 'problem' : 'paused'}
+                  Problem {openIssue.number} · {ISSUE_SEVERITY_LABELS[openIssue.severity]}
                 </div>
+                <p className="mt-0.5 text-white/80">{openIssue.title}</p>
+                <p className="mt-1 text-sm text-white/40">
+                  {openIssue.raisedBy} · {new Date(openIssue.createdAt).toLocaleString('en-IN')} ·
+                  still open
+                </p>
+              </div>
+            </div>
+          ) : held && lastStop ? (
+            <div className="mt-4 flex items-start gap-3 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+              <Pause className="mt-0.5 size-5 shrink-0 text-white/40" />
+              <div>
+                <div className="font-semibold text-white">Paused</div>
                 <p className="mt-0.5 text-white/80">{lastStop.note}</p>
                 <p className="mt-1 text-sm text-white/40">
                   {lastStop.operator} · {new Date(lastStop.createdAt).toLocaleString('en-IN')}
@@ -404,7 +432,9 @@ export default function FloorPage() {
               {stopping === 'ISSUE' ? 'What is wrong?' : 'Why are you pausing?'}
             </h2>
             <p className="mt-1 text-white/50">
-              The job stops either way. This is what the office will see.
+              {stopping === 'ISSUE'
+                ? 'The job stops, and this stays on the quality list until somebody closes it.'
+                : 'The job stops. This is what the office will see.'}
             </p>
             <textarea
               rows={3}
@@ -418,12 +448,43 @@ export default function FloorPage() {
               }
               className="mt-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-lg text-white ring-1 ring-white/15 placeholder:text-white/30 focus:ring-4 focus:ring-white/40 focus:outline-none"
             />
+            {stopping === 'ISSUE' ? (
+              <div className="mt-4">
+                <div className="text-xs font-medium tracking-widest text-white/40 uppercase">
+                  How bad
+                </div>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {ISSUE_SEVERITIES.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setSeverity(value)}
+                      className={cn(
+                        'min-h-[56px] rounded-2xl text-base font-bold uppercase',
+                        'focus-visible:ring-4 focus-visible:ring-white/40 focus-visible:outline-none',
+                        severity === value
+                          ? value === 'HIGH'
+                            ? 'bg-red-500 text-white'
+                            : value === 'MEDIUM'
+                              ? 'bg-amber-500 text-ink-900'
+                              : 'bg-white/25 text-white'
+                          : 'bg-white/5 text-white/60 ring-1 ring-white/10',
+                      )}
+                    >
+                      {ISSUE_SEVERITY_LABELS[value]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className="mt-4 grid grid-cols-2 gap-3">
               <FloorButton
                 tone="pause"
                 onClick={() => {
                   setStopping(null);
                   setReason('');
+                  setSeverity('MEDIUM');
                 }}
               >
                 Back

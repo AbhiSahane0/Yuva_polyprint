@@ -22,6 +22,7 @@ import { prisma, TX } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
 import { availabilityForCards } from '../production/material-reservation.js';
 import { updateStage } from '../production/production.service.js';
+import { createIssue } from '../quality/quality.service.js';
 
 /**
  * **The machine screen.**
@@ -45,6 +46,14 @@ const today = (): string => new Date().toISOString().slice(0, 10);
 /** Cards a machine could still be working on. A finished card is not one. */
 const LIVE_CARD: Prisma.ProductionOrderWhereInput = {
   status: { in: ['PLANNED', 'RUNNING', 'ON_HOLD'] },
+};
+
+/** Defects still open on a card. They outlive the stoppage that raised them. */
+const OPEN_ISSUES = {
+  where: { status: { not: 'RESOLVED' as const } },
+  select: { id: true, number: true, severity: true, title: true, raisedBy: true, createdAt: true },
+  orderBy: { createdAt: 'desc' as const },
+  take: 5,
 };
 
 const STAGE_SELECT = {
@@ -75,6 +84,7 @@ const STAGE_SELECT = {
       materialOverrideReason: true,
       order: { select: { number: true, dueDate: true, quantityKg: true } },
       stages: { select: { id: true, position: true, status: true, stage: true } },
+      qualityIssues: OPEN_ISSUES,
     },
   },
   floorEvents: {
@@ -174,6 +184,15 @@ function toJob(row: StageRow, short: string[]): FloorJob {
       note: event.note,
       operator: event.operator,
       createdAt: event.createdAt.toISOString(),
+    })),
+
+    issues: card.qualityIssues.map((issue) => ({
+      id: issue.id,
+      number: issue.number,
+      severity: issue.severity,
+      title: issue.title,
+      raisedBy: issue.raisedBy,
+      createdAt: issue.createdAt.toISOString(),
     })),
 
     shortOf: short,
@@ -416,11 +435,35 @@ export async function holdJob(
       where: { id: row.productionOrderId },
       data: { status: 'ON_HOLD' },
     });
+
+    if (input.kind === 'ISSUE') {
+      /*
+       * A defect is not a stoppage. The machine starting again in ten minutes
+       * does not make the problem go away, so it is raised as a quality issue
+       * — with a severity, an owner and a life — through the same call the
+       * office uses. One way for a defect to come into existence.
+       */
+      await createIssue(
+        tx,
+        {
+          productionOrderId: row.productionOrderId,
+          stageId: row.id,
+          severity: input.severity,
+          title: input.note,
+          detail: '',
+          rejectedKg: 0,
+          responsibleId: input.operatorId,
+        },
+        person.name,
+      );
+      return;
+    }
+
     await tx.floorEvent.create({
       data: {
         productionOrderId: row.productionOrderId,
         stageId: row.id,
-        kind: input.kind,
+        kind: 'PAUSED',
         note: input.note,
         operatorId: input.operatorId,
         operator: person.name,

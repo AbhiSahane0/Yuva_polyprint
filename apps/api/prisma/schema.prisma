@@ -1702,10 +1702,12 @@ model Employee {
   /// Every stage they have run. See ProductionStage.operatorId.
   stages ProductionStage[]
 
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
   /// Stoppages and issues they recorded at the machine.
-  floorEvents FloorEvent[]
+  floorEvents   FloorEvent[]
+  /// Quality issues they are answerable for.
+  qualityIssues QualityIssue[]
 
   @@index([isActive, name])
   @@index([roleId])
@@ -1945,6 +1947,8 @@ model ProductionOrder {
   dispatchLines DispatchLine[]
   /// What the floor said about it — stopped, and why.
   floorEvents   FloorEvent[]
+  /// What was found wrong with it.
+  qualityIssues QualityIssue[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -2007,7 +2011,8 @@ model ProductionStage {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  floorEvents FloorEvent[]
+  floorEvents   FloorEvent[]
+  qualityIssues QualityIssue[]
 
   @@unique([productionOrderId, position])
   @@index([status])
@@ -2073,6 +2078,7 @@ model StockReservation {
   /// One row per material per card: raising a card twice for the same film
   /// should correct the figure, not hold it twice.
   /**
+   * /**
    * /**
    * /**
    * /**
@@ -2550,13 +2556,16 @@ model DispatchPackage {
 /// stage already carries when it started and finished and what it weighed;
 /// what it could never say was **why a machine is standing idle** — and that
 /// is the question the office asks across the floor twenty times a day.
+/// Why a machine stopped.
+///
+/// Only two, since Quality & Waste exists: a stoppage is a moment, and a
+/// defect is a state that somebody has to close. The operator's Problem
+/// button raises a **QualityIssue** rather than logging a third kind here —
+/// one record, with a severity and a life, instead of a line of text nobody
+/// can act on.
 enum FloorEventKind {
   PAUSED
   RESUMED
-  /// Something wrong with the job: a bad reel, a registration problem, a
-  /// blocked die. Stops the card in the same way a pause does — a problem
-  /// worth typing is a problem worth stopping for.
-  ISSUE
 }
 
 /// One thing the operator said at the machine.
@@ -2596,4 +2605,84 @@ model FloorEvent {
   @@index([stageId])
   @@index([createdAt])
   @@map("floor_events")
+}
+
+/// How badly it matters. The works' own three, as the floor already speaks.
+enum IssueSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+/// Where an issue has got to.
+///
+/// Three, and the middle one earns its place: "somebody is looking at it" is a
+/// different thing from "nobody has picked it up", and an issues list where
+/// both read as Open is a list the works stops believing.
+enum IssueStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+}
+
+/// **Something found wrong with a run.**
+///
+/// Raised from the machine when the operator presses Problem, or from the
+/// office when it is found afterwards at the checking table. Either way it is
+/// a state rather than an event: it has a severity, somebody answerable for
+/// it, and it stays on the list until it is closed with a note saying what
+/// happened.
+///
+/// `rejectedKg` is the part that reaches the rest of the system. Waste is
+/// material lost **at the machine** and every stage already records it; a
+/// rejection is finished film that was made, weighed and then failed — so it
+/// is counted out of what the godown can send, and Dispatch stops offering
+/// it. The two are separate figures because they are separate events, and
+/// adding them together would be counting one loss twice.
+model QualityIssue {
+  id     String @id @default(cuid())
+  /// Sequential and human-facing. Its own series, like an order's.
+  number Int    @unique
+
+  productionOrderId String          @map("production_order_id")
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+
+  /// The stage it was found at. Null when it was found off the machine —
+  /// at the checking table, or by the customer.
+  stageId String?          @map("stage_id")
+  stage   ProductionStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+
+  severity IssueSeverity @default(MEDIUM)
+  status   IssueStatus   @default(OPEN)
+
+  /// One line, in the works' own words: "Delamination on the edge".
+  title  String
+  detail String @default("")
+
+  /// Finished goods that cannot be sent. Not waste — see the note above.
+  rejectedKg Decimal @default(0) @map("rejected_kg") @db.Decimal(12, 3)
+
+  /// Who found it. A name rather than a link, because it may be an operator
+  /// at the machine or somebody in the office, and those are different tables.
+  raisedBy String @default("") @map("raised_by")
+
+  /// Who is answerable for it. An issue nobody owns is one nobody closes.
+  responsibleId   String?   @map("responsible_id")
+  responsible     Employee? @relation(fields: [responsibleId], references: [id], onDelete: SetNull)
+  /// Snapshotted, so an old issue still names somebody after they leave.
+  responsibleName String    @default("") @map("responsible_name")
+
+  resolvedBy String    @default("") @map("resolved_by")
+  resolvedAt DateTime? @map("resolved_at")
+  /// What was actually done. "Resolved" on its own teaches nobody anything.
+  resolution String    @default("")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([severity])
+  @@index([productionOrderId])
+  @@index([createdAt])
+  @@map("quality_issues")
 }

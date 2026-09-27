@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ISSUE_SEVERITIES } from '../lib/quality.js';
 
 const weight = (label: string) =>
   z.coerce
@@ -39,6 +40,15 @@ export const holdFloorJobSchema = z.object({
   operatorId: z.string().min(1, 'Tap your name first'),
   kind: z.enum(['PAUSED', 'ISSUE']),
   note: z.string().trim().min(3, 'Say briefly what happened').max(500),
+  /**
+   * How bad, on a problem. Asked at the machine rather than left for the
+   * office, because the operator is the one who can see whether the press is
+   * making scrap — and an issues list where everything arrives unclassified
+   * is a list nobody can triage.
+   *
+   * Ignored on a pause: a break is not a defect.
+   */
+  severity: z.enum(ISSUE_SEVERITIES).default('MEDIUM'),
 });
 
 export const resumeFloorJobSchema = z.object({

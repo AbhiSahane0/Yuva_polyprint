@@ -22,6 +22,7 @@ import {
 import type { Prisma } from '../../generated/prisma/client.js';
 import { prisma, TX } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/api-error.js';
+import { rejectedByCard } from '../quality/quality.service.js';
 
 /**
  * **Dispatch — what left the building, and on whose lorry.**
@@ -109,6 +110,7 @@ async function deliveryFor(
     tx.productionOrder.findMany({
       where: { orderId: { in: ids }, status: 'COMPLETED' },
       select: {
+        id: true,
         orderId: true,
         quantityKg: true,
         jobSheet: { select: { finalOutputKg: true } },
@@ -124,6 +126,21 @@ async function deliveryFor(
     }),
   ]);
 
+  /*
+   * **Film that was made and then failed.**
+   *
+   * A rejection is not waste. Waste is what the machine lost, and the run's
+   * own output already has it taken off; this is finished film that was
+   * weighed, packed and then rejected at the checking table. It is still in
+   * the building and it still cannot go on a lorry, so it is counted out of
+   * what the godown can send — the one place a quality issue reaches the rest
+   * of the system.
+   */
+  const rejected = await rejectedByCard(
+    tx,
+    cards.map((card) => card.id),
+  );
+
   const producedKg = new Map<string, number>();
   for (const card of cards) {
     /*
@@ -133,7 +150,10 @@ async function deliveryFor(
      * override rather than being impossible.
      */
     const output = toNumber(card.jobSheet?.finalOutputKg) || toNumber(card.quantityKg);
-    producedKg.set(card.orderId, (producedKg.get(card.orderId) ?? 0) + output);
+    /* Floored at nought: a card cannot have made a negative amount, however
+       much of what it made was later rejected. */
+    const sendable = Math.max(0, output - (rejected.get(card.id) ?? 0));
+    producedKg.set(card.orderId, (producedKg.get(card.orderId) ?? 0) + sendable);
   }
 
   const goneKg = new Map<string, number>();
@@ -431,6 +451,12 @@ export async function readyToSend(query: ReadyToSendQuery): Promise<ReadyToSend[
     prisma,
     orders.map((order) => order.id),
   );
+  /* The same rejections `deliveryFor` took off the totals, so the per-card
+     list underneath cannot show a card as having more than the order does. */
+  const rejected = await rejectedByCard(
+    prisma,
+    orders.flatMap((order) => order.productionOrders.map((card) => card.id)),
+  );
   const now = today();
 
   return (
@@ -440,7 +466,11 @@ export async function readyToSend(query: ReadyToSendQuery): Promise<ReadyToSend[
         const cards = order.productionOrders.map((card) => ({
           id: card.id,
           number: card.number,
-          producedKg: toNumber(card.jobSheet?.finalOutputKg) || toNumber(card.quantityKg),
+          producedKg: Math.max(
+            0,
+            (toNumber(card.jobSheet?.finalOutputKg) || toNumber(card.quantityKg)) -
+              (rejected.get(card.id) ?? 0),
+          ),
           completedAt: card.completedAt?.toISOString() ?? null,
         }));
 

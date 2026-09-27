@@ -44,6 +44,7 @@ import {
   readyToSend,
 } from '../src/modules/dispatch/dispatch.service.js';
 import { planOrder } from '../src/modules/planning/planning.service.js';
+import { raiseIssue, updateIssue } from '../src/modules/quality/quality.service.js';
 import { receiveStock } from '../src/modules/inventory/inventory.service.js';
 import {
   costSheet,
@@ -189,6 +190,12 @@ async function clear(quiet = false) {
    * the order cannot go while a challan still names it — which is the whole
    * point of that constraint and exactly right outside a demo.
    */
+  /* Issues cascade from the card, so they go with it — counted here so the
+     line the script prints is not quietly wrong. */
+  const issues = await prisma.qualityIssue.count({
+    where: { productionOrder: { notes: { contains: MARK } } },
+  });
+
   const notes = await prisma.dispatch.findMany({
     where: { notes: { contains: MARK } },
     select: { id: true },
@@ -210,8 +217,9 @@ async function clear(quiet = false) {
     `Removed ${quotations.count} quotations, ${orders.count} orders, ${cards.count} job cards,`,
   );
   console.log(
-    `        ${sheets.length} job sheets, ${notes.length} dispatch notes, ${batches.length} stock batches, ${people.count} employees.`,
+    `        ${sheets.length} job sheets, ${notes.length} dispatch notes, ${issues} quality issues,`,
   );
+  console.log(`        ${batches.length} stock batches, ${people.count} employees.`);
 }
 
 /** One line per job, so the run reads as the list it is. */
@@ -679,6 +687,63 @@ async function main() {
     }
 
     if (runningAt) {
+      /*
+       * A works always has something outstanding, and the quality screen is
+       * the issues list — an empty one demonstrates nothing.
+       *
+       * Both are raised against jobs ON THE FLOOR and neither rejects any
+       * film, on purpose: a rejection is counted out of the godown, and
+       * putting one on the finished job would quietly move the dispatch
+       * figures this script's own output describes.
+       */
+      if (plan.level === 'laminating') {
+        const owner = await prisma.employee.findFirst({
+          where: { role: { process: 'LAMINATION' } },
+          select: { id: true },
+        });
+        const issue = await raiseIssue(
+          {
+            productionOrderId: card.id,
+            stageId: null,
+            severity: 'HIGH',
+            title: 'Delamination on the outer edge',
+            detail: 'Third and fourth reel, about 15 mm in. Adhesive coat being checked.',
+            rejectedKg: 0,
+            responsibleId: owner?.id ?? null,
+          },
+          'Demo',
+        );
+        say(
+          'Problem',
+          `issue ${issue.number}`,
+          `${design.jobName} — ${issue.severity}, still open`,
+        );
+      }
+
+      if (plan.level === 'printing') {
+        const raised = await raiseIssue(
+          {
+            productionOrderId: card.id,
+            stageId: null,
+            severity: 'LOW',
+            title: 'Colour shade variation on the first 200 m',
+            detail: '',
+            rejectedKg: 0,
+            responsibleId: null,
+          },
+          'Demo',
+        );
+        await updateIssue(
+          raised.id,
+          {
+            status: 'RESOLVED',
+            resolution: 'Ink viscosity corrected; the run was re-checked and passed.',
+          },
+          'Demo',
+        );
+        say('Problem', `issue ${raised.number}`, `${design.jobName} — closed, with what was done`);
+      }
+
       say(
         'On the floor',
         `card #${card.number}`,

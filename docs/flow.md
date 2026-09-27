@@ -603,6 +603,73 @@ held.
 
 ---
 
+## Step 6b — what went wrong, and where it went · **Quality & waste**
+
+Two questions on one screen, and they are deliberately **different numbers**.
+
+### Waste is read, not recorded
+
+Every stage has said what went on and what came off since the job card was
+built. Nothing new is entered here; the screen groups what the floor has been
+typing all along.
+
+**By process**, because that is the question it answers. A works losing 6% at
+lamination and 1% everywhere else has a laminator problem, and no amount of
+looking at individual jobs says so. The percentage is what to compare between
+stages — the weight only tells you which stage runs the most film.
+
+**By day**, for the last fortnight, with the quiet days drawn as noughts. A
+trend with the empty days left out is not a trend; it is a list of busy days
+drawn as though they were consecutive.
+
+### A rejection is not waste
+
+Waste is material lost **at the machine**. A rejection is finished film that
+was made, weighed, and then failed at the checking table.
+
+They are never added together. The material left the shelf once and was lost
+once — counting a rejection as waste as well would make a works that scrapped
+40 kg look as though it had lost 80, on the one screen built to tell it
+otherwise.
+
+A rejection has exactly one consequence, and it is not on this screen: **the
+godown cannot send it.** Record 62.5 kg rejected and Dispatch's "in the
+godown" drops by 62.5 kg the same moment, because that film is still in the
+building and still cannot go on a lorry.
+
+> Closing the issue does **not** give the film back. The scrap is a fact about
+> the film, not about the paperwork chasing it. If it turns out to be fine
+> after all, the honest way to say so is to put the rejected weight back to
+> nought — and the godown figure returns with it.
+
+### An issue has a life
+
+Raised from the machine when the operator presses **Problem**, or here when it
+is found afterwards. Either way it is a state rather than an event: it has a
+severity, somebody answerable for it, and it stays on the list until it is
+closed.
+
+| Field             | Why it is there                                                 |
+| ----------------- | --------------------------------------------------------------- |
+| **How bad**       | High, medium, low — chosen at the machine by whoever can see it |
+| **On it**         | an issue nobody owns is one nobody closes                       |
+| **Rejected**      | finished film that cannot be sent. Usually nought               |
+| **What was done** | required to close it                                            |
+
+Three statuses, and the middle one earns its place: "being looked at" is a
+different thing from nobody having picked it up, and a list where both read as
+Open is a list the works stops believing. Both count as open.
+
+**Closing takes a note.** "Resolved" on its own teaches nobody anything, and
+the same defect comes back in March with nothing on file about what was done
+in September. A closed issue can be reopened — the fix did not hold — rather
+than raising a second one about the same defect and losing the history.
+
+Worst first, and the oldest of those above the newest: an issue open a week
+outranks one raised this morning, because it is the one being ignored.
+
+---
+
 ## Step 7 — the card is finished
 
 When every stage is done, mark the card **Completed**.
@@ -793,6 +860,7 @@ used them can still explain themselves.
 | **Orders**             | What customers have committed to, and when it is due         |
 | **Planning**           | What can run, when it runs, and on which machine             |
 | **Machine screen**     | One machine, one job, four buttons — the tablet on the floor |
+| **Quality & waste**    | Where material is going, and what is still wrong             |
 | **Production**         | What is on the floor right now, and how far along            |
 | **Employees**          | Who is here, and what they are on                            |
 | **Job sheets**         | What each run actually cost                                  |
@@ -818,12 +886,12 @@ npm run seed:demo -w @yuva/api
 | ------------------ | -------------------------------------------------------------------------------------------------------------- |
 | **Quoted**         | a quotation sent, nobody has answered                                                                          |
 | **Ordered**        | won, on the books, booked onto a press — and one of the two cannot make its date                               |
-| **On the floor**   | printing done, lamination running                                                                              |
+| **On the floor**   | printing done, lamination running — one issue open against it and one closed                                   |
 | **Finished**       | every stage done, costed, taken off stock                                                                      |
 | **Part delivered** | half of it gone on a lorry, listed reel by reel, with the balance still in the godown and a draft note waiting |
 
-Walk Quotations → Orders → Planning → Production → Job sheets → Dispatch →
-Inventory in that order and the whole chain reads in one sitting. Remove it again with:
+Walk Quotations → Orders → Planning → Production → Quality → Job sheets →
+Dispatch → Inventory in that order and the whole chain reads in one sitting. Remove it again with:
 
 ```bash
 npm run seed:demo -w @yuva/api -- --clear
@@ -835,8 +903,6 @@ npm run seed:demo -w @yuva/api -- --clear
 
 So nobody goes looking for it:
 
-- **Quality and waste analysis** — the figures are all recorded; the reporting
-  on top of them is not built.
 - **Capacity scheduling.** Planning records the day and the machine somebody
   chose; it does not work out the sequence, and it will happily let two jobs be
   booked onto one press on one day. The machine load card shows that happening

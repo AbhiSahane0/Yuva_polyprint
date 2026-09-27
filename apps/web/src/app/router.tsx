@@ -20,6 +20,7 @@ const OrderPage = lazy(() => import('@/features/orders/pages/OrderPage'));
 const NewOrderPage = lazy(() => import('@/features/orders/pages/NewOrderPage'));
 const PlanningPage = lazy(() => import('@/features/planning/pages/PlanningPage'));
 const FloorPage = lazy(() => import('@/features/floor/pages/FloorPage'));
+const QualityPage = lazy(() => import('@/features/quality/pages/QualityPage'));
 const DispatchPage = lazy(() => import('@/features/dispatch/pages/DispatchPage'));
 const DispatchNotePage = lazy(() => import('@/features/dispatch/pages/DispatchNotePage'));
 const DispatchFormPage = lazy(() => import('@/features/dispatch/pages/DispatchFormPage'));
@@ -200,6 +201,13 @@ function AppRoutes() {
           */}
           <Route path="/production" element={<ProductionPage />} />
           <Route path="/production/:id" element={<JobCardPage />} />
+          {/*
+            Quality reads like Production: where material is going and what is
+            still wrong is the whole works' question, and the floor fixes most
+            of it — hiding the figures from them is how a waste rate stays
+            where it is. Raising and closing needs `jobs`, guarded on the API.
+          */}
+          <Route path="/quality" element={<QualityPage />} />
           {/* No guard, like Production: the floor reads this to fill in a job
               card. Adding somebody is refused by the API without `jobs`. */}
           <Route path="/employees" element={<EmployeesPage />} />

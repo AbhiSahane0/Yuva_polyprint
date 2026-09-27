@@ -15,6 +15,7 @@ import orderRoutes from '../modules/orders/order.routes.js';
 import dispatchRoutes from '../modules/dispatch/dispatch.routes.js';
 import planningRoutes from '../modules/planning/planning.routes.js';
 import floorRoutes from '../modules/floor/floor.routes.js';
+import qualityRoutes from '../modules/quality/quality.routes.js';
 import productionRoutes from '../modules/production/production.routes.js';
 import purchaseRoutes from '../modules/purchase/purchase.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
@@ -73,6 +74,13 @@ router.use('/planning', authenticate, planningRoutes);
  * office, because it is the same write through the same service.
  */
 router.use('/floor', authenticate, floorRoutes);
+
+/*
+ * What went wrong, and where material is being lost. Readable by anyone signed
+ * in — the floor fixes most of it, and hiding the figures from them is how a
+ * waste rate stays where it is. Raising and closing needs `jobs`.
+ */
+router.use('/quality', authenticate, qualityRoutes);
 
 /*
  * Jobs are edited from two places — the customer editor and the quotation

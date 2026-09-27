@@ -1,4 +1,5 @@
 import type { FloorAction, FloorEventKind } from '../lib/floor.js';
+import type { IssueSeverity } from '../lib/quality.js';
 import type { ProductionStatus, StageStatus } from '../constants/production.js';
 import type { MachineKind } from '../lib/rate-costing.js';
 
@@ -72,6 +73,22 @@ export interface FloorJob {
    * to the machine.
    */
   events: FloorEvent[];
+
+  /**
+   * Defects still open on this card, worst first.
+   *
+   * Separate from the events above because they outlive the stoppage: the
+   * press is started again in ten minutes and the issue is still somebody's
+   * to close. The operator coming on next shift needs to see it.
+   */
+  issues: {
+    id: string;
+    number: number;
+    severity: IssueSeverity;
+    title: string;
+    raisedBy: string;
+    createdAt: string;
+  }[];
 
   /**
    * Short of film, and what of. A stage cannot be started against it unless

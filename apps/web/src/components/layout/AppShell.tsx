@@ -7,6 +7,7 @@ import {
   IndianRupee,
   LogOut,
   Menu,
+  ShieldAlert,
   ShieldCheck,
   Disc3,
   Package,
@@ -77,6 +78,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: '/floor', label: 'Machine screen', icon: Tablet },
       { to: '/cylinders', label: 'Design & Cylinders', icon: Disc3, module: 'cylinders' },
       { to: '/job-sheets', label: 'Job sheets', icon: ClipboardList, module: 'jobs' },
+      { to: '/quality', label: 'Quality & waste', icon: ShieldAlert },
       /* No module, for the same reason as Production: the operator dropdown on
          a job card is what this is for, and the floor has to be able to read
          it. Adding somebody needs `jobs`, enforced on the API. */
