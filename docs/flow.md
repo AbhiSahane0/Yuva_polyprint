@@ -1,7 +1,7 @@
 # How a job moves through the system
 
-From the day a customer asks for a price to the day the works knows what the run
-actually cost.
+From the day a customer asks for a price to the day the goods leave the
+building — and the works knows what the run actually cost.
 
 This is written to be read aloud. If you are showing somebody the system for the
 first time, start at the top and work down — every step says what it is for,
@@ -22,6 +22,9 @@ technical knowledge.
                                        ORDER          what they committed to
                                           │
                                           ▼
+                                      PLANNING        can it run, and when —
+                                          │             and on which machine
+                                          ▼
                                       JOB CARD        what the floor will do
                                           │             + claims the film, ink
                                           │               and adhesive it needs
@@ -34,8 +37,16 @@ technical knowledge.
                                      JOB SHEET        what it actually cost
                                           │
                                           ▼
-                                      STOCK GOES DOWN
+                                     STOCK GOES DOWN
+                                          │
+                                          ▼
+                                      DISPATCH        it leaves the building,
+                                                      and the order is complete
 ```
+
+Three screens watch that chain rather than move it along: the **machine
+screen** the floor works from, **Quality & waste**, and **Machines**. Part
+three covers them.
 
 Two things are worth saying before any of the detail.
 
@@ -234,12 +245,12 @@ and the day it is wanted. It is the office's record, and the floor reads it too
 
 An order moves **Confirmed → In production → Completed**, and it can be
 **Cancelled** while nothing has been made. It does not move itself to In
-production; starting work does that, in Step 6.
+production; starting work does that, in Step 7.
 
 Orders for work taken over the phone, with no quotation behind them, can be
 typed here directly.
 
-## Step 4a — the gate before the floor · **Planning**
+## Step 5 — the gate before the floor · **Planning**
 
 Between an order and a job card there is a decision nothing used to record:
 **when it runs, and on what machine.** The order carries a due date, which is
@@ -308,7 +319,7 @@ afterwards would be a second opinion about a job already running.
 
 ---
 
-## Step 5 — raise the job card · on the order, **Start production**
+## Step 6 — raise the job card · on the order, **Start production**
 
 A job card is what the floor works from. It is raised **from the order**, never
 on its own — a card with no order behind it is a run nobody asked for.
@@ -407,7 +418,7 @@ because film ages on a shelf. Hovering a roll shows its batch code.
 
 > **A shortage does not stop the card being raised.** Raising it is how the
 > floor finds out what is missing and how purchasing finds out what to order.
-> The stop comes at the machine — Step 6.
+> The stop comes at the machine — Step 7.
 
 ### The panel folds away
 
@@ -420,7 +431,7 @@ A job that is **short with nobody having said why** opens itself. The panel is
 then the reason the job will not start, and the way past it is a button inside
 it.
 
-## Step 6 — run it, stage by stage · **Production → the card**
+## Step 7 — run it, stage by stage · **Production → the card**
 
 This is the screen somebody stands at a machine with. One block per stage, in
 the order the job meets them.
@@ -530,220 +541,21 @@ own with the weight carried across. The progress bar on the card and in the list
 is worked out from the stages — done, out of the ones that apply — so the two
 screens can never disagree.
 
-## Step 6a — the same job, from the machine · **Machine screen**
-
-Everything in Step 6 can also be done from a tablet at the machine, and that
-is where it is meant to be done. `/floor` is a different screen for a
-different person: dark, no sidebar, four buttons and one job on it.
-
-### Setting a tablet up
-
-Asked twice, once each:
-
-1. **Which machine is this?** The tablet remembers, and from then on shows only
-   the work at that machine.
-2. **Who is on the machine?** That machine's own people are offered first —
-   the press's operators on the press's tablet — and the rest of the works
-   below them. One tap, and "Not you?" changes it at the start of a shift.
-
-The name matters because it is the one thing the office was guessing at. A
-stage used to be signed by whoever a supervisor remembered on Friday; now it is
-signed by whoever pressed the button.
-
-### What it shows
-
-One job: the order, the design, the customer, which stage and how far down the
-card it is, and four figures — ordered, on the machine, came off, waste. Under
-it, what is next at this machine, so an operator can see the shape of their
-shift without asking.
-
-**Only work the reel has actually reached.** A stage whose predecessor has not
-finished is never offered, so the lamination tablet cannot start a job that has
-not been printed. A stage the office has assigned to Laminator 1 does not
-appear on Laminator 2 — somebody chose, and a tablet quietly overriding that is
-how two machines start the same job. A stage with no machine yet goes to
-whichever machine of the right kind reaches it first.
-
-### The four buttons
-
-| Button           | What it does                                                  |
-| ---------------- | ------------------------------------------------------------- |
-| **Start job**    | records the weight going on, the operator and the machine     |
-| **Complete job** | records what came off, and hands the reel to the next machine |
-| **Pause**        | stops the job, and asks why                                   |
-| **Problem**      | the same, and reads as a problem rather than a break          |
-
-Start and Complete are the **same write the office screen makes** — so the
-material re-check still happens at the moment film goes on a machine, the card
-still starts itself, and the reel is still handed on with its weight. A tablet
-that recorded jobs its own way would drift from the job card within a month,
-and the job card is the document the works is paid against. A job whose film is
-not in is refused here too, in the same words.
-
-### Why a machine is standing idle
-
-This is the part nothing else recorded. A stage already says when it started,
-when it finished and what it weighed; none of it could say why the press has
-been quiet since eleven.
-
-Pause and Problem both stop the job and both insist on a reason, and each one
-is **logged rather than stored** — a shift holds four stoppages, and the fourth
-overwriting the third is how a works loses its own day. The card reads **On
-hold** on the office Production screen the moment the operator presses it,
-with no phone call, and the reason is on the tablet for whoever comes on next
-shift. **Start again** puts it back to running, and that is logged too.
-
-A held job cannot be started or finished until somebody restarts it. Held means
-held.
-
-> This log is where Quality & Waste will read from when it is built. It is not
-> that module: there is no severity and there are no categories, because
-> inventing a vocabulary the works has not asked for is how a screen ends up
-> with a dropdown nobody uses honestly.
-
----
-
-## Step 6b — what went wrong, and where it went · **Quality & waste**
-
-Two questions on one screen, and they are deliberately **different numbers**.
-
-### Waste is read, not recorded
-
-Every stage has said what went on and what came off since the job card was
-built. Nothing new is entered here; the screen groups what the floor has been
-typing all along.
-
-**By process**, because that is the question it answers. A works losing 6% at
-lamination and 1% everywhere else has a laminator problem, and no amount of
-looking at individual jobs says so. The percentage is what to compare between
-stages — the weight only tells you which stage runs the most film.
-
-**By day**, for the last fortnight, with the quiet days drawn as noughts. A
-trend with the empty days left out is not a trend; it is a list of busy days
-drawn as though they were consecutive.
-
-### A rejection is not waste
-
-Waste is material lost **at the machine**. A rejection is finished film that
-was made, weighed, and then failed at the checking table.
-
-They are never added together. The material left the shelf once and was lost
-once — counting a rejection as waste as well would make a works that scrapped
-40 kg look as though it had lost 80, on the one screen built to tell it
-otherwise.
-
-A rejection has exactly one consequence, and it is not on this screen: **the
-godown cannot send it.** Record 62.5 kg rejected and Dispatch's "in the
-godown" drops by 62.5 kg the same moment, because that film is still in the
-building and still cannot go on a lorry.
-
-> Closing the issue does **not** give the film back. The scrap is a fact about
-> the film, not about the paperwork chasing it. If it turns out to be fine
-> after all, the honest way to say so is to put the rejected weight back to
-> nought — and the godown figure returns with it.
-
-### An issue has a life
-
-Raised from the machine when the operator presses **Problem**, or here when it
-is found afterwards. Either way it is a state rather than an event: it has a
-severity, somebody answerable for it, and it stays on the list until it is
-closed.
-
-| Field             | Why it is there                                                 |
-| ----------------- | --------------------------------------------------------------- |
-| **How bad**       | High, medium, low — chosen at the machine by whoever can see it |
-| **On it**         | an issue nobody owns is one nobody closes                       |
-| **Rejected**      | finished film that cannot be sent. Usually nought               |
-| **What was done** | required to close it                                            |
-
-Three statuses, and the middle one earns its place: "being looked at" is a
-different thing from nobody having picked it up, and a list where both read as
-Open is a list the works stops believing. Both count as open.
-
-**Closing takes a note.** "Resolved" on its own teaches nobody anything, and
-the same defect comes back in March with nothing on file about what was done
-in September. A closed issue can be reopened — the fix did not hold — rather
-than raising a second one about the same defect and losing the history.
-
-Worst first, and the oldest of those above the newest: an issue open a week
-outranks one raised this morning, because it is the one being ignored.
-
----
-
-## Step 6c — where each machine is · **Machines**
-
-Almost nothing on this screen is stored, and that is the point of it.
-
-What is **on** a machine is the stage running on it. **Who** is on it is that
-stage's operator. **Made today** and **waste** are the stages that finished on
-it today. **Stood today** is the pauses and problems the machine screen has
-been recording all along — which is what those reasons were being kept for.
-None of it is a figure anybody maintains, so none of it can go stale.
-
-### The one stored fact
-
-A machine being down. And even that has no flag: **a maintenance record with
-no end is the machine being down.** A status somebody has to remember to clear
-is a status that is wrong, and the press would read "under maintenance" for a
-fortnight after it came back.
-
-Two kinds, because the works only distinguishes two: a **service** somebody
-chose to do, and a **breakdown** nobody chose. Putting one down insists on a
-reason; bringing it back asks what was done, but does not insist — a breakdown
-that cleared itself is a real afternoon, and refusing the record would leave
-the machine reading Down on every screen while it runs.
-
-**It does not insist the job comes off first.** A press does not break down
-politely between stages. The job stays where it is and the machine reads Down,
-which is the truth; a system that demanded the stage be finished first is one
-the fitter works around.
-
-**Down sorts first**, because it is the only card asking for anything.
-
-### What being down actually does
-
-| Screen             | What happens                                                   |
-| ------------------ | -------------------------------------------------------------- |
-| **Machine screen** | the machine leaves the picker; a tablet already on it says why |
-| **Machine screen** | no job can be started on it, in the same words                 |
-| **Planning**       | the row says the machine is down — but still lets you book it  |
-
-Planning warns and does not block, deliberately: **you schedule around a
-service**, and that is the whole point of knowing about one. The warning only
-ever says "right now", because nothing schedules maintenance ahead and a claim
-about next Tuesday would be invented.
-
-Maintenance counts towards the time a machine has stood, alongside the floor's
-own stoppages. A downtime figure that counted the fitter but not the four
-pauses — or the other way round — would flatter the works exactly where it
-should not.
-
-### What this screen is not
-
-It does not edit the machines. Their names, speeds, horsepower and what they
-cost to run stay on the **Costing** screen, because that is what they are for.
-This one says where they are, not what they cost.
-
-And nothing is scheduled ahead: no intervals, no next-service dates. Those
-would need a figure per machine that the works has not given us, and an
-interval nobody set becomes a red flag everybody learns to ignore.
-
----
-
-## Step 7 — the card is finished
+## Step 8 — the card is finished
 
 When every stage is done, mark the card **Completed**.
 
 **Completing the card does not complete the order.** For a customer, complete
-means delivered, and nothing in the system knows about delivery yet. The order
-stays In production until somebody says otherwise, which is honest.
+means delivered, and that is Dispatch's to say — Step 11. The order stays In
+production until a delivery note settles the last of it, and then it completes
+itself.
 
-## Step 8 — what it actually cost · **Job sheet**
+## Step 9 — what it actually cost · **Job sheet**
 
 The quotation said what the job _should_ cost. The job sheet says what it _did_.
 
 On the finished card, press **Record what it cost**. That raises a job sheet
-already pointed at this card — which matters, and Step 9 says why.
+already pointed at this card — which matters, and Step 10 says why.
 
 The sheet is laid out like the works' own printed form, with the same rows in
 the same order: the films, the twelve colours, the solvents, the adhesive. For
@@ -755,7 +567,7 @@ produce, and what the office prices repeat work from. It also compares the
 wastage the job actually lost against the allowance it was quoted at, and says
 what the difference cost.
 
-## Step 9 — take the material off stock
+## Step 10 — take the material off stock
 
 On the costed sheet, press **Take off stock**.
 
@@ -777,7 +589,7 @@ done with a stock adjustment rather than by editing history.
 
 ---
 
-## Step 10 — it goes out · **Dispatch**
+## Step 11 — it goes out · **Dispatch**
 
 This is the step that finishes an order, and until it existed nothing did: a job
 card could be complete, costed and off stock while the order it was for still
@@ -880,6 +692,212 @@ here would take every delivered job off twice.
 
 ---
 
+# Part three — watching it happen
+
+The eleven steps above are a job's life, in order. These three screens are not
+steps in it: they watch the same job from the floor's side, and any of them can
+be open at any point in Part two.
+
+## The tablet at the machine · **Machine screen**
+
+Everything in Step 7 can also be done from a tablet at the machine, and that
+is where it is meant to be done. `/floor` is a different screen for a
+different person: dark, no sidebar, four buttons and one job on it.
+
+### Setting a tablet up
+
+Asked twice, once each:
+
+1. **Which machine is this?** The tablet remembers, and from then on shows only
+   the work at that machine.
+2. **Who is on the machine?** That machine's own people are offered first —
+   the press's operators on the press's tablet — and the rest of the works
+   below them. One tap, and "Not you?" changes it at the start of a shift.
+
+The name matters because it is the one thing the office was guessing at. A
+stage used to be signed by whoever a supervisor remembered on Friday; now it is
+signed by whoever pressed the button.
+
+### What it shows
+
+One job: the order, the design, the customer, which stage and how far down the
+card it is, and four figures — ordered, on the machine, came off, waste. Under
+it, what is next at this machine, so an operator can see the shape of their
+shift without asking.
+
+**Only work the reel has actually reached.** A stage whose predecessor has not
+finished is never offered, so the lamination tablet cannot start a job that has
+not been printed. A stage the office has assigned to Laminator 1 does not
+appear on Laminator 2 — somebody chose, and a tablet quietly overriding that is
+how two machines start the same job. A stage with no machine yet goes to
+whichever machine of the right kind reaches it first.
+
+### The four buttons
+
+| Button           | What it does                                                  |
+| ---------------- | ------------------------------------------------------------- |
+| **Start job**    | records the weight going on, the operator and the machine     |
+| **Complete job** | records what came off, and hands the reel to the next machine |
+| **Pause**        | stops the job, and asks why                                   |
+| **Problem**      | the same, and reads as a problem rather than a break          |
+
+Start and Complete are the **same write the office screen makes** — so the
+material re-check still happens at the moment film goes on a machine, the card
+still starts itself, and the reel is still handed on with its weight. A tablet
+that recorded jobs its own way would drift from the job card within a month,
+and the job card is the document the works is paid against. A job whose film is
+not in is refused here too, in the same words.
+
+### Why a machine is standing idle
+
+This is the part nothing else recorded. A stage already says when it started,
+when it finished and what it weighed; none of it could say why the press has
+been quiet since eleven.
+
+Pause and Problem both stop the job and both insist on a reason, and each one
+is **logged rather than stored** — a shift holds four stoppages, and the fourth
+overwriting the third is how a works loses its own day. The card reads **On
+hold** on the office Production screen the moment the operator presses it,
+with no phone call, and the reason is on the tablet for whoever comes on next
+shift. **Start again** puts it back to running, and that is logged too.
+
+A held job cannot be started or finished until somebody restarts it. Held means
+held.
+
+> This log is where Quality & Waste will read from when it is built. It is not
+> that module: there is no severity and there are no categories, because
+> inventing a vocabulary the works has not asked for is how a screen ends up
+> with a dropdown nobody uses honestly.
+
+---
+
+## What went wrong, and where it went · **Quality & waste**
+
+Two questions on one screen, and they are deliberately **different numbers**.
+
+### Waste is read, not recorded
+
+Every stage has said what went on and what came off since the job card was
+built. Nothing new is entered here; the screen groups what the floor has been
+typing all along.
+
+**By process**, because that is the question it answers. A works losing 6% at
+lamination and 1% everywhere else has a laminator problem, and no amount of
+looking at individual jobs says so. The percentage is what to compare between
+stages — the weight only tells you which stage runs the most film.
+
+**By day**, for the last fortnight, with the quiet days drawn as noughts. A
+trend with the empty days left out is not a trend; it is a list of busy days
+drawn as though they were consecutive.
+
+### A rejection is not waste
+
+Waste is material lost **at the machine**. A rejection is finished film that
+was made, weighed, and then failed at the checking table.
+
+They are never added together. The material left the shelf once and was lost
+once — counting a rejection as waste as well would make a works that scrapped
+40 kg look as though it had lost 80, on the one screen built to tell it
+otherwise.
+
+A rejection has exactly one consequence, and it is not on this screen: **the
+godown cannot send it.** Record 62.5 kg rejected and Dispatch's "in the
+godown" drops by 62.5 kg the same moment, because that film is still in the
+building and still cannot go on a lorry.
+
+> Closing the issue does **not** give the film back. The scrap is a fact about
+> the film, not about the paperwork chasing it. If it turns out to be fine
+> after all, the honest way to say so is to put the rejected weight back to
+> nought — and the godown figure returns with it.
+
+### An issue has a life
+
+Raised from the machine when the operator presses **Problem**, or here when it
+is found afterwards. Either way it is a state rather than an event: it has a
+severity, somebody answerable for it, and it stays on the list until it is
+closed.
+
+| Field             | Why it is there                                                 |
+| ----------------- | --------------------------------------------------------------- |
+| **How bad**       | High, medium, low — chosen at the machine by whoever can see it |
+| **On it**         | an issue nobody owns is one nobody closes                       |
+| **Rejected**      | finished film that cannot be sent. Usually nought               |
+| **What was done** | required to close it                                            |
+
+Three statuses, and the middle one earns its place: "being looked at" is a
+different thing from nobody having picked it up, and a list where both read as
+Open is a list the works stops believing. Both count as open.
+
+**Closing takes a note.** "Resolved" on its own teaches nobody anything, and
+the same defect comes back in March with nothing on file about what was done
+in September. A closed issue can be reopened — the fix did not hold — rather
+than raising a second one about the same defect and losing the history.
+
+Worst first, and the oldest of those above the newest: an issue open a week
+outranks one raised this morning, because it is the one being ignored.
+
+---
+
+## Where each machine is · **Machines**
+
+Almost nothing on this screen is stored, and that is the point of it.
+
+What is **on** a machine is the stage running on it. **Who** is on it is that
+stage's operator. **Made today** and **waste** are the stages that finished on
+it today. **Stood today** is the pauses and problems the machine screen has
+been recording all along — which is what those reasons were being kept for.
+None of it is a figure anybody maintains, so none of it can go stale.
+
+### The one stored fact
+
+A machine being down. And even that has no flag: **a maintenance record with
+no end is the machine being down.** A status somebody has to remember to clear
+is a status that is wrong, and the press would read "under maintenance" for a
+fortnight after it came back.
+
+Two kinds, because the works only distinguishes two: a **service** somebody
+chose to do, and a **breakdown** nobody chose. Putting one down insists on a
+reason; bringing it back asks what was done, but does not insist — a breakdown
+that cleared itself is a real afternoon, and refusing the record would leave
+the machine reading Down on every screen while it runs.
+
+**It does not insist the job comes off first.** A press does not break down
+politely between stages. The job stays where it is and the machine reads Down,
+which is the truth; a system that demanded the stage be finished first is one
+the fitter works around.
+
+**Down sorts first**, because it is the only card asking for anything.
+
+### What being down actually does
+
+| Screen             | What happens                                                   |
+| ------------------ | -------------------------------------------------------------- |
+| **Machine screen** | the machine leaves the picker; a tablet already on it says why |
+| **Machine screen** | no job can be started on it, in the same words                 |
+| **Planning**       | the row says the machine is down — but still lets you book it  |
+
+Planning warns and does not block, deliberately: **you schedule around a
+service**, and that is the whole point of knowing about one. The warning only
+ever says "right now", because nothing schedules maintenance ahead and a claim
+about next Tuesday would be invented.
+
+Maintenance counts towards the time a machine has stood, alongside the floor's
+own stoppages. A downtime figure that counted the fitter but not the four
+pauses — or the other way round — would flatter the works exactly where it
+should not.
+
+### What this screen is not
+
+It does not edit the machines. Their names, speeds, horsepower and what they
+cost to run stay on the **Costing** screen, because that is what they are for.
+This one says where they are, not what they cost.
+
+And nothing is scheduled ahead: no intervals, no next-service dates. Those
+would need a figure per machine that the works has not given us, and an
+interval nobody set becomes a red flag everybody learns to ignore.
+
+---
+
 # The rules behind all of it
 
 Four ideas explain most of the system's behaviour. They are worth knowing,
@@ -913,24 +931,61 @@ used them can still explain themselves.
 
 # The screens, at a glance
 
+Grouped the way the sidebar groups them.
+
+**Commercial**
+
+| Screen         | Answers                                              |
+| -------------- | ---------------------------------------------------- |
+| **Customers**  | Who we sell to, and what designs they have           |
+| **Quotations** | What we have offered, and what came of it            |
+| **Orders**     | What customers have committed to, and when it is due |
+| **Dispatch**   | What has left the works, and what is waiting to go   |
+
+**Materials**
+
+| Screen        | Answers                                               |
+| ------------- | ----------------------------------------------------- |
+| **Inventory** | What we hold, what it is worth, what is running out   |
+| **Purchase**  | What is on order and what has arrived                 |
+| **Rates**     | Today's raw material prices                           |
+| **Costing**   | What the works costs to run, and what each machine is |
+
+**Production**
+
 | Screen                 | Answers                                                      |
 | ---------------------- | ------------------------------------------------------------ |
-| **Customers**          | Who we sell to, and what designs they have                   |
-| **Quotations**         | What we have offered, and what came of it                    |
-| **Orders**             | What customers have committed to, and when it is due         |
 | **Planning**           | What can run, when it runs, and on which machine             |
-| **Machine screen**     | One machine, one job, four buttons — the tablet on the floor |
-| **Quality & waste**    | Where material is going, and what is still wrong             |
-| **Machines**           | Where each machine is, and why one is standing               |
 | **Production**         | What is on the floor right now, and how far along            |
-| **Employees**          | Who is here, and what they are on                            |
-| **Job sheets**         | What each run actually cost                                  |
-| **Dispatch**           | What has left the works, and what is waiting to go           |
-| **Inventory**          | What we hold, what it is worth, what is running out          |
-| **Purchase**           | What is on order and what has arrived                        |
-| **Rates**              | Today's raw material prices                                  |
-| **Costing**            | What the works costs to run                                  |
+| **Machine screen**     | One machine, one job, four buttons — the tablet on the floor |
 | **Design & Cylinders** | Which designs have cylinders, and where they are             |
+| **Job sheets**         | What each run actually cost                                  |
+| **Quality & waste**    | Where material is going, and what is still wrong             |
+
+**Resources**
+
+| Screen        | Answers                                        |
+| ------------- | ---------------------------------------------- |
+| **Machines**  | Where each machine is, and why one is standing |
+| **Employees** | Who is here, and what they are on              |
+
+---------------------- | ------------------------------------------------------------ |
+| **Customers** | Who we sell to, and what designs they have |
+| **Quotations** | What we have offered, and what came of it |
+| **Orders** | What customers have committed to, and when it is due |
+| **Planning** | What can run, when it runs, and on which machine |
+| **Machine screen** | One machine, one job, four buttons — the tablet on the floor |
+| **Quality & waste** | Where material is going, and what is still wrong |
+| **Machines** | Where each machine is, and why one is standing |
+| **Production** | What is on the floor right now, and how far along |
+| **Employees** | Who is here, and what they are on |
+| **Job sheets** | What each run actually cost |
+| **Dispatch** | What has left the works, and what is waiting to go |
+| **Inventory** | What we hold, what it is worth, what is running out |
+| **Purchase** | What is on order and what has arrived |
+| **Rates** | Today's raw material prices |
+| **Costing** | What the works costs to run |
+| **Design & Cylinders** | Which designs have cylinders, and where they are |
 
 ---
 
@@ -951,10 +1006,11 @@ npm run seed:demo -w @yuva/api
 | **Serviced**       | one laminator down four hours and back, with what was done                                                     |
 | **Finished**       | every stage done, costed, taken off stock                                                                      |
 | **Part delivered** | half of it gone on a lorry, listed reel by reel, with the balance still in the godown and a draft note waiting |
+| **Short of film**  | a card raised and refusing to start, because the poly it needs is genuinely not stocked                        |
 
-Walk Quotations → Orders → Planning → Production → Machines → Quality → Job
-sheets → Dispatch → Inventory in that order and the whole chain reads in one
-sitting. Remove it again with:
+Walk Quotations → Orders → Planning → Production → Job sheets → Dispatch →
+Inventory in that order and the chain reads in one sitting; Machines and
+Quality & waste can be looked at from anywhere along it. Remove it again with:
 
 ```bash
 npm run seed:demo -w @yuva/api -- --clear
