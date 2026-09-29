@@ -10,6 +10,23 @@ technical knowledge.
 
 ---
 
+## What is in here
+
+| Part                                                                 | What it covers                                                             |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| [The chain, in one picture](#the-chain-in-one-picture)               | the whole thing on one screen                                              |
+| [Part one — before the first job](#part-one--before-the-first-job)   | the seven things set up once                                               |
+| [Part two — a job, start to end](#part-two--a-job-start-to-end)      | the eleven steps a job actually takes                                      |
+| [Part three — watching it happen](#part-three--watching-it-happen)   | the three screens that watch rather than move                              |
+| [Every screen, and what it is for](#every-screen-and-what-it-is-for) | each one in turn: what it answers, what it needs, what it feeds            |
+| [How the screens feed each other](#how-the-screens-feed-each-other)  | what travels, what is worked out, and what moves when you change something |
+| [The rules behind all of it](#the-rules-behind-all-of-it)            | four ideas that explain most of the behaviour                              |
+| [Seeing it end to end](#seeing-it-end-to-end)                        | the demonstration set                                                      |
+| [What is not built yet](#what-is-not-built-yet)                      | so nobody goes looking                                                     |
+| [Deliberately not built](#deliberately-not-built)                    | and so nobody proposes it again                                            |
+
+---
+
 ## The chain, in one picture
 
 ```
@@ -131,7 +148,35 @@ A customer's designs live under them — thickness, size, pouch style, how many
 cylinders. A quotation raised against an existing design fills itself in from
 that record.
 
-## Step 4 — who works here · **Employees**
+## Step 4 — the designs themselves · **Designs**
+
+Every product the works has on its books, in one searchable list: the code,
+the name, what it is made of, whose it is, how often it has been priced and
+whether it has cylinders or artwork.
+
+A design normally needs no attention here at all — it belongs to a customer
+and is edited on that customer's page, or created inside the quotation wizard
+while somebody is pricing it. **This screen exists for the ones that have
+nobody's name on them.**
+
+Four hundred-odd designs came across from the works' old sheets and about
+seventy of them arrived with no customer: the sheet never said, or the name
+was written somewhere the importer could not read. A design belonging to
+nobody appears on nobody's page, so until this screen there was no way to find
+them at all.
+
+So they sort to the top, under **Needs a customer**. Pick one, say whose it
+is, and it moves onto that customer's page and is edited there like every
+other design from then on. Assigning is the only thing this screen changes —
+a second editor here would be a second place for the same measurements to
+drift apart.
+
+Worth doing early, because a design with no customer cannot be quoted: the
+wizard starts from a customer and works down to their designs.
+
+---
+
+## Step 5 — who works here · **Employees**
 
 Name, what they do, which shift. Their role points at one of the wages from
 Step 2, so nobody's pay is typed twice.
@@ -150,7 +195,7 @@ and nobody has to keep it up to date: if a job card stage is running with
 somebody's name on it, they are working, and that is the only thing that can
 make it true.
 
-## Step 5 — film in the building · **Purchase** and **Inventory**
+## Step 6 — film in the building · **Purchase** and **Inventory**
 
 Raise a purchase order on a supplier, and record the delivery when it arrives.
 Accepting a delivery opens a **stock batch** — that is what puts film on the
@@ -183,7 +228,7 @@ two. **Free below zero** means more has been promised to job cards than the
 works holds — it is shown in red rather than hidden behind a nought, because a
 works that finds that out at the machine finds out too late.
 
-## Step 6 — the printing cylinders · **Design & Cylinders** _(optional)_
+## Step 7 — the printing cylinders · **Design & Cylinders** _(optional)_
 
 Which designs already have a set engraved, and where those sets are. A design
 that already has cylinders does not need charging for them again, and the
@@ -571,9 +616,11 @@ what the difference cost.
 
 On the costed sheet, press **Take off stock**.
 
-**This is the only thing in the entire system that reduces stock.** Not the
-quotation, not the order, not the job card. Only the sheet, because only the
-sheet knows what was actually weighed at the machine.
+**Nothing else in a job's life reduces stock.** Not the quotation, not the
+order, not the job card — only the sheet, because only the sheet knows what
+was actually weighed at the machine. (Film arriving on a delivery, and a
+stocktake correction typed on the Inventory screen, are the other two ways
+stock moves; neither belongs to a job.)
 
 It does two things at once:
 
@@ -935,63 +982,298 @@ used them can still explain themselves.
 
 ---
 
-# The screens, at a glance
+# Every screen, and what it is for
 
-Grouped the way the sidebar groups them.
+Eighteen screens. For each: what it answers, what has to exist before it is
+any use, and what it feeds further down the line.
 
-**Commercial**
+Grouped the way the sidebar groups them — seventeen are on it, and the
+eighteenth, the machine screen, is deliberately not.
 
-| Screen         | Answers                                              |
-| -------------- | ---------------------------------------------------- |
-| **Customers**  | Who we sell to, and what designs they have           |
-| **Quotations** | What we have offered, and what came of it            |
-| **Orders**     | What customers have committed to, and when it is due |
-| **Dispatch**   | What has left the works, and what is waiting to go   |
+---
 
-**Materials**
+## Commercial
 
-| Screen        | Answers                                               |
-| ------------- | ----------------------------------------------------- |
-| **Inventory** | What we hold, what it is worth, what is running out   |
-| **Purchase**  | What is on order and what has arrived                 |
-| **Rates**     | Today's raw material prices                           |
-| **Costing**   | What the works costs to run, and what each machine is |
+### Customers
 
-**Production**
+**Answers** — who we sell to, and what designs they have.
+**Needs first** — nothing. This is where a works starts.
+**Feeds** — every quotation, and through it every order, job card and invoice
+line. A customer's designs are what the quotation wizard offers.
 
-| Screen                 | Answers                                                                                                           |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| **Planning**           | What can run, when it runs, and on which machine                                                                  |
-| **Production**         | What is on the floor right now, and how far along                                                                 |
-| **Machine screen**     | One machine, one job, four buttons — the tablet on the floor. Not in the sidebar: bookmark `/floor` on the tablet |
-| **Design & Cylinders** | Which designs have cylinders, and where they are                                                                  |
-| **Job sheets**         | What each run actually cost                                                                                       |
-| **Quality & waste**    | Where material is going, and what is still wrong                                                                  |
+Company, brand, GST number, address, contact. The brand is what the office
+actually calls them, so it is what the screens show; the company name is what
+a bill has to carry.
 
-**Resources**
+### Designs
 
-| Screen        | Answers                                        |
-| ------------- | ---------------------------------------------- |
-| **Machines**  | Where each machine is, and why one is standing |
-| **Employees** | Who is here, and what they are on              |
+**Answers** — every product on the books, and which of them nobody has
+claimed.
+**Needs first** — Customers, for a design to belong to somebody.
+**Feeds** — the quotation wizard, which starts from a customer and offers
+their designs.
 
----------------------- | ------------------------------------------------------------ |
-| **Customers** | Who we sell to, and what designs they have |
-| **Quotations** | What we have offered, and what came of it |
-| **Orders** | What customers have committed to, and when it is due |
-| **Planning** | What can run, when it runs, and on which machine |
-| **Machine screen** | One machine, one job, four buttons — the tablet on the floor |
-| **Quality & waste** | Where material is going, and what is still wrong |
-| **Machines** | Where each machine is, and why one is standing |
-| **Production** | What is on the floor right now, and how far along |
-| **Employees** | Who is here, and what they are on |
-| **Job sheets** | What each run actually cost |
-| **Dispatch** | What has left the works, and what is waiting to go |
-| **Inventory** | What we hold, what it is worth, what is running out |
-| **Purchase** | What is on order and what has arrived |
-| **Rates** | Today's raw material prices |
-| **Costing** | What the works costs to run |
-| **Design & Cylinders** | Which designs have cylinders, and where they are |
+The list nothing else provides, and a worklist for the seventy-odd designs
+that came off the old sheets with no customer. Assigning one is all it writes.
+
+### Quotations
+
+**Answers** — what we have offered, at what price, and what came of it.
+**Needs first** — Rates and Costing, or the price is wrong and nothing says
+so. A customer and a design.
+**Feeds** — orders, and through them the job card's bill of materials. **The
+quotation is the only place a job's structure is recorded**, which is why a
+job typed straight into Orders can never have its film worked out.
+
+Priced at up to three quantities at once. Costed on the figures in force on
+**its own date**, so putting up the price of film today does not move a
+quotation sent last month.
+
+### Orders
+
+**Answers** — what the customer committed to, at what price, and when it is
+wanted.
+**Needs first** — a won quotation, or the office typing one for repeat work.
+**Feeds** — Planning, job cards, and Dispatch.
+
+One order per quotation **line**, not per quotation: three jobs on one
+quotation are made, finished and delivered separately, and one order holding
+all three could never say that two are done and one is late.
+
+### Dispatch
+
+**Answers** — what has left the building, on whose lorry, and what is still
+standing in the godown.
+**Needs first** — a finished job card, so there is something to send.
+**Feeds** — the order's status. Sending the last of an order is what completes
+it.
+
+One note is one lorry and one customer, with a line per order aboard and a row
+per reel beneath it.
+
+---
+
+## Materials
+
+### Inventory
+
+**Answers** — what the works holds, what it is worth, and what is running out.
+**Needs first** — Rates, for a material to exist at all.
+**Feeds** — every job card's material check, and the job sheet that finally
+takes stock down.
+
+**The single source of truth for stock.** Where a thing is sitting is a free
+text note on the batch, not a managed list — see _Deliberately not built_.
+
+### Purchase
+
+**Answers** — what is on order, with whom, and what has arrived.
+**Needs first** — Rates and a supplier.
+**Feeds** — Inventory. Accepting a delivery is one of the two ways stock comes
+into existence, and it goes through the inventory service rather than writing
+batches itself.
+
+### Rates
+
+**Answers** — what every material costs today, and what it cost on any past
+day.
+**Needs first** — nothing.
+**Feeds** — every quotation and every job sheet.
+
+Rates carry the date they apply from. Nothing already quoted moves when one
+changes.
+
+### Costing
+
+**Answers** — what the works itself costs to run: machines, wages, overheads
+and the settings behind every price.
+**Needs first** — nothing.
+**Feeds** — every quotation. A machine speed or a wage moves the price of
+every job quoted afterwards, which is why changing anything here needs the
+rates permission.
+
+---
+
+## Production
+
+### Planning
+
+**Answers** — can it run, when does it run, and on which machine.
+**Needs first** — a confirmed order.
+**Feeds** — nothing automatically. It is a note of intent: it reserves no film
+and raises no card.
+
+Asks the job card's own material question **before** a card exists, so nobody
+finds out a job cannot be made by trying to make it.
+
+### Production
+
+**Answers** — what is on the floor right now and how far along.
+**Needs first** — an order. The film, unless somebody allows it to run short.
+**Feeds** — the job sheet, and the godown once a card finishes.
+
+The job card **claims** film; it never takes it off the shelf.
+
+### Machine screen
+
+**Answers** — for one operator at one machine: what am I running, and what do
+I press.
+**Needs first** — a machine, a job that has reached it, and a name to tap.
+**Feeds** — exactly what the Production screen feeds, because it is the same
+write through the same service.
+
+Not in the sidebar: bookmark `/floor` on the tablet. If no screen ever goes on
+the floor, skip it — Production covers the same ground from the office.
+
+### Design & Cylinders
+
+**Answers** — which designs have an engraved set, where each cylinder is, and
+what state it is in.
+**Needs first** — a design.
+**Feeds** — the cylinder charge on a quotation, and the artwork a job prints
+from.
+
+### Job sheets
+
+**Answers** — what a run actually consumed and what it actually cost a
+kilogram.
+**Needs first** — a finished job card.
+**Feeds** — **stock.** Posting a sheet is the only thing in the entire system
+that reduces it.
+
+The quotation said what a job _should_ cost. This says what it _did_, on the
+works' own printed form.
+
+### Quality & waste
+
+**Answers** — where material is being lost, and what is still wrong.
+**Needs first** — finished stages to read waste from.
+**Feeds** — Dispatch. A rejection is finished film that cannot be sent, and
+the godown counts it out.
+
+Waste and rejections are **different numbers and never added together**.
+
+---
+
+## Resources
+
+### Machines
+
+**Answers** — where each machine is, what is on it, and why one is standing.
+**Needs first** — machines on the Costing screen.
+**Feeds** — the machine screen, which will not start a job on a machine that
+is down, and Planning, which warns but still lets you book around a service.
+
+Almost nothing here is stored. The one stored fact is a machine being down —
+and a record with no end **is** the machine being down.
+
+### Employees
+
+**Answers** — who is here, what they do, and what they are on right now.
+**Needs first** — the wages on the Costing screen, for a role to point at.
+**Feeds** — the operator box on every job card and machine screen.
+
+Deliberately not a personnel system: no attendance, no leave, no payroll.
+
+---
+
+## Administration
+
+### Users
+
+**Answers** — who can sign in, and which sections each of them sees.
+**Needs first** — nothing.
+**Feeds** — what every other screen will let somebody do. Administrators see
+everything; everybody else sees the sections ticked for them.
+
+Hiding a section is a courtesy, not the lock. The server refuses the same
+things independently.
+
+---
+
+# How the screens feed each other
+
+Two ideas cover almost all of it.
+
+## Nothing is typed twice
+
+A fact is entered once and travels. Nobody retypes the customer onto the
+order, the design onto the job card, or the quantity onto the job sheet.
+
+```
+   Customer ──► Quotation ──► Order ──► Job card ──► Job sheet ──► Dispatch
+                    │                      │
+                    │                      └─► claims film from Inventory
+                    └─► priced from Rates + Costing, as at its own date
+```
+
+The one place this breaks is deliberate: **an order typed straight into
+Orders, with no quotation behind it, has no structure** — so the job card
+cannot work out what film it needs and says so, rather than guessing.
+
+## Most of what you see is worked out, not stored
+
+If a figure can be calculated from something else, it is — every time it is
+shown. Nothing on this list is a field anybody maintains, and none of it can
+go stale:
+
+| Figure                       | Worked out from                                               |
+| ---------------------------- | ------------------------------------------------------------- |
+| How far a job card has got   | its stages that are done                                      |
+| Whether an order is late     | its due date against today                                    |
+| What is free in stock        | on hand, less what open job cards have claimed                |
+| What a job is short of       | what it needs, against what is free and wide enough           |
+| Who is on a machine          | the stage running on it                                       |
+| What is in the godown        | what finished cards made, less what has gone, less rejections |
+| Whether a machine is down    | a maintenance record with no end                              |
+| How long a machine has stood | the pauses, problems and repairs recorded on it               |
+| Waste at a stage             | what went on, less what came off                              |
+
+## Change this, and this follows
+
+| If you change…                      | …this moves                                                                                                                                         |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A material rate                     | quotations raised **from now on**. Nothing already quoted                                                                                           |
+| A machine speed, wage or overhead   | the same — from now on only                                                                                                                         |
+| A costing setting (margin, wastage) | the same. Which is why it needs the rates permission                                                                                                |
+| Win a quotation                     | one order per line, plus a design record for any line that did not already have one. Both idempotent: winning twice creates nothing the second time |
+| Raise a job card                    | film, ink and adhesive are **claimed** — free stock drops, the shelf does not                                                                       |
+| Start a stage                       | the card starts, and the order moves to In production                                                                                               |
+| Finish a stage                      | the reel passes to the next machine with its weight                                                                                                 |
+| Post a job sheet                    | **stock comes down**, and the card's claim is released                                                                                              |
+| Record a rejection                  | the godown has that much less to send                                                                                                               |
+| Put a machine down                  | it leaves the floor's picker; Planning warns but still books it                                                                                     |
+| Send a dispatch note                | every order it finishes becomes Completed                                                                                                           |
+| Cancel a sent note                  | the goods come back, and a completed order reopens                                                                                                  |
+
+## The one rule about stock
+
+**A job's material comes off the shelf exactly once, and only the job sheet
+does it.**
+
+- A **job card claims** film. This is a promise, not a movement — the shelf is
+  untouched, and another job simply cannot promise the same roll.
+- A **job sheet issues** it. Posting a sheet releases the claim at the same
+  moment, in the same transaction, so a claim and an issue can never both
+  stand against the same film.
+
+Everything else in a job's life that touches material — Planning's check, the
+machine screen's refusal, Quality's rejection, Dispatch's godown figure —
+**reads** and never writes.
+
+Two things outside a job's life also move stock, and both are meant to:
+
+| Where                     | What it does                                                                                                                             |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Purchase**, on delivery | opens a batch — this is how film arrives                                                                                                 |
+| **Inventory**, by hand    | receive, issue, adjust or transfer, for the things a job sheet cannot explain: a stocktake correction, film lent to another job, a spill |
+
+Both go through the one inventory service that owns the ledger — Purchase
+does not write batches itself — so however stock moves, it is written the same
+way and the batch always agrees with its own movements. There is a check for
+exactly that: `npm run audit -w @yuva/api`.
+
+---
 
 ---
 
