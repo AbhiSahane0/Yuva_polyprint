@@ -15,7 +15,7 @@ technical knowledge.
 | Part                                                                 | What it covers                                                             |
 | -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | [The chain, in one picture](#the-chain-in-one-picture)               | the whole thing on one screen                                              |
-| [The Overview screen](#overview)                                     | the same thing live, and the page you land on                              |
+| [The Overview screen](#the-overview-screen)                          | the same thing live, and the page you land on                              |
 | [Part one — before the first job](#part-one--before-the-first-job)   | the seven things set up once                                               |
 | [Part two — a job, start to end](#part-two--a-job-start-to-end)      | the eleven steps a job actually takes                                      |
 | [Part three — watching it happen](#part-three--watching-it-happen)   | the three screens that watch rather than move                              |
@@ -64,7 +64,8 @@ technical knowledge.
 
 Three screens watch that chain rather than move it along: the **machine
 screen** the floor works from, **Quality & waste**, and **Machines**. Part
-three covers them.
+three covers them. A fourth, **Overview**, watches the whole of it at once —
+and since that is the page signing in lands on, it comes first.
 
 Two things are worth saying before any of the detail.
 
@@ -77,6 +78,49 @@ disagree with itself eventually.
 date they apply from. Putting up the price of film today does not change what a
 quotation said last month. This matters more than it sounds: it is what lets the
 office change figures without being frightened of them.
+
+---
+
+# The Overview screen
+
+That diagram is also a screen. Signing in lands on **Overview**, which is the
+same chain with this morning's numbers in it — and it is the one page in the
+system that writes nothing, so it can be left open on a desk all day.
+
+It reads in three bands, in the order the questions actually get asked.
+
+**Where is everything** runs across the top, following the chain left to right:
+quoted and waiting on an answer, on the books, scheduled, on the floor, sitting
+in the godown, gone this month. Six numbers, each one a link to the screen it
+came from.
+
+**What needs attention** comes next, worst first — a shortage that will stop a
+job, a job that cannot make its date, an issue nobody has closed, a machine
+that is down. Each line says how many and goes straight to the screen that
+fixes it. An empty list is the normal state and says so.
+
+Beside that list sits **Today** — made, waste, machines up, and what the stock
+on hand is worth. Four figures that answer "how did today go" without opening
+anything.
+
+**The floor itself** is last, laid out by stage, so a glance says what is
+printing, what is laminating, and what is waiting.
+
+The thing worth understanding about it is what it does **not** do: it owns no
+figures of its own. The godown figure is the one Dispatch works out, the waste
+figure is Quality's, the machine states are Machines'. The Overview asks each
+of those for its answer and lays the answers out — it never recalculates
+anything. An overview with its own arithmetic drifts from the screen it
+summarises, and from then on every number has to be checked twice, forever.
+
+So when the Overview and a screen disagree, that is a bug, not a difference of
+opinion. They are the same answer, printed in two places.
+
+It refetches every thirty seconds, because it is a screen people leave open.
+
+It does show money, but only as totals — what is quoted, what is on the books,
+what the stock is worth. No margin, no quoted-against-actual, no profitability.
+Those are a report, and reports are deliberately not built (see the end).
 
 ---
 
@@ -1004,7 +1048,8 @@ nineteenth, the machine screen, is deliberately not.
 The page signing in lands on. Three bands, in the order the questions get
 asked: **the chain** across the top — quoted, on the books, scheduled, on the
 floor, in the godown, gone this month — then **what needs attention**, worst
-first, each line a link straight to the screen that fixes it, then **the floor
+first, each line a link straight to the screen that fixes it, with **Today**
+beside it (made, waste, machines up, value of stock on hand), then **the floor
 itself**, laid out by stage.
 
 It owns no figures. The godown figure is Dispatch's, the waste figure is
@@ -1012,9 +1057,9 @@ Quality's, the machine states are Machines'. An overview that worked out its
 own version of any of them would drift from the screen it summarises, and then
 somebody has to check both, every time, forever.
 
-Nothing on it is a rate, a margin or a cost — counts, weights, and what is
-riding on the floor. It refetches every thirty seconds, because it is a screen
-people leave open on a desk.
+Money appears only as totals — quoted, on the books, stock value. No margin and
+no quoted-against-actual; that is a report. It refetches every thirty seconds,
+because it is a screen people leave open on a desk.
 
 ---
 
@@ -1212,14 +1257,43 @@ Deliberately not a personnel system: no attendance, no leave, no payroll.
 **Feeds** — what every other screen will let somebody do. Administrators see
 everything; everybody else sees the sections ticked for them.
 
-Hiding a section is a courtesy, not the lock. The server refuses the same
-things independently.
+There are eight ticks, and this is what each one is for:
+
+| Tick                     | Unlocks                                                                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Customers**            | Customers, and Designs                                                                                                                     |
+| **Quotations**           | Quotations, and raising or changing an order                                                                                               |
+| **Rates**                | Rates, Costing, and the costing settings — the margin and the wastage allowance                                                            |
+| **Inventory**            | Inventory, and moving stock by hand                                                                                                        |
+| **Purchase & Suppliers** | Purchase and suppliers                                                                                                                     |
+| **Design & Cylinders**   | the cylinder sets, and the artwork on them                                                                                                 |
+| **Jobs**                 | everything the floor writes: a job card, a stage, Job sheets, Planning's booking, a quality issue, a machine's service record, an operator |
+| **Dispatch**             | raising, sending and cancelling a delivery note                                                                                            |
+
+Two of them need **two** ticks, because the action crosses a boundary:
+booking a purchase delivery in needs _Purchase_ **and** _Inventory_, since it
+opens a stock batch; posting a job sheet needs _Jobs_ **and** _Inventory_,
+since it takes material off the shelf. Both are deliberate — they are the two
+places a screen outside Inventory writes to the ledger.
+
+Six screens have no tick of their own and anybody signed in can read them:
+**Overview**, **Orders**, **Planning**, **Production**, **Quality & waste**
+and **Machines**. That is on purpose — what is due and when, and what is on
+the floor, are the floor's questions as much as the office's. Writing to any
+of them still needs the tick above: a job card needs _Jobs_, an order needs
+_Quotations_.
+
+Hiding a section is a courtesy, not the lock. Every one of those ticks is
+checked again on the server, on each request, and the server refuses
+independently of what the sidebar chose to show. Somebody who types a URL for
+a screen they have no tick for gets nothing back.
 
 ---
 
 # How the screens feed each other
 
-Two ideas cover almost all of it.
+Four things to know: what travels, what is worked out rather than kept, what
+moves when you change something, and the one rule about stock.
 
 ## Nothing is typed twice
 
@@ -1299,7 +1373,14 @@ does not write batches itself — so however stock moves, it is written the same
 way and the batch always agrees with its own movements. There is a check for
 exactly that: `npm run audit -w @yuva/api`.
 
----
+## And one screen that only reads
+
+**Overview** is the exception to this whole section: nothing feeds it, because
+it is not a step. It asks the other modules for the answers they already work
+out — Dispatch for the godown, Quality for waste, Machines for who is running,
+Inventory for stock on hand — and prints them together. It stores nothing and
+writes nothing, so it cannot be out of step with the screens it summarises; if
+it ever is, that is a bug.
 
 ---
 
@@ -1314,7 +1395,8 @@ npm run seed:demo -w @yuva/api
 
 | Stage              | What to look at                                                                                                |
 | ------------------ | -------------------------------------------------------------------------------------------------------------- |
-| **Quoted**         | a quotation sent, nobody has answered                                                                          |
+| **Quoted**         | two quotations sent, nobody has answered                                                                       |
+| **Lost**           | one turned down, with the reason recorded                                                                      |
 | **Ordered**        | won, on the books, booked onto a press — and one of the two cannot make its date                               |
 | **On the floor**   | printing done, lamination running — one issue open against it and one closed                                   |
 | **Serviced**       | one laminator down four hours and back, with what was done                                                     |
@@ -1322,9 +1404,13 @@ npm run seed:demo -w @yuva/api
 | **Part delivered** | half of it gone on a lorry, listed reel by reel, with the balance still in the godown and a draft note waiting |
 | **Short of film**  | a card raised and refusing to start, because the poly it needs is genuinely not stocked                        |
 
-Walk Quotations → Orders → Planning → Production → Job sheets → Dispatch →
-Inventory in that order and the chain reads in one sitting; Machines and
-Quality & waste can be looked at from anywhere along it. Remove it again with:
+Start on **Overview**, which is where signing in lands and where all of the
+above shows up at once — the chain band counts it, and the shortage and the
+late job appear under _Needs attention_. Then walk Quotations → Orders →
+Planning → Production → Job sheets → Dispatch → Inventory in that order and
+the chain reads in one sitting; Machines and Quality & waste can be looked at
+from anywhere along it, and every figure on the Overview should match the
+screen it links to. Remove it again with:
 
 ```bash
 npm run seed:demo -w @yuva/api -- --clear
@@ -1340,7 +1426,10 @@ So nobody goes looking for it:
   chose; it does not work out the sequence, and it will happily let two jobs be
   booked onto one press on one day. The machine load card shows that happening
   rather than preventing it, which is the honest half of the job.
-- **Reports** — the report cards, the exports and the profitability figures. The Overview answers the daily "where is everything"; this would be the month-end reading of it.
+- **Reports** — the report cards, the exports and the profitability figures.
+  The Overview answers the daily "where is everything" and shows money as
+  totals; this would be the month-end reading of it, with margins and
+  quoted-against-actual in it.
 - **Reserving by roll on the job sheet.** The card earmarks particular rolls;
   the sheet still issues by weight, oldest first, and does not check that the
   roll it took is the roll that was held.
@@ -1384,7 +1473,7 @@ grouping on the Inventory screen, not a module.
 
 ---
 
-And two gaps in the works' own data worth closing:
+And four gaps in the works' own data worth closing:
 
 - There is **no pouch-making machine** on the Costing screen, so that stage's
   machine box has nothing to offer and pouch making is not costed by the minute.

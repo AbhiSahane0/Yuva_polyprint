@@ -75,3 +75,75 @@ describe('the sidebar is a column of three', () => {
     expect(SOURCE).not.toContain('pb-28');
   });
 });
+
+/**
+ * **The sidebar and `docs/flow.md` describe the same six groups.**
+ *
+ * They stopped agreeing. "Every screen, and what it is for" in the doc files
+ * Machines and Employees under **Resources** and Designs under **Commercial**;
+ * the sidebar had no Resources group at all — Designs had been appended to
+ * Production when it was built, and Machines and Employees were sitting there
+ * with it. Nothing broke, which is why it went unnoticed: a reader following
+ * the doc simply could not find the group it told them to look in.
+ *
+ * The doc is the one somebody reads while learning the system, so it is the
+ * side this test takes.
+ */
+describe('the sidebar matches the documented grouping', () => {
+  const NAV = SOURCE.slice(SOURCE.indexOf('const NAV'), SOURCE.indexOf('export function AppShell'));
+
+  /** Group name → the `to` paths listed under it, in order. */
+  function groups(): Map<string, string[]> {
+    const out = new Map<string, string[]>();
+    /* Deliberately crude: the comments between items carry `/` characters, so
+       match the route literals rather than trying to parse the object. */
+    for (const chunk of NAV.split(/group: '/).slice(1)) {
+      const name = chunk.slice(0, chunk.indexOf("'"));
+      out.set(
+        name,
+        [...chunk.matchAll(/to: '([^']+)'/g)].map((m) => m[1] ?? ''),
+      );
+    }
+    return out;
+  }
+
+  /** The routes under one group — and proof that group is there at all. */
+  function routesUnder(name: string): string[] {
+    const found = groups().get(name);
+    expect(found, `the sidebar has a ${name} group`).toBeDefined();
+    return found ?? [];
+  }
+
+  it('has the six groups the doc lists, in the doc order', () => {
+    expect([...groups().keys()]).toEqual([
+      'Overview',
+      'Commercial',
+      'Materials',
+      'Production',
+      'Resources',
+      'Administration',
+    ]);
+  });
+
+  it('keeps Designs with Customers and not with the job screens', () => {
+    const commercial = routesUnder('Commercial');
+    /* Its question is whose artwork this is, and it is gated on `customers`. */
+    expect(commercial).toContain('/designs');
+    expect(routesUnder('Production')).not.toContain('/designs');
+    /* Next to the customer it belongs to. */
+    expect(commercial.indexOf('/designs')).toBe(commercial.indexOf('/customers') + 1);
+  });
+
+  it('keeps Machines and Employees under Resources', () => {
+    expect(routesUnder('Resources')).toEqual(['/machines', '/employees']);
+    const production = routesUnder('Production');
+    expect(production).not.toContain('/machines');
+    expect(production).not.toContain('/employees');
+  });
+
+  it('leaves the machine screen out of the sidebar', () => {
+    /* `/floor` is bookmarked on the tablet. The doc says so under "Machine
+       screen"; putting it in the sidebar would invite the office to open it. */
+    expect(NAV).not.toContain("'/floor'");
+  });
+});
