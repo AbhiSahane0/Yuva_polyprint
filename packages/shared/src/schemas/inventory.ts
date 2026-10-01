@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { paginationQuerySchema } from './common.js';
+import { isoDateSchema, paginationQuerySchema } from './common.js';
 import { materialCategorySchema } from './material.js';
 import { STOCK_MOVEMENT_KINDS } from '../lib/inventory.js';
 
@@ -88,7 +88,7 @@ export const receiveStockSchema = z
       .max(80)
       .default('')
       .transform((value) => value || 'NA'),
-    receivedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter the date as yyyy-mm-dd'),
+    receivedOn: isoDateSchema('date'),
     /**
      * What was actually paid, **per the unit above**.
      *

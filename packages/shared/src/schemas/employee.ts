@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { SHIFTS } from '../constants/employees.js';
 import { partialWithoutDefaults } from './partial-update.js';
+import { isoDateSchema } from './common.js';
 
 /**
  * Adding somebody to the works.
@@ -27,11 +28,7 @@ export const employeeSchema = z.object({
 
   shift: z.enum(SHIFTS).default('GENERAL'),
   phone: z.string().trim().max(20).default(''),
-  joinedOn: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a yyyy-mm-dd date')
-    .nullable()
-    .default(null),
+  joinedOn: isoDateSchema('joining date').nullable().default(null),
   /** Cleared when somebody leaves. Their record stays — their runs name them. */
   isActive: z.boolean().default(true),
   notes: z.string().trim().max(1000).default(''),

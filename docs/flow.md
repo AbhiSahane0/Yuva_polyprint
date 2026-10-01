@@ -1276,17 +1276,32 @@ opens a stock batch; posting a job sheet needs _Jobs_ **and** _Inventory_,
 since it takes material off the shelf. Both are deliberate — they are the two
 places a screen outside Inventory writes to the ledger.
 
-Six screens have no tick of their own and anybody signed in can read them:
-**Overview**, **Orders**, **Planning**, **Production**, **Quality & waste**
-and **Machines**. That is on purpose — what is due and when, and what is on
-the floor, are the floor's questions as much as the office's. Writing to any
-of them still needs the tick above: a job card needs _Jobs_, an order needs
-_Quotations_.
+**The ticks gate writing, not reading.** This is the thing to understand about
+them, and it is deliberate rather than an oversight.
 
-Hiding a section is a courtesy, not the lock. Every one of those ticks is
-checked again on the server, on each request, and the server refuses
-independently of what the sidebar chose to show. Somebody who types a URL for
-a screen they have no tick for gets nothing back.
+Every tick above is checked again on the server, on every request — the sidebar
+hiding a link is a courtesy, and the refusal is what actually stops the write.
+Someone with only _Quotations_ who sends a request to issue stock, start a
+stage or book a lorry is refused, whatever their screen showed them.
+
+Reading is the other way round. Nearly everything is readable by anyone signed
+in, because the screens need each other: the quotation form cannot price a job
+without the rates, cannot tell the office what is in stock without the ledger,
+and cannot say whether cylinders already exist without the register. Gating
+those reads would break the quotation screen for the very people who are meant
+to use it. So **Overview, Orders, Planning, Production, Quality & waste,
+Machines, Employees, Rates, Inventory, Purchase, Design & Cylinders, Job
+sheets and Dispatch can all be read by anyone with a sign-in**, and each of
+those decisions is written down at the route where it is made.
+
+Only two things are closed to reading: **Users** and the sign-in log, both
+administrator-only.
+
+Worth being plain about what that means: a user with only _Quotations_ can,
+through the API, read what the works pays its suppliers and what a finished job
+actually cost. They cannot change any of it. If a figure ever needs to be kept
+from somebody who is allowed to sign in at all, that is a change to make
+deliberately, not something the current ticks already do.
 
 ---
 
