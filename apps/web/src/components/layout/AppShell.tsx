@@ -5,6 +5,7 @@ import {
   Boxes,
   FileText,
   IndianRupee,
+  LayoutDashboard,
   LogOut,
   Menu,
   ShieldAlert,
@@ -43,9 +44,17 @@ interface NavItem {
 
 const NAV: { group: string; items: NavItem[] }[] = [
   {
+    group: 'Overview',
+    items: [{ to: '/overview', label: 'Overview', icon: LayoutDashboard }],
+  },
+  {
     group: 'Commercial',
     items: [
       { to: '/customers', label: 'Customers', icon: Users, module: 'customers' },
+      /* With Customers, not with Production: this screen's question is whose
+         artwork this is and what it is made of, and it is gated on the same
+         module as the customer it belongs to. */
+      { to: '/designs', label: 'Designs', icon: Boxes, module: 'customers' },
       { to: '/quotations', label: 'Quotations', icon: FileText, module: 'quotations' },
       /*
        * No module, on purpose. What is due and when is the floor's question as
@@ -76,12 +85,18 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: '/cylinders', label: 'Design & Cylinders', icon: Disc3, module: 'cylinders' },
       { to: '/job-sheets', label: 'Job sheets', icon: ClipboardList, module: 'jobs' },
       { to: '/quality', label: 'Quality & waste', icon: ShieldAlert },
+    ],
+  },
+  {
+    /* The two things a job is run with, as against the job itself. The
+       wireframe groups them this way and so does docs/flow.md. */
+    group: 'Resources',
+    items: [
       /* No module, for the same reason as Production: the operator dropdown on
          a job card is what this is for, and the floor has to be able to read
          it. Adding somebody needs `jobs`, enforced on the API. */
       { to: '/machines', label: 'Machines', icon: Cog },
       { to: '/employees', label: 'Employees', icon: HardHat },
-      { to: '/designs', label: 'Designs', icon: Boxes, module: 'customers' },
     ],
   },
   {

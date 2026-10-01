@@ -1,10 +1,9 @@
 import { z } from 'zod';
 import { partialWithoutDefaults } from './partial-update.js';
-import { paginationQuerySchema } from './common.js';
+import { isoDateSchema, paginationQuerySchema } from './common.js';
 import { CHOOSABLE_STATUSES, PURCHASE_ORDER_STATUSES } from '../lib/purchase.js';
 
-const isoDate = (label: string) =>
-  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, `Enter the ${label} as yyyy-mm-dd`);
+const isoDate = isoDateSchema;
 
 const optionalText = (max: number) =>
   z

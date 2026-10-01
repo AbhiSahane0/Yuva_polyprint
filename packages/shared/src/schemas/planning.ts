@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { PLANNING_STATUSES } from '../lib/planning.js';
+import { isoDateSchema } from './common.js';
 
-const isoDate = (label: string) =>
-  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, `Enter the ${label} as yyyy-mm-dd`);
+const isoDate = isoDateSchema;
 
 /**
  * Booking an order onto a machine, on a day.

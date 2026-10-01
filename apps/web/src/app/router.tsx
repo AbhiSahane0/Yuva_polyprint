@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { APP_MODULES, isAppModule, type User } from '@yuva/shared';
+import { isAppModule, type User } from '@yuva/shared';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { AppShell } from '@/components/layout/AppShell';
 import {
@@ -13,6 +13,7 @@ import { canAccess, useAuthStore } from '@/features/auth/auth-store';
 
 // Route-level code splitting keeps the initial bundle small as modules land.
 const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'));
+const OverviewPage = lazy(() => import('@/features/overview/pages/OverviewPage'));
 const CustomersPage = lazy(() => import('@/features/customers/pages/CustomersPage'));
 const QuotationsPage = lazy(() => import('@/features/quotations/pages/QuotationsPage'));
 const OrdersPage = lazy(() => import('@/features/orders/pages/OrdersPage'));
@@ -64,10 +65,25 @@ function NotFound() {
  * can actually open, and fall back to Users for an admin-shaped account with
  * nothing ticked.
  */
+/**
+ * Where signing in lands you.
+ *
+ * The overview, for anybody who can see it — which is anybody signed in. It
+ * is the page that answers the morning question, and landing on Customers
+ * instead was landing on a filing cabinet.
+ *
+ * The fallbacks stay for the cases that cannot: a user with no modules at all
+ * still reaches something rather than a blank screen.
+ */
+/**
+ * Where signing in lands you.
+ *
+ * The overview, for anybody signed in — it is the page that answers the
+ * morning question, and landing on Customers instead was landing on a filing
+ * cabinet. It carries no module guard, so there is nobody it can fail for.
+ */
 function homeFor(user: User | null): string {
-  const first = APP_MODULES.find((module) => canAccess(user, module));
-  if (first) return `/${first}`;
-  return user?.isAdmin ? '/users' : '/login';
+  return user ? '/overview' : '/login';
 }
 
 /**
@@ -107,6 +123,15 @@ function AppRoutes() {
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/" element={<Navigate to={homeFor(user)} replace />} />
+
+          {/*
+            The whole works on one screen, and the page signing in lands on.
+            No module guard: every figure on it is a count or a total, nothing
+            here is a rate or a margin, and the one screen meant to answer
+            "how are we doing" should not be the one half the works cannot
+            open. Each tile links to a screen that has its own guard.
+          */}
+          <Route path="/overview" element={<OverviewPage />} />
 
           <Route
             path="/customers"

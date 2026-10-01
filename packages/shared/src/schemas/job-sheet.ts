@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { JOB_SHEET_STAGES } from '../lib/job-sheet-costing.js';
 import { partialWithoutDefaults } from './partial-update.js';
+import { isoDateSchema } from './common.js';
 
 /**
  * What the app will accept onto a job sheet.
@@ -58,7 +59,7 @@ export const jobSheetStageSchema = z.object({
 });
 
 export const jobSheetSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a yyyy-mm-dd date'),
+  date: isoDateSchema('date'),
   status: z.enum(['OPEN', 'COSTED', 'CLOSED']).default('OPEN'),
 
   jobId: z.string().trim().min(1).nullable().default(null),
@@ -136,12 +137,6 @@ export const jobSheetQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
   search: z.string().trim().max(120).default(''),
   status: z.enum(['OPEN', 'COSTED', 'CLOSED']).optional(),
-  from: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
-  to: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
+  from: isoDateSchema('from date').optional(),
+  to: isoDateSchema('to date').optional(),
 });

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { partialWithoutDefaults } from './partial-update.js';
-import { paginationQuerySchema } from './common.js';
+import { isoDateSchema, paginationQuerySchema } from './common.js';
 import { CYLINDER_EVENT_KINDS, CYLINDER_OWNERSHIPS, CYLINDER_STATUSES } from '../lib/cylinders.js';
 
 const optionalText = (max: number) =>
@@ -11,8 +11,7 @@ const optionalText = (max: number) =>
     .default('')
     .transform((value) => (value.toUpperCase() === 'NA' ? '' : value));
 
-const isoDate = (label: string) =>
-  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, `Enter the ${label} as yyyy-mm-dd`);
+const isoDate = isoDateSchema;
 
 const optionalDate = (label: string) =>
   z

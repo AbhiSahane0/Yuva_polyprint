@@ -1,5 +1,5 @@
 /**
- * **Four jobs, one at each stage of the works' own chain.**
+ * **Ten jobs, spread the way a real week is spread.**
  *
  * Not fixtures. Every row below is produced by the same services the screens
  * call — a quotation is costed by the costing engine, winning it raises the
@@ -8,10 +8,12 @@
  * took off stock. If any of that breaks, this script breaks, which is most of
  * why it is worth having.
  *
- *   1. Quoted        a quotation sent, nobody has answered
- *   2. Ordered       won, the order is on the books, nothing started
- *   3. On the floor  printing done, lamination running
- *   4. Finished      every stage done, costed, and taken off stock
+ * The spread itself is `PLAN`, below — two quotations nobody has answered, one
+ * lost, two on the books with one of them already late, three at different
+ * points on the floor, one finished and costed, and one the works has not got
+ * the film for. On top of that it services a laminator, raises two quality
+ * issues, and sends half of the finished job on a lorry with a draft note
+ * behind it.
  *
  * It uses the works' REAL customers and designs, so the screens read as they
  * would in use, and it creates no customer and no design of its own. Everything
@@ -244,12 +246,12 @@ const say = (level: string, what: string, detail: string) =>
  * not on the form, which is fine for a job that stops at the order.
  */
 /**
- * Ten jobs, spread the way a real week is spread.
+ * The spread, and what each row means.
  *
- * Not one at each stage in a tidy row — a works has several quotations out that
- * nobody has answered, one it lost, a couple waiting to start, three or four on
- * the floor at different points, and one finished. It also, sooner or later,
- * has a job it has not got the film for.
+ * Not one job at each stage in a tidy row — a works has several quotations out
+ * that nobody has answered, one it lost, a couple waiting to start, three or
+ * four on the floor at different points, and one finished. It also, sooner or
+ * later, has a job it has not got the film for.
  *
  * `level` is what to do with it, and the loop below reads it:
  *
@@ -497,7 +499,7 @@ async function main() {
 
   console.log('Film on the shelf.');
 
-  /* --- and the four jobs ------------------------------------------------- */
+  /* --- and the ten jobs -------------------------------------------------- */
   for (const plan of PLAN) {
     const design = await prisma.job.findFirst({
       where: { jobName: plan.design },
