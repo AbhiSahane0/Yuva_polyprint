@@ -5,6 +5,7 @@ import {
   Boxes,
   FileText,
   IndianRupee,
+  LayoutDashboard,
   LogOut,
   Menu,
   ShieldAlert,
@@ -42,6 +43,10 @@ interface NavItem {
 }
 
 const NAV: { group: string; items: NavItem[] }[] = [
+  {
+    group: 'Overview',
+    items: [{ to: '/overview', label: 'Overview', icon: LayoutDashboard }],
+  },
   {
     group: 'Commercial',
     items: [

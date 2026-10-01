@@ -39,6 +39,7 @@ export * from './types/floor.js';
 export * from './types/quality.js';
 export * from './types/machine.js';
 export * from './types/job.js';
+export * from './types/overview.js';
 
 export * from './lib/quotation-math.js';
 export * from './lib/pouch-making.js';

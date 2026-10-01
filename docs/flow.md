@@ -15,6 +15,7 @@ technical knowledge.
 | Part                                                                 | What it covers                                                             |
 | -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | [The chain, in one picture](#the-chain-in-one-picture)               | the whole thing on one screen                                              |
+| [The Overview screen](#overview)                                     | the same thing live, and the page you land on                              |
 | [Part one — before the first job](#part-one--before-the-first-job)   | the seven things set up once                                               |
 | [Part two — a job, start to end](#part-two--a-job-start-to-end)      | the eleven steps a job actually takes                                      |
 | [Part three — watching it happen](#part-three--watching-it-happen)   | the three screens that watch rather than move                              |
@@ -984,11 +985,36 @@ used them can still explain themselves.
 
 # Every screen, and what it is for
 
-Eighteen screens. For each: what it answers, what has to exist before it is
+Nineteen screens. For each: what it answers, what has to exist before it is
 any use, and what it feeds further down the line.
 
-Grouped the way the sidebar groups them — seventeen are on it, and the
-eighteenth, the machine screen, is deliberately not.
+Grouped the way the sidebar groups them — eighteen are on it, and the
+nineteenth, the machine screen, is deliberately not.
+
+---
+
+## Overview
+
+### Overview
+
+**Answers** — where is everything, and what needs me today.
+**Needs first** — nothing of its own. It is a reading of the other screens.
+**Feeds** — nothing. It writes nothing at all, so it is safe to leave open.
+
+The page signing in lands on. Three bands, in the order the questions get
+asked: **the chain** across the top — quoted, on the books, scheduled, on the
+floor, in the godown, gone this month — then **what needs attention**, worst
+first, each line a link straight to the screen that fixes it, then **the floor
+itself**, laid out by stage.
+
+It owns no figures. The godown figure is Dispatch's, the waste figure is
+Quality's, the machine states are Machines'. An overview that worked out its
+own version of any of them would drift from the screen it summarises, and then
+somebody has to check both, every time, forever.
+
+Nothing on it is a rate, a margin or a cost — counts, weights, and what is
+riding on the floor. It refetches every thirty seconds, because it is a screen
+people leave open on a desk.
 
 ---
 
@@ -1314,7 +1340,7 @@ So nobody goes looking for it:
   chose; it does not work out the sequence, and it will happily let two jobs be
   booked onto one press on one day. The machine load card shows that happening
   rather than preventing it, which is the honest half of the job.
-- **Reports and an overview screen.**
+- **Reports** — the report cards, the exports and the profitability figures. The Overview answers the daily "where is everything"; this would be the month-end reading of it.
 - **Reserving by roll on the job sheet.** The card earmarks particular rolls;
   the sheet still issues by weight, oldest first, and does not check that the
   roll it took is the roll that was held.

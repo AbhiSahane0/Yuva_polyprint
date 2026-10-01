@@ -17,6 +17,7 @@ import planningRoutes from '../modules/planning/planning.routes.js';
 import floorRoutes from '../modules/floor/floor.routes.js';
 import qualityRoutes from '../modules/quality/quality.routes.js';
 import machineRoutes from '../modules/machines/machine.routes.js';
+import overviewRoutes from '../modules/overview/overview.routes.js';
 import productionRoutes from '../modules/production/production.routes.js';
 import purchaseRoutes from '../modules/purchase/purchase.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
@@ -89,6 +90,13 @@ router.use('/quality', authenticate, qualityRoutes);
  * machine costs to run stays on Costing behind `rates`.
  */
 router.use('/machines', authenticate, machineRoutes);
+
+/*
+ * The whole works on one screen. Read-only, and it owns no figures of its own
+ * — every number is read from the module that owns it, so the summary and the
+ * screen it summarises cannot disagree.
+ */
+router.use('/overview', authenticate, overviewRoutes);
 
 /*
  * Jobs are edited from two places — the customer editor and the quotation
