@@ -2,7 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import type { Overview } from '@yuva/shared';
 import { request } from '@/lib/api-client';
 
-export const overviewKeys = { all: ['overview'] as const };
+export const overviewKeys = {
+  all: ['overview'] as const,
+  window: (days: number) => ['overview', days] as const,
+};
 
 /**
  * The whole works, refetched on its own.
@@ -16,11 +19,14 @@ export const overviewKeys = { all: ['overview'] as const };
  * `refetchOnWindowFocus` is the other half — coming back to the tab after a
  * meeting should not show the state you left.
  */
-export function useOverview() {
+export function useOverview(days: number) {
   return useQuery({
-    queryKey: overviewKeys.all,
-    queryFn: () => request<Overview>({ url: '/overview', method: 'GET' }),
+    queryKey: overviewKeys.window(days),
+    queryFn: () => request<Overview>({ url: `/overview?days=${days}`, method: 'GET' }),
     refetchInterval: 30_000,
     refetchOnWindowFocus: true,
+    /* Switching 7 / 14 / 30 keeps the figures on screen while the new window
+       loads, rather than blanking the page somebody is reading. */
+    placeholderData: (previous) => previous,
   });
 }

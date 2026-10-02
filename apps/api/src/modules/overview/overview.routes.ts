@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { overviewQuerySchema } from '@yuva/shared';
+import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/async-handler.js';
 import { ok } from '../../utils/api-response.js';
 import { overview } from './overview.service.js';
@@ -16,8 +18,9 @@ const router = Router();
  */
 router.get(
   '/',
-  asyncHandler(async (_req, res) => {
-    ok(res, await overview());
+  validate({ query: overviewQuerySchema }),
+  asyncHandler(async (req, res) => {
+    ok(res, await overview(Number((req.query as { days?: number }).days ?? 14)));
   }),
 );
 

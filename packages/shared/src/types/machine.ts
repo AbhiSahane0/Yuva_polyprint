@@ -71,3 +71,21 @@ export interface MachineBoard {
   /** Recently closed spells, newest first — the service history. */
   history: MaintenanceRecord[];
 }
+
+/**
+ * One machine's output over a window of days, for the owner's view.
+ *
+ * Separate from `MachineCard`, which is today and carries what is on the
+ * machine right now, and from Planning's `MachineLoad`, which is what a
+ * machine has coming. This is the fortnight behind: who earned their keep.
+ */
+export interface MachineOutput {
+  id: string;
+  name: string;
+  kind: MachineKind;
+  outputKg: number;
+  wasteKg: number;
+  wastePercent: number;
+  runs: number;
+  isDown: boolean;
+}
