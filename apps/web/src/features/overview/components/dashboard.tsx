@@ -13,12 +13,15 @@ export function Panel({
   action,
   onAction,
   children,
+  footer,
   className,
 }: {
   title: string;
   action?: string;
   onAction?: () => void;
   children: ReactNode;
+  /** Sits at the bottom of the card, so panels side by side line up. */
+  footer?: ReactNode;
   className?: string;
 }) {
   return (
@@ -45,6 +48,9 @@ export function Panel({
         ) : null}
       </div>
       <div className="min-h-0 flex-1">{children}</div>
+      {footer ? (
+        <p className="text-ink-400 border-ink-50 mt-auto border-t px-4 py-2.5 text-xs">{footer}</p>
+      ) : null}
     </section>
   );
 }
@@ -172,67 +178,83 @@ export interface BarRow {
   value: number;
   /** The figure printed on the right. */
   display: string;
-  /** Under the label. */
+  /** Under the bar, small. */
   sub?: string;
   /** Marks this row as the one to look at. */
   flag?: 'bad' | 'warn' | null;
 }
 
 /**
- * A ranked list with the bar behind the label rather than beside it.
+ * A ranked list, each row with a bar of its own.
  *
- * Behind, because the label is what identifies the row and a bar in its own
- * column pushes the names into a narrow strip. The bar is a wash the eye reads
- * as length without having to leave the words.
+ * The bar is a slim track under the name rather than a wash behind it. Behind
+ * the row it read as a selected state — a block of pale blue with a hard edge
+ * cutting through the words — and a reader has to be told it means a quantity.
+ * A track with a fill is the shape everybody already knows, and it leaves the
+ * label and the figure on a clean ground.
+ *
+ * `floor` keeps a set of close values honest. Four stages all losing about 2.5%
+ * drawn against the largest of them come out as four near-full bars, which says
+ * "all equally bad" when the truth is "all comfortably low". Scaling to at
+ * least the floor draws them where they belong.
  */
 export function BarList({
   rows,
   empty,
+  floor = 0,
   onRow,
 }: {
   rows: BarRow[];
   empty: string;
+  floor?: number;
   onRow?: (key: string) => void;
 }) {
   if (rows.length === 0) {
     return <p className="text-ink-400 px-4 py-6 text-center text-sm">{empty}</p>;
   }
-  const max = Math.max(...rows.map((row) => row.value), 1);
+  const max = Math.max(...rows.map((row) => row.value), floor, 1);
 
   return (
     <ul className="divide-ink-50 divide-y">
       {rows.map((row) => {
-        const width = `${Math.max(1.5, (row.value / max) * 100)}%`;
+        const filled = Math.min(100, (row.value / max) * 100);
         const inner = (
           <>
-            <span
-              className={cn(
-                'absolute inset-y-0 left-0 rounded-r-sm',
-                row.flag === 'bad'
-                  ? 'bg-danger-100/70'
-                  : row.flag === 'warn'
-                    ? 'bg-warning-100/70'
-                    : 'bg-brand-100/60',
-              )}
-              style={{ width }}
-              aria-hidden
-            />
-            <span className="relative min-w-0 flex-1">
-              <span className="text-ink-800 block truncate text-sm">{row.label}</span>
-              {row.sub ? <span className="text-ink-400 block text-xs">{row.sub}</span> : null}
-            </span>
-            <span
-              className={cn(
-                'relative shrink-0 text-sm font-semibold tabular-nums',
-                row.flag === 'bad'
-                  ? 'text-danger-700'
-                  : row.flag === 'warn'
-                    ? 'text-warning-700'
-                    : 'text-ink-900',
-              )}
-            >
-              {row.display}
-            </span>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-ink-800 min-w-0 flex-1 truncate text-sm font-medium">
+                {row.label}
+              </span>
+              <span
+                className={cn(
+                  'shrink-0 text-sm font-semibold tabular-nums',
+                  row.flag === 'bad'
+                    ? 'text-danger-700'
+                    : row.flag === 'warn'
+                      ? 'text-warning-700'
+                      : 'text-ink-900',
+                )}
+              >
+                {row.display}
+              </span>
+            </div>
+            <div className="mt-1.5 flex items-center gap-2.5">
+              <span className="bg-ink-100 h-1.5 min-w-0 flex-1 overflow-hidden rounded-full">
+                <span
+                  className={cn(
+                    'block h-full rounded-full transition-[width] duration-300',
+                    row.flag === 'bad'
+                      ? 'bg-danger-500'
+                      : row.flag === 'warn'
+                        ? 'bg-warning-500'
+                        : 'bg-brand-500',
+                  )}
+                  style={{ width: `${filled}%` }}
+                />
+              </span>
+              {row.sub ? (
+                <span className="text-ink-400 shrink-0 text-xs tabular-nums">{row.sub}</span>
+              ) : null}
+            </div>
           </>
         );
         return (
@@ -241,12 +263,12 @@ export function BarList({
               <button
                 type="button"
                 onClick={() => onRow(row.key)}
-                className="hover:bg-ink-25 relative flex w-full items-center gap-3 px-4 py-2 text-left transition-colors"
+                className="hover:bg-ink-25 block w-full px-4 py-2.5 text-left transition-colors"
               >
                 {inner}
               </button>
             ) : (
-              <div className="relative flex items-center gap-3 px-4 py-2">{inner}</div>
+              <div className="px-4 py-2.5">{inner}</div>
             )}
           </li>
         );

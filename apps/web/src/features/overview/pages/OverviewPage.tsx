@@ -133,7 +133,7 @@ export default function OverviewPage() {
     sub: machine.isDown
       ? 'down now'
       : machine.runs === 0
-        ? 'nothing finished'
+        ? 'idle all window'
         : `${machine.runs} ${machine.runs === 1 ? 'run' : 'runs'} · ${machine.wastePercent}% waste`,
     flag: machine.isDown ? 'bad' : machine.runs === 0 ? 'warn' : null,
   }));
@@ -143,7 +143,7 @@ export default function OverviewPage() {
     label: row.label,
     value: row.percent,
     display: `${row.percent}%`,
-    sub: `${formatNumber(row.wasteKg, 0)} kg of ${formatNumber(row.inputKg, 0)} kg`,
+    sub: `${formatNumber(row.wasteKg, 0)} of ${formatNumber(row.inputKg, 0)} kg`,
     flag: row.percent >= 5 ? 'bad' : row.percent >= 3.5 ? 'warn' : null,
   }));
 
@@ -152,7 +152,7 @@ export default function OverviewPage() {
     label: row.customerName,
     value: row.value,
     display: shortRs(row.value),
-    sub: `${row.percent}% of the book · ${row.orders} ${row.orders === 1 ? 'order' : 'orders'}`,
+    sub: `${row.percent}% · ${row.orders} ${row.orders === 1 ? 'order' : 'orders'}`,
     flag: row.percent >= 40 ? 'warn' : null,
   }));
 
@@ -297,37 +297,47 @@ export default function OverviewPage() {
 
       {/* Where the work went, where the film went, and who it is for. */}
       <div className="mb-4 grid gap-4 lg:grid-cols-3">
-        <Panel title={`Machines · ${days} days`} action="Machines" onAction={() => go('/machines')}>
+        <Panel
+          title={`Machines · ${days} days`}
+          action="Machines"
+          onAction={() => go('/machines')}
+          footer={
+            <>
+              {data.machines.running} running · {data.machines.idle} idle
+              {data.machines.down > 0 ? ` · ${data.machines.down} down` : ''} of {machineCount}
+              {unattributedKg > 0 ? ` · ${formatNumber(unattributedKg, 0)} kg on no machine` : ''}
+            </>
+          }
+        >
           <BarList rows={machineRows} empty="No machines on record." />
-          <p className="text-ink-400 border-ink-50 border-t px-4 py-2 text-xs">
-            {data.machines.running} running · {data.machines.idle} idle
-            {data.machines.down > 0 ? ` · ${data.machines.down} down` : ''} of {machineCount}
-            {unattributedKg > 0 ? ` · ${formatNumber(unattributedKg, 0)} kg on no machine` : ''}
-          </p>
         </Panel>
 
         <Panel
           title={`Waste by stage · ${days} days`}
           action="Quality"
           onAction={() => go('/quality')}
+          footer="Against what went on at each stage. Drawn to 5%, so a low fortnight looks low."
         >
-          <BarList rows={wasteRows} empty="Nothing has finished in this window." />
-          <p className="text-ink-400 border-ink-50 border-t px-4 py-2 text-xs">
-            Against what went on at each stage, so a heavy stage and a light one compare.
-          </p>
+          {/* Floored at 5 — four stages all losing 2.5% drawn against each other
+              come out as four full bars, which says the opposite of the truth. */}
+          <BarList rows={wasteRows} empty="Nothing has finished in this window." floor={5} />
         </Panel>
 
-        <Panel title="Order book by customer" action="Customers" onAction={() => go('/customers')}>
+        <Panel
+          title="Order book by customer"
+          action="Customers"
+          onAction={() => go('/customers')}
+          footer={
+            data.winRate.percent === null
+              ? 'No quotation has been answered yet.'
+              : `${data.winRate.percent}% of answered quotations won · ${data.winRate.sent} still out`
+          }
+        >
           <BarList
             rows={customerRows}
             empty="Nothing on the books."
             onRow={(key) => go(`/customers/${key}`)}
           />
-          <p className="text-ink-400 border-ink-50 border-t px-4 py-2 text-xs">
-            {data.winRate.percent === null
-              ? 'No quotation has been answered yet.'
-              : `${data.winRate.percent}% of answered quotations won · ${data.winRate.sent} still out`}
-          </p>
         </Panel>
       </div>
 
