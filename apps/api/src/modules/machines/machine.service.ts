@@ -13,6 +13,7 @@ import {
   type MaintenanceRecord,
   type StandEvent,
   type StartMaintenanceInput,
+  type MachineOutput,
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../../lib/prisma.js';
@@ -342,4 +343,65 @@ export async function machineHistory(machineId: string): Promise<MaintenanceReco
   });
   const now = new Date().toISOString();
   return rows.map((row) => toRecord(row, now));
+}
+
+/**
+ * What each machine got through over a window of days.
+ *
+ * The board above is today's figures, which is what the floor wants. An owner
+ * wants the fortnight: today tells you nothing about whether a press is earning
+ * its keep, because today might be a make-ready day.
+ *
+ * Here rather than in the overview because it is a fact about machines, and the
+ * day the Machines screen wants a fortnight column it should read the same
+ * figures rather than work out its own.
+ */
+export async function machineOutput(days: number): Promise<MachineOutput[]> {
+  const from = new Date();
+  from.setUTCHours(0, 0, 0, 0);
+  from.setUTCDate(from.getUTCDate() - (days - 1));
+
+  const [machines, stages, open] = await Promise.all([
+    prisma.costingMachine.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, kind: true },
+      orderBy: [{ kind: 'asc' }, { name: 'asc' }],
+    }),
+    /* Finished runs only. A stage still on the machine has produced nothing
+       that can be counted, whatever its input says. */
+    prisma.productionStage.findMany({
+      where: { status: 'DONE', finishedAt: { gte: from }, machineId: { not: null } },
+      select: { machineId: true, inputKg: true, outputKg: true },
+    }),
+    prisma.maintenanceRecord.findMany({
+      where: { endedAt: null },
+      select: { machineId: true },
+    }),
+  ]);
+
+  const down = new Set(open.map((row) => row.machineId));
+  const totals = new Map<string, { input: number; output: number; runs: number }>();
+  for (const stage of stages) {
+    if (!stage.machineId) continue;
+    const at = totals.get(stage.machineId) ?? { input: 0, output: 0, runs: 0 };
+    at.input += Number(stage.inputKg);
+    at.output += Number(stage.outputKg);
+    at.runs += 1;
+    totals.set(stage.machineId, at);
+  }
+
+  return machines.map((machine) => {
+    const at = totals.get(machine.id) ?? { input: 0, output: 0, runs: 0 };
+    const waste = at.input - at.output;
+    return {
+      id: machine.id,
+      name: machine.name,
+      kind: machine.kind,
+      outputKg: Math.round(at.output * 1000) / 1000,
+      wasteKg: Math.round(waste * 1000) / 1000,
+      wastePercent: at.input > 0 ? Math.round((waste / at.input) * 10000) / 100 : 0,
+      runs: at.runs,
+      isDown: down.has(machine.id),
+    };
+  });
 }

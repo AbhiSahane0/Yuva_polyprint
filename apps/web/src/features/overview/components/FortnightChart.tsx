@@ -56,9 +56,11 @@ function fullDate(iso: string): string {
 export function FortnightChart({
   trend,
   fortnight,
+  days,
 }: {
   trend: OverviewDay[];
   fortnight: OverviewFortnight;
+  days: number;
 }) {
   const gradientId = useId();
   const [hovered, setHovered] = useState<number | null>(null);
@@ -72,6 +74,9 @@ export function FortnightChart({
 
   const band = PLOT_W / trend.length;
   const barW = Math.min(26, band * 0.56);
+  /* Every date on a week, every other on a month — thirty labels in this width
+     overlap into a grey smear. */
+  const labelEvery = trend.length > 20 ? 3 : trend.length > 10 ? 2 : 1;
   const xOf = (index: number) => PAD.left + band * index + band / 2;
   const yOfKg = (kg: number) => PAD.top + PLOT_H - (kg / kgTop) * PLOT_H;
   const yOfPct = (pct: number) => PAD.top + PLOT_H - (pct / pctTop) * PLOT_H;
@@ -103,7 +108,7 @@ export function FortnightChart({
             label="Made"
             value={formatNumber(fortnight.outputKg, 0)}
             unit="kg"
-            hint={`over ${fortnight.workingDays} working ${fortnight.workingDays === 1 ? 'day' : 'days'}`}
+            hint={`${fortnight.workingDays} working ${fortnight.workingDays === 1 ? 'day' : 'days'} of ${days}`}
           />
           <Figure
             label="Waste"
@@ -241,15 +246,17 @@ export function FortnightChart({
                     opacity={hovered === null || hovered === index ? 1 : 0.45}
                   />
                 )}
-                <text
-                  x={xOf(index)}
-                  y={H - 8}
-                  textAnchor="middle"
-                  fontSize="10"
-                  fill={hovered === index ? 'var(--color-ink-700)' : 'var(--color-ink-400)'}
-                >
-                  {dayLabel(day.date)}
-                </text>
+                {index % labelEvery === 0 || index === trend.length - 1 || hovered === index ? (
+                  <text
+                    x={xOf(index)}
+                    y={H - 8}
+                    textAnchor="middle"
+                    fontSize="10"
+                    fill={hovered === index ? 'var(--color-ink-700)' : 'var(--color-ink-400)'}
+                  >
+                    {dayLabel(day.date)}
+                  </text>
+                ) : null}
               </g>
             );
           })}

@@ -1,3 +1,4 @@
+import type { MachineOutput } from './machine.js';
 import type { MachineKind } from '../lib/rate-costing.js';
 
 /**
@@ -88,6 +89,71 @@ export interface OverviewFortnight {
   workingDays: number;
 }
 
+/**
+ * A figure with the direction it has moved.
+ *
+ * The number on its own answers "how much"; the owner's question is "better or
+ * worse than last time", and that needs the period before this one. `change` is
+ * null where there is no previous period to compare against — a works three
+ * days old has no last fortnight, and inventing a 100% rise would be a lie.
+ */
+export interface Trend {
+  value: number;
+  /** The same figure over the period before this one. */
+  previous: number;
+  /** Percent movement, or null where the previous period was empty. */
+  change: number | null;
+  /** True where a rise is the good direction. Waste is the one that is not. */
+  riseIsGood: boolean;
+}
+
+/** How the quotation book is converting. */
+export interface WinRate {
+  sent: number;
+  won: number;
+  lost: number;
+  /** Won against decided — the ones still out do not count either way. */
+  percent: number | null;
+}
+
+/** An order the owner should know about before the customer rings. */
+export interface OrderAtRisk {
+  id: string;
+  number: number;
+  customerName: string;
+  jobName: string;
+  dueDate: string;
+  /** Negative where it is already past. */
+  daysLeft: number;
+  quantityKg: number;
+  /** Still to make and send, in kilograms. */
+  pendingKg: number;
+  status: string;
+  /** Nothing has been raised on the floor for it yet. */
+  notStarted: boolean;
+}
+
+/** Who the order book is with. */
+export interface CustomerShare {
+  customerId: string | null;
+  customerName: string;
+  value: number;
+  kg: number;
+  orders: number;
+  /** Share of the open order book by value, 0 to 100. */
+  percent: number;
+}
+
+/** Waste at one stage over the window. */
+export interface StageWasteShare {
+  stage: string;
+  label: string;
+  wasteKg: number;
+  inputKg: number;
+  percent: number;
+  runs: number;
+}
+
 export interface Overview {
   /** The day this was read, so a screen left open overnight says so. */
   asOf: string;
@@ -113,13 +179,48 @@ export interface Overview {
     runs: number;
   };
 
+  /** The window everything time-based on this screen is measured over. */
+  days: number;
+
   /**
-   * The last fortnight, oldest day first. The one thing on this screen that is
-   * a shape rather than a number: a works reads a fortnight of output and waste
-   * faster than it reads either of today's figures.
+   * The window, oldest day first. The one thing on this screen that is a shape
+   * rather than a number: a works reads a fortnight of output and waste faster
+   * than it reads either of today's figures.
    */
   trend: OverviewDay[];
   fortnight: OverviewFortnight;
+
+  /**
+   * The five figures an owner wants before anything else, each against the
+   * period before it so the direction is visible without doing arithmetic.
+   */
+  kpis: {
+    /** Confirmed and in production, at what it was sold for. */
+    orderBook: { value: number; count: number; kg: number };
+    /** What has actually left, this calendar month against last. */
+    delivered: Trend & { kg: number; count: number };
+    /** Kilograms off the machines over the window. */
+    output: Trend;
+    /** Waste over the window, as a percentage of what went on. */
+    waste: Trend;
+    /** Orders completed in the window that made their date. */
+    onTime: { percent: number | null; onTime: number; late: number; total: number };
+  };
+
+  /** How the quotation book converts. */
+  winRate: WinRate;
+
+  /** Each machine's share of the window. */
+  machineLoad: MachineOutput[];
+
+  /** Where the works is losing film, worst first. */
+  wasteByStage: StageWasteShare[];
+
+  /** Who the open order book is with, biggest first. */
+  customers: CustomerShare[];
+
+  /** Due soonest first, overdue at the top. */
+  atRisk: OrderAtRisk[];
 
   stock: {
     value: number;

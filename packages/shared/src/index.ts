@@ -89,4 +89,5 @@ export * from './schemas/planning.js';
 export * from './schemas/floor.js';
 export * from './schemas/quality.js';
 export * from './schemas/machine.js';
+export * from './schemas/overview.js';
 export * from './schemas/job.js';
