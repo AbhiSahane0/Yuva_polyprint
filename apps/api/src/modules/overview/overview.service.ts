@@ -1,9 +1,11 @@
 import {
   laminationLabel,
+  lineValue,
   PRODUCTION_STAGE_LABELS,
   type Alert,
   type FloorCard,
   type Overview,
+  type OverviewDay,
 } from '@yuva/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../../lib/prisma.js';
@@ -72,12 +74,26 @@ export async function overview(): Promise<Overview> {
       machineBoard({ days: 14 }),
       qualityBoard({ days: 14 }),
       listStock({ page: 1, pageSize: 1 } as never),
+      /*
+       * What has actually left this month. The rate comes off the order rather
+       * than the line, because a line carries what went and the order carries
+       * what it is worth — the same pair `lineValue` takes on the Dispatch
+       * screen, so the two figures are arrived at the same way.
+       */
       prisma.dispatch.findMany({
         where: {
           status: 'DISPATCHED',
           dispatchDate: { gte: new Date(`${monthStart}T00:00:00.000Z`) },
         },
-        select: { lines: { select: { quantityKg: true } } },
+        select: {
+          lines: {
+            select: {
+              quantityKg: true,
+              quantityPouches: true,
+              order: { select: { ratePerKg: true, ratePerPouch: true } },
+            },
+          },
+        },
       }),
       prisma.job.count({ where: { customerId: null } }),
     ]);
@@ -228,6 +244,29 @@ export async function overview(): Promise<Overview> {
 
   const godownKg = godown.reduce((sum, row) => sum + row.readyKg, 0);
 
+  /* ------------------------------------------------------ the last fortnight */
+
+  /*
+   * Quality already works the fortnight out, day by day, for its own waste
+   * chart — so this reads that series rather than querying the stages again.
+   * What it adds is the other half of each day: Quality records what went ON
+   * the machine and what was lost, and the works wants what came OFF.
+   *
+   * Quiet days stay in the series as zeros. A chart that skipped them would
+   * put Friday next to Monday and make a fortnight look like a fortnight of
+   * work, which is the one thing this chart must not do.
+   */
+  const trend: OverviewDay[] = quality.trend.map((day) => ({
+    date: day.date,
+    outputKg: round(day.inputKg - day.wasteKg),
+    wasteKg: round(day.wasteKg),
+    wastePercent: day.percent,
+    runs: day.runs,
+  }));
+
+  const fortnightInputKg = trend.reduce((sum, day) => sum + day.outputKg + day.wasteKg, 0);
+  const fortnightWasteKg = trend.reduce((sum, day) => sum + day.wasteKg, 0);
+
   return {
     asOf: new Date().toISOString(),
 
@@ -259,7 +298,25 @@ export async function overview(): Promise<Overview> {
             0,
           ),
         ),
-        value: null,
+        value:
+          Math.round(
+            sent.reduce(
+              (sum, note) =>
+                sum +
+                note.lines.reduce(
+                  (value, line) =>
+                    value +
+                    lineValue({
+                      netKg: toNumber(line.quantityKg),
+                      pouches: line.quantityPouches ?? 0,
+                      ratePerKg: toNumber(line.order?.ratePerKg),
+                      ratePerPouch: toNumber(line.order?.ratePerPouch),
+                    }),
+                  0,
+                ),
+              0,
+            ) * 100,
+          ) / 100,
       },
     },
 
@@ -268,6 +325,17 @@ export async function overview(): Promise<Overview> {
       wasteKg: quality.totals.todayWasteKg,
       wastePercent: quality.totals.todayWastePercent,
       runs: machines.machines.reduce((sum, machine) => sum + machine.runs, 0),
+    },
+
+    trend,
+    fortnight: {
+      outputKg: round(trend.reduce((sum, day) => sum + day.outputKg, 0)),
+      wasteKg: round(fortnightWasteKg),
+      wastePercent:
+        fortnightInputKg > 0 ? Math.round((fortnightWasteKg / fortnightInputKg) * 10000) / 100 : 0,
+      runs: trend.reduce((sum, day) => sum + day.runs, 0),
+      bestDayKg: trend.reduce((best, day) => Math.max(best, day.outputKg), 0),
+      workingDays: trend.filter((day) => day.runs > 0).length,
     },
 
     stock: {

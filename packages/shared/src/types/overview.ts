@@ -56,6 +56,38 @@ export interface FloorCard {
   isOverdue: boolean;
 }
 
+/**
+ * One day of the works' output, for the fortnight chart.
+ *
+ * Quiet days are in the series with zeros rather than left out — a gap in a
+ * chart reads as missing data, and a day nothing was finished is a fact about
+ * the fortnight rather than an absence of one.
+ */
+export interface OverviewDay {
+  /** yyyy-mm-dd. */
+  date: string;
+  /** What came off the machines that day. */
+  outputKg: number;
+  /** What went on, less what came off. */
+  wasteKg: number;
+  /** Against what went on, so a heavy day and a light one compare. */
+  wastePercent: number;
+  /** Stages finished. Zero on a quiet day, which is why the bar is empty. */
+  runs: number;
+}
+
+/** What the fortnight came to, so the chart has a figure beside it. */
+export interface OverviewFortnight {
+  outputKg: number;
+  wasteKg: number;
+  wastePercent: number;
+  runs: number;
+  /** The heaviest day in the window, for the chart's own scale and label. */
+  bestDayKg: number;
+  /** Days anything was finished at all. */
+  workingDays: number;
+}
+
 export interface Overview {
   /** The day this was read, so a screen left open overnight says so. */
   asOf: string;
@@ -80,6 +112,14 @@ export interface Overview {
     /** Stages finished today, across the floor. */
     runs: number;
   };
+
+  /**
+   * The last fortnight, oldest day first. The one thing on this screen that is
+   * a shape rather than a number: a works reads a fortnight of output and waste
+   * faster than it reads either of today's figures.
+   */
+  trend: OverviewDay[];
+  fortnight: OverviewFortnight;
 
   stock: {
     value: number;

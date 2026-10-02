@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ChevronRight, Circle, Plus } from 'lucide-react';
+import { ArrowRight, ChevronRight, Plus } from 'lucide-react';
 import {
   formatNumber,
   formatRs,
@@ -15,13 +15,21 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { cn } from '@/lib/utils';
 import { useOverview } from '../api/overview-api';
+import { FortnightChart } from '../components/FortnightChart';
 
-const SEVERITY: Record<Alert['severity'], { dot: string; tone: 'danger' | 'warning' | 'neutral' }> =
-  {
-    HIGH: { dot: 'text-danger-600 fill-danger-600', tone: 'danger' },
-    MEDIUM: { dot: 'text-warning-600 fill-warning-600', tone: 'warning' },
-    LOW: { dot: 'text-ink-300 fill-ink-300', tone: 'neutral' },
-  };
+/*
+ * Severity is carried by a stripe down the edge of the row rather than a dot
+ * beside the text. A dot has to be found; a stripe is the first thing the eye
+ * reaches, and the list is read by somebody scanning for what is wrong.
+ */
+const SEVERITY: Record<
+  Alert['severity'],
+  { stripe: string; tone: 'danger' | 'warning' | 'neutral' }
+> = {
+  HIGH: { stripe: 'bg-danger-500', tone: 'danger' },
+  MEDIUM: { stripe: 'bg-warning-500', tone: 'warning' },
+  LOW: { stripe: 'bg-ink-300', tone: 'neutral' },
+};
 
 /** The stages a job passes, in floor order, so the board reads left to right. */
 const STAGE_ORDER = ['PRINTING', 'LAMINATION', 'SLITTING', 'POUCHING'] as const;
@@ -31,7 +39,15 @@ function formatDate(iso: string): string {
   return `${day}-${month}-${year}`;
 }
 
-/** One link in the chain across the top. */
+/**
+ * One link in the chain across the top.
+ *
+ * The count is the headline because it is what somebody pictures — four jobs on
+ * the floor, two quotations out. What the count is made of goes underneath:
+ * kilograms where the link is about material, rupees where it is about money,
+ * and nothing at all where neither is meaningful, rather than a zero that looks
+ * like a figure.
+ */
 function Link({
   label,
   link,
@@ -45,23 +61,28 @@ function Link({
   href: string;
   onGo: (href: string) => void;
 }) {
+  const parts = [
+    link.value !== null ? formatRs(link.value) : null,
+    link.kg !== null ? `${formatNumber(link.kg, 0)} ${unit ?? 'kg'}` : null,
+  ].filter(Boolean);
+
   return (
     <button
       type="button"
       onClick={() => onGo(href)}
-      className="border-ink-200 hover:border-brand-300 hover:bg-brand-50/30 flex-1 rounded-[var(--radius-lg)] border bg-white px-4 py-3 text-left transition-colors"
+      className={cn(
+        'group border-ink-200 relative flex flex-col justify-between rounded-[var(--radius-lg)] border bg-white px-3.5 py-3 text-left',
+        'hover:border-brand-400 hover:shadow-[var(--shadow-card)] transition-all duration-150',
+      )}
     >
-      <div className="text-ink-500 text-xs font-medium tracking-wide uppercase">{label}</div>
-      <div className="text-ink-900 mt-0.5 text-2xl font-bold tabular-nums">
+      <div className="text-ink-500 group-hover:text-brand-700 text-[11px] font-medium tracking-wider uppercase transition-colors">
+        {label}
+      </div>
+      <div className="text-ink-900 mt-1.5 text-[1.75rem] leading-none font-bold tabular-nums">
         {formatNumber(link.count, 0)}
       </div>
-      {/* The second line is what the count is made of — kilograms on the floor,
-          rupees on the books. Blank where neither means anything. */}
-      <div className="text-ink-500 mt-0.5 text-xs tabular-nums">
-        {link.value !== null ? formatRs(link.value) : null}
-        {link.value !== null && link.kg !== null ? ' · ' : null}
-        {link.kg !== null ? `${formatNumber(link.kg, 0)} ${unit ?? 'kg'}` : null}
-        {link.value === null && link.kg === null ? ' ' : null}
+      <div className="text-ink-500 mt-1.5 min-h-[1rem] text-xs tabular-nums">
+        {parts.join(' · ')}
       </div>
     </button>
   );
@@ -73,11 +94,14 @@ function Link({
  * The page somebody opens first thing, to answer one question: where is
  * everything, and what needs me today.
  *
- * Three bands, in the order those questions are asked. **The chain** across
- * the top — quoted, ordered, planned, on the floor, in the godown, gone out —
+ * Four bands, in the order those questions are asked. **The chain** across the
+ * top — quoted, ordered, planned, on the floor, in the godown, gone out —
  * because a works wants to see the whole pipe before any part of it. **What
  * needs attention**, worst first, each line a link straight to the screen that
- * fixes it. Then **the floor itself**, grouped by stage.
+ * fixes it, with today's figures beside it. **The last fortnight**, as a shape
+ * rather than a number, because whether the floor is keeping up is a question
+ * about a run of days and not about this one. Then **the floor itself**,
+ * grouped by stage.
  *
  * Every figure is read from the module that owns it, never recalculated here:
  * an overview that disagreed with the screen it summarises would make somebody
@@ -100,12 +124,13 @@ export default function OverviewPage() {
     cards: data.floor.filter((card) => card.stage === stage && card.stageLabel !== 'Not started'),
   }));
   const notStarted = data.floor.filter((card) => card.stageLabel === 'Not started');
+  const machineCount = data.machines.running + data.machines.idle + data.machines.down;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
       <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-ink-900 text-xl font-bold sm:text-2xl">
+          <h1 className="text-ink-900 text-xl font-bold tracking-tight sm:text-2xl">
             {greeting(new Date().getHours())}
             {user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}
           </h1>
@@ -132,11 +157,9 @@ export default function OverviewPage() {
       </header>
 
       {/* The chain. The whole pipe, in the order a job travels it. */}
-      <section className="mb-6">
-        <h2 className="text-ink-800 mb-2 text-xs font-semibold tracking-wider uppercase">
-          Where everything is
-        </h2>
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-6">
+      <section className="mb-5">
+        <SectionHeading>Where everything is</SectionHeading>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           <Link label="Quoted" link={data.chain.quoted} href="/quotations" onGo={go} />
           <Link label="On the books" link={data.chain.ordered} href="/orders" onGo={go} />
           <Link label="Scheduled" link={data.chain.planned} href="/planning" onGo={go} />
@@ -151,14 +174,12 @@ export default function OverviewPage() {
         </div>
       </section>
 
-      <div className="mb-6 grid gap-4 lg:grid-cols-3">
+      <div className="mb-5 grid gap-4 lg:grid-cols-3">
         {/* What needs somebody. */}
         <section className="lg:col-span-2">
-          <h2 className="text-ink-800 mb-2 text-xs font-semibold tracking-wider uppercase">
-            Needs attention
-          </h2>
+          <SectionHeading>Needs attention</SectionHeading>
           {data.attention.length === 0 ? (
-            <div className="border-success-200 bg-success-50/40 text-success-800 rounded-[var(--radius-lg)] border px-4 py-6 text-center text-sm">
+            <div className="border-success-200 bg-success-50/50 text-success-800 flex h-full min-h-[8rem] items-center justify-center rounded-[var(--radius-lg)] border px-4 py-6 text-center text-sm">
               Nothing is asking for you. Every job has its film, every machine is up, and nothing is
               past its date.
             </div>
@@ -169,11 +190,17 @@ export default function OverviewPage() {
                   <button
                     type="button"
                     onClick={() => go(alert.href)}
-                    className="hover:bg-ink-25 flex w-full items-center gap-3 px-4 py-2.5 text-left"
+                    className="hover:bg-ink-25 group relative flex w-full items-center gap-3 py-2.5 pr-3 pl-4 text-left transition-colors"
                   >
-                    <Circle className={cn('size-2.5 shrink-0', SEVERITY[alert.severity].dot)} />
+                    <span
+                      className={cn(
+                        'absolute top-0 bottom-0 left-0 w-1',
+                        SEVERITY[alert.severity].stripe,
+                      )}
+                      aria-hidden
+                    />
                     <span className="text-ink-800 min-w-0 flex-1 text-sm">{alert.title}</span>
-                    <ChevronRight className="text-ink-300 size-4 shrink-0" />
+                    <ChevronRight className="text-ink-300 group-hover:text-brand-600 size-4 shrink-0 transition-colors" />
                   </button>
                 </li>
               ))}
@@ -183,59 +210,62 @@ export default function OverviewPage() {
 
         {/* Today, and what the works is holding. */}
         <section>
-          <h2 className="text-ink-800 mb-2 text-xs font-semibold tracking-wider uppercase">
-            Today
-          </h2>
-          <div className="border-ink-200 space-y-3 rounded-[var(--radius-lg)] border bg-white p-4">
-            {[
-              {
-                label: 'Made',
-                value: `${formatNumber(data.today.outputKg, 0)} kg`,
-                hint: `${data.today.runs} run${data.today.runs === 1 ? '' : 's'} finished`,
-              },
-              {
-                label: 'Waste',
-                value: data.today.runs > 0 ? `${data.today.wastePercent}%` : '—',
-                hint:
-                  data.today.runs > 0
-                    ? `${formatNumber(data.today.wasteKg, 1)} kg`
-                    : 'nothing finished yet',
-              },
-              {
-                label: 'Machines',
-                value: `${data.machines.running} of ${data.machines.running + data.machines.idle + data.machines.down}`,
-                hint: data.machines.down > 0 ? `${data.machines.down} down` : 'none down',
-              },
-              {
-                label: 'Stock on hand',
-                value: formatRs(data.stock.value),
-                hint: `${data.stock.materialsInStock} materials`,
-              },
-            ].map((row) => (
-              <div key={row.label} className="flex items-baseline justify-between gap-2">
-                <span className="text-ink-500 text-xs font-medium tracking-wide uppercase">
-                  {row.label}
-                </span>
-                <span className="text-right">
-                  <span className="text-ink-900 block font-semibold tabular-nums">{row.value}</span>
-                  <span className="text-ink-400 block text-xs">{row.hint}</span>
-                </span>
-              </div>
-            ))}
+          <SectionHeading>Today</SectionHeading>
+          <div className="border-ink-200 divide-ink-100 h-full divide-y rounded-[var(--radius-lg)] border bg-white">
+            <Stat
+              label="Made"
+              value={`${formatNumber(data.today.outputKg, 0)} kg`}
+              hint={`${data.today.runs} run${data.today.runs === 1 ? '' : 's'} finished`}
+            />
+            <Stat
+              label="Waste"
+              value={data.today.runs > 0 ? `${data.today.wastePercent}%` : '—'}
+              hint={
+                data.today.runs > 0
+                  ? `${formatNumber(data.today.wasteKg, 1)} kg`
+                  : 'nothing finished yet'
+              }
+              tone={data.today.runs > 0 && data.today.wastePercent >= 5 ? 'warn' : 'plain'}
+            />
+            <Stat
+              label="Machines"
+              value={`${data.machines.running} of ${machineCount}`}
+              hint={data.machines.down > 0 ? `${data.machines.down} down` : 'none down'}
+              tone={data.machines.down > 0 ? 'bad' : 'plain'}
+            />
+            <Stat
+              label="Stock on hand"
+              value={formatRs(data.stock.value)}
+              hint={`${data.stock.materialsInStock} materials`}
+            />
           </div>
         </section>
       </div>
 
+      {/* The fortnight. The only thing on the page that is a shape. */}
+      <section className="mb-5">
+        <div className="mb-2 flex items-baseline justify-between gap-3">
+          <SectionHeading className="mb-0">The last fortnight</SectionHeading>
+          <button
+            type="button"
+            onClick={() => go('/quality')}
+            className="text-ink-500 hover:text-ink-900 flex shrink-0 items-center gap-1 text-xs transition-colors"
+          >
+            Waste by stage
+            <ArrowRight className="size-3.5" />
+          </button>
+        </div>
+        <FortnightChart trend={data.trend} fortnight={data.fortnight} />
+      </section>
+
       {/* The floor, stage by stage. */}
       <section>
-        <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="text-ink-800 text-xs font-semibold tracking-wider uppercase">
-            On the floor
-          </h2>
+        <div className="mb-2 flex items-baseline justify-between gap-3">
+          <SectionHeading className="mb-0">On the floor</SectionHeading>
           <button
             type="button"
             onClick={() => go('/production')}
-            className="text-ink-500 hover:text-ink-900 flex items-center gap-1 text-xs"
+            className="text-ink-500 hover:text-ink-900 flex shrink-0 items-center gap-1 text-xs transition-colors"
           >
             Every job card
             <ArrowRight className="size-3.5" />
@@ -250,9 +280,9 @@ export default function OverviewPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {byStage.map((column) => (
               <div key={column.stage}>
-                <div className="text-ink-500 mb-1.5 flex items-baseline justify-between text-xs font-medium tracking-wide uppercase">
+                <div className="text-ink-500 mb-1.5 flex items-baseline justify-between text-[11px] font-medium tracking-wider uppercase">
                   <span>{column.label}</span>
-                  <span className="tabular-nums">{column.cards.length}</span>
+                  <span className="text-ink-400 tabular-nums">{column.cards.length}</span>
                 </div>
                 <div className="space-y-2">
                   {column.cards.length === 0 ? (
@@ -272,7 +302,7 @@ export default function OverviewPage() {
             waiting on film is the one most worth seeing. */}
         {notStarted.length > 0 ? (
           <div className="mt-4">
-            <div className="text-ink-500 mb-1.5 text-xs font-medium tracking-wide uppercase">
+            <div className="text-ink-500 mb-1.5 text-[11px] font-medium tracking-wider uppercase">
               Raised, not started
             </div>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -287,6 +317,54 @@ export default function OverviewPage() {
   );
 }
 
+/** Every band is titled the same way, so the page reads as a sequence. */
+function SectionHeading({ children, className }: { children: string; className?: string }) {
+  return (
+    <h2
+      className={cn(
+        'text-ink-700 mb-2 text-[11px] font-semibold tracking-wider uppercase',
+        className,
+      )}
+    >
+      {children}
+    </h2>
+  );
+}
+
+/** One row of the Today rail. */
+function Stat({
+  label,
+  value,
+  hint,
+  tone = 'plain',
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  tone?: 'plain' | 'warn' | 'bad';
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-2 px-4 py-3">
+      <span className="text-ink-500 text-[11px] font-medium tracking-wider uppercase">{label}</span>
+      <span className="text-right">
+        <span
+          className={cn(
+            'block font-semibold tabular-nums',
+            tone === 'bad'
+              ? 'text-danger-700'
+              : tone === 'warn'
+                ? 'text-warning-700'
+                : 'text-ink-900',
+          )}
+        >
+          {value}
+        </span>
+        <span className="text-ink-400 block text-xs">{hint}</span>
+      </span>
+    </div>
+  );
+}
+
 /** One job on the board. */
 function Card({ card, onGo }: { card: FloorCard; onGo: (href: string) => void }) {
   return (
@@ -295,7 +373,7 @@ function Card({ card, onGo }: { card: FloorCard; onGo: (href: string) => void })
       onClick={() => onGo(`/production/${card.cardId}`)}
       className={cn(
         'w-full rounded-[var(--radius-md)] border bg-white p-3 text-left shadow-[var(--shadow-card)]',
-        'hover:border-brand-300 transition-colors',
+        'hover:border-brand-400 hover:shadow-[var(--shadow-elevated)] transition-all duration-150',
         card.isShort ? 'border-danger-200' : 'border-ink-200',
       )}
     >

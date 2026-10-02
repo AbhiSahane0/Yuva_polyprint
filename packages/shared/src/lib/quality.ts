@@ -138,6 +138,8 @@ export interface WasteDay {
   wasteKg: number;
   inputKg: number;
   percent: number;
+  /** Stages finished that day. Zero is what makes a quiet day read as quiet. */
+  runs: number;
 }
 
 /**
@@ -148,14 +150,15 @@ export interface WasteDay {
  * decline look like a straight line.
  */
 export function wasteTrend(stages: StageWaste[], days: number, endingOn: string): WasteDay[] {
-  const totals = new Map<string, { waste: number; input: number }>();
+  const totals = new Map<string, { waste: number; input: number; runs: number }>();
 
   for (const stage of stages) {
     if (!stage.finishedAt || !stage.outputKg) continue;
     const date = stage.finishedAt.slice(0, 10);
-    const at = totals.get(date) ?? { waste: 0, input: 0 };
+    const at = totals.get(date) ?? { waste: 0, input: 0, runs: 0 };
     at.waste += wasteKg(stage);
     at.input += stage.inputKg;
+    at.runs += 1;
     totals.set(date, at);
   }
 
@@ -165,12 +168,13 @@ export function wasteTrend(stages: StageWaste[], days: number, endingOn: string)
     const at = new Date(end);
     at.setUTCDate(at.getUTCDate() - back);
     const date = at.toISOString().slice(0, 10);
-    const total = totals.get(date) ?? { waste: 0, input: 0 };
+    const total = totals.get(date) ?? { waste: 0, input: 0, runs: 0 };
     out.push({
       date,
       wasteKg: round(total.waste, 3),
       inputKg: round(total.input, 3),
       percent: total.input > 0 ? round((total.waste / total.input) * 100, 2) : 0,
+      runs: total.runs,
     });
   }
   return out;

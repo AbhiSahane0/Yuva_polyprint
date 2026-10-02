@@ -328,6 +328,19 @@ const PLAN = [
 ] as const;
 
 /**
+ * Which day each job card's **first** finished stage came off, counting back
+ * from today. Its later stages walk forward one day at a time from there.
+ *
+ * Indexed by card rather than by `PLAN` position, because only five of the ten
+ * rows reach a job card at all — the quotations and the plain orders never
+ * touch a machine. Spread across the fortnight on purpose: a works has heavy
+ * days and quiet ones, and the overview's trend chart is there to show that
+ * shape. A seed that put every run on one afternoon would draw one spike and
+ * thirteen empty days, which teaches nobody anything.
+ */
+const FIRST_RAN_ON = [13, 11, 8, 6, 3] as const;
+
+/**
  * What each job prints.
  *
  * Four process colours is the ordinary job. **A five-colour job is CMYK plus a
@@ -500,6 +513,10 @@ async function main() {
   console.log('Film on the shelf.');
 
   /* --- and the ten jobs -------------------------------------------------- */
+  /* How many cards have been built, so the fortnight spread above is indexed by
+     card and not by the plan row — half the rows never reach a machine. */
+  let cardsMade = 0;
+
   for (const plan of PLAN) {
     const design = await prisma.job.findFirst({
       where: { jobName: plan.design },
@@ -706,6 +723,11 @@ async function main() {
      */
     let inKg = Math.round(plan.kg * 1.08);
     const runningAt = RUNNING_AT[plan.level];
+    /* Which day this card's first stage came off, counting back from today.
+       Spread so the fortnight reads as a fortnight of work rather than one
+       busy afternoon — see the backdating inside the loop. */
+    let ranOn = FIRST_RAN_ON[cardsMade % FIRST_RAN_ON.length] ?? 6;
+    cardsMade += 1;
 
     for (const stage of card.stages) {
       if (stage.stage === runningAt) {
@@ -727,6 +749,23 @@ async function main() {
         outputKg: outKg,
         status: 'DONE',
       });
+      /*
+       * Put the run back where it actually happened.
+       *
+       * `updateStage` stamps `finishedAt` with now, which is right in use and
+       * wrong here: every demo run would land on the day the seed was run, and
+       * the overview's fortnight chart would show one spike against thirteen
+       * empty days. A works finishes something most days, so the demo does
+       * too — each card starts on its own day and walks its stages forward.
+       */
+      await prisma.productionStage.update({
+        where: { id: stage.id },
+        data: {
+          startedAt: new Date(`${daysAgo(ranOn)}T09:30:00.000Z`),
+          finishedAt: new Date(`${daysAgo(ranOn)}T16:45:00.000Z`),
+        },
+      });
+      ranOn = Math.max(0, ranOn - 1);
       inKg = outKg;
     }
 
