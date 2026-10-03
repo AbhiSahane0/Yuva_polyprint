@@ -140,9 +140,32 @@ export function QuantityFields({
   return (
     <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-ink-500 flex items-center gap-2 text-xs font-semibold tracking-wide uppercase">
-          <Layers3 className="size-3.5" aria-hidden />
-          Quantities
+        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+          <span className="text-ink-500 flex items-center gap-2 text-xs font-semibold tracking-wide uppercase">
+            <Layers3 className="size-3.5" aria-hidden />
+            Quantities
+          </span>
+          {/*
+            The yield, stated once.
+            
+            It belongs to the LINE, not to a quantity: the structure decides what
+            a pouch weighs, and ordering twice as much does not change it. Up
+            here rather than repeated down every row — and it is the figure the
+            office is asked for across the table ("how many bags to a kilo?"),
+            so it should not have to be worked out from a total.
+          */}
+          {pouchesPerKg > 0 ? (
+            <span
+              className="border-brand-200 bg-brand-50 text-brand-800 rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums"
+              title={`One pouch weighs ${formatNumber(pouchWeightG, 2)} g, from the structure's own gsm. 1,000 ÷ ${formatNumber(pouchWeightG, 2)} = ${formatNumber(pouchesPerKg, 2)}.`}
+            >
+              {formatNumber(pouchesPerKg, 2)} pouches per kg
+              <span className="text-brand-600 font-normal">
+                {' '}
+                · {formatNumber(pouchWeightG, 2)} g each
+              </span>
+            </span>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {onSelectQuantity && fields.length > 1 ? (

@@ -1758,6 +1758,21 @@ function JobCard({
    * re-renders the card.
    */
   const lastComputed = useRef<Record<number, number>>({});
+  /*
+   * A rate that was SAVED is a decision, and opening the document is not
+   * changing one.
+   *
+   * The first costing of a line always differs from the nothing recorded
+   * above, so on an existing quotation it wrote straight over the figure the
+   * office had agreed: ₹335 on the record, ₹365.01 in the box a moment after
+   * the page drew, and a save of anything else — a phone number, a date —
+   * would have carried the new price with it.
+   *
+   * So the first run on a line that already has a rate records the computed
+   * figure and writes nothing. Everything after behaves as before: touch the
+   * film, the colours or the quantity and the price follows.
+   */
+  const settled = useRef<Record<number, boolean>>({});
 
   useEffect(() => {
     costing.results.forEach((result, position) => {
@@ -1765,10 +1780,22 @@ function JobCard({
 
       const next = round(result.ratePerKg, 2);
       if (lastComputed.current[position] === next) return;
+
+      const saved = num(item?.quantities?.[position]?.ratePerKg);
+      if (!settled.current[position]) {
+        settled.current[position] = true;
+        if (saved > 0) {
+          /* Loaded with a price somebody agreed. Note what it would cost now,
+             and leave the box alone. */
+          lastComputed.current[position] = next;
+          return;
+        }
+      }
+
       lastComputed.current[position] = next;
       setNumber(setValue, `items.${index}.quantities.${position}.ratePerKg`, next);
     });
-  }, [costing.results, index, setValue]);
+  }, [costing.results, index, setValue, item?.quantities]);
 
   /**
    * Fill the repeats in as the size is typed, until the office says otherwise.
