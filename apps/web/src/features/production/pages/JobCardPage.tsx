@@ -119,6 +119,9 @@ export default function JobCardPage() {
     );
   }
 
+  /* Captured past the guard above, so the handlers below — which TypeScript
+     does not narrow into — can name the card without asserting it exists. */
+  const cardId = card.id;
   const ended = card.status === 'COMPLETED';
   const nextStatuses = PRODUCTION_STATUSES.filter(
     (status) => status !== card.status && canMoveProductionTo(card.status, status),
@@ -150,12 +153,39 @@ export default function JobCardPage() {
     }
   }
 
-  async function patchStage(
+  /**
+   * A flow step: start, finish, skip, put back.
+   *
+   * Waits for the server, because it is the server that decides. Starting a
+   * stage can be refused outright when the film is not there, and it moves the
+   * card and the order with it — none of which can be guessed at here.
+   */
+  async function moveStage(
     stageId: string,
     input: Parameters<typeof updateStage.mutateAsync>[0]['input'],
   ) {
     try {
-      await updateStage.mutateAsync({ stageId, input });
+      await updateStage.mutateAsync({ cardId, stageId, input });
+    } catch (caught) {
+      toast.error(caught instanceof ApiClientError ? caught.message : 'Could not save');
+    }
+  }
+
+  /**
+   * A field: the machine, who ran it, a weight.
+   *
+   * Shows at once and saves behind itself. `optimistic` is what the screen
+   * should read while the request is in the air — the id the control is bound
+   * to, plus the name the card prints beside it, which the server snapshots
+   * and this page already knows. A failure puts the old value back.
+   */
+  async function setField(
+    stageId: string,
+    input: Parameters<typeof updateStage.mutateAsync>[0]['input'],
+    optimistic: NonNullable<Parameters<typeof updateStage.mutateAsync>[0]['optimistic']>,
+  ) {
+    try {
+      await updateStage.mutateAsync({ cardId, stageId, input, optimistic });
     } catch (caught) {
       toast.error(caught instanceof ApiClientError ? caught.message : 'Could not save');
     }
@@ -339,14 +369,14 @@ export default function JobCardPage() {
                         <Button
                           size="sm"
                           variant="secondary"
-                          onClick={() => void patchStage(stage.id, { status: 'RUNNING' })}
+                          onClick={() => void moveStage(stage.id, { status: 'RUNNING' })}
                         >
                           Start
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => void patchStage(stage.id, { status: 'SKIPPED' })}
+                          onClick={() => void moveStage(stage.id, { status: 'SKIPPED' })}
                         >
                           Not needed
                         </Button>
@@ -355,7 +385,7 @@ export default function JobCardPage() {
                     {stage.status === 'RUNNING' ? (
                       <Button
                         size="sm"
-                        onClick={() => void patchStage(stage.id, { status: 'DONE' })}
+                        onClick={() => void moveStage(stage.id, { status: 'DONE' })}
                       >
                         Finish
                       </Button>
@@ -364,7 +394,7 @@ export default function JobCardPage() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => void patchStage(stage.id, { status: 'PENDING' })}
+                        onClick={() => void moveStage(stage.id, { status: 'PENDING' })}
                       >
                         Put back
                       </Button>
@@ -380,9 +410,18 @@ export default function JobCardPage() {
                       id={`machine-${stage.id}`}
                       value={stage.machineId ?? ''}
                       disabled={locked}
-                      onChange={(event) =>
-                        void patchStage(stage.id, { machineId: event.target.value || null })
-                      }
+                      onChange={(event) => {
+                        const machineId = event.target.value || null;
+                        void setField(
+                          stage.id,
+                          { machineId },
+                          {
+                            machineId,
+                            machineName:
+                              machinesFor(stage).find((m) => m.id === machineId)?.name ?? '',
+                          },
+                        );
+                      }}
                     >
                       <option value="">— pick one —</option>
                       {machinesFor(stage).map((machine) => (
@@ -399,7 +438,16 @@ export default function JobCardPage() {
                       stage={stage}
                       people={people}
                       disabled={locked}
-                      onPick={(operatorId) => void patchStage(stage.id, { operatorId })}
+                      onPick={(operatorId) =>
+                        void setField(
+                          stage.id,
+                          { operatorId },
+                          {
+                            operatorId,
+                            operator: people.find((p) => p.id === operatorId)?.name ?? '',
+                          },
+                        )
+                      }
                     />
                   </Field>
 
@@ -408,10 +456,11 @@ export default function JobCardPage() {
                       id={`in-${stage.id}`}
                       defaultValue={stage.inputKg ? String(stage.inputKg) : ''}
                       disabled={locked}
-                      onBlur={(event) =>
-                        Number(event.target.value || 0) !== stage.inputKg &&
-                        void patchStage(stage.id, { inputKg: Number(event.target.value || 0) })
-                      }
+                      onBlur={(event) => {
+                        const inputKg = Number(event.target.value || 0);
+                        if (inputKg === stage.inputKg) return;
+                        void setField(stage.id, { inputKg }, { inputKg });
+                      }}
                     />
                   </Field>
 
@@ -420,10 +469,11 @@ export default function JobCardPage() {
                       id={`out-${stage.id}`}
                       defaultValue={stage.outputKg ? String(stage.outputKg) : ''}
                       disabled={locked}
-                      onBlur={(event) =>
-                        Number(event.target.value || 0) !== stage.outputKg &&
-                        void patchStage(stage.id, { outputKg: Number(event.target.value || 0) })
-                      }
+                      onBlur={(event) => {
+                        const outputKg = Number(event.target.value || 0);
+                        if (outputKg === stage.outputKg) return;
+                        void setField(stage.id, { outputKg }, { outputKg });
+                      }}
                     />
                   </Field>
 

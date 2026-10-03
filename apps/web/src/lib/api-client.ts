@@ -76,12 +76,28 @@ apiClient.interceptors.response.use(
       );
     }
 
+    /*
+     * No envelope came back, so the API never answered — this is the network,
+     * a proxy, or the server being down or restarting.
+     *
+     * Axios' own text for these is "Request failed with status code 502",
+     * which is what the works saw on the floor when a save failed. It names
+     * nothing anybody can act on and, worse, does not say the thing that
+     * matters: the change did not save. A gateway in front of the API answers
+     * 502 or 504 on a cold start or a redeploy, so this is not a rare path.
+     */
     const message =
       error.code === 'ECONNABORTED'
-        ? 'The request timed out. Please try again.'
+        ? 'That took too long. Nothing was saved — try again.'
         : status === 0
-          ? 'Cannot reach the server. Check your connection.'
-          : (error.message ?? 'Something went wrong');
+          ? 'Cannot reach the server. Nothing was saved — check the connection.'
+          : status === 502 || status === 503 || status === 504
+            ? 'The server is not answering. Nothing was saved — try again in a moment.'
+            : status === 429
+              ? 'Too many requests at once. Wait a moment and try again.'
+              : status >= 500
+                ? 'Something went wrong at our end. Nothing was saved — try again.'
+                : (error.message ?? 'Something went wrong');
 
     return Promise.reject(new ApiClientError(message, ERROR_CODE.INTERNAL_ERROR, status));
   },
