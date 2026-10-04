@@ -159,6 +159,8 @@ function toItem(row: ItemRow): QuotationItem {
     widthMm: toNumber(row.widthMm),
     heightMm: toNumber(row.heightMm),
     isGazette: row.isGazette,
+    hasDPunch: row.hasDPunch,
+    hasVNotch: row.hasVNotch,
     gazetteBottom: toNumber(row.gazetteBottom),
     gazetteLeft: toNumber(row.gazetteLeft),
     gazetteRight: toNumber(row.gazetteRight),
@@ -281,6 +283,8 @@ function toQuotation(row: QuotationRow): Quotation {
     email: row.email,
     gstNumber: row.gstNumber,
     referredBy: row.referredBy,
+    enquiryFrom: row.enquiryFrom,
+    generatedThrough: row.generatedThrough,
     decidedAt: row.decidedAt ? row.decidedAt.toISOString() : null,
     lostReason: row.lostReason,
     marginPercent: row.marginPercent === null ? null : toNumber(row.marginPercent),
@@ -685,7 +689,6 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
             const created = await tx.customer.create({
               data: {
                 companyName: input.customerName,
-                brandName: input.brandName || 'NA',
                 address: input.addressLine1 || 'NA',
                 city: input.addressLine2 || 'NA',
                 district: input.addressLine3 || 'NA',
@@ -704,19 +707,6 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
             customerId = created.id;
             customerWasCreated = true;
           }
-        }
-
-        /*
-         * A brand corrected on the quotation belongs to the customer, so it is
-         * written back — the same way their address already is. Only when the
-         * office actually typed one: an empty box means "I did not say", not
-         * "erase what you have".
-         */
-        if (customerId !== null && !customerWasCreated && input.brandName) {
-          await tx.customer.update({
-            where: { id: customerId },
-            data: { brandName: input.brandName },
-          });
         }
 
         /*
@@ -739,6 +729,8 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
             email: input.email,
             gstNumber: input.gstNumber,
             referredBy: input.referredBy,
+            enquiryFrom: input.enquiryFrom,
+            generatedThrough: input.generatedThrough,
             // Clamped against the quantities that actually arrived — see
             // `resolveSelectedQuantity`.
             selectedQuantity: resolveSelectedQuantity(input.selectedQuantity, tiers.length),
@@ -767,6 +759,8 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
               widthMm: entry.input.widthMm,
               heightMm: entry.input.heightMm,
               isGazette: entry.input.isGazette,
+              hasDPunch: entry.input.hasDPunch,
+              hasVNotch: entry.input.hasVNotch,
               gazetteBottom: entry.input.gazetteBottom,
               gazetteLeft: entry.input.gazetteLeft,
               gazetteRight: entry.input.gazetteRight,
@@ -972,6 +966,8 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
        * dropped here would quietly reprice a gazette pouch as a flat bag.
        */
       isGazette: item.isGazette,
+      hasDPunch: item.hasDPunch,
+      hasVNotch: item.hasVNotch,
       gazetteBottom: toNumber(item.gazetteBottom),
       gazetteLeft: toNumber(item.gazetteLeft),
       gazetteRight: toNumber(item.gazetteRight),
@@ -1054,6 +1050,10 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
         ...(input.email !== undefined ? { email: input.email } : {}),
         ...(input.gstNumber !== undefined ? { gstNumber: input.gstNumber } : {}),
         ...(input.referredBy !== undefined ? { referredBy: input.referredBy } : {}),
+        ...(input.enquiryFrom !== undefined ? { enquiryFrom: input.enquiryFrom } : {}),
+        ...(input.generatedThrough !== undefined
+          ? { generatedThrough: input.generatedThrough }
+          : {}),
         ...(input.terms ? { terms: input.terms } : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
         selectedQuantity: resolveSelectedQuantity(
@@ -1086,6 +1086,8 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
           widthMm: entry.input.widthMm,
           heightMm: entry.input.heightMm,
           isGazette: entry.input.isGazette,
+          hasDPunch: entry.input.hasDPunch,
+          hasVNotch: entry.input.hasVNotch,
           gazetteBottom: entry.input.gazetteBottom,
           gazetteLeft: entry.input.gazetteLeft,
           gazetteRight: entry.input.gazetteRight,
@@ -1224,6 +1226,8 @@ export async function createQuotationVersion(id: string): Promise<Quotation> {
             /* A revision is the same enquiry repriced, so whoever sent it comes
                across with the rest of the customer block. */
             referredBy: source.referredBy,
+            enquiryFrom: source.enquiryFrom,
+            generatedThrough: source.generatedThrough,
             cylinderRate: source.cylinderRate,
             gstPercent: source.gstPercent,
             materialAdvancePercent: source.materialAdvancePercent,
@@ -1265,6 +1269,8 @@ export async function createQuotationVersion(id: string): Promise<Quotation> {
               widthMm: item.widthMm,
               heightMm: item.heightMm,
               isGazette: item.isGazette,
+              hasDPunch: item.hasDPunch,
+              hasVNotch: item.hasVNotch,
               gazetteBottom: item.gazetteBottom,
               gazetteLeft: item.gazetteLeft,
               gazetteRight: item.gazetteRight,

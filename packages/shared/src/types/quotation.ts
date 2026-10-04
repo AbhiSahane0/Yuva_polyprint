@@ -1,4 +1,10 @@
-import type { InkKind, JobKind, PouchType, PricingBasis } from '../constants/job.js';
+import type {
+  EnquiryChannel,
+  InkKind,
+  JobKind,
+  PouchType,
+  PricingBasis,
+} from '../constants/job.js';
 import type { QuotationStatus } from '../schemas/quotation.js';
 
 /** One ink a line prints, as it was priced the day the quotation was written. */
@@ -69,6 +75,9 @@ export interface QuotationItem {
   gazetteBottom: number;
   gazetteLeft: number;
   gazetteRight: number;
+  /** Finishing, not style — see the schema. The punch is charged; the notch is not. */
+  hasDPunch: boolean;
+  hasVNotch: boolean;
   /** The flat film one pouch is cut from: the pouch plus its gussets. */
   filmWidthMm: number;
   filmHeightMm: number;
@@ -176,6 +185,11 @@ export interface Quotation extends QuotationSummary {
    * emailed. See the schema for why it has no more machinery than this.
    */
   referredBy: string;
+
+  /** Who asked, and how they got in touch. Null channel on anything written
+      before the question was asked. */
+  enquiryFrom: string;
+  generatedThrough: EnquiryChannel | null;
 
   /** When the customer's answer was recorded. */
   decidedAt: string | null;

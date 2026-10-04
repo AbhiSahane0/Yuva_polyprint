@@ -97,7 +97,7 @@ function toEvent(row: EventRow): CylinderEvent {
 }
 
 const DESIGN_INCLUDE = {
-  customer: { select: { id: true, companyName: true, brandName: true } },
+  customer: { select: { id: true, companyName: true } },
   cylinders: { include: CYLINDER_INCLUDE, orderBy: [{ position: 'asc' }, { code: 'asc' }] },
   /* Counted, not fetched: the list shows how many files there are, not which. */
   _count: { select: { artwork: { where: { status: { in: ['ACTIVE', 'SUPERSEDED'] } } } } },
@@ -131,12 +131,7 @@ function toDesign(row: JobRow): DesignSummary {
     customerId: row.customer?.id ?? null,
     // The brand is what the office calls them; the company is what an invoice
     // says. This screen is the office's, so the brand wins where there is one.
-    customerName:
-      row.customer === null
-        ? null
-        : row.customer.brandName !== 'NA' && row.customer.brandName.trim() !== ''
-          ? row.customer.brandName
-          : row.customer.companyName,
+    customerName: row.customer === null ? null : row.customer.companyName,
     pouchType: row.pouchType,
     expectedCylinders: toNumber(row.totalCylinders),
     cylinderCount: cylinders.length,
@@ -184,7 +179,6 @@ export async function listDesigns(query: ListCylindersQuery): Promise<DesignList
         { jobCode: { contains: query.q, mode: 'insensitive' } },
         { cylinders: { some: { code: { contains: query.q, mode: 'insensitive' } } } },
         { customer: { companyName: { contains: query.q, mode: 'insensitive' } } },
-        { customer: { brandName: { contains: query.q, mode: 'insensitive' } } },
       ],
     });
   }
@@ -458,7 +452,7 @@ export async function describeDeletion(jobId: string): Promise<DesignDeletion> {
       id: true,
       jobName: true,
       jobCode: true,
-      customer: { select: { companyName: true, brandName: true } },
+      customer: { select: { companyName: true } },
       _count: {
         select: {
           cylinders: true,
@@ -497,12 +491,7 @@ export async function describeDeletion(jobId: string): Promise<DesignDeletion> {
     jobId: job.id,
     jobName: job.jobName,
     jobCode: job.jobCode,
-    customerName:
-      job.customer === null
-        ? null
-        : job.customer.brandName !== 'NA' && job.customer.brandName.trim() !== ''
-          ? job.customer.brandName
-          : job.customer.companyName,
+    customerName: job.customer === null ? null : job.customer.companyName,
     cylinders: job._count.cylinders,
     cylinderEvents,
     artworkFiles: job._count.artwork,

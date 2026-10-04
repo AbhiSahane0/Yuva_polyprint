@@ -337,7 +337,7 @@ function AssignCustomer({
           id="assign-customer"
           options={options}
           value={query}
-          placeholder="Type a company or brand…"
+          placeholder="Type a company…"
           onChange={(next) => {
             setQuery(next);
             /* Typing after a choice clears it, or the box would read one

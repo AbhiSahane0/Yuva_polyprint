@@ -203,25 +203,6 @@ describe('a design read back from the server', () => {
   });
 });
 
-describe('the brand, as a customer detail', () => {
-  it('is written back when the office corrects it', () => {
-    const baseline = baselineFromCustomer(customer);
-    expect(changedCustomerFields(baseline, { ...baseline, brandName: 'Ashoka' }, baseline)).toEqual(
-      {
-        brandName: 'Ashoka',
-      },
-    );
-  });
-
-  it('is not written when it was only read', () => {
-    // 'NA' on the record, blank in the box: unchanged, so nothing is sent.
-    const withBrand = { ...customer, brandName: 'NA' } as unknown as CustomerDetail;
-    const baseline = baselineFromCustomer(withBrand);
-    expect(baseline.brandName).toBe('');
-    expect(changedCustomerFields(baseline, { ...baseline }, baseline)).toBeNull();
-  });
-});
-
 describe('a field nobody changed on this screen', () => {
   /*
    * The rule that exists because a customer's address was wiped twice. On an
@@ -293,7 +274,6 @@ describe('a blank on the quotation is not a decision', () => {
    */
   const record: CustomerDetails = {
     companyName: 'Family And Quantity Check',
-    brandName: 'Test',
     address: 'Samsherpur',
     city: '',
     district: '',
@@ -313,7 +293,6 @@ describe('a blank on the quotation is not a decision', () => {
 
   const blankSnapshot: CustomerDetails = {
     companyName: 'Family And Quantity Check',
-    brandName: '',
     address: '',
     city: '',
     district: '',

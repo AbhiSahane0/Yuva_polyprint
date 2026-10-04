@@ -53,6 +53,9 @@ import { cn } from '@/lib/utils';
  */
 const LAYER_COUNTS = [2, 3] as const;
 
+/** What the laminate gains in adhesive, as `totalMicron` in the engine counts it. */
+const ADHESIVE_MICRON = 2;
+
 interface Film {
   id: string;
   name: string;
@@ -148,10 +151,27 @@ export function LayerFields({
       shouldDirty: true,
     });
 
-    if (!film || typed > 0) return;
-
+    if (!film) return;
     const micron = micronFromFilmName(film.name);
     if (micron === null) return;
+
+    /*
+     * The gauge is filled in when the box is empty — and also when the family
+     * is stocked at one thickness only.
+     *
+     * MET PET is the case: the works buys it at 12µ and nothing else, so a row
+     * switched to it from a 50µ poly was left reading 50µ of a film that does
+     * not exist at 50. Where a family IS stocked at several gauges, a typed
+     * figure is the office's own and is left alone — that is what keeps a 19µ
+     * PET from being pulled back to 12.
+     */
+    const stockedGauges = new Set(
+      films
+        .filter((candidate) => filmFamily(candidate.name) === family)
+        .map((candidate) => micronFromFilmName(candidate.name))
+        .filter((gauge): gauge is number => gauge !== null),
+    );
+    if (typed > 0 && stockedGauges.size !== 1) return;
 
     setValue(`items.${itemIndex}.layers.${index}.micron`, String(micron) as never, {
       shouldDirty: true,
@@ -209,6 +229,27 @@ export function LayerFields({
   function rateText(film: Film | undefined): string {
     return (film?.currentRate ?? '').toString();
   }
+
+  /*
+   * The structure's thickness, the way the costing counts it.
+   *
+   * Two microns a lamination for the adhesive, which is what `totalMicron` in
+   * the engine adds — so the figure shown here is the figure the job is priced
+   * on, and not a sum of the boxes that happens to be 2µ lighter.
+   */
+  const plyMicrons = layers
+    .map((layer) => Number(layer?.micron ?? 0))
+    .filter((micron) => Number.isFinite(micron) && micron > 0);
+  const total = {
+    plies: plyMicrons.length,
+    adhesive: plyMicrons.length > 1 ? ADHESIVE_MICRON : 0,
+    micron:
+      Math.round(
+        (plyMicrons.reduce((sum, micron) => sum + micron, 0) +
+          (plyMicrons.length > 1 ? ADHESIVE_MICRON : 0)) *
+          100,
+      ) / 100,
+  };
 
   return (
     <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4">
@@ -382,6 +423,27 @@ export function LayerFields({
           );
         })}
       </div>
+
+      {/*
+        The total, where the office looks for it.
+        
+        The plies are typed one at a time and the figure that matters is their
+        sum — it is the number on the customer's own enquiry ("91 micron"), and
+        it was the one thing on this panel that had to be done in somebody's
+        head. The adhesive is in it because it is in the laminate: two microns
+        a lamination, which is what the costing adds.
+      */}
+      {total.plies > 0 ? (
+        <div className="border-ink-100 mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t pt-3">
+          <span className="text-ink-500 text-xs">
+            {total.plies} {total.plies === 1 ? 'ply' : 'plies'}
+            {total.adhesive > 0 ? ` + ${total.adhesive}µ adhesive` : ''}
+          </span>
+          <span className="text-ink-900 text-sm font-semibold tabular-nums">
+            {total.micron}µ total
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }

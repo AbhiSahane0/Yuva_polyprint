@@ -10,7 +10,7 @@ import { z } from 'zod';
  * from a schema whose fields default to `'NA'` gets:
  *
  * ```
- * { district: 'Nashik', brandName: 'NA', address: 'NA', city: 'NA',
+ * { district: 'Nashik', address: 'NA', city: 'NA',
  *   mobile: 'NA', email: 'NA', gstNumber: 'NA', ... }
  * ```
  *

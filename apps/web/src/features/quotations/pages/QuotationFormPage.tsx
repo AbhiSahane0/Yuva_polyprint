@@ -20,6 +20,10 @@ import {
   UserPlus,
 } from 'lucide-react';
 import {
+  ENQUIRY_CHANNEL_LABELS,
+  ENQUIRY_CHANNELS,
+  needsWhiteBase,
+  WHITE_BASE_NAME,
   type CreateQuotationFormValues,
   type CreateQuotationInput,
   type CustomerJob,
@@ -31,7 +35,7 @@ import {
   PET_MICRON_PER_LAYER,
   JOB_KINDS,
   JOB_KIND_LABELS,
-  POUCH_TYPES,
+  POUCH_TYPES_OFFERED,
   POUCH_TYPE_LABELS,
   type JobColour,
   type PouchType,
@@ -186,6 +190,8 @@ const BLANK_DESIGN = {
   gazetteBottom: 0,
   gazetteLeft: 0,
   gazetteRight: 0,
+  hasDPunch: false,
+  hasVNotch: false,
   layers: [
     { materialId: null, micron: PET_MICRON_PER_LAYER, rateOverride: '' },
     { materialId: null, micron: 50, rateOverride: '' },
@@ -204,7 +210,10 @@ const BLANK_DESIGN = {
 const BLANK_ITEM = {
   ...BLANK_DESIGN,
   jobKind: 'POUCH',
-  pouchType: 'STANDUP',
+  /* Nothing chosen. A style that defaults is a style that goes out unread —
+     and the one that used to default was a standup, which also decided the ink
+     laydown and the wastage the line was costed at. */
+  pouchType: null,
   pouchTypeNote: '',
   // The trade convention for a standup pouch, which the office can change on
   // the line — see the switch in the Quantities panel.
@@ -362,7 +371,6 @@ export default function QuotationFormPage() {
       transportPerKg: '',
       pouchMakingPerKg: '',
       customerName: '',
-      brandName: '',
       referredBy: '',
       addressLine1: '',
       addressLine2: '',
@@ -486,7 +494,6 @@ export default function QuotationFormPage() {
      */
     if (isEdit && !pickedByHand.current) {
       const gaps: [keyof CreateQuotationFormValues, keyof CustomerDetails, string][] = [
-        ['brandName', 'brandName', real(chosenCustomer.brandName)],
         ['addressLine1', 'address', real(chosenCustomer.address)],
         ['addressLine2', 'city', real(chosenCustomer.city)],
         ['addressLine3', 'district', real(chosenCustomer.district)],
@@ -509,7 +516,6 @@ export default function QuotationFormPage() {
       return;
     }
     setValue('customerName', chosenCustomer.companyName);
-    setValue('brandName', real(chosenCustomer.brandName));
     setValue('addressLine1', real(chosenCustomer.address));
     setValue('addressLine2', real(chosenCustomer.city));
     setValue('addressLine3', real(chosenCustomer.district));
@@ -521,7 +527,6 @@ export default function QuotationFormPage() {
     // is something they typed.
     saved.current.shown = customerDetailsFromForm({
       customerName: chosenCustomer.companyName,
-      brandName: real(chosenCustomer.brandName),
       addressLine1: real(chosenCustomer.address),
       addressLine2: real(chosenCustomer.city),
       addressLine3: real(chosenCustomer.district),
@@ -542,15 +547,11 @@ export default function QuotationFormPage() {
       saveAsCustomer: false,
       selectedQuantity: existing.selectedQuantity,
       customerName: existing.customerName,
-      /*
-       * Blank, not from the quotation: the brand lives on the customer and is
-       * not snapshotted here, so the prefill fills it in once their record
-       * loads. Starting undefined would leave the box uncontrolled for a beat.
-       */
-      brandName: '',
-      /* Unlike the brand, this IS snapshotted on the quotation — it belongs to
-         the enquiry rather than to the customer — so it comes straight back. */
+      /* Snapshotted on the quotation — these belong to the enquiry rather than
+         to the customer — so they come straight back. */
       referredBy: existing.referredBy,
+      enquiryFrom: existing.enquiryFrom,
+      generatedThrough: existing.generatedThrough,
       addressLine1: existing.addressLine1,
       addressLine2: existing.addressLine2,
       addressLine3: existing.addressLine3,
@@ -617,7 +618,6 @@ export default function QuotationFormPage() {
      */
     saved.current.shown = customerDetailsFromForm({
       customerName: existing.customerName,
-      brandName: '',
       addressLine1: existing.addressLine1,
       addressLine2: existing.addressLine2,
       addressLine3: existing.addressLine3,
@@ -856,7 +856,6 @@ export default function QuotationFormPage() {
     setValue('customerId', null);
     for (const field of [
       'customerName',
-      'brandName',
       'addressLine1',
       'addressLine2',
       'addressLine3',
@@ -888,7 +887,6 @@ export default function QuotationFormPage() {
 
     const current: CustomerDetails = {
       companyName: watched.customerName ?? '',
-      brandName: watched.brandName ?? '',
       address: watched.addressLine1 ?? '',
       city: watched.addressLine2 ?? '',
       district: watched.addressLine3 ?? '',
@@ -1075,7 +1073,6 @@ export default function QuotationFormPage() {
            */
           ...strippedCosting(values, costingMasters, pouchTypesOnThisQuotation),
           saveAsCustomer: customerMode === 'new',
-          brandName: values.brandName ?? '',
           customerId: customerMode === 'existing' ? values.customerId : null,
         } as CreateQuotationInput;
 
@@ -1192,19 +1189,13 @@ export default function QuotationFormPage() {
                         registration={register('customerName')}
                         value={watched.customerName ?? ''}
                         invalid={Boolean(formState.errors.customerName)}
-                        placeholder="Search company or brand…"
+                        placeholder="Search company…"
                         /*
-                         * The list is already what the server matched, on
-                         * company name OR brand. Filtering it again by company
-                         * name here discarded every customer found by their
-                         * brand — typing "Ashoka" returned ADF Foods Ltd from
-                         * the API and then showed nothing at all.
+                         * The list is already what the server matched. Filtering
+                         * it again by company name here would discard anything
+                         * the API found another way.
                          */
                         filterLocally={false}
-                        describe={(name) => {
-                          const brand = customers.find((c) => c.companyName === name)?.brandName;
-                          return brand && brand !== 'NA' ? brand : undefined;
-                        }}
                         onPick={(name) => {
                           /* A deliberate choice, so the prefill may run. */
                           pickedByHand.current = true;
@@ -1235,17 +1226,36 @@ export default function QuotationFormPage() {
               </div>
 
               {/*
-                Beside the company, on both paths.
+                Where the work came from.
                 
-                For an existing customer it arrives filled in and stays
-                editable — a brand the office corrects here is written back to
-                their record, the same way a corrected address already is. For a
-                new company it is simply typed, and set when the record is
-                created on save.
+                Two questions the office is asked and has been answering from
+                memory: who enquired, and how they got in touch. Beside
+                "Referred by" rather than instead of it — the person who asked
+                and the person who sent them are often not the same.
               */}
-              <div className="sm:col-span-5">
-                <Field label="Brand" htmlFor="brandName">
-                  <Input id="brandName" placeholder="e.g. Ashoka" {...register('brandName')} />
+              <div className="sm:col-span-3">
+                <Field label="Enquiry from" htmlFor="enquiryFrom" hint="Who asked">
+                  <Input
+                    id="enquiryFrom"
+                    autoComplete="off"
+                    placeholder="e.g. Dipak Gunjal"
+                    {...register('enquiryFrom')}
+                  />
+                </Field>
+              </div>
+
+              <div className="sm:col-span-2">
+                <Field label="Generated through" htmlFor="generatedThrough">
+                  <Select id="generatedThrough" {...register('generatedThrough')}>
+                    {/* Nothing chosen is a real answer here: a quotation whose
+                        channel nobody recorded should not claim one. */}
+                    <option value="">— not recorded —</option>
+                    {ENQUIRY_CHANNELS.map((channel) => (
+                      <option key={channel} value={channel}>
+                        {ENQUIRY_CHANNEL_LABELS[channel]}
+                      </option>
+                    ))}
+                  </Select>
                 </Field>
               </div>
 
@@ -1669,6 +1679,49 @@ function JobCard({
     setNumber(setValue, `items.${index}.cylinderCount`, next.length);
   };
 
+  /*
+   * A clear film pulls a white onto the press.
+   *
+   * Printing on natural film without a white behind it gives a washed-out pack,
+   * so the works always runs one — it takes a station and a cylinder like any
+   * other colour. It used to be remembered or not, because the rate master
+   * carried milky and natural as a single row and the question never appeared
+   * on screen.
+   *
+   * Added once and then left alone. Taking it off is the office's decision —
+   * this is not a rule that fights them — so the ref remembers that it has
+   * offered, rather than putting it back on the next keystroke.
+   */
+  const whiteOffered = useRef(false);
+  const plyNames = (item?.layers ?? []).map(
+    (layer) => films.find((film) => film.id === layer?.materialId)?.name ?? null,
+  );
+  const wantsWhite = needsWhiteBase(plyNames);
+
+  useEffect(() => {
+    if (!wantsWhite || whiteOffered.current || !special) return;
+    if (
+      colours.some((colour) => colour.name.trim().toLowerCase() === WHITE_BASE_NAME.toLowerCase())
+    )
+      return;
+    whiteOffered.current = true;
+    const next = [...colours, { ...special, name: WHITE_BASE_NAME }];
+    setValue(`items.${index}.colours`, next as never, { shouldDirty: true });
+
+    /*
+     * The cylinder count follows only if it was already following.
+     *
+     * Colours and cylinders normally move together, and that is right when the
+     * office is clicking colours. This addition is not something they clicked —
+     * so on a line where they typed 6 cylinders without listing any colours,
+     * taking the count to 1 would quietly throw away their own figure. It grows
+     * by one where the two were in step, and is left alone where they were not.
+     */
+    if (num(item?.cylinderCount) === colours.length) {
+      setNumber(setValue, `items.${index}.cylinderCount`, next.length);
+    }
+  }, [wantsWhite, colours, special, index, setValue, item?.cylinderCount]);
+
   const setCylinderCount = (count: number) => {
     const next = resizeColours(colours, count, special, processPalette);
     setValue(`items.${index}.colours`, next as never, { shouldDirty: true });
@@ -2056,11 +2109,20 @@ function JobCard({
                 }}
               >
                 <option value="">— Choose —</option>
-                {POUCH_TYPES.map((style) => (
+                {POUCH_TYPES_OFFERED.map((style) => (
                   <option key={style} value={style}>
                     {POUCH_TYPE_LABELS[style]}
                   </option>
                 ))}
+                {/*
+                  A line saved under a style the works no longer sells keeps it,
+                  and keeps it visible. Dropping it from the list would make the
+                  box read empty and the next save would silently restyle a
+                  quotation somebody already sent.
+                */}
+                {pouchType && !POUCH_TYPES_OFFERED.includes(pouchType) ? (
+                  <option value={pouchType}>{POUCH_TYPE_LABELS[pouchType]} (retired)</option>
+                ) : null}
               </Select>
             </Field>
           </div>
@@ -2106,6 +2168,40 @@ function JobCard({
                 />
                 <span className="text-ink-800 text-sm font-medium">Gazette pouch</span>
               </label>
+
+              {/*
+                Finishing, not style.
+                
+                D punch used to be an entry in the style list, which made the
+                office choose between "D punch" and "Standup" for a pouch that
+                is plainly both. The punch is charged — at the works' own rate,
+                which replaces the ordinary making charge. The notch is recorded
+                and not charged, because the works has no rate for one.
+              */}
+              <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+                {(
+                  [
+                    ['hasDPunch', 'D punch', 'Charged at the works’ punch rate'],
+                    ['hasVNotch', 'V notch', 'Recorded only — no charge'],
+                  ] as const
+                ).map(([field, label, hint]) => (
+                  <label key={field} className="flex cursor-pointer items-center gap-2.5">
+                    <input
+                      type="checkbox"
+                      className="accent-brand-600 size-4 cursor-pointer"
+                      checked={item?.[field] === true}
+                      onChange={(event) =>
+                        setValue(`items.${index}.${field}`, event.target.checked, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        })
+                      }
+                    />
+                    <span className="text-ink-800 text-sm font-medium">{label}</span>
+                    <span className="text-ink-400 text-xs">{hint}</span>
+                  </label>
+                ))}
+              </div>
 
               {item?.isGazette ? (
                 <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-12">

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { partialWithoutDefaults } from './partial-update.js';
 import {
+  ENQUIRY_CHANNELS,
   INK_KINDS,
   JOB_KINDS,
   POUCH_TYPES,
@@ -133,6 +134,16 @@ export const quotationItemSchema = z
      * cylinder — see `computeItemGeometry`.
      */
     isGazette: z.boolean().default(false),
+    /**
+     * Finishing, not style.
+     *
+     * A punched handle or a tear notch can be asked for on any pouch, which is
+     * why they are ticks and not entries in the style list. The punch is
+     * charged at the works' own rate; the notch is recorded and not charged,
+     * because the works has no rate for one.
+     */
+    hasDPunch: z.boolean().default(false),
+    hasVNotch: z.boolean().default(false),
     gazetteBottom: zeroOrMore('Bottom gazette').default(0),
     gazetteLeft: zeroOrMore('Left gazette').default(0),
     gazetteRight: zeroOrMore('Right gazette').default(0),
@@ -195,6 +206,8 @@ export const quotationItemSchema = z
             pouchType: null,
             pouchTypeNote: '',
             isGazette: false,
+            hasDPunch: false,
+            hasVNotch: false,
             gazetteBottom: 0,
             gazetteLeft: 0,
             gazetteRight: 0,
@@ -295,15 +308,6 @@ const createQuotationBaseSchema = z.object({
    */
   saveAsCustomer: z.boolean().default(false),
   /**
-   * The customer's brand, as the office has it on this screen.
-   *
-   * Carried on the quotation input but not stored on the quotation: a brand
-   * belongs to the customer, and holding a second copy here would let the two
-   * disagree the moment either was edited. It is used to fill the brand in when
-   * a new company is created, and to correct it on an existing one.
-   */
-  brandName: z.string().trim().max(200).default(''),
-  /**
    * Who sent this enquiry the works' way.
    *
    * Business arrives through people, and the works wants that on the record.
@@ -314,6 +318,20 @@ const createQuotationBaseSchema = z.object({
    * around data nobody has yet.
    */
   referredBy: z.string().trim().max(200).default(''),
+
+  /**
+   * Who asked, and how they got in touch.
+   *
+   * Beside `referredBy` rather than instead of it: the person who enquired and
+   * the person who sent them are often not the same, and the office wants both.
+   *
+   * The channel is nullable and has no default. Every quotation written before
+   * the question was asked has no answer, and defaulting one — to Phone, say —
+   * would put a figure in next year's "where does the work come from" that
+   * nobody ever typed.
+   */
+  enquiryFrom: z.string().trim().max(200).default(''),
+  generatedThrough: z.enum(ENQUIRY_CHANNELS).nullable().default(null),
   /* "Required" is untrue once a single character has been typed, which is what
    * this rule actually rejects — so the message says what to do instead. */
   customerName: z.string().trim().min(2, 'Enter the company name').max(200),
