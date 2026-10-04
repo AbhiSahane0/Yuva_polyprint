@@ -22,6 +22,7 @@ import {
 import {
   ENQUIRY_CHANNEL_LABELS,
   ENQUIRY_CHANNELS,
+  type QuotationCylinderRepair,
   needsWhiteBase,
   WHITE_BASE_NAME,
   type CreateQuotationFormValues,
@@ -120,6 +121,7 @@ import {
   type CostingMasters,
 } from '../components/CostingOverrides';
 import { LayerFields } from '../components/LayerFields';
+import { CylinderRepair } from '../components/CylinderRepair';
 import { QuantityFields, type QuantityResult } from '../components/QuantityFields';
 import { StepIndicator, type Step } from '../components/StepIndicator';
 
@@ -199,6 +201,8 @@ const BLANK_DESIGN = {
   repeatWidth: 1,
   repeatHeight: 1,
   cylinderCount: 4,
+  repairCylinders: false,
+  repairs: [] as QuotationCylinderRepair[],
   /* Seeded with the four process colours once the rates list has loaded —
      see `JobCard`. Empty here because this constant cannot know them. */
   colours: [] as JobColour[],
@@ -608,6 +612,8 @@ export default function QuotationFormPage() {
         cylinderCount: item.cylinderCount,
         transportCost: item.transportCost,
         chargeCylinders: item.chargeCylinders,
+        repairCylinders: item.repairCylinders,
+        repairs: item.repairs,
       })) as CreateQuotationFormValues['items'],
     });
     /*
@@ -732,6 +738,9 @@ export default function QuotationFormPage() {
           cylinderCount: num(item?.cylinderCount),
           transportCost: num(item?.transportCost),
           chargeCylinders: item?.chargeCylinders !== false,
+          /* Charged whether or not a new set is, so the panel's total is on the
+             cylinder line while the office is still typing it. */
+          repairs: item?.repairCylinders ? ((item?.repairs ?? []) as { cost: number }[]) : [],
           /* The engraver's mounting margin, from the Costing screen. */
           mountingMm: settings?.cylinderMountingMm,
         },
@@ -1175,7 +1184,10 @@ export default function QuotationFormPage() {
                 ))}
               </div>
 
-              <div className="sm:col-span-7">
+              {/* Four of twelve. A company name is a line of text, not a
+                  paragraph, and at seven columns the box ran most of the way
+                  across the step with nothing in it. */}
+              <div className="sm:col-span-4">
                 {customerMode === 'existing' ? (
                   <>
                     <Field
@@ -1404,6 +1416,7 @@ export default function QuotationFormPage() {
                 customerName={watched.customerName ?? ''}
                 quotationNumber={existing?.number ?? null}
                 jobs={chosenCustomer?.jobs ?? []}
+                knownCustomer={customerMode === 'existing' && Boolean(customerId)}
                 item={watched.items?.[index] as Partial<ItemValues> | undefined}
                 cost={costed[index]}
                 errors={formState.errors.items?.[index] as JobErrors | undefined}
@@ -1570,6 +1583,7 @@ function JobCard({
   customerName,
   quotationNumber,
   jobs,
+  knownCustomer,
   item,
   cost,
   errors,
@@ -1598,6 +1612,13 @@ function JobCard({
   quotationNumber: number | null;
   /** The chosen customer's saved jobs. Empty for a new company. */
   jobs: CustomerJob[];
+  /**
+   * Whether the works already has this customer.
+   *
+   * A known customer's cylinders are already in the works, so the panel that
+   * asks how many to cut is replaced by the one that asks which to put right.
+   */
+  knownCustomer: boolean;
   item: Partial<ItemValues> | undefined;
   cost: ItemCosting | undefined;
   errors: JobErrors | undefined;
@@ -2102,9 +2123,18 @@ function JobCard({
                 invalid={Boolean(errors?.pouchType)}
                 onChange={(event) => {
                   const next = (event.target.value || null) as PouchType | null;
+                  /*
+                   * Validated only once it has been answered.
+                   *
+                   * `shouldValidate` on an empty box marks the field in error
+                   * the instant the step opens — before anybody has been asked
+                   * anything. The style is still required and the submit still
+                   * refuses without one; this only stops the form telling the
+                   * office off for not having answered yet.
+                   */
                   setValue(`items.${index}.pouchType`, next as ItemValues['pouchType'], {
                     shouldDirty: true,
-                    shouldValidate: true,
+                    shouldValidate: next !== null,
                   });
                 }}
               >
@@ -2292,7 +2322,29 @@ function JobCard({
           a dashed box above the costing — true, and one more line between the
           office and the price.
         */}
-        {fromSavedJob ? null : (
+        {/*
+          A customer the works already has is a customer whose cylinders it
+          already holds, so there is nothing to charge for cutting them — and
+          the panel that asks how many to cut is replaced by the one that asks
+          which to put right.
+        */}
+        {knownCustomer ? (
+          <div className="col-span-2 sm:col-span-12">
+            <CylinderRepair
+              jobId={(item?.jobId as string | null) ?? null}
+              on={item?.repairCylinders === true}
+              repairs={(item?.repairs ?? []) as QuotationCylinderRepair[]}
+              onToggle={(on) =>
+                setValue(`items.${index}.repairCylinders`, on, { shouldDirty: true })
+              }
+              onChange={(next) =>
+                setValue(`items.${index}.repairs`, next as never, { shouldDirty: true })
+              }
+            />
+          </div>
+        ) : null}
+
+        {fromSavedJob || knownCustomer ? null : (
           <div className="col-span-2 sm:col-span-12">
             <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">

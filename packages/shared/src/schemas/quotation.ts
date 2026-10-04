@@ -70,6 +70,24 @@ export const quotationLayerSchema = z.object({
 });
 
 /** One quantity a line is priced at. */
+/**
+ * One cylinder being re-engraved, and what it costs.
+ *
+ * The cost is typed every time: the master records what a cylinder cost to
+ * ENGRAVE, which is not what it costs to put right. The code and colour are
+ * snapshotted beside the link so the quotation still reads after the cylinder
+ * has been re-engraved, renumbered or scrapped.
+ */
+export const cylinderRepairSchema = z.object({
+  cylinderId: z.string().min(1).nullable().default(null),
+  code: z.string().trim().min(1, 'Which cylinder?').max(60),
+  colour: z.string().trim().max(60).default('NA'),
+  cost: z.coerce
+    .number({ message: 'Enter what the repair costs' })
+    .min(0, 'Cannot be negative')
+    .max(1_000_000, 'That looks wrong — check it'),
+});
+
 export const quotationQuantitySchema = z.object({
   quantityKg: zeroOrMore('Quantity').default(0),
   ratePerKg: zeroOrMore('Rate').default(0),
@@ -186,6 +204,17 @@ export const quotationItemSchema = z
      * needs a new set engraved.
      */
     chargeCylinders: z.boolean().default(true),
+
+    /**
+     * A repeat order that needs one of the existing set put right.
+     *
+     * Separate from `chargeCylinders`, and the two are not opposites: a line
+     * may charge for a new set, or quote a repair, or neither. The repair is
+     * charged in the cylinder bucket, so it is advance-billed the way an
+     * engraving already is.
+     */
+    repairCylinders: z.boolean().default(false),
+    repairs: z.array(cylinderRepairSchema).max(12, 'A set is at most twelve cylinders').default([]),
   })
   /*
    * A roll has no pouch style. Rather than reject the combination — which would
@@ -224,13 +253,17 @@ export const quotationItemSchema = z
       ? rolled
       : { ...rolled, gazetteBottom: 0, gazetteLeft: 0, gazetteRight: 0 };
 
+    /* Untick the box and the rows go with it, rather than lying in wait to be
+       charged the next time somebody ticks it. */
+    const repaired = line.repairCylinders ? line : { ...line, repairs: [] };
+
     /*
      * A roll is film on a reel: there are no pouches to count, so the choice is
      * not offered and cannot be smuggled in through the API either. Everything
      * else takes what the office chose, falling back to the trade convention.
      */
     return {
-      ...line,
+      ...repaired,
       pricingBasis:
         line.jobKind === 'ROLL'
           ? ('PER_KG' as const)

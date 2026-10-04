@@ -59,6 +59,7 @@ const QUOTATION_INCLUDE = {
       layers: { orderBy: { position: 'asc' } },
       colours: { orderBy: { position: 'asc' } },
       quantities: { orderBy: { position: 'asc' } },
+      repairs: { orderBy: { position: 'asc' } },
     },
   },
 } as const;
@@ -172,6 +173,14 @@ function toItem(row: ItemRow): QuotationItem {
     cylinderCount: row.cylinderCount,
     transportCost: toNumber(row.transportCost),
     chargeCylinders: row.chargeCylinders,
+    repairCylinders: row.repairCylinders,
+    repairs: byPosition(row.repairs ?? []).map((repair) => ({
+      cylinderId: repair.cylinderId,
+      position: repair.position,
+      code: repair.code,
+      colour: repair.colour,
+      cost: toNumber(repair.cost),
+    })),
     micron: toNumber(row.micron),
     pouchesPerKg: toNumber(row.pouchesPerKg),
     cylinderWidth: toNumber(row.cylinderWidth),
@@ -409,6 +418,8 @@ function priceQuotation(
         cylinderCount: item.cylinderCount,
         transportCost: item.transportCost,
         chargeCylinders: item.chargeCylinders,
+        /* Charged whether or not a new set is — see `computeItemGeometry`. */
+        repairs: item.repairCylinders ? item.repairs : [],
         /* The engraver's mounting margin, from the Costing screen. */
         mountingMm: costing.settings.cylinderMountingMm,
       },
@@ -770,6 +781,18 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
               cylinderCount: entry.input.cylinderCount,
               transportCost: entry.input.transportCost,
               chargeCylinders: entry.input.chargeCylinders,
+              repairCylinders: entry.input.repairCylinders,
+              repairs: {
+                create: (entry.input.repairCylinders ? entry.input.repairs : []).map(
+                  (repair, position) => ({
+                    cylinderId: repair.cylinderId,
+                    position: position + 1,
+                    code: repair.code,
+                    colour: repair.colour,
+                    cost: repair.cost,
+                  }),
+                ),
+              },
               // micron, pouchesPerKg and the four cylinder figures.
               ...entry.geometry,
               materialCostPerKg: entry.material.costPerKg,
@@ -1010,6 +1033,13 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
       cylinderCount: item.cylinderCount,
       transportCost: toNumber(item.transportCost),
       chargeCylinders: item.chargeCylinders,
+      repairCylinders: item.repairCylinders,
+      repairs: byPosition(item.repairs).map((repair) => ({
+        cylinderId: repair.cylinderId,
+        code: repair.code,
+        colour: repair.colour,
+        cost: toNumber(repair.cost),
+      })),
     }));
 
   const costing = await loadCostingContext(input.date ?? toISODate(existing.date));
@@ -1097,6 +1127,18 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
           cylinderCount: entry.input.cylinderCount,
           transportCost: entry.input.transportCost,
           chargeCylinders: entry.input.chargeCylinders,
+          repairCylinders: entry.input.repairCylinders,
+          repairs: {
+            create: (entry.input.repairCylinders ? entry.input.repairs : []).map(
+              (repair, position) => ({
+                cylinderId: repair.cylinderId,
+                position: position + 1,
+                code: repair.code,
+                colour: repair.colour,
+                cost: repair.cost,
+              }),
+            ),
+          },
           ...entry.geometry,
           materialCostPerKg: entry.material.costPerKg,
           compositeGsm: entry.material.compositeGsm,
@@ -1282,6 +1324,16 @@ export async function createQuotationVersion(id: string): Promise<Quotation> {
               cylinderCount: item.cylinderCount,
               transportCost: item.transportCost,
               chargeCylinders: item.chargeCylinders,
+              repairCylinders: item.repairCylinders,
+              repairs: {
+                create: byPosition(item.repairs).map((repair) => ({
+                  cylinderId: repair.cylinderId,
+                  position: repair.position,
+                  code: repair.code,
+                  colour: repair.colour,
+                  cost: repair.cost,
+                })),
+              },
               micron: item.micron,
               pouchesPerKg: item.pouchesPerKg,
               cylinderWidth: item.cylinderWidth,

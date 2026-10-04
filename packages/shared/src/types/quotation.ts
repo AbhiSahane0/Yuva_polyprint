@@ -7,6 +7,22 @@ import type {
 } from '../constants/job.js';
 import type { QuotationStatus } from '../schemas/quotation.js';
 
+/**
+ * One cylinder being re-engraved on a repeat order.
+ *
+ * Snapshotted like everything else on a quotation: the code and the colour
+ * travel with the document, so it still reads after the cylinder has been
+ * re-engraved, renumbered or scrapped, and the link goes null rather than
+ * taking the quotation with it.
+ */
+export interface QuotationCylinderRepair {
+  cylinderId: string | null;
+  position: number;
+  code: string;
+  colour: string;
+  cost: number;
+}
+
 /** One ink a line prints, as it was priced the day the quotation was written. */
 export interface QuotationItemColour {
   id: string;
@@ -78,6 +94,9 @@ export interface QuotationItem {
   /** Finishing, not style — see the schema. The punch is charged; the notch is not. */
   hasDPunch: boolean;
   hasVNotch: boolean;
+  /** A repeat order quoting one of its existing cylinders put right. */
+  repairCylinders: boolean;
+  repairs: QuotationCylinderRepair[];
   /** The flat film one pouch is cut from: the pouch plus its gussets. */
   filmWidthMm: number;
   filmHeightMm: number;

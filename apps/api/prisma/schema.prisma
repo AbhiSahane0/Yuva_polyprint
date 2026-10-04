@@ -488,6 +488,12 @@ model QuotationItem {
   /// say so — "each job/design requires a separate cylinder".
   chargeCylinders Boolean @default(true) @map("charge_cylinders")
 
+  /// A repeat order sometimes needs a cylinder re-engraved rather than a new
+  /// set cut. Ticked on the line, with the cylinders and what each costs below
+  /// — the repair is charged in the cylinder bucket, so it is advance-billed
+  /// the way an engraving already is.
+  repairCylinders Boolean @default(false) @map("repair_cylinders")
+
   // ---- Computed geometry, the same at every quantity ----------------------
   micron                Decimal @db.Decimal(10, 2)
   pouchesPerKg          Decimal @map("pouches_per_kg") @db.Decimal(12, 2)
@@ -505,6 +511,7 @@ model QuotationItem {
   layers     QuotationItemLayer[]
   colours    QuotationItemColour[]
   quantities QuotationItemQuantity[]
+  repairs    QuotationItemCylinderRepair[]
 
   createdAt DateTime @default(now()) @map("created_at")
   /// The order this line became, if the quotation was won.
@@ -1391,6 +1398,8 @@ model Cylinder {
   notes String @default("")
 
   events CylinderEvent[]
+  /// Quotation lines that quoted a repair of this cylinder.
+  repairs QuotationItemCylinderRepair[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -2773,4 +2782,37 @@ model MaintenanceRecord {
   /// Finding what is down right now, which every screen asks.
   @@index([endedAt])
   @@map("maintenance_records")
+}
+
+/// One cylinder being re-engraved on a repeat order, and what it costs.
+///
+/// Snapshotted the way every other figure on a quotation is: the code and the
+/// colour travel with the document, so it still reads after the cylinder has
+/// been re-engraved, renumbered or scrapped. `cylinderId` is the link where the
+/// cylinder is still on record and goes null if it is removed — a quotation
+/// does not stop being true because the works threw a cylinder away.
+model QuotationItemCylinderRepair {
+  id String @id @default(cuid())
+
+  itemId String        @map("item_id")
+  item   QuotationItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  cylinderId String?   @map("cylinder_id")
+  cylinder   Cylinder? @relation(fields: [cylinderId], references: [id], onDelete: SetNull)
+
+  /// The order they are listed in, which is the order of the set.
+  position Int
+
+  code   String
+  colour String @default("NA")
+
+  /// Typed on the line, every time. The master records what a cylinder cost to
+  /// ENGRAVE, which is not what it costs to put right.
+  cost Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([itemId])
+  @@index([cylinderId])
+  @@map("quotation_item_cylinder_repairs")
 }
