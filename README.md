@@ -3,18 +3,26 @@
 Flexible packaging manufacturing ERP: quotation → order → planning → multi-stage
 production → quality/waste → costing → dispatch, with full job-level traceability.
 
-> **Status: in use, and being built out module by module.** Quoting, costing,
-> rates, stock, buying, the cylinder register, job sheets, orders and the
-> production floor are
-> implemented and verified against the works' own paperwork — seven of their
-> 2022 quotations reproduce to the paisa, and all fourteen tabs of their
-> September job-sheet workbook cost exactly. Planning, production, quality,
-> dispatch and reporting are not built yet; they are added one at a time as each
-> is confirmed in scope.
+> **Status: the whole chain is built, and in use.** Quotation → order →
+> planning → the floor, stage by stage → quality and waste → the job sheet that
+> says what the run actually cost → dispatch. Verified against the works' own
+> paperwork rather than against itself: seven of their 2022 quotations reproduce
+> **to the paisa**, all fourteen tabs of their September job-sheet workbook cost
+> exactly, and a standing audit runs 74 invariant checks against the live
+> database.
 >
-> | Built                                                                                                                                                                                       | Not yet                                                                                                            |
-> | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-> | Customers · **Quotations** · **Orders** · **Production** · **Employees** · Rates · Costing · Inventory · Purchase · Design & cylinders · Artwork · **Job sheets** · Users · Sign-in monitor | Planning · Product master · Quality & waste · Machines · Warehouse · Dispatch · Reports · Overview · Operator view |
+> | Built                                                                                                                                                                                                                                                     | Deliberately not    |
+> | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+> | Overview · Customers · Designs · **Quotations** · **Orders** · **Dispatch** · Inventory · Purchase · Rates · Costing · **Planning** · **Production** · Design & cylinders · Artwork · **Job sheets** · **Quality & waste** · Machines · Employees · Users | Warehouse · Reports |
+>
+> The machine screen the floor works from is at `/floor` and is bookmarked on a
+> tablet rather than put in the sidebar. **Warehouse** was turned down —
+> Inventory is the one source of truth for stock, and where a thing sits is
+> already on the batch. **Reports** is out of scope until the operational
+> screens have a year behind them; the Overview answers the daily question in
+> the meantime. Both are argued out in
+> [`docs/flow.md`](./docs/flow.md#deliberately-not-built) so they are not
+> re-proposed every six months.
 
 ---
 
@@ -822,8 +830,10 @@ Five rules worth repeating here:
   prices an unnamed "special colour" at the dearest ink having all three of
   laydown, solids and a rate — Magenta at Rs 235. Give Gold a laydown and every
   quotation raised afterwards prices its special colours at Rs 510, more than
-  double, with nobody having chosen it. LDPE carries no density for the same
-  reason and cannot yet be used as a quotation ply.
+  double, with nobody having chosen it. **PP Film and Nylon carry no density**
+  for the same reason: a ply with no density cannot be turned into a weight, so
+  a job using either is estimated on the micron proxy rather than calculated.
+  LDPE has both a density and a rate and is quoted daily.
 - **None of the three new quotation designs is wired to the Download PDF
   button.** Folio, Dossier and Statement render from real data through
   `preview:quotations`; the button still sends the original document until the

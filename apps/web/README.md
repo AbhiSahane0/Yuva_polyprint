@@ -193,23 +193,19 @@ PET + Poly + Adhesive") and Pouches per kg ("From design size and composite
 GSM"). The two calculated ones update live as you type. The server recomputes
 on save regardless; the live figure is feedback, not the source of truth.
 
-#### Company and brand
+#### Company
 
-Two names, because customers genuinely have two. **Company** is who they are
-registered as and what belongs on an invoice; **Brand** is what they sell under
-and what the office actually calls them — a proprietorship registers as a person
-and trades as a brand.
+One name. There used to be two — **Brand** sat beside **Company**, on the
+theory that a proprietorship registers as a person and trades under something
+else — and the works filled it in for two customers out of seventy. It was
+printed on the quotation beside the company name, which made the document look
+wrong more often than right, so it was removed in October 2026, column
+included. The two values that existed are recorded in that migration's comment
+if the works ever wants them back.
 
-The table shows **Brand** where Contact used to be. A contact person was
-recorded for almost none of the imported customers; it is still stored and still
-editable on the form, it simply no longer earns a column.
-
-Searching matches on **both names**, so typing a brand finds the company
-registered behind it. That is the point — an enquiry arrives naming the brand.
-
-Brand starts empty on every customer; the office fills them in as they go. The
-quotation wizard shows it under the company once one is chosen, so you can
-confirm you picked the firm behind the brand you were asked about.
+A contact person is still stored and still editable on the form; it simply does
+not earn a column, having been recorded for almost none of the imported
+customers.
 
 #### GST number
 
@@ -596,10 +592,11 @@ is for somebody else, and leaving a half-filled form behind is how a chosen
 customer's address ends up saved onto a firm it belongs to no part of. Only the
 name used to be cleared, and only in one direction.
 
-**Brand** sits beside the company on both paths. For an existing customer it
-arrives from their record; for a new company it is typed, and set when the
-record is created. Searching matches company name **and** brand, so an enquiry
-naming a brand finds the firm behind it.
+**Enquiry from** and **Generated through** sit beside the company: who asked,
+and how they got in touch — mail, WhatsApp, phone, SMS. The channel has no
+default and starts at "not recorded", because every quotation written before
+the question was asked genuinely has no answer and defaulting one would put a
+figure in next year's "where does our work come from" that nobody typed.
 
 **Referred by** sits beside the date. Business arrives through people and the
 works wants that on the record — but it is **recorded and nothing else**: not
