@@ -13,6 +13,8 @@ import {
   type CostingInput,
   type CustomOverhead,
 } from './rate-costing.js';
+import { pouchExpense, pouchMakingInForce } from './pouch-making.js';
+import { round } from './quotation-math.js';
 
 /**
  * Checked against the works' own workbook — "3. Anupriya.xlsx", 5 kg atta
@@ -1169,5 +1171,118 @@ describe('the settings that are not charges', () => {
     // third option and no way to delete one.
     expect(costRate(withAdhesive('FLAT_GSM', null))!.adhesiveCost).toBeGreaterThan(0);
     expect(costRate(withAdhesive('BATCH', null))!.adhesiveCost).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * **Reading the costing must not change it.**
+ *
+ * The quotation form folds its four costing figures away behind a checkbox,
+ * and ticking it fills the boxes in with "the works' own figures" so that the
+ * office reads a number rather than a greyed placeholder. Those boxes are
+ * OVERRIDES. So the figure written into one has to be, to the paisa, what the
+ * line was already being costed at — otherwise ticking a box to look at the
+ * costing moves the cost, the suggested rate follows it, and a quotation
+ * somebody agreed months ago reprices itself because it was opened.
+ *
+ * It did. The form kept its own copy of the making rule, written before the
+ * works moved to per-kilogram bands, so it offered the per-pouch figure while
+ * the engine charged the band — and a Rs 335 line re-rated to Rs 365.02 on a
+ * tick. The rule now has one definition, `pouchMakingInForce`, which both
+ * sides call; this pins the property that made the duplicate dangerous.
+ */
+describe('the making figure the form offers is the one in force', () => {
+  const BANDS = { plainPerKg: 20, gussetPerKg: 25, gussetHandlePerKg: 30 };
+
+  /** The fixture charges making through an override; these cases must not. */
+  const noOverride = (over: Partial<typeof JOB> = {}): CostingInput => ({
+    ...input(),
+    job: { ...JOB, ...over },
+    overheads: {
+      ...MASTER.overheads,
+      pouchMakingPerKgOverride: null,
+      pouchMakingBands: BANDS,
+    },
+  });
+
+  /*
+   * What the works charges, asserted as the figures the client wrote out
+   * rather than re-derived — this is the half the round-trip below cannot
+   * prove, since both sides now call the same function and would agree with
+   * each other even while agreeing on the wrong number.
+   */
+  const cases: [string, Partial<typeof JOB>, number | null][] = [
+    ['a plain pouch', {}, 20],
+    ['a gusseted one', { isGazette: true }, 25],
+    ['one with a handle', { isGazette: true, hasDPunch: true }, 30],
+    ['a punch with no gusset', { hasDPunch: true }, 25],
+    /* The band says nothing about the zipper, which is still charged by the
+       metre on top — so this is the case where it is not a round 20. Checked
+       against piecesPerKg below rather than as a literal, the pouch count
+       being the fixture's business and not this rule's. */
+    ['a zippered one', { pouchType: 'STANDUP_ZIPPER' as const, pouchWidthMm: 130 }, null],
+  ];
+
+  for (const [what, over, band] of cases) {
+    it(`charges ${what} at the works' band`, () => {
+      const open = costRate(noOverride(over))!;
+      /* 130 mm of zipper at Rs 3.60 the metre, on top of the plain band. */
+      const expected = band ?? round(20 + 0.468 * open.piecesPerKg, 4);
+      expect(open.pouchMakingPerKg).toBe(expected);
+    });
+
+    it(`costs ${what} the same whether or not the figure is written back`, () => {
+      const open = costRate(noOverride(over))!;
+
+      const offered = pouchMakingInForce(
+        { isGazette: over.isGazette, hasDPunch: over.hasDPunch },
+        pouchExpense(
+          over.pouchType ?? null,
+          over.pouchWidthMm ?? JOB.filmWidthMm,
+          MASTER.overheads.pouchMaking,
+          over.hasDPunch ?? false,
+        ),
+        BANDS,
+        open.piecesPerKg,
+      );
+
+      const ticked = costRate({
+        ...noOverride(over),
+        overheads: {
+          ...MASTER.overheads,
+          pouchMakingBands: BANDS,
+          pouchMakingPerKgOverride: offered,
+        },
+      })!;
+
+      /* Not "close to": the rate on the document is the rate on the document. */
+      expect(ticked.pouchMakingPerKg).toBe(open.pouchMakingPerKg);
+      expect(ticked.ratePerKg).toBe(open.ratePerKg);
+    });
+  }
+
+  it('offers the per-pouch figure where the works has set no bands', () => {
+    /* A quotation dated before October 2026 is costed the old way, and the
+       box has to offer the old figure or it would reprice history. */
+    /* A style, because the per-pouch rule is read off one — without it the
+       works charges nothing for making and there is nothing to compare. */
+    const job = { ...JOB, pouchType: 'CENTRE_SEAL' as const };
+    const open = costRate({
+      ...input(),
+      job,
+      overheads: { ...MASTER.overheads, pouchMakingPerKgOverride: null },
+    })!;
+
+    const offered = pouchMakingInForce(
+      {},
+      pouchExpense(job.pouchType, JOB.filmWidthMm, MASTER.overheads.pouchMaking),
+      null,
+      open.piecesPerKg,
+    );
+
+    /* Rs 0.25 to form, seal and cut one, which is what it was before the
+       bands — a quotation dated before October 2026 must still read it. */
+    expect(open.pouchMakingPerKg).toBe(round(0.25 * open.piecesPerKg, 4));
+    expect(offered).toBe(open.pouchMakingPerKg);
   });
 });

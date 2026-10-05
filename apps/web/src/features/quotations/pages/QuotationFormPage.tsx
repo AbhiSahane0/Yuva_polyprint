@@ -52,7 +52,9 @@ import {
   computeMargin,
   computeMaterialCostPerKg,
   plyRatePerKg,
+  defaultMarginFor,
   pouchExpense,
+  pouchMakingInForce,
   resolveSelectedQuantity,
   round,
   suggestRepeatHeight,
@@ -110,6 +112,7 @@ import { QuotationPreview } from '../components/QuotationPreview';
 import { SendQuotationModal } from '../components/SendQuotationModal';
 import { CostingBreakdownModal } from '@/features/costing/components/CostingBreakdownModal';
 import {
+  MIN_COSTABLE_KG,
   useRateCosting,
   type RateCostingLine,
   type RateCostingOverrides,
@@ -769,12 +772,24 @@ export default function QuotationFormPage() {
   /*
    * What the works would charge for making, per kilogram, on this quotation.
    *
-   * There is no such figure on the Costing screen and there cannot be: making
-   * is charged **per pouch**, and the same charge reads between Rs 11 and Rs 64
-   * a kilogram across the works' own nine costed pouches, on nothing but how
-   * big the pouch is. So it is worked out here, from the style and the size the
-   * office has actually typed — `perPouch × pouchesPerKg`, which is precisely
-   * what the rate carries.
+   * There is no such figure on the Costing screen and there cannot be. Making
+   * is charged two ways and neither lands on a single number: the works' three
+   * bands are per kilogram but are chosen by the two ticks on the line, and the
+   * older per-pouch rate reads between Rs 11 and Rs 64 a kilogram across the
+   * works' own nine costed pouches, on nothing but how big the pouch is. So it
+   * is worked out here from the style, the ticks and the size.
+   *
+   * **It must equal to the paisa what the engine charges when nothing is
+   * overridden**, and that is not a tidiness point — it is the whole safety of
+   * the fold. Opening the section writes this figure into the box, which makes
+   * it an override; if it differs by so much as a hundredth from what the line
+   * was already costed at, the cost moves, the suggested rate moves with it,
+   * and a saved quotation is silently repriced by somebody who only wanted to
+   * look. It did: a Rs 335 line re-rated itself to Rs 365.02 on a tick.
+   *
+   * So the rule below is `rate-costing.ts`'s own, in the same order and at the
+   * same four places — band if the works has set one, with the zipper by the
+   * metre on top of it, and the per-pouch rate otherwise.
    *
    * Null where no single figure applies: before a job has a size to derive one
    * from, on a document whose jobs disagree, and on one that makes no pouches
@@ -789,20 +804,33 @@ export default function QuotationFormPage() {
       dPunchLargeAboveMm: settings.dPunchLargeAboveMm,
       zipperRatePerMetre: settings.zipperRatePerMetre,
     };
+    const bands = {
+      plainPerKg: settings.pouchMakingPlainPerKg,
+      gussetPerKg: settings.pouchMakingGussetPerKg,
+      gussetHandlePerKg: settings.pouchMakingGussetHandlePerKg,
+    };
 
     const figures: number[] = [];
     for (const [index, item] of (watched.items ?? []).entries()) {
       if ((item?.jobKind ?? 'POUCH') === 'ROLL') continue;
 
-      const perPouch = pouchExpense(
+      /* The tick is part of what a pouch costs to make, so it is part of what
+         it costs to punch one too — the engine passes it and so must this. */
+      const hasDPunch = item?.hasDPunch === true;
+      const expense = pouchExpense(
         (item?.pouchType || null) as PouchType | null,
         num(item?.widthMm),
         rates,
-      ).perPouch;
+        hasDPunch,
+      );
       const pouchesPerKg = costed[index]?.geometry.pouchesPerKg ?? 0;
-      if (perPouch <= 0 || pouchesPerKg <= 0) return null;
+      if (pouchesPerKg <= 0) return null;
 
-      figures.push(Math.round(perPouch * pouchesPerKg * 100) / 100);
+      const line = { isGazette: item?.isGazette === true, hasDPunch };
+      const figure = pouchMakingInForce(line, expense, bands, pouchesPerKg);
+      if (figure <= 0) return null;
+
+      figures.push(figure);
     }
 
     if (figures.length === 0) return null;
@@ -810,13 +838,36 @@ export default function QuotationFormPage() {
   }, [watched.items, costed, settings]);
 
   /*
+   * The margin this document is actually being costed at, where it has one.
+   *
+   * The margin follows the VOLUME — 15% to 500 kg, 10% above — and is chosen
+   * per quantity, so a document priced at 250, 500 and 1,000 kg carries 15%,
+   * 15% and 10% and no single figure describes it. Null then, and the box says
+   * "by quantity" rather than offering one of the two.
+   *
+   * Quantities too small to cost do not vote: nothing is in force on a row the
+   * engine skips, and a blank box would otherwise claim the 15% band.
+   */
+  const marginMaster = useMemo(() => {
+    const figures = (watched.items ?? [])
+      .flatMap((item) => item?.quantities ?? [])
+      .map((quantity) => num(quantity?.quantityKg))
+      .filter((kg) => kg >= MIN_COSTABLE_KG)
+      .map((kg) => defaultMarginFor(kg));
+
+    if (figures.length === 0) return null;
+    return figures.every((figure) => figure === figures[0]) ? (figures[0] ?? null) : null;
+  }, [watched.items]);
+
+  /*
    * The works' own four, for the section that folds them away.
    *
    * Read for this quotation's date like everything else on the screen, so the
-   * figures it offers are the ones the server would price it at.
+   * figures it offers are the ones the server would price it at — and equal to
+   * them, which is what keeps opening the section from repricing the document.
    */
   const costingMasters: CostingMasters = {
-    marginPercent: settings?.defaultMarginPercent ?? 9,
+    marginPercent: marginMaster,
     transportPerKg: settings?.transportPerKg ?? 10,
     defaultWastagePercent: settings?.defaultWastagePercent ?? 8,
     pouchWastagePercent: settings?.pouchWastagePercent ?? 7,

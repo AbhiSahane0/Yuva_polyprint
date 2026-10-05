@@ -32,7 +32,21 @@ import { Field, NumberInput } from '@/components/ui/Field';
 
 /** What the works itself charges, from the Costing screen for this date. */
 export interface CostingMasters {
-  marginPercent: number;
+  /**
+   * The margin in force, where one figure covers the whole document.
+   *
+   * Not the Costing screen's figure: since the margin follows the volume —
+   * 15% to 500 kg, 10% above — the margin actually applied is chosen per
+   * QUANTITY, and a document priced at 250, 500 and 1,000 kg is costed at
+   * 15%, 15% and 10%. There is a single figure to offer only when every
+   * costable quantity on it falls the same side of the break.
+   *
+   * Null otherwise, and the box stays empty saying "by quantity" — the same
+   * shape as wastage, and for the same reason. Filling in 9% there, which is
+   * what this used to do, was not a display fault: the box is an override, so
+   * it took the margin off every tier of a document nobody meant to discount.
+   */
+  marginPercent: number | null;
   transportPerKg: number;
   defaultWastagePercent: number;
   pouchWastagePercent: number;
@@ -94,7 +108,7 @@ function mastersFor(
   pouchTypes: (PouchType | null | undefined)[],
 ): Record<CostingField, string> {
   return {
-    marginPercent: String(masters.marginPercent),
+    marginPercent: masters.marginPercent === null ? '' : String(masters.marginPercent),
     transportPerKg: String(masters.transportPerKg),
     pouchMakingPerKg: masters.pouchMakingPerKg === null ? '' : String(masters.pouchMakingPerKg),
     wastagePercent: wastageMaster(masters, pouchTypes),
@@ -230,10 +244,18 @@ export function CostingOverrides({
             Left as the works&rsquo; own figure, a box follows the Costing screen.
           </p>
           <div className="sm:col-span-4">
-            <Field label="Margin %" htmlFor="marginPercent">
+            {/*
+              Empty where the document straddles the 500 kg break, because
+              there is no one margin in force to show — see `CostingMasters`.
+            */}
+            <Field
+              label="Margin %"
+              htmlFor="marginPercent"
+              hint="Blank follows the volume: 15% to 500 kg, 10% above"
+            >
               <NumberInput
                 id="marginPercent"
-                placeholder={own.marginPercent}
+                placeholder={own.marginPercent === '' ? 'by quantity' : own.marginPercent}
                 {...register('marginPercent')}
               />
             </Field>

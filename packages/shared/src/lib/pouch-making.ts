@@ -268,3 +268,31 @@ export function pouchMakingPerKgFor(
   if (line.isGazette || line.hasDPunch) return at(bands.gussetPerKg);
   return at(bands.plainPerKg);
 }
+
+/**
+ * **What a kilogram of these pouches is charged at when nobody has overridden
+ * it** — band where the works has set one, per-pouch rate where it has not,
+ * and the zipper by the metre on top either way.
+ *
+ * This is the rule `costRate` applies, lifted out of it so that it has exactly
+ * one definition. The quotation form needs the same answer: its costing
+ * section fills the override box in with "the works' own figure", and an
+ * override is an override — if the figure it writes is not to the paisa what
+ * the line was already costed at, then merely opening that section moves the
+ * cost, the suggested rate follows, and a saved quotation reprices itself
+ * because somebody looked at it. It did exactly that, with a second copy of
+ * this rule that still read the per-pouch rate after the bands arrived.
+ *
+ * Two readings of the same thing cannot be kept in step by care. One can.
+ */
+export function pouchMakingInForce(
+  line: { isGazette?: boolean; hasDPunch?: boolean },
+  expense: PouchExpense,
+  bands: PouchMakingBands | null | undefined,
+  piecesPerKg: number,
+): number {
+  const banded = pouchMakingPerKgFor(line, bands);
+  return banded > 0
+    ? round(banded + expense.zipper * piecesPerKg, 4)
+    : round(expense.perPouch * piecesPerKg, 4);
+}

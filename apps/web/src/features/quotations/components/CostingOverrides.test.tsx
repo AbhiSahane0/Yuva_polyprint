@@ -163,6 +163,20 @@ describe('CostingOverrides', () => {
     expect(box('pouchMakingPerKg')?.value).toBe('20');
   });
 
+  /*
+   * The margin follows the VOLUME, so there is a single figure to offer only
+   * when every costable quantity falls the same side of the 500 kg break.
+   * Filling one in regardless is what repriced a saved quotation: the box is
+   * an override, so offering the Costing screen's 9% took the margin off every
+   * tier of a document the engine was costing at 15%.
+   */
+  it('leaves the margin empty when the document straddles the volume break', () => {
+    render(<Host masters={{ ...MASTERS, marginPercent: null }} />);
+    fireEvent.click(checkbox());
+    expect(box('marginPercent')?.value).toBe('');
+    expect(box('marginPercent')?.placeholder).toBe('by quantity');
+  });
+
   it('cannot offer a wastage when the jobs disagree about it', () => {
     // Which of the two applies is decided by the STYLE, job by job. A single
     // figure across a mixed document would be wrong for half of it.
@@ -239,6 +253,15 @@ describe('strippedCosting', () => {
     expect(strippedCosting({ pouchMakingPerKg: '9.80' }, MASTERS, [STANDUP]).pouchMakingPerKg).toBe(
       '9.80',
     );
+  });
+
+  it('keeps a margin the office set on a document that straddles the break', () => {
+    // No master figure to compare against, so nothing can be stripped as equal
+    // to it — which is right: they typed it because neither band would do.
+    expect(
+      strippedCosting({ marginPercent: '12' }, { ...MASTERS, marginPercent: null }, [STANDUP])
+        .marginPercent,
+    ).toBe('12');
   });
 
   it('keeps a wastage the office set on a document its jobs disagree about', () => {

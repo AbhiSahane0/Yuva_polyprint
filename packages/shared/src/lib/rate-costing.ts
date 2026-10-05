@@ -2,7 +2,7 @@ import type { PouchType } from '../constants/job.js';
 import {
   NO_POUCH_EXPENSE,
   pouchExpense,
-  pouchMakingPerKgFor,
+  pouchMakingInForce,
   type PouchExpense,
   type PouchMakingBands,
   type PouchMakingRates,
@@ -1248,18 +1248,19 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
    * metre rather than an operation, and the bands say nothing about it.
    */
   const override = overheads.pouchMakingPerKgOverride;
-  const bands = overheads.pouchMakingBands;
-  const banded = bands
-    ? pouchMakingPerKgFor({ isGazette: job.isGazette, hasDPunch: job.hasDPunch }, bands)
-    : 0;
 
   const pouchMakingPerKg = !job.makesPouches
     ? 0
     : override !== null && override !== undefined
       ? round(override, 4)
-      : banded > 0
-        ? round(banded + expense.zipper * piecesPerKg, 4)
-        : round(expense.perPouch * piecesPerKg, 4);
+      : /* Steps 2 and 3, which the quotation form must read the same way —
+           see `pouchMakingInForce`. */
+        pouchMakingInForce(
+          { isGazette: job.isGazette, hasDPunch: job.hasDPunch },
+          expense,
+          overheads.pouchMakingBands,
+          piecesPerKg,
+        );
 
   const ratePerKg = round(baseRatePerKg + stationSurchargePerKg + pouchMakingPerKg, 2);
   const ratePerPiece = piecesPerKg > 0 ? round(ratePerKg / piecesPerKg, 4) : 0;
