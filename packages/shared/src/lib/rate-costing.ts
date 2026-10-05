@@ -2,7 +2,9 @@ import type { PouchType } from '../constants/job.js';
 import {
   NO_POUCH_EXPENSE,
   pouchExpense,
+  pouchMakingPerKgFor,
   type PouchExpense,
+  type PouchMakingBands,
   type PouchMakingRates,
 } from './pouch-making.js';
 import { round } from './quotation-math.js';
@@ -231,6 +233,15 @@ export interface CostingOverheads {
    * became per pouch carry one of these and still price exactly as they did.
    */
   pouchMakingPerKgOverride?: number | null;
+
+  /**
+   * The works' three per-kilogram making bands.
+   *
+   * Absent on a works that has not set them, and on every quotation priced
+   * before they existed — both fall back to the per-pouch rate, so reopening an
+   * old document shows what it was sold at.
+   */
+  pouchMakingBands?: PouchMakingBands | null;
   /**
    * What each printing station beyond the fifth adds, per kilogram. The sheet
    * charges 5.5 for the sixth and 7.5 for the seventh.
@@ -442,6 +453,14 @@ export interface CostingJob {
    * — see `pouchExpense`, which explains why it replaces rather than adds.
    */
   hasDPunch?: boolean;
+
+  /**
+   * A gusseted pouch, as the line has it.
+   *
+   * Reaches the costing for one reason: it chooses the making band. The gusset
+   * depths themselves enlarge the film and are already in the weight.
+   */
+  isGazette?: boolean;
 
   /**
    * The style, which decides what making one costs: a zipper is charged across
@@ -1214,12 +1233,33 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
       )
     : NO_POUCH_EXPENSE;
 
+  /*
+   * **The making charge, by the kilogram.**
+   *
+   * Three sources, in order of who decided:
+   *
+   * 1. The office's own figure on the line, which replaces the whole charge.
+   * 2. The works' three bands — plain, gusset, gusset with handle — which is
+   *    how the works has priced making since October 2026.
+   * 3. The per-pouch rate, for anything priced before those bands existed and
+   *    for a works that has not set them.
+   *
+   * The ZIPPER is added on top of all three: it is a part bought in by the
+   * metre rather than an operation, and the bands say nothing about it.
+   */
   const override = overheads.pouchMakingPerKgOverride;
+  const bands = overheads.pouchMakingBands;
+  const banded = bands
+    ? pouchMakingPerKgFor({ isGazette: job.isGazette, hasDPunch: job.hasDPunch }, bands)
+    : 0;
+
   const pouchMakingPerKg = !job.makesPouches
     ? 0
     : override !== null && override !== undefined
       ? round(override, 4)
-      : round(expense.perPouch * piecesPerKg, 4);
+      : banded > 0
+        ? round(banded + expense.zipper * piecesPerKg, 4)
+        : round(expense.perPouch * piecesPerKg, 4);
 
   const ratePerKg = round(baseRatePerKg + stationSurchargePerKg + pouchMakingPerKg, 2);
   const ratePerPiece = piecesPerKg > 0 ? round(ratePerKg / piecesPerKg, 4) : 0;

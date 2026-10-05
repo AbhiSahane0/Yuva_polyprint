@@ -36,7 +36,7 @@ export const POUCH_TYPES = [
   'CENTRE_SEAL',
   'THREE_SIDE_SEAL',
   'THREE_SIDE_SEAL_ZIPPER',
-  'STANDUP_WITH_ZIPPER',
+  'STANDUP_NO_ZIPPER',
   'FLAT_BOTTOM',
   'OTHER',
 ] as const;
@@ -55,7 +55,7 @@ export const POUCH_TYPES_OFFERED: readonly PouchType[] = [
   'STANDUP_ZIPPER',
   'STANDUP',
   'THREE_SIDE_SEAL_ZIPPER',
-  'STANDUP_WITH_ZIPPER',
+  'STANDUP_NO_ZIPPER',
   'FLAT_BOTTOM',
 ];
 
@@ -73,7 +73,7 @@ export const POUCH_TYPE_LABELS: Record<PouchType, string> = {
   CENTRE_SEAL: 'Centre seal',
   THREE_SIDE_SEAL: 'Three side seal',
   THREE_SIDE_SEAL_ZIPPER: 'Three side seal zipper',
-  STANDUP_WITH_ZIPPER: 'Standup with zipper',
+  STANDUP_NO_ZIPPER: 'Standup without zipper',
   FLAT_BOTTOM: 'Flat bottom',
   OTHER: 'Other',
 };

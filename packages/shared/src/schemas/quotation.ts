@@ -595,6 +595,18 @@ export const settingsSchema = z.object({
    * pouch is.
    */
   pouchMakingPerPouch: z.coerce.number().min(0).max(1_000),
+  /**
+   * Pouch making by the KILOGRAM, in the three bands the works gave in
+   * October 2026 — see `pouchMakingPerKgFor` for which line falls in which.
+   *
+   * These supersede `pouchMakingPerPouch` for every pouch line. The per-pouch
+   * figure stays on the master because every quotation written before the
+   * change was priced from it, and reopening one of those has to show what it
+   * was sold at rather than what it would cost today.
+   */
+  pouchMakingPlainPerKg: z.coerce.number().min(0).max(10_000),
+  pouchMakingGussetPerKg: z.coerce.number().min(0).max(10_000),
+  pouchMakingGussetHandlePerKg: z.coerce.number().min(0).max(10_000),
   /** The zipper, by the metre, charged across the pouch's mouth. */
   zipperRatePerMetre: z.coerce.number().min(0).max(10_000),
   /** What a D punch costs to make — a flat charge instead of the making rate. */
@@ -777,6 +789,22 @@ export const DEFAULT_SETTINGS: AppSettings = {
    * workbook shows 3.80 on one of its two zipper sheets; 3.60 is the rate.
    */
   pouchMakingPerPouch: 0.25,
+  /*
+   * **Zero on purpose, and the real figures live in the history.**
+   *
+   * The works gave these in October 2026 — plain 20, gusset 25, gusset with
+   * handle 30 — and they are written as dated rows rather than as defaults
+   * here. A quotation from 2022 asks what the works held THEN, finds a band
+   * whose only change is dated after it, and falls back to this zero — which
+   * sends it down the per-pouch path it was actually priced on.
+   *
+   * A default of 20 would have repriced every historical document at today's
+   * figures the moment somebody opened one, which is the one thing the dated
+   * costing exists to prevent.
+   */
+  pouchMakingPlainPerKg: 0,
+  pouchMakingGussetPerKg: 0,
+  pouchMakingGussetHandlePerKg: 0,
   dPunchPerPouch: 0.6,
   dPunchLargePerPouch: 0.8,
   /*

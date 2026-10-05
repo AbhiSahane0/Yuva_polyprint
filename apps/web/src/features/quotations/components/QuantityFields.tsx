@@ -562,6 +562,13 @@ function PairedBox({
  * beside it in the stronger type, because it is the one that is true. Net
  * needs the whole costing, so it is absent — not zero — when the line cannot
  * yet be costed.
+ *
+ * **The words "gross" and "net" are no longer printed.** The client did not
+ * want them on a screen a customer might see over somebody's shoulder, and
+ * asked for the figures to stay. So the pair reads "34.9% · −3.1%", the second
+ * still in the stronger type and still coloured by how healthy it is, and each
+ * still says what it is in full when hovered. Nothing about the arithmetic
+ * changed, and the two are still in the same order.
  */
 function Margins({
   ratePerKg,
@@ -588,7 +595,7 @@ function Margins({
           2,
         )} of material) ÷ ${formatRs(ratePerKg, 2)}. Film, ink and adhesive only.`}
       >
-        {formatNumber(gross, 1)}% gross
+        {formatNumber(gross, 1)}%
       </span>
       <span className="text-ink-300">·</span>
       {both === null ? (
@@ -596,7 +603,7 @@ function Margins({
           className="text-ink-400"
           title="Net needs the full costing — choose a film for every ply, and a quantity of at least a kilogram."
         >
-          net &mdash;
+          &mdash;
         </span>
       ) : (
         <span
@@ -613,7 +620,7 @@ function Margins({
                 : 'text-success-600',
           )}
         >
-          {formatNumber(both.netPercent, 1)}% net
+          {formatNumber(both.netPercent, 1)}%
         </span>
       )}
     </span>

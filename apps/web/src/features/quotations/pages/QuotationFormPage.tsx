@@ -1796,8 +1796,12 @@ function JobCard({
        */
       colours,
       makesPouches: jobKind !== 'ROLL',
-      /* The style decides what making one costs, and the FINISHED width is what
-         a zipper crosses — the film width includes the side gussets. */
+      /* The two ticks choose the making band: plain, gusset, gusset with
+         handle. A roll is made into nothing and pays none of them. */
+      isGazette: jobKind !== 'ROLL' && item?.isGazette === true,
+      hasDPunch: jobKind !== 'ROLL' && item?.hasDPunch === true,
+      /* The style decides what the zipper costs, and the FINISHED width is what
+         it crosses — the film width includes the side gussets. */
       pouchType: jobKind === 'ROLL' ? null : pouchType,
       pouchWidthMm: num(item?.widthMm),
       quantitiesKg: (cost?.quantities ?? []).map((quantity) => quantity?.quantityKg ?? 0),

@@ -571,7 +571,19 @@ async function nextQuotationNumber(tx: Prisma.TransactionClient): Promise<number
 export function listOrderBy(
   query: ListQuotationsQuery,
 ): Prisma.QuotationOrderByWithRelationInput[] {
-  if (!query.sort) return [{ status: 'asc' }, { number: 'desc' }];
+  /*
+   * **Newest first, by the date on the document.**
+   *
+   * It used to lead on status — every draft, then every sent one, then the won
+   * and the lost — which put a quotation written this morning below eleven
+   * from last year because D sorts before S. The office opens this screen to
+   * find what they wrote today.
+   *
+   * The number breaks a tie because two quotations written on one day are
+   * ordered by which was raised second, and `id` after that so the page
+   * boundary is stable when even those collide.
+   */
+  if (!query.sort) return [{ date: 'desc' }, { number: 'desc' }, { id: 'desc' }];
 
   const dir = query.dir ?? 'asc';
   if (query.sort === 'number') return [{ number: dir }];

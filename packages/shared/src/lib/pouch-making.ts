@@ -69,7 +69,6 @@ export const ZIPPERED_POUCHES: readonly PouchType[] = [
   'STANDUP_ZIPPER',
   'ZIPPER',
   'THREE_SIDE_SEAL_ZIPPER',
-  'STANDUP_WITH_ZIPPER',
 ];
 
 /**
@@ -104,7 +103,7 @@ export const WORKBOOK_POUCHES: readonly PouchType[] = [
    * It is a reading of the works' two documents, not something either of them
    * states, and it is the one thing here worth putting to the works directly.
    */
-  'STANDUP_WITH_ZIPPER',
+  'STANDUP_NO_ZIPPER',
   'FLAT_BOTTOM',
 ];
 
@@ -218,4 +217,54 @@ export function inkGsmFor(input: {
   pouchInkGsm: number;
 }): number {
   return isWorkbookPouch(input.pouchType) ? input.pouchInkGsm : input.inkGsm;
+}
+
+/**
+ * **What making a kilogram of pouches costs.**
+ *
+ * The works priced this per POUCH until October 2026 — Rs 0.25 to form, seal
+ * and cut one — and then gave three figures by the kilogram instead:
+ *
+ * | | |
+ * | --- | --- |
+ * | plain pouch | Rs 20 a kg |
+ * | gusset | Rs 25 a kg |
+ * | gusset with handle | Rs 30 a kg |
+ *
+ * "Gusset" and "gusset with handle" are the two ticks on the line, not styles:
+ * a gazette pouch gussets at the sides and base, and the handle is the D punch.
+ * So the band is read off what the line says it is rather than off the style
+ * list, which is why a centre seal and a three side seal share the first band
+ * exactly as the client wrote them.
+ *
+ * **Two cases the client did not state**, both decided here and both worth
+ * putting back to them:
+ *
+ * - A **punch with no gusset**. Taken as the middle band: it is one operation
+ *   more than a plain pouch and one less than a gusseted one.
+ * - A **standup**, which gussets at the base by definition but is not ticked as
+ *   a gazette unless the office ticks it. Read off the tick, not the style, so
+ *   an unticked standup is charged as plain. Ticking the gusset is what the
+ *   office already does when the depths matter to the weight.
+ *
+ * The zipper is unchanged and still charged by the metre on top: the client's
+ * three figures say nothing about it, and a zipper is a part bought in rather
+ * than an operation.
+ */
+export interface PouchMakingBands {
+  plainPerKg: number;
+  gussetPerKg: number;
+  gussetHandlePerKg: number;
+}
+
+export function pouchMakingPerKgFor(
+  line: { isGazette?: boolean; hasDPunch?: boolean },
+  bands: PouchMakingBands | null | undefined,
+): number {
+  if (!bands) return 0;
+  const at = (value: number) => (Number.isFinite(value) && value > 0 ? value : 0);
+
+  if (line.isGazette && line.hasDPunch) return at(bands.gussetHandlePerKg);
+  if (line.isGazette || line.hasDPunch) return at(bands.gussetPerKg);
+  return at(bands.plainPerKg);
 }

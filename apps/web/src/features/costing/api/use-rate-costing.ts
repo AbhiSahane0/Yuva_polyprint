@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import {
+  defaultMarginFor,
   adhesiveGsmFor,
   costRate,
   parseStationSteps,
@@ -35,6 +36,9 @@ export interface RateCostingLine {
   /** One cylinder per colour, which is how many the line is charged for. */
   colourCount: number;
   makesPouches: boolean;
+  /** The two ticks that choose the making band — see `pouchMakingPerKgFor`. */
+  isGazette?: boolean;
+  hasDPunch?: boolean;
   /**
    * The style, and the finished width the zipper would cross.
    *
@@ -210,6 +214,8 @@ export function useRateCosting(
           tolueneRatePerKg: rate(settings.defaultTolueneMaterial),
         },
         makesPouches: line.makesPouches,
+        isGazette: line.isGazette ?? false,
+        hasDPunch: line.hasDPunch ?? false,
         pouchType: line.pouchType,
         pouchWidthMm: line.pouchWidthMm,
         piecesPerKgOverride: line.piecesPerKg,
@@ -255,6 +261,13 @@ export function useRateCosting(
           dPunchLargeAboveMm: settings.dPunchLargeAboveMm,
           zipperRatePerMetre: settings.zipperRatePerMetre,
         },
+        /* The works' three per-kilogram bands, which supersede the per-pouch
+           rate above for anything priced since October 2026. */
+        pouchMakingBands: {
+          plainPerKg: settings.pouchMakingPlainPerKg,
+          gussetPerKg: settings.pouchMakingGussetPerKg,
+          gussetHandlePerKg: settings.pouchMakingGussetHandlePerKg,
+        },
         /* The office's own figure replaces the whole charge, in the unit it is
            stated in. Null lets the style decide. */
         pouchMakingPerKgOverride: overrides.pouchMakingPerKg ?? null,
@@ -276,6 +289,12 @@ export function useRateCosting(
           settings.stationSurcharge7,
           settings.stationSurcharge8,
         ],
+        /*
+         * A placeholder. The real figure is chosen per QUANTITY below, because
+         * the works asks more of a small order than a large one and a
+         * quotation prices two or three at once — one margin for the whole
+         * document would make at least one of its own tiers wrong.
+         */
         marginPercent: pick(overrides.marginPercent, settings.defaultMarginPercent),
         marginBasis: settings.marginBasis,
         /*
@@ -310,11 +329,28 @@ export function useRateCosting(
       input
         ? line.quantitiesKg.map((qty) =>
             qty >= MIN_COSTABLE_KG
-              ? costRate({ ...input, job: { ...input.job, orderQtyKg: qty } })
+              ? costRate({
+                  ...input,
+                  job: { ...input.job, orderQtyKg: qty },
+                  overheads: {
+                    ...input.overheads,
+                    /*
+                     * The margin follows the quantity — 15% up to 500 kg, 10%
+                     * above — unless the office has typed one, which is theirs
+                     * and applies to every tier.
+                     *
+                     * Chosen HERE rather than once for the document, because
+                     * this is the only place that knows which quantity is being
+                     * costed. A quotation priced at 250, 500 and 1,000 kg
+                     * carries 15%, 15% and 10%.
+                     */
+                    marginPercent: overrides.marginPercent ?? defaultMarginFor(qty),
+                  },
+                })
               : null,
           )
         : [],
-    [input, line.quantitiesKg],
+    [input, line.quantitiesKg, overrides.marginPercent],
   );
 
   /*
