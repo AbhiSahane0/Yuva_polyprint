@@ -79,19 +79,31 @@ describe('CostingOverrides', () => {
     expect(checkbox().checked).toBe(false);
   });
 
-  it('says what the quotation is priced at while they are away', () => {
-    // Folding them away must not mean the office cannot see the figures — that
-    // would be worse than the boxes. One line, and it is the works' own.
+  /*
+   * It used to say so, in one line, and the client asked for that line to go.
+   * The quotation screen is read with the customer across the desk, and what
+   * the works makes on the job is not theirs to read — the same reason the
+   * margin percentages on the quantity rows lost the words "gross" and "net".
+   * The figures are a tick away, which is the point of the tick.
+   */
+  it('puts no figure on screen at all while they are away', () => {
     render(<Host />);
-    expect(onScreen()).toContain('Margin 9%');
-    expect(onScreen()).toContain('Transport Rs. 6.80/kg');
-    expect(onScreen()).toContain('Wastage 7%');
-    expect(onScreen()).toContain('Pouch making Rs. 11.04/kg');
+    expect(onScreen()).not.toContain('Margin 9%');
+    expect(onScreen()).not.toContain('6.80');
+    expect(onScreen()).not.toContain('Wastage');
+    expect(onScreen()).not.toContain('11.04');
+    /* Nor a heading over it: a heading above one checkbox is noise. */
+    expect(onScreen()).not.toContain('This quotation’s costing');
+    /* The checkbox names the section by itself. */
+    expect(onScreen()).toContain('Edit this quotation’s costing');
   });
 
   it('says what decides making when it cannot be worked out', () => {
+    // Only once the boxes are open, where it belongs on the box it explains.
     render(<Host masters={NO_MAKING} />);
-    expect(onScreen()).toContain('Pouch making by style');
+    expect(onScreen()).not.toContain('by style');
+    fireEvent.click(checkbox());
+    expect(box('pouchMakingPerKg')?.placeholder).toBe('by style');
   });
 
   it('opens the boxes filled in with the works’ own figures', () => {
@@ -177,7 +189,8 @@ describe('CostingOverrides', () => {
     // Unticking is how an override is taken back, so it has to undo the typing
     // as well as the opening — otherwise 15 would price the document invisibly.
     expect(box('marginPercent')).toBeNull();
-    expect(onScreen()).toContain('Margin 9%');
+    // And 15 is not left on screen in a summary either: closed shows nothing.
+    expect(onScreen()).not.toContain('15');
   });
 });
 
