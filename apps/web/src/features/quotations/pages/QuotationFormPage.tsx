@@ -206,6 +206,8 @@ const BLANK_DESIGN = {
   cylinderCount: 4,
   repairCylinders: false,
   repairs: [] as QuotationCylinderRepair[],
+  cylinderManufacturer: '',
+  cylinderDesign: '',
   /* Seeded with the four process colours once the rates list has loaded —
      see `JobCard`. Empty here because this constant cannot know them. */
   colours: [] as JobColour[],
@@ -617,6 +619,8 @@ export default function QuotationFormPage() {
         chargeCylinders: item.chargeCylinders,
         repairCylinders: item.repairCylinders,
         repairs: item.repairs,
+        cylinderManufacturer: item.cylinderManufacturer,
+        cylinderDesign: item.cylinderDesign,
       })) as CreateQuotationFormValues['items'],
     });
     /*
@@ -1311,7 +1315,9 @@ export default function QuotationFormPage() {
                   mid-word — "— not recorde" — and a box that clips its own
                   default reads as broken before anybody has touched it. */}
               <div className="sm:col-span-3">
-                <Field label="Generated through" htmlFor="generatedThrough">
+                {/* "Enquiry Source" is the client's own name for it, and the
+                    one the works uses out loud. "Generated through" was ours. */}
+                <Field label="Enquiry source" htmlFor="generatedThrough" hint="How it reached us">
                   <Select id="generatedThrough" {...register('generatedThrough')}>
                     {/* Nothing chosen is a real answer here: a quotation whose
                         channel nobody recorded should not claim one. Worded the
@@ -2491,6 +2497,48 @@ function JobCard({
                     />
                   </Field>
                 </div>
+
+                {/*
+                  Who cuts them, and what they print.
+
+                  Typed rather than chosen from a list: the works uses a handful
+                  of engravers and writes their names differently on different
+                  days, and a design is called whatever the customer calls it.
+                  Neither is a register the works keeps, so a dropdown would
+                  only force one of the two to be wrong.
+
+                  Both optional, and both kept on the record — the engraver
+                  because they do not all charge alike, so which one a set was
+                  quoted against is part of what was quoted.
+                */}
+                <div className="sm:col-span-6">
+                  <Field
+                    label="Cylinder manufacturer"
+                    htmlFor={`items.${index}.cylinderManufacturer`}
+                    hint="Who engraves the set"
+                  >
+                    <Input
+                      id={`items.${index}.cylinderManufacturer`}
+                      autoComplete="off"
+                      placeholder="e.g. Shree Engravers"
+                      {...register(`items.${index}.cylinderManufacturer`)}
+                    />
+                  </Field>
+                </div>
+                <div className="sm:col-span-6">
+                  <Field
+                    label="Cylinder design"
+                    htmlFor={`items.${index}.cylinderDesign`}
+                    hint="What the set prints, as the customer names it"
+                  >
+                    <Input
+                      id={`items.${index}.cylinderDesign`}
+                      autoComplete="off"
+                      placeholder="e.g. Bhel 250gm front"
+                      {...register(`items.${index}.cylinderDesign`)}
+                    />
+                  </Field>
+                </div>
                 {/*
                   The working, not just the answer.
                   
@@ -2530,8 +2578,23 @@ function JobCard({
                   </Field>
                 </div>
                 <div className="sm:col-span-3">
+                  {/*
+                    A dash, not a price, when nothing is being cut.
+
+                    The per-cylinder figure is worked out from the size alone,
+                    so it reads the same whether the line asks for six
+                    cylinders or none — and at none it was sitting under a zero
+                    total saying "Rs. 6,750", which looks like a charge that
+                    went missing rather than one that was never due.
+                  */}
                   <Field label="Cost per cylinder" htmlFor={`items.${index}.costPerCylinder`}>
-                    <ReadOnlyValue value={formatRs(cost?.geometry.costPerCylinder ?? 0)} />
+                    <ReadOnlyValue
+                      value={
+                        num(item?.cylinderCount) > 0
+                          ? formatRs(cost?.geometry.costPerCylinder ?? 0)
+                          : '—'
+                      }
+                    />
                   </Field>
                 </div>
                 <div className="sm:col-span-3">

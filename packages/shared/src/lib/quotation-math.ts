@@ -166,10 +166,12 @@ export function computeItem(
   );
   const cylinderCircumference = round(input.heightMm * input.repeatHeight, 2);
   const costPerCylinder = round(((cylinderWidth * cylinderCircumference) / 100) * cylinderRate, 2);
-  const totalCylinderCost = round(
-    costPerCylinder * input.cylinderCount + (input.transportCost ?? 0),
-    2,
-  );
+  /* No cylinders, no cylinder cost — the transport too, since there is nothing
+     to deliver. See the same rule in `computeItemGeometry`. */
+  const totalCylinderCost =
+    input.cylinderCount > 0
+      ? round(costPerCylinder * input.cylinderCount + (input.transportCost ?? 0), 2)
+      : 0;
 
   return {
     micron,
@@ -514,10 +516,22 @@ export function computeItemGeometry(input: ItemGeometryInputs, cylinderRate: num
     (input.repairs ?? []).reduce((total, repair) => total + (Number(repair.cost) || 0), 0),
     2,
   );
-  const totalCylinderCost =
-    (input.chargeCylinders ?? true)
-      ? round(costPerCylinder * input.cylinderCount + (input.transportCost ?? 0) + repairCost, 2)
-      : repairCost;
+  /*
+   * **No cylinders means no cylinder cost**, transport included.
+   *
+   * The arithmetic already gave nought for the cylinders themselves, but it
+   * went on adding the transport — so a line with no cylinders on it quoted a
+   * delivery charge for delivering nothing. It happens on every unprinted job:
+   * a line with no colours asks for no cylinders at all, and the works still
+   * saw a figure on the cylinder line.
+   *
+   * A repair is charged whatever the count: a cylinder being put right is one
+   * that already exists and was never going to be counted here.
+   */
+  const charged = (input.chargeCylinders ?? true) && input.cylinderCount > 0;
+  const totalCylinderCost = charged
+    ? round(costPerCylinder * input.cylinderCount + (input.transportCost ?? 0) + repairCost, 2)
+    : repairCost;
 
   return {
     micron: round(input.micron, 2),

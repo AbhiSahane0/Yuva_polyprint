@@ -13,6 +13,8 @@ export const CYLINDER_STATUSES = [
   'IN_USE',
   'DAMAGED',
   'NEEDS_REWORK',
+  'UNDER_REPAIR',
+  'REPAIRED',
   'RETIRED',
 ] as const;
 export type CylinderStatus = (typeof CYLINDER_STATUSES)[number];
@@ -23,6 +25,7 @@ export const CYLINDER_EVENT_KINDS = [
   'IN_USE',
   'RETURNED',
   'DAMAGED',
+  'SENT_FOR_REPAIR',
   'REWORKED',
   'TRANSFERRED',
   'RETIRED',
@@ -38,6 +41,8 @@ export const CYLINDER_STATUS_LABELS: Record<CylinderStatus, string> = {
   IN_USE: 'In use',
   DAMAGED: 'Damaged',
   NEEDS_REWORK: 'Needs rework',
+  UNDER_REPAIR: 'Under repair',
+  REPAIRED: 'Repaired',
   RETIRED: 'Retired',
 };
 
@@ -47,7 +52,8 @@ export const CYLINDER_EVENT_LABELS: Record<CylinderEventKind, string> = {
   IN_USE: 'In use',
   RETURNED: 'Returned to store',
   DAMAGED: 'Damaged',
-  REWORKED: 'Reworked',
+  SENT_FOR_REPAIR: 'Sent for repair',
+  REWORKED: 'Repaired and returned',
   TRANSFERRED: 'Transferred',
   RETIRED: 'Retired',
 };
@@ -68,8 +74,18 @@ export function statusAfter(kind: CylinderEventKind, current: CylinderStatus): C
   switch (kind) {
     case 'ENGRAVED':
     case 'RETURNED':
-    case 'REWORKED':
       return 'IN_STORE';
+    /*
+     * A repaired cylinder is on the shelf and usable, so this could have been
+     * IN_STORE — and was. It is its own status because the works asked to see
+     * it: "which of these have been back to the engraver" is a question about
+     * a cylinder that is about to be mounted, and one the register could not
+     * answer without reading every history.
+     */
+    case 'REWORKED':
+      return 'REPAIRED';
+    case 'SENT_FOR_REPAIR':
+      return 'UNDER_REPAIR';
     case 'ALLOCATED':
       return 'ALLOCATED';
     case 'IN_USE':
@@ -105,12 +121,17 @@ export function canRecord(kind: CylinderEventKind, current: CylinderStatus): boo
  * would resolve to whichever was imported last.
  */
 export function isUnusable(status: CylinderStatus): boolean {
-  return status === 'DAMAGED' || status === 'NEEDS_REWORK';
+  return status === 'DAMAGED' || status === 'NEEDS_REWORK' || status === 'UNDER_REPAIR';
 }
 
-/** Statuses that mean it is off the shelf. */
+/**
+ * Statuses that mean it is off the shelf.
+ *
+ * `UNDER_REPAIR` counts: it is not in the works at all, which is a stronger
+ * statement than allocated or mounted and the whole reason the status exists.
+ */
 export function isOutOfStore(status: CylinderStatus): boolean {
-  return status === 'ALLOCATED' || status === 'IN_USE';
+  return status === 'ALLOCATED' || status === 'IN_USE' || status === 'UNDER_REPAIR';
 }
 
 /**
@@ -122,12 +143,19 @@ export function isOutOfStore(status: CylinderStatus): boolean {
  */
 export function designStatus(statuses: CylinderStatus[]): CylinderStatus | 'NONE' {
   if (statuses.length === 0) return 'NONE';
+  /*
+   * Worst first. `UNDER_REPAIR` sits below the two that need somebody to act,
+   * because somebody already has — it is away being dealt with. `REPAIRED` is
+   * as good as in store and ranks with it.
+   */
   const order: CylinderStatus[] = [
     'DAMAGED',
     'NEEDS_REWORK',
+    'UNDER_REPAIR',
     'RETIRED',
     'IN_USE',
     'ALLOCATED',
+    'REPAIRED',
     'IN_STORE',
   ];
   // Retired is only the design's state when every one of them is.

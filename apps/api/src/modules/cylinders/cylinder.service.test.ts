@@ -127,3 +127,38 @@ describe('the cylinder register', () => {
     expect(CODE).toContain('been retired');
   });
 });
+
+/**
+ * **Why a cylinder is away follows the same rule its status does.**
+ *
+ * The register's one law is that a cylinder's state is a fact about its last
+ * event rather than a flag somebody sets, and the repair reason is state: a
+ * cylinder printing happily while the register says "cyan worn across the
+ * gusset" is the same lie as one marked in store while it is on a machine.
+ *
+ * So it is written in exactly one place — the event recorder — and the editor
+ * that corrects a cylinder's details cannot touch it.
+ */
+describe('the repair reason', () => {
+  it('is written only where the event is', () => {
+    /* Set when it goes out... */
+    expect(CODE).toContain("const sending = input.kind === 'SENT_FOR_REPAIR'");
+    expect(CODE).toContain('repairReason: input.repairReason');
+  });
+
+  it('cannot be typed in by hand', () => {
+    /*
+     * `updateCylinder` corrects colour, position, ownership, location, size
+     * and cost. If it could set this too, the register would have two writers
+     * and no way to say which was right.
+     */
+    const editor = CODE.slice(CODE.indexOf('export async function updateCylinder'));
+    expect(editor).not.toContain('repairReason');
+  });
+
+  it('is cleared by anything that ends the trip', () => {
+    // Not only by the repair coming back. A cylinder mounted, returned or
+    // retired is not out for repair whatever its last reason said.
+    expect(CODE).toContain("repairReason: '' }");
+  });
+});

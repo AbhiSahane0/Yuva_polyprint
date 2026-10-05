@@ -58,6 +58,10 @@ enum EnquiryChannel {
   WHATSAPP
   PHONE
   SMS
+  /// Somebody brought it in — a referral, a walk-in, a word at a trade fair.
+  /// The one route that is not a wire, and the one the referred-by name on the
+  /// quotation is there to go with.
+  PERSON
   OTHER
 }
 
@@ -305,9 +309,13 @@ model Quotation {
   /// office wants both on the record.
   enquiryFrom String @default("") @map("enquiry_from")
 
-  /// How the enquiry arrived — mail, WhatsApp, a phone call. Null on every
-  /// quotation written before the question was asked, which is honest: the
-  /// office does not remember, and a default would invent an answer.
+  /// How the enquiry arrived — mail, WhatsApp, a phone call, a person. Null on
+  /// every quotation written before the question was asked, which is honest:
+  /// the office does not remember, and a default would invent an answer.
+  ///
+  /// **The screen calls this "Enquiry source"**, which is the client's name for
+  /// it. The column keeps the name it was created with rather than carrying a
+  /// rename through the API and a migration for the sake of a label.
   generatedThrough EnquiryChannel? @map("generated_through")
 
   /// Which quantity the document is for, 1-based, among this quotation's tiers.
@@ -493,6 +501,16 @@ model QuotationItem {
   /// — the repair is charged in the cylinder bucket, so it is advance-billed
   /// the way an engraving already is.
   repairCylinders Boolean @default(false) @map("repair_cylinders")
+
+  /// Who cuts them. The works deals with more than one engraver and they do
+  /// not charge alike, so which one a set was quoted against is part of what
+  /// was quoted — not a detail to look up afterwards in the register.
+  cylinderManufacturer String @default("") @map("cylinder_manufacturer")
+
+  /// What the set prints, as the customer names it. Often not the job name:
+  /// one job can run several designs, and the customer rings up about the
+  /// design rather than the line it was quoted on.
+  cylinderDesign String @default("") @map("cylinder_design")
 
   // ---- Computed geometry, the same at every quantity ----------------------
   micron                Decimal @db.Decimal(10, 2)
@@ -1318,6 +1336,12 @@ enum CylinderStatus {
   DAMAGED
   /// Usable but due for re-engraving before its next run.
   NEEDS_REWORK
+  /// Gone out to be put right. Not in the works at all — which is the state
+  /// the register had no word for, so a set at the engraver read as damaged
+  /// and on the shelf.
+  UNDER_REPAIR
+  /// Back from the engraver and usable again.
+  REPAIRED
   /// Scrapped or returned to the customer. Kept for the history.
   RETIRED
 }
@@ -1339,7 +1363,9 @@ enum CylinderEventKind {
   RETURNED
   /// Found unusable.
   DAMAGED
-  /// Re-engraved and usable again.
+  /// Sent out to be put right. Carries the reason.
+  SENT_FOR_REPAIR
+  /// Re-engraved and usable again. Ends a repair.
   REWORKED
   /// Moved shelves. Changes where it is, not what it is doing.
   TRANSFERRED
@@ -1377,6 +1403,12 @@ model Cylinder {
 
   ownership CylinderOwnership @default(YUVA_OWNED)
   status    CylinderStatus    @default(IN_STORE)
+
+  /// Why it went out, while it is out. Written only by the event recorder —
+  /// set when it is sent for repair, cleared when it comes back — for the same
+  /// reason the status is: a field somebody can type is a field that disagrees
+  /// with what happened.
+  repairReason String @default("") @map("repair_reason")
 
   /// Free text, like a stock location. 'Cylinder Store A-1'.
   location String @default("NA")
@@ -1435,6 +1467,12 @@ model CylinderEvent {
   /// Where it went, on a TRANSFERRED event.
   fromLocation String @default("") @map("from_location")
   toLocation   String @default("") @map("to_location")
+
+  /// What was wrong with it, on a SENT_FOR_REPAIR event. Kept on the event
+  /// rather than only on the cylinder, because it belongs to the day it was
+  /// sent: a cylinder repaired three times has three reasons, and the current
+  /// one is not the history.
+  repairReason String @default("") @map("repair_reason")
 
   notes     String @default("")
   enteredBy String @map("entered_by")

@@ -174,6 +174,8 @@ function toItem(row: ItemRow): QuotationItem {
     transportCost: toNumber(row.transportCost),
     chargeCylinders: row.chargeCylinders,
     repairCylinders: row.repairCylinders,
+    cylinderManufacturer: row.cylinderManufacturer,
+    cylinderDesign: row.cylinderDesign,
     repairs: byPosition(row.repairs ?? []).map((repair) => ({
       cylinderId: repair.cylinderId,
       position: repair.position,
@@ -794,6 +796,8 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
               transportCost: entry.input.transportCost,
               chargeCylinders: entry.input.chargeCylinders,
               repairCylinders: entry.input.repairCylinders,
+              cylinderManufacturer: entry.input.cylinderManufacturer,
+              cylinderDesign: entry.input.cylinderDesign,
               repairs: {
                 create: (entry.input.repairCylinders ? entry.input.repairs : []).map(
                   (repair, position) => ({
@@ -1046,6 +1050,8 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
       transportCost: toNumber(item.transportCost),
       chargeCylinders: item.chargeCylinders,
       repairCylinders: item.repairCylinders,
+      cylinderManufacturer: item.cylinderManufacturer,
+      cylinderDesign: item.cylinderDesign,
       repairs: byPosition(item.repairs).map((repair) => ({
         cylinderId: repair.cylinderId,
         code: repair.code,
@@ -1140,6 +1146,8 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
           transportCost: entry.input.transportCost,
           chargeCylinders: entry.input.chargeCylinders,
           repairCylinders: entry.input.repairCylinders,
+          cylinderManufacturer: entry.input.cylinderManufacturer,
+          cylinderDesign: entry.input.cylinderDesign,
           repairs: {
             create: (entry.input.repairCylinders ? entry.input.repairs : []).map(
               (repair, position) => ({
@@ -1337,6 +1345,8 @@ export async function createQuotationVersion(id: string): Promise<Quotation> {
               transportCost: item.transportCost,
               chargeCylinders: item.chargeCylinders,
               repairCylinders: item.repairCylinders,
+              cylinderManufacturer: item.cylinderManufacturer,
+              cylinderDesign: item.cylinderDesign,
               repairs: {
                 create: byPosition(item.repairs).map((repair) => ({
                   cylinderId: repair.cylinderId,

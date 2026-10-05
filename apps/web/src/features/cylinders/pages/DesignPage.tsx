@@ -26,6 +26,8 @@ const STATUS_TONE: Record<CylinderStatus | 'NONE', 'neutral' | 'success' | 'warn
   IN_USE: 'brand',
   DAMAGED: 'warning',
   NEEDS_REWORK: 'warning',
+  UNDER_REPAIR: 'warning',
+  REPAIRED: 'success',
   RETIRED: 'neutral',
   NONE: 'neutral',
 };
@@ -211,6 +213,17 @@ export default function DesignPage() {
                       <Badge tone={STATUS_TONE[cylinder.status]}>
                         {CYLINDER_STATUS_LABELS[cylinder.status]}
                       </Badge>
+                      {/*
+                        Under the badge rather than in a column of its own: it
+                        is only ever there on the one cylinder that is away,
+                        and an empty column on every other row would cost more
+                        width than the answer is worth.
+                      */}
+                      {cylinder.repairReason ? (
+                        <span className="text-ink-500 mt-1 block max-w-[22ch] text-xs">
+                          {cylinder.repairReason}
+                        </span>
+                      ) : null}
                     </td>
                   </tr>
                 ))}

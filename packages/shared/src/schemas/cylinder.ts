@@ -107,6 +107,8 @@ export const recordCylinderEventSchema = z
     reference: optionalText(120),
     /** Only meaningful on a transfer. */
     toLocation: z.string().trim().max(80).default(''),
+    /** Only meaningful when it is being sent out — and required there. */
+    repairReason: z.string().trim().max(300).default(''),
     notes: optionalText(500),
   })
   .refine((value) => value.kind !== 'TRANSFERRED' || value.toLocation.trim().length > 0, {
@@ -120,6 +122,15 @@ export const recordCylinderEventSchema = z
   .refine((value) => !['DAMAGED', 'RETIRED'].includes(value.kind) || value.notes.length >= 3, {
     message: 'Say briefly what happened',
     path: ['notes'],
+  })
+  /*
+   * A cylinder sent out with no reason given is one nobody can price, chase or
+   * learn from — and the engraver's bill arrives weeks later against a job the
+   * office has forgotten the shape of. Required rather than encouraged.
+   */
+  .refine((value) => value.kind !== 'SENT_FOR_REPAIR' || value.repairReason.length >= 3, {
+    message: 'Say what needs putting right',
+    path: ['repairReason'],
   });
 
 export const listCylindersQuerySchema = paginationQuerySchema.extend({

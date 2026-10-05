@@ -215,6 +215,17 @@ export const quotationItemSchema = z
      */
     repairCylinders: z.boolean().default(false),
     repairs: z.array(cylinderRepairSchema).max(12, 'A set is at most twelve cylinders').default([]),
+
+    /*
+     * Who cuts the set, and what it prints.
+     *
+     * Free text rather than lists. The works deals with a handful of engravers
+     * and names them differently on different days, and a design is called
+     * whatever the customer calls it — a dropdown would force one of those two
+     * to be wrong, and neither is a thing the works keeps a register of.
+     */
+    cylinderManufacturer: z.string().trim().max(120, 'That name is too long').default(''),
+    cylinderDesign: z.string().trim().max(120, 'That name is too long').default(''),
   })
   /*
    * A roll has no pouch style. Rather than reject the combination — which would
