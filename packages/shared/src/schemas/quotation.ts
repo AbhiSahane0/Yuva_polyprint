@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { partialWithoutDefaults } from './partial-update.js';
 import {
+  ENQUIRY_CHANNELS,
   INK_KINDS,
   JOB_KINDS,
   POUCH_TYPES,
@@ -69,6 +70,24 @@ export const quotationLayerSchema = z.object({
 });
 
 /** One quantity a line is priced at. */
+/**
+ * One cylinder being re-engraved, and what it costs.
+ *
+ * The cost is typed every time: the master records what a cylinder cost to
+ * ENGRAVE, which is not what it costs to put right. The code and colour are
+ * snapshotted beside the link so the quotation still reads after the cylinder
+ * has been re-engraved, renumbered or scrapped.
+ */
+export const cylinderRepairSchema = z.object({
+  cylinderId: z.string().min(1).nullable().default(null),
+  code: z.string().trim().min(1, 'Which cylinder?').max(60),
+  colour: z.string().trim().max(60).default('NA'),
+  cost: z.coerce
+    .number({ message: 'Enter what the repair costs' })
+    .min(0, 'Cannot be negative')
+    .max(1_000_000, 'That looks wrong — check it'),
+});
+
 export const quotationQuantitySchema = z.object({
   quantityKg: zeroOrMore('Quantity').default(0),
   ratePerKg: zeroOrMore('Rate').default(0),
@@ -133,6 +152,16 @@ export const quotationItemSchema = z
      * cylinder — see `computeItemGeometry`.
      */
     isGazette: z.boolean().default(false),
+    /**
+     * Finishing, not style.
+     *
+     * A punched handle or a tear notch can be asked for on any pouch, which is
+     * why they are ticks and not entries in the style list. The punch is
+     * charged at the works' own rate; the notch is recorded and not charged,
+     * because the works has no rate for one.
+     */
+    hasDPunch: z.boolean().default(false),
+    hasVNotch: z.boolean().default(false),
     gazetteBottom: zeroOrMore('Bottom gazette').default(0),
     gazetteLeft: zeroOrMore('Left gazette').default(0),
     gazetteRight: zeroOrMore('Right gazette').default(0),
@@ -175,6 +204,17 @@ export const quotationItemSchema = z
      * needs a new set engraved.
      */
     chargeCylinders: z.boolean().default(true),
+
+    /**
+     * A repeat order that needs one of the existing set put right.
+     *
+     * Separate from `chargeCylinders`, and the two are not opposites: a line
+     * may charge for a new set, or quote a repair, or neither. The repair is
+     * charged in the cylinder bucket, so it is advance-billed the way an
+     * engraving already is.
+     */
+    repairCylinders: z.boolean().default(false),
+    repairs: z.array(cylinderRepairSchema).max(12, 'A set is at most twelve cylinders').default([]),
   })
   /*
    * A roll has no pouch style. Rather than reject the combination — which would
@@ -195,6 +235,8 @@ export const quotationItemSchema = z
             pouchType: null,
             pouchTypeNote: '',
             isGazette: false,
+            hasDPunch: false,
+            hasVNotch: false,
             gazetteBottom: 0,
             gazetteLeft: 0,
             gazetteRight: 0,
@@ -211,13 +253,17 @@ export const quotationItemSchema = z
       ? rolled
       : { ...rolled, gazetteBottom: 0, gazetteLeft: 0, gazetteRight: 0 };
 
+    /* Untick the box and the rows go with it, rather than lying in wait to be
+       charged the next time somebody ticks it. */
+    const repaired = line.repairCylinders ? line : { ...line, repairs: [] };
+
     /*
      * A roll is film on a reel: there are no pouches to count, so the choice is
      * not offered and cannot be smuggled in through the API either. Everything
      * else takes what the office chose, falling back to the trade convention.
      */
     return {
-      ...line,
+      ...repaired,
       pricingBasis:
         line.jobKind === 'ROLL'
           ? ('PER_KG' as const)
@@ -295,15 +341,6 @@ const createQuotationBaseSchema = z.object({
    */
   saveAsCustomer: z.boolean().default(false),
   /**
-   * The customer's brand, as the office has it on this screen.
-   *
-   * Carried on the quotation input but not stored on the quotation: a brand
-   * belongs to the customer, and holding a second copy here would let the two
-   * disagree the moment either was edited. It is used to fill the brand in when
-   * a new company is created, and to correct it on an existing one.
-   */
-  brandName: z.string().trim().max(200).default(''),
-  /**
    * Who sent this enquiry the works' way.
    *
    * Business arrives through people, and the works wants that on the record.
@@ -314,6 +351,20 @@ const createQuotationBaseSchema = z.object({
    * around data nobody has yet.
    */
   referredBy: z.string().trim().max(200).default(''),
+
+  /**
+   * Who asked, and how they got in touch.
+   *
+   * Beside `referredBy` rather than instead of it: the person who enquired and
+   * the person who sent them are often not the same, and the office wants both.
+   *
+   * The channel is nullable and has no default. Every quotation written before
+   * the question was asked has no answer, and defaulting one — to Phone, say —
+   * would put a figure in next year's "where does the work come from" that
+   * nobody ever typed.
+   */
+  enquiryFrom: z.string().trim().max(200).default(''),
+  generatedThrough: z.enum(ENQUIRY_CHANNELS).nullable().default(null),
   /* "Required" is untrue once a single character has been typed, which is what
    * this rule actually rejects — so the message says what to do instead. */
   customerName: z.string().trim().min(2, 'Enter the company name').max(200),

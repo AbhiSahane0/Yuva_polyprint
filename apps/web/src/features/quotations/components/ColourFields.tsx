@@ -84,6 +84,27 @@ export function ColourFields({
     onChange([...colours, { ...special }]);
   };
 
+  /*
+   * Naming a special.
+   *
+   * It is anonymous by default and that is still right — which colour a brand's
+   * red turns out to be is decided at artwork, weeks after the price is given.
+   * But the office often DOES know, and a white laid behind a clear film is
+   * known before anything else. So the chip is typeable and the default stands
+   * when nothing is typed; the name travels with the quotation and changes no
+   * figure, every special being priced the same way.
+   */
+  const renameSpecialAt = (index: number, name: string) => {
+    let seen = -1;
+    onChange(
+      colours.map((colour) => {
+        if (colour.kind !== 'SPECIAL') return colour;
+        seen += 1;
+        return seen === index ? { ...colour, name } : colour;
+      }),
+    );
+  };
+
   const removeSpecialAt = (index: number) => {
     let seen = -1;
     onChange(
@@ -149,7 +170,24 @@ export function ColourFields({
               aria-hidden
               className="from-brand-500 size-2.5 rounded-full bg-gradient-to-br to-amber-400"
             />
-            {SPECIAL_COLOUR_NAME}
+            <input
+              type="text"
+              value={colour.name === SPECIAL_COLOUR_NAME ? '' : colour.name}
+              disabled={disabled}
+              placeholder={SPECIAL_COLOUR_NAME}
+              aria-label={`Name of special colour ${index + 1}`}
+              size={Math.max(
+                12,
+                (colour.name === SPECIAL_COLOUR_NAME ? 0 : colour.name.length) + 1,
+              )}
+              onChange={(event) =>
+                renameSpecialAt(
+                  index,
+                  event.target.value.trim() === '' ? SPECIAL_COLOUR_NAME : event.target.value,
+                )
+              }
+              className="text-brand-700 placeholder:text-brand-700/70 min-w-0 border-0 bg-transparent p-0 text-xs font-medium focus:ring-0 focus:outline-none disabled:cursor-not-allowed"
+            />
             <button
               type="button"
               disabled={disabled}

@@ -148,13 +148,6 @@ export type CustomerJobFormValues = z.input<typeof customerJobSchema>;
 
 export const createCustomerSchema = z.object({
   companyName: z.string().trim().min(2, 'Company name is required').max(200),
-  /**
-   * What they trade as, where that differs from the registered name.
-   *
-   * Optional, and 'NA' when unset like every other legacy text field — the
-   * office fills these in as they go rather than in one sitting.
-   */
-  brandName: optionalText(200).default(NA),
   contactPerson: optionalText(120).default(NA),
   address: optionalText(400).default(NA),
   city: optionalText(80).default(NA),

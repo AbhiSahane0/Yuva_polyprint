@@ -263,3 +263,42 @@ describe('QuantityFields', () => {
     expect(screen.getByText('net —')).toBeTruthy();
   });
 });
+
+/**
+ * **"How many bags to a kilo?" is the question asked across the table.**
+ *
+ * It was answerable only by reading a total and dividing — a 250 kg row said
+ * "21,915 pouches at 11.41 g each", and the yield had to be worked out from
+ * it. The yield belongs to the LINE rather than to a quantity: the structure
+ * decides what a pouch weighs, and ordering twice as much does not change it.
+ * So it is stated once, in the section header.
+ */
+describe('the yield is stated, not implied', () => {
+  it('shows pouches per kilogram and the weight of one', () => {
+    render(
+      <Row
+        pouchesPerKg={87.66}
+        showsPouches
+        startKg={250}
+        startRate={335}
+        results={[
+          {
+            quantityKg: 250,
+            ratePerKg: 335,
+            totalPouches: 21915,
+            totalAmount: 83750,
+          } as QuantityResult,
+        ]}
+      />,
+    );
+    const badge = screen.getByText(/87\.66 pouches per kg/);
+    expect(badge.textContent).toContain('11.41 g each');
+    /* The working, for somebody who wants to check it. */
+    expect(badge.getAttribute('title')).toContain('1,000 ÷ 11.41');
+  });
+
+  it('says nothing at all until the structure can give a weight', () => {
+    render(<Row pouchesPerKg={0} showsPouches startKg={250} startRate={335} />);
+    expect(screen.queryByText(/pouches per kg/)).toBeNull();
+  });
+});

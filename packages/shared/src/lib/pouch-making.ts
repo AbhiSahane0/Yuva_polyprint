@@ -65,7 +65,12 @@ export interface PouchExpense {
 export const NO_POUCH_EXPENSE: PouchExpense = { making: 0, zipper: 0, perPouch: 0 };
 
 /** The styles that carry a zipper across the mouth. */
-export const ZIPPERED_POUCHES: readonly PouchType[] = ['STANDUP_ZIPPER', 'ZIPPER'];
+export const ZIPPERED_POUCHES: readonly PouchType[] = [
+  'STANDUP_ZIPPER',
+  'ZIPPER',
+  'THREE_SIDE_SEAL_ZIPPER',
+  'STANDUP_WITH_ZIPPER',
+];
 
 /**
  * The styles the works' pouch workbook costs.
@@ -89,6 +94,18 @@ export const WORKBOOK_POUCHES: readonly PouchType[] = [
   'STANDUP_ZIPPER',
   'ZIPPER',
   'D_PUNCH',
+  /*
+   * The three added in October 2026 follow their base style, because that is
+   * the machine that makes them: a standup with a zipper and a flat bottom are
+   * both standup work, and a three side seal with a zipper is still a three
+   * side seal, costed on the Estimation sheet like the plain one.
+   *
+   * **This decides the ink laydown and the wastage, so it moves the price.**
+   * It is a reading of the works' two documents, not something either of them
+   * states, and it is the one thing here worth putting to the works directly.
+   */
+  'STANDUP_WITH_ZIPPER',
+  'FLAT_BOTTOM',
 ];
 
 /** Whether this line is costed on the pouch workbook rather than the Estimation sheet. */
@@ -111,6 +128,8 @@ export function pouchExpense(
   pouchType: PouchType | null | undefined,
   pouchWidthMm: number,
   rates: PouchMakingRates | null | undefined,
+  /** Ticked on the line. A punched handle is extra work, not another style. */
+  hasDPunch = false,
 ): PouchExpense {
   if (!pouchType || !rates) return NO_POUCH_EXPENSE;
 
@@ -129,12 +148,21 @@ export function pouchExpense(
    * one at a dearer rate again, the punch being made across the top. The
    * workbook shows both: 0.60 on a 190 mm pouch and 0.80 on a 485 mm one.
    */
-  const making =
-    pouchType === 'D_PUNCH'
-      ? at(pouchWidthMm) > at(rates.dPunchLargeAboveMm) && at(rates.dPunchLargePerPouch) > 0
-        ? at(rates.dPunchLargePerPouch)
-        : at(rates.dPunchPerPouch)
-      : at(rates.makingPerPouch);
+  /*
+   * The punch REPLACES the ordinary making charge rather than adding to it,
+   * which is how the workbook's 0.60 and 0.80 are written: they are what a
+   * punched pouch costs to make, not a surcharge on top of one.
+   *
+   * Reached two ways now. `D_PUNCH` as a style is the old way and is no longer
+   * offered; the tick is the new one. Both land here so a quotation written
+   * last year and one written today cost the same pouch the same.
+   */
+  const punched = hasDPunch || pouchType === 'D_PUNCH';
+  const making = punched
+    ? at(pouchWidthMm) > at(rates.dPunchLargeAboveMm) && at(rates.dPunchLargePerPouch) > 0
+      ? at(rates.dPunchLargePerPouch)
+      : at(rates.dPunchPerPouch)
+    : at(rates.makingPerPouch);
 
   const zipper = ZIPPERED_POUCHES.includes(pouchType)
     ? round((at(pouchWidthMm) / 1000) * at(rates.zipperRatePerMetre), 4)

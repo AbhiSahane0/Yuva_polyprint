@@ -76,7 +76,6 @@ export default function CustomersPage() {
   const exportCustomersToExcel = (customers: Customer[]) => {
     const data = customers.map((customer) => ({
       Company: customer.companyName,
-      Brand: customer.brandName,
       Mobile: customer.mobile,
       City: customer.city,
       Address: customer.address,
@@ -189,7 +188,7 @@ export default function CustomersPage() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search company, brand, mobile, city…"
+            placeholder="Search company, mobile, city…"
             aria-label="Search customers"
             className="pr-9 pl-9"
           />

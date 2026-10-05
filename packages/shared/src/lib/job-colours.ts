@@ -198,3 +198,24 @@ export function resizeColours(
 
   return [...process.slice(0, keepProcess), ...specials.slice(0, keepSpecials)];
 }
+
+/**
+ * **A clear film needs a white behind the print, and the office forgets.**
+ *
+ * The rate master used to carry one `LDPE Milky / Natural`, which is two films:
+ * the milky one is pigmented and hides what is behind it, the natural one is
+ * clear and shows the product through. Printing on clear film without laying a
+ * white down first gives a washed-out pack — so a white is always run, always
+ * takes a station, and was always remembered or not.
+ *
+ * Named by the film rather than by a flag on the material, because the rule is
+ * about what the word "natural" means in this trade and not about a property
+ * anybody has recorded. A film the works adds later called `PET Natural` gets
+ * the same treatment without a migration.
+ */
+export function needsWhiteBase(filmNames: readonly (string | null | undefined)[]): boolean {
+  return filmNames.some((name) => /\bnatural\b/i.test(name ?? ''));
+}
+
+/** What the white laid behind a clear film is called on the quotation. */
+export const WHITE_BASE_NAME = 'White';

@@ -435,6 +435,15 @@ export interface CostingJob {
   makesPouches: boolean;
 
   /**
+   * A punched handle, ticked on the line.
+   *
+   * Finishing rather than a style, so it reaches the costing separately from
+   * `pouchType`. It replaces the ordinary making charge with the workbook's own
+   * — see `pouchExpense`, which explains why it replaces rather than adds.
+   */
+  hasDPunch?: boolean;
+
+  /**
    * The style, which decides what making one costs: a zipper is charged across
    * the mouth by the metre, a D punch is made at its own flat rate. Null
    * charges nothing, because a style nobody has chosen has no charge.
@@ -1197,7 +1206,12 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
    * what quotations written before this was per pouch still carry.
    */
   const expense: PouchExpense = job.makesPouches
-    ? pouchExpense(job.pouchType, job.pouchWidthMm ?? job.filmWidthMm, overheads.pouchMaking)
+    ? pouchExpense(
+        job.pouchType,
+        job.pouchWidthMm ?? job.filmWidthMm,
+        overheads.pouchMaking,
+        job.hasDPunch ?? false,
+      )
     : NO_POUCH_EXPENSE;
 
   const override = overheads.pouchMakingPerKgOverride;

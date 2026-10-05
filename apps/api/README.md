@@ -219,7 +219,7 @@ every partial update into a full overwrite.
 Zod's `.partial()` makes a field optional; it does **not** remove its
 `.default()`, and a default fires precisely when a key is absent. So
 `PATCH /customers/:id` with `{ district: 'Nashik' }` parsed to that plus
-`brandName: 'NA'`, `address: 'NA'`, `city: 'NA'`, `mobile: 'NA'`,
+`address: 'NA'`, `city: 'NA'`, `mobile: 'NA'`,
 `email: 'NA'` — and the service spread it into `prisma.update`.
 
 It erased four real customer records. Three attempts to fix it in the quotation

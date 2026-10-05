@@ -37,12 +37,13 @@ compared — and they are. See §17.
 
 ### Step 1 — Customer
 
-| Input           | What it does                                                                    |
-| --------------- | ------------------------------------------------------------------------------- |
-| Company         | Picks an existing customer, or starts a new one                                 |
-| Brand           | Printed on the document                                                         |
-| **Referred by** | **Who sent this enquiry the works' way. Recorded and nothing else — see below** |
-| **Date**        | **Decides which rates and settings price the job**                              |
+| Input                 | What it does                                                                    |
+| --------------------- | ------------------------------------------------------------------------------- |
+| Company               | Picks an existing customer, or starts a new one                                 |
+| **Enquiry from**      | **Who asked. Recorded and nothing else**                                        |
+| **Generated through** | **How it arrived — mail, WhatsApp, phone, SMS. Blank until somebody says**      |
+| **Referred by**       | **Who sent this enquiry the works' way. Recorded and nothing else — see below** |
+| **Date**              | **Decides which rates and settings price the job**                              |
 
 > **The date is not decoration.** A quotation is costed on the rates and
 > overheads **in force on its own date**, not on today's. Open a quotation from

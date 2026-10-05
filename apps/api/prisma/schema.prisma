@@ -40,12 +40,24 @@ enum PouchType {
   STANDUP
   STANDUP_ZIPPER
   ZIPPER
-  /// A punched D-shaped carry hole. Its own style because the punch is its own
-  /// charge on top of making, which is what the works' pouch workbook shows.
+  /// Retired October 2026 — a punched handle is finishing, not a style, and is
+  /// now `QuotationItem.hasDPunch`. Kept so documents that chose it still read.
   D_PUNCH
   SPOUT
   CENTRE_SEAL
   THREE_SIDE_SEAL
+  THREE_SIDE_SEAL_ZIPPER
+  STANDUP_WITH_ZIPPER
+  FLAT_BOTTOM
+  OTHER
+}
+
+/// How an enquiry reached the works.
+enum EnquiryChannel {
+  MAIL
+  WHATSAPP
+  PHONE
+  SMS
   OTHER
 }
 
@@ -76,12 +88,6 @@ model Customer {
   id String @id @default(cuid())
 
   companyName   String @map("company_name")
-  /// The brand this company sells under, where that differs from its
-  /// registered name. A proprietorship registers as a person and trades as a
-  /// brand, and the office knows most customers by the second — so this is what
-  /// the customer list and the quotation show, and `companyName` stays the name
-  /// that belongs on an invoice.
-  brandName     String @default("NA") @map("brand_name")
   contactPerson String @default("NA") @map("contact_person")
   address       String @default("NA")
   city          String @default("NA")
@@ -294,6 +300,16 @@ model Quotation {
   /// per-customer view can be derived from these later, but not the reverse.
   referredBy String @default("") @map("referred_by")
 
+  /// Who asked. Beside `referredBy` rather than instead of it: the person who
+  /// enquired and the person who sent them are often not the same, and the
+  /// office wants both on the record.
+  enquiryFrom String @default("") @map("enquiry_from")
+
+  /// How the enquiry arrived — mail, WhatsApp, a phone call. Null on every
+  /// quotation written before the question was asked, which is honest: the
+  /// office does not remember, and a default would invent an answer.
+  generatedThrough EnquiryChannel? @map("generated_through")
+
   /// Which quantity the document is for, 1-based, among this quotation's tiers.
   ///
   /// The office may price a job at two or three quantities to see what volume
@@ -440,6 +456,17 @@ model QuotationItem {
   gazetteLeft   Decimal @default(0) @map("gazette_left") @db.Decimal(10, 2)
   gazetteRight  Decimal @default(0) @map("gazette_right") @db.Decimal(10, 2)
 
+  /// Finishing, not style. A punched handle or a tear notch can be asked for on
+  /// any pouch, so they are ticked here rather than chosen from the style list
+  /// — which is where D punch used to live, forcing a choice between "D punch"
+  /// and "Standup" when a pouch is perfectly able to be both.
+  ///
+  /// The punch is charged: it replaces the ordinary making rate with the
+  /// workbook's own, the same figure the retired `D_PUNCH` style reached. The
+  /// notch carries no charge, because the works has no rate for one.
+  hasDPunch Boolean @default(false) @map("has_d_punch")
+  hasVNotch Boolean @default(false) @map("has_v_notch")
+
   /// The flat film one pouch is cut from — the pouch plus its gussets. Equal to
   /// width and height on an ordinary bag; larger on a gazette. Stored because
   /// it is what the printed document and the machine both work from.
@@ -461,6 +488,12 @@ model QuotationItem {
   /// say so — "each job/design requires a separate cylinder".
   chargeCylinders Boolean @default(true) @map("charge_cylinders")
 
+  /// A repeat order sometimes needs a cylinder re-engraved rather than a new
+  /// set cut. Ticked on the line, with the cylinders and what each costs below
+  /// — the repair is charged in the cylinder bucket, so it is advance-billed
+  /// the way an engraving already is.
+  repairCylinders Boolean @default(false) @map("repair_cylinders")
+
   // ---- Computed geometry, the same at every quantity ----------------------
   micron                Decimal @db.Decimal(10, 2)
   pouchesPerKg          Decimal @map("pouches_per_kg") @db.Decimal(12, 2)
@@ -478,6 +511,7 @@ model QuotationItem {
   layers     QuotationItemLayer[]
   colours    QuotationItemColour[]
   quantities QuotationItemQuantity[]
+  repairs    QuotationItemCylinderRepair[]
 
   createdAt DateTime @default(now()) @map("created_at")
   /// The order this line became, if the quotation was won.
@@ -1364,6 +1398,8 @@ model Cylinder {
   notes String @default("")
 
   events CylinderEvent[]
+  /// Quotation lines that quoted a repair of this cylinder.
+  repairs QuotationItemCylinderRepair[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -2746,4 +2782,37 @@ model MaintenanceRecord {
   /// Finding what is down right now, which every screen asks.
   @@index([endedAt])
   @@map("maintenance_records")
+}
+
+/// One cylinder being re-engraved on a repeat order, and what it costs.
+///
+/// Snapshotted the way every other figure on a quotation is: the code and the
+/// colour travel with the document, so it still reads after the cylinder has
+/// been re-engraved, renumbered or scrapped. `cylinderId` is the link where the
+/// cylinder is still on record and goes null if it is removed — a quotation
+/// does not stop being true because the works threw a cylinder away.
+model QuotationItemCylinderRepair {
+  id String @id @default(cuid())
+
+  itemId String        @map("item_id")
+  item   QuotationItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  cylinderId String?   @map("cylinder_id")
+  cylinder   Cylinder? @relation(fields: [cylinderId], references: [id], onDelete: SetNull)
+
+  /// The order they are listed in, which is the order of the set.
+  position Int
+
+  code   String
+  colour String @default("NA")
+
+  /// Typed on the line, every time. The master records what a cylinder cost to
+  /// ENGRAVE, which is not what it costs to put right.
+  cost Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([itemId])
+  @@index([cylinderId])
+  @@map("quotation_item_cylinder_repairs")
 }

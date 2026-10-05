@@ -169,7 +169,7 @@ const DESIGN_SELECT = {
   polyMicron: true,
   polyType: true,
   jobColours: true,
-  customer: { select: { companyName: true, brandName: true } },
+  customer: { select: { companyName: true } },
   quotationItems: {
     select: { quotation: { select: { date: true } } },
     orderBy: { quotation: { date: 'desc' } },
@@ -226,7 +226,6 @@ export async function listDesigns(query: ListDesignsQuery): Promise<DesignMaster
             { jobName: { contains: query.q, mode: 'insensitive' } },
             { jobCode: { contains: query.q, mode: 'insensitive' } },
             { customer: { companyName: { contains: query.q, mode: 'insensitive' } } },
-            { customer: { brandName: { contains: query.q, mode: 'insensitive' } } },
           ],
         }
       : {}),

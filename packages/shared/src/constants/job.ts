@@ -16,10 +16,16 @@ export const JOB_KIND_LABELS: Record<JobKind, string> = {
 /**
  * Pouch styles the works produces.
  *
- * The first four are what the company's own letterhead advertises; centre seal
- * and three side seal appear throughout the imported job names. `OTHER` exists
- * because a fixed list that cannot describe a real order is worse than no list
- * — it carries a free-text note alongside it.
+ * **`POUCH_TYPES` is every value the database may hold; `POUCH_TYPES_OFFERED`
+ * is what the office may choose.** They differ because a style can stop being
+ * sold without the quotations that used it ceasing to exist — dropping a value
+ * from the enum would make an old document unreadable, which is a steep price
+ * for tidying a dropdown.
+ *
+ * D punch and V notch left this list in October 2026. They are not styles: a
+ * three side seal with a punched handle is still a three side seal, and asking
+ * the office to choose between "D punch" and "Standup" was asking a question
+ * with no right answer. They are now ticked on the line, beside the gusset.
  */
 export const POUCH_TYPES = [
   'STANDUP',
@@ -29,9 +35,34 @@ export const POUCH_TYPES = [
   'SPOUT',
   'CENTRE_SEAL',
   'THREE_SIDE_SEAL',
+  'THREE_SIDE_SEAL_ZIPPER',
+  'STANDUP_WITH_ZIPPER',
+  'FLAT_BOTTOM',
   'OTHER',
 ] as const;
 export type PouchType = (typeof POUCH_TYPES)[number];
+
+/**
+ * What the dropdown offers, in the works' own order.
+ *
+ * The order is the client's, and it is the order the office thinks in rather
+ * than anything alphabetical. Nothing is selected until somebody chooses: a
+ * style that defaults is a style that goes out unread.
+ */
+export const POUCH_TYPES_OFFERED: readonly PouchType[] = [
+  'THREE_SIDE_SEAL',
+  'CENTRE_SEAL',
+  'STANDUP_ZIPPER',
+  'STANDUP',
+  'THREE_SIDE_SEAL_ZIPPER',
+  'STANDUP_WITH_ZIPPER',
+  'FLAT_BOTTOM',
+];
+
+/** Styles no longer offered, kept so documents that used them still read. */
+export const POUCH_TYPES_RETIRED: readonly PouchType[] = POUCH_TYPES.filter(
+  (type) => !POUCH_TYPES_OFFERED.includes(type),
+);
 
 export const POUCH_TYPE_LABELS: Record<PouchType, string> = {
   STANDUP: 'Standup',
@@ -41,6 +72,26 @@ export const POUCH_TYPE_LABELS: Record<PouchType, string> = {
   SPOUT: 'Spout pouch',
   CENTRE_SEAL: 'Centre seal',
   THREE_SIDE_SEAL: 'Three side seal',
+  THREE_SIDE_SEAL_ZIPPER: 'Three side seal zipper',
+  STANDUP_WITH_ZIPPER: 'Standup with zipper',
+  FLAT_BOTTOM: 'Flat bottom',
+  OTHER: 'Other',
+};
+
+/**
+ * How an enquiry reached the works.
+ *
+ * Recorded on the quotation because the office is asked where the work comes
+ * from and has been answering from memory.
+ */
+export const ENQUIRY_CHANNELS = ['MAIL', 'WHATSAPP', 'PHONE', 'SMS', 'OTHER'] as const;
+export type EnquiryChannel = (typeof ENQUIRY_CHANNELS)[number];
+
+export const ENQUIRY_CHANNEL_LABELS: Record<EnquiryChannel, string> = {
+  MAIL: 'Mail',
+  WHATSAPP: 'WhatsApp',
+  PHONE: 'Phone',
+  SMS: 'SMS',
   OTHER: 'Other',
 };
 

@@ -40,7 +40,7 @@ import { getSettings } from '../settings/settings.service.js';
  */
 
 const SHEET_INCLUDE = {
-  customer: { select: { companyName: true, brandName: true } },
+  customer: { select: { companyName: true } },
   /* Only its number: the sheet names the card it costs, it does not restate it. */
   productionOrder: { select: { number: true } },
   lines: { orderBy: { position: 'asc' } },
@@ -63,13 +63,8 @@ const day = (value: Date): string => value.toISOString().slice(0, 10);
  * knows most customers by the second — so the brand wins wherever there is one,
  * matching the customer list and the quotation.
  */
-const customerName = (
-  customer: { companyName: string; brandName: string } | null | undefined,
-): string => {
-  if (!customer) return '';
-  const brand = customer.brandName;
-  return brand && brand !== 'NA' ? brand : customer.companyName;
-};
+const customerName = (customer: { companyName: string } | null | undefined): string =>
+  customer?.companyName ?? '';
 const asDate = (iso: string): Date => new Date(`${iso}T00:00:00.000Z`);
 
 function toJobSheet(row: SheetRow): JobSheet {
@@ -646,7 +641,6 @@ export async function listJobSheets(query: {
           OR: [
             { jobName: { contains: query.search, mode: 'insensitive' as const } },
             { customer: { companyName: { contains: query.search, mode: 'insensitive' as const } } },
-            { customer: { brandName: { contains: query.search, mode: 'insensitive' as const } } },
             ...(Number.isFinite(Number(query.search)) && query.search.trim() !== ''
               ? [{ number: Number(query.search) }]
               : []),
@@ -668,7 +662,7 @@ export async function listJobSheets(query: {
         date: true,
         status: true,
         jobName: true,
-        customer: { select: { companyName: true, brandName: true } },
+        customer: { select: { companyName: true } },
         /* Only its number: the sheet names the card it costs, it does not restate it. */
         productionOrder: { select: { number: true } },
         pouchingWeightKg: true,

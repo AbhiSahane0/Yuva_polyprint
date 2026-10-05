@@ -152,16 +152,6 @@ export function CustomerTable({
               <th scope="col" className="px-4 py-3 font-semibold">
                 Company
               </th>
-              {/*
-                Brand, where Contact used to be. The office knows most customers
-                by what they sell, not by the firm registered behind it — and a
-                contact person was recorded for almost none of them. The column
-                is gone from the screen only; contactPerson is still stored and
-                still editable on the customer form.
-              */}
-              <th scope="col" className="px-4 py-3 font-semibold">
-                Brand
-              </th>
               <th scope="col" className="px-4 py-3 font-semibold">
                 Mobile
               </th>
@@ -215,9 +205,6 @@ export function CustomerTable({
                         {customer.address === 'NA' ? '—' : customer.address}
                       </p>
                     </td>
-                    <td className="text-ink-600 px-4 py-3">
-                      <Value value={customer.brandName} />
-                    </td>
                     <td className="text-ink-600 px-4 py-3 tabular-nums">
                       <Value value={customer.mobile} />
                     </td>
@@ -236,7 +223,7 @@ export function CustomerTable({
                   </tr>
                   {expanded ? (
                     <tr className="border-ink-100 bg-ink-25 border-b">
-                      <td colSpan={8} className="p-0">
+                      <td colSpan={7} className="p-0">
                         <JobList customerId={customer.id} />
                       </td>
                     </tr>
@@ -260,15 +247,6 @@ export function CustomerTable({
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-ink-900 text-sm font-medium">{customer.companyName}</p>
-                  {/*
-                    The brand gets its own line rather than joining the one
-                    below: it identifies the customer, where a mobile number and
-                    a town merely describe them — and it is the name an enquiry
-                    arrives under.
-                  */}
-                  {customer.brandName !== 'NA' ? (
-                    <p className="text-ink-600 mt-0.5 text-xs">{customer.brandName}</p>
-                  ) : null}
                   <p className="text-ink-500 mt-1 text-xs tabular-nums">
                     <Value value={customer.mobile} />
                     {customer.city !== 'NA' ? ` · ${customer.city}` : ''}

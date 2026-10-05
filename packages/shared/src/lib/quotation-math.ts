@@ -256,6 +256,13 @@ export interface ItemGeometryInputs {
    * terms say exactly that — "each job/design requires a separate cylinder".
    */
   chargeCylinders?: boolean;
+  /**
+   * Cylinders being re-engraved on this line, and what each costs to put right.
+   *
+   * Charged whether or not a new set is. A repeat order charges nothing for the
+   * set it already has and may still be quoted for a repair of one of them.
+   */
+  repairs?: readonly { cost: number }[];
 }
 
 export interface ItemGeometry {
@@ -491,10 +498,26 @@ export function computeItemGeometry(input: ItemGeometryInputs, cylinderRate: num
    * included, because there is nothing to deliver. The per-cylinder figure is
    * still reported so the office can see what a new set would have cost.
    */
+  /*
+   * What the customer pays for cylinders on this line.
+   *
+   * Three cases, and they are not exclusive in principle though the form only
+   * offers one at a time: a new set is cut and charged; an existing set has one
+   * or more put right, charged at what the office typed against each; or
+   * neither, which is the ordinary repeat order.
+   *
+   * The repair sits in this bucket rather than in the material rate because it
+   * is a cylinder cost — the quotation bills it 100% in advance with the rest
+   * of them, and the customer reads it on the cylinder line.
+   */
+  const repairCost = round(
+    (input.repairs ?? []).reduce((total, repair) => total + (Number(repair.cost) || 0), 0),
+    2,
+  );
   const totalCylinderCost =
     (input.chargeCylinders ?? true)
-      ? round(costPerCylinder * input.cylinderCount + (input.transportCost ?? 0), 2)
-      : 0;
+      ? round(costPerCylinder * input.cylinderCount + (input.transportCost ?? 0) + repairCost, 2)
+      : repairCost;
 
   return {
     micron: round(input.micron, 2),
