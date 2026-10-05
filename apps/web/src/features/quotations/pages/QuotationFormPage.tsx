@@ -1256,12 +1256,17 @@ export default function QuotationFormPage() {
                 </Field>
               </div>
 
-              <div className="sm:col-span-2">
+              {/* Three columns, not two. At two the placeholder was cut off
+                  mid-word — "— not recorde" — and a box that clips its own
+                  default reads as broken before anybody has touched it. */}
+              <div className="sm:col-span-3">
                 <Field label="Generated through" htmlFor="generatedThrough">
                   <Select id="generatedThrough" {...register('generatedThrough')}>
                     {/* Nothing chosen is a real answer here: a quotation whose
-                        channel nobody recorded should not claim one. */}
-                    <option value="">— not recorded —</option>
+                        channel nobody recorded should not claim one. Worded the
+                        same as the pouch type's, so the two unanswered boxes on
+                        this wizard read alike. */}
+                    <option value="">— Choose —</option>
                     {ENQUIRY_CHANNELS.map((channel) => (
                       <option key={channel} value={channel}>
                         {ENQUIRY_CHANNEL_LABELS[channel]}
