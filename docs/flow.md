@@ -273,7 +273,7 @@ two. **Free below zero** means more has been promised to job cards than the
 works holds — it is shown in red rather than hidden behind a nought, because a
 works that finds that out at the machine finds out too late.
 
-## Step 7 — the printing cylinders · **Design & Cylinders** _(optional)_
+## Step 7 — the printing cylinders · **Cylinder register** _(optional)_
 
 Which designs already have a set engraved, and where those sets are. A design
 that already has cylinders does not need charging for them again, and the
@@ -1196,7 +1196,7 @@ write through the same service.
 Not in the sidebar: bookmark `/floor` on the tablet. If no screen ever goes on
 the floor, skip it — Production covers the same ground from the office.
 
-### Design & Cylinders
+### Cylinder register
 
 **Answers** — which designs have an engraved set, where each cylinder is, and
 what state it is in.
@@ -1266,7 +1266,7 @@ There are eight ticks, and this is what each one is for:
 | **Rates**                | Rates, Costing, and the costing settings — the margin and the wastage allowance                                                            |
 | **Inventory**            | Inventory, and moving stock by hand                                                                                                        |
 | **Purchase & Suppliers** | Purchase and suppliers                                                                                                                     |
-| **Design & Cylinders**   | the cylinder sets, and the artwork on them                                                                                                 |
+| **Cylinder register**    | the cylinder sets, and the artwork on them                                                                                                 |
 | **Jobs**                 | everything the floor writes: a job card, a stage, Job sheets, Planning's booking, a quality issue, a machine's service record, an operator |
 | **Dispatch**             | raising, sending and cancelling a delivery note                                                                                            |
 
@@ -1290,7 +1290,7 @@ without the rates, cannot tell the office what is in stock without the ledger,
 and cannot say whether cylinders already exist without the register. Gating
 those reads would break the quotation screen for the very people who are meant
 to use it. So **Overview, Orders, Planning, Production, Quality & waste,
-Machines, Employees, Rates, Inventory, Purchase, Design & Cylinders, Job
+Machines, Employees, Rates, Inventory, Purchase, Cylinder register, Job
 sheets and Dispatch can all be read by anyone with a sign-in**, and each of
 those decisions is written down at the route where it is made.
 
