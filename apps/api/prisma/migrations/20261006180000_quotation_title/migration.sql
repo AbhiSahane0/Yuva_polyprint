@@ -1,0 +1,11 @@
+-- What the quotation as a whole is for.
+--
+-- A quotation carries a name per job line, which answers "what is this line"
+-- but not "what is this document". Four lines reading Green Peas 1 kg, Green
+-- Peas 500 g, Sweet Corn 1 kg and Mixed Vegetables 1 kg are one proposal for
+-- a range, and the customer knows it by the range — so the printed document
+-- needs a line the job names cannot supply between them.
+--
+-- Optional, and the printed document leaves the line out entirely when it is
+-- blank. Nothing already on file is given a title it was not sent with.
+ALTER TABLE "quotations" ADD COLUMN "title" TEXT NOT NULL DEFAULT '';

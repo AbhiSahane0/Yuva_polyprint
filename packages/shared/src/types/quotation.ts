@@ -216,6 +216,15 @@ export interface Quotation extends QuotationSummary {
   enquiryFrom: string;
   generatedThrough: EnquiryChannel | null;
 
+  /**
+   * What the document as a whole is for — "Green Peas Packaging Range".
+   *
+   * The job names answer what each LINE is; this answers what the quotation
+   * is. Empty on anything written before the field existed, and the printed
+   * document leaves the line out rather than inventing one.
+   */
+  title: string;
+
   /** When the customer's answer was recorded. */
   decidedAt: string | null;
   /** Why they said no. Empty unless the quotation was lost. */
