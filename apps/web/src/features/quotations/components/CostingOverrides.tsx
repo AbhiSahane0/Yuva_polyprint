@@ -18,10 +18,12 @@ import { Field, NumberInput } from '@/components/ui/Field';
  * with the number greyed behind it reads as a field that still needs doing, and
  * it is the one place a figure is known and the screen was being coy about it.
  *
- * **Nothing is shown while it is closed.** It did carry a heading and a line of
- * what the document was priced at, and the client asked for both to go: the
- * office reads this screen with the customer across the desk, and the margin is
- * not the customer's business. See the comment on the checkbox.
+ * **Nothing is shown while it is closed, and it starts closed every time.** It
+ * did carry a heading and a line of what the document was priced at, and it
+ * used to open itself on a quotation that had overridden something. The client
+ * asked for all of it to go: the office reads this screen with the customer
+ * across the desk, and the margin is not the customer's business. See the
+ * comments on `open` and on the checkbox.
  *
  * **Untouched means the works' figure, not a copy of it.** Anything still equal
  * to the master when the quotation is saved is sent blank — see
@@ -158,22 +160,26 @@ export function CostingOverrides({
   masters: CostingMasters;
   pouchTypes: (PouchType | null | undefined)[];
 }) {
+  /*
+   * **Always closed until somebody ticks it.**
+   *
+   * It used to open itself on a quotation that had overridden something, on
+   * the reasoning that hiding a figure the document is actually priced at was
+   * worse than showing it. The client's answer is that it is not: this screen
+   * is read with the customer on the other side of the desk, and a margin that
+   * puts itself on display because of how the document happens to have been
+   * priced is exactly what they asked to be rid of.
+   *
+   * The overrides are not lost by being hidden. They stay in the form, they go
+   * back to the server untouched, and ticking the box shows them — see
+   * `strippedCosting`, which is what keeps opening and closing from leaving a
+   * mark either way.
+   */
   const [open, setOpen] = useState(false);
-  const filled = FIELDS.some((field) => text(values[field]).trim() !== '');
 
   /* What was last written into each box on the works' behalf, so a box still
      holding it can be told apart from one somebody typed. */
   const applied = useRef<Partial<Record<CostingField, string>>>({});
-
-  /*
-   * A saved quotation that overrode something opens with its figures showing,
-   * because hiding a number this document is actually priced at would be worse
-   * than the four empty boxes this replaces. It only ever opens: once the
-   * office unticks, every field is cleared, so nothing here reopens it.
-   */
-  useEffect(() => {
-    if (filled) setOpen(true);
-  }, [filled]);
 
   const own = mastersFor(masters, pouchTypes);
 

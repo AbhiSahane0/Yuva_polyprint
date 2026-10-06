@@ -571,10 +571,15 @@ export default function QuotationFormPage() {
       status: existing.status,
       terms: existing.terms,
       notes: existing.notes,
-      /* Null on the row means the quotation follows the works', so show blank. */
+      /* Null on the row means the quotation follows the works', so show blank.
+         All FOUR — wastage was missing here, so opening a quotation that set
+         its own wastage read it back as blank, and saving anything at all
+         wrote that blank over the figure and repriced the document on the
+         works' wastage instead. */
       marginPercent: existing.marginPercent ?? '',
       transportPerKg: existing.transportPerKg ?? '',
       pouchMakingPerKg: existing.pouchMakingPerKg ?? '',
+      wastagePercent: existing.wastagePercent ?? '',
       items: existing.items.map((item) => ({
         id: item.id,
         jobId: item.jobId,

@@ -186,11 +186,27 @@ describe('CostingOverrides', () => {
     expect(box('wastagePercent')?.placeholder).toBe('by job kind');
   });
 
-  it('does not overwrite a figure that is already there', () => {
+  /**
+   * **It starts closed even on a quotation that overrode something.**
+   *
+   * It used to open itself, on the reasoning that hiding a figure the document
+   * is actually priced at was worse than showing it. The client's answer is
+   * that it is not: a margin that puts itself on display because of how the
+   * document happens to have been priced is the thing they asked to be rid of,
+   * and this screen is read with the customer across the desk.
+   *
+   * The override is hidden, not lost — one tick shows it, unchanged.
+   */
+  it('stays closed on a quotation that already overrides, and keeps the figure', () => {
     render(<Host defaults={{ marginPercent: '15' } as Partial<CreateQuotationFormValues>} />);
-    // A saved quotation that overrode something opens showing it, rather than
-    // hiding a number this document is actually priced at.
-    expect(checkbox().checked).toBe(true);
+    expect(checkbox().checked).toBe(false);
+    expect(box('marginPercent')).toBeNull();
+    /* Nothing of it on screen either — not the figure, and no hint that this
+       document is priced differently from any other. */
+    expect(onScreen()).not.toContain('15');
+
+    fireEvent.click(checkbox());
+    // Still 15, not overwritten with the works' 9 on the way open.
     expect(box('marginPercent')?.value).toBe('15');
   });
 

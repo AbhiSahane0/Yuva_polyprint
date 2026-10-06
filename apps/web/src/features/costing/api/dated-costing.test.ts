@@ -79,3 +79,26 @@ describe('the costing panel is dated', () => {
     }
   });
 });
+
+/**
+ * **All four overrides survive a round trip through the edit screen.**
+ *
+ * `wastagePercent` did not. It was absent from the mapping that fills the form
+ * from a saved quotation, so a document that set its own wastage read back as
+ * blank — and `strippedCosting` then sent that blank to the server, which took
+ * it as "follow the works" and repriced the document. Wastage inflates the
+ * film bought and film is four-fifths of a rate, so losing it silently moves
+ * real money.
+ *
+ * Checked as a set rather than one by one, because the fault was an omission:
+ * three of the four were there, which is exactly what makes it easy to miss.
+ */
+describe('the quotation’s own costing figures survive being reopened', () => {
+  it('fills every one of the four from the saved document', () => {
+    const reset = FORM.slice(FORM.indexOf('marginPercent: existing.marginPercent'));
+    const body = reset.slice(0, reset.indexOf('items: existing.items'));
+    for (const field of ['marginPercent', 'transportPerKg', 'pouchMakingPerKg', 'wastagePercent']) {
+      expect(body).toContain(`${field}: existing.${field} ?? ''`);
+    }
+  });
+});
