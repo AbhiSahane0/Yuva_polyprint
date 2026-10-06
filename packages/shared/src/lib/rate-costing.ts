@@ -1,6 +1,7 @@
 import type { PouchType } from '../constants/job.js';
 import {
   NO_POUCH_EXPENSE,
+  isWorkbookPouch,
   pouchExpense,
   pouchMakingInForce,
   type PouchExpense,
@@ -300,7 +301,7 @@ export interface CostingColour {
 }
 
 /**
- * Adhesive laid down, worked out from the structure — as the sheet does.
+ * **The Estimation sheet's** adhesive, worked out from the structure.
  *
  * `IF(ply > 40µ, 3, 2)` for the coat weight, times the number of laminations.
  * The sheet writes that second term as "2 if there is a Met PET ply, else 1",
@@ -309,8 +310,12 @@ export interface CostingColour {
  * everywhere the sheet is actually used.
  *
  * A single ply is not laminated at all and carries no adhesive.
+ *
+ * **Not the figure to reach for directly.** The pouch workbook lays a flat 2
+ * whatever the structure, so which of the two applies depends on the style —
+ * `adhesiveGsmFor` below is what picks, and what callers should use.
  */
-export function adhesiveGsmFor(
+export function laminationAdhesiveGsm(
   plies: { micron: number }[],
   options: { thinGsm: number; thickGsm: number; thickPlyMicron: number },
 ): number {
@@ -321,6 +326,48 @@ export function adhesiveGsmFor(
   const thickest = Math.max(...plies.slice(1).map((ply) => ply.micron), 0);
   const coat = thickest > options.thickPlyMicron ? options.thickGsm : options.thinGsm;
   return round(coat * laminations, 4);
+}
+
+/**
+ * **Which adhesive figure this line carries.**
+ *
+ * The works has two costing documents and they disagree about the glue, the
+ * same way they disagree about the ink and the wastage. The Estimation sheet
+ * works a coat out per lamination and takes a heavier one under a thick ply,
+ * reaching 6 on a three-ply. Every block of the pouch workbook writes a flat 2
+ * on its ADHESIVE row whether the laminate is two plies or three, and the
+ * client has confirmed that is what the works lays.
+ *
+ * It is a physical quantity, not a pricing convention, so this is the figure
+ * everywhere: what the laminate weighs, what the glue costs, and what
+ * production takes off the shelf. The one thing it is NOT is the pouch weight
+ * BASIS — see `workbookStructureGsm`, which is a convention and stays out of
+ * production.
+ *
+ * Named as the old lamination-only function was, deliberately: every caller
+ * that used to get the Estimation rule by default now has to say what style it
+ * is costing, and the compiler asks each one in turn. Three times this module
+ * has grown a second copy of a rule and drifted; it does not get a fourth.
+ */
+export function adhesiveGsmFor(input: {
+  /** The style. Anything outside the pouch workbook is on the Estimation sheet. */
+  pouchType: PouchType | null | undefined;
+  /** Ticked on the line. A punched pouch is costed on the workbook. */
+  hasDPunch?: boolean | null;
+  plies: { micron: number }[];
+  thinGsm: number;
+  thickGsm: number;
+  thickPlyMicron: number;
+  /** The pouch workbook's flat figure, from the Costing screen. */
+  pouchAdhesiveGsm: number;
+}): number {
+  /* No lamination, no glue — on either document. A single ply is not stuck to
+     anything, and the workbook's flat figure is the weight of a bond. */
+  if (input.plies.length < 2) return 0;
+
+  return isWorkbookPouch(input.pouchType, input)
+    ? round(Math.max(0, input.pouchAdhesiveGsm), 4)
+    : laminationAdhesiveGsm(input.plies, input);
 }
 
 /** The five dilutions the works uses, and what each leaves behind. */

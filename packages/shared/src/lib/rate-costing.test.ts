@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  adhesiveGsmFor,
+  laminationAdhesiveGsm,
   batchSolidsFor,
   costRate,
   inkGsmOf,
@@ -844,12 +844,12 @@ describe('adhesive is worked out from the structure', () => {
      * Estimation!E13/F13/G13: a heavier coat under a ply thicker than 40µ, one
      * coat per lamination. PET over a 110µ poly is 3 gsm across one join.
      */
-    expect(adhesiveGsmFor([{ micron: 12 }, { micron: 110 }], opts)).toBe(3);
+    expect(laminationAdhesiveGsm([{ micron: 12 }, { micron: 110 }], opts)).toBe(3);
   });
 
   it('takes the thin coat under a thin ply', () => {
     // Quotation 132: PET 12µ over MET PET 12µ — one join, nothing thick.
-    expect(adhesiveGsmFor([{ micron: 12 }, { micron: 12 }], opts)).toBe(2);
+    expect(laminationAdhesiveGsm([{ micron: 12 }, { micron: 12 }], opts)).toBe(2);
   });
 
   it('counts a coat for every lamination, not for every ply', () => {
@@ -858,13 +858,13 @@ describe('adhesive is worked out from the structure', () => {
      * a shortcut for its own three-ply structure. Plies minus one agrees with
      * it everywhere the sheet is actually used and is right elsewhere too.
      */
-    expect(adhesiveGsmFor([{ micron: 12 }, { micron: 12 }, { micron: 110 }], opts)).toBe(6);
+    expect(laminationAdhesiveGsm([{ micron: 12 }, { micron: 12 }, { micron: 110 }], opts)).toBe(6);
   });
 
   it('is nothing at all on a single ply', () => {
     // An unlaminated film is not glued to anything.
-    expect(adhesiveGsmFor([{ micron: 12 }], opts)).toBe(0);
-    expect(adhesiveGsmFor([], opts)).toBe(0);
+    expect(laminationAdhesiveGsm([{ micron: 12 }], opts)).toBe(0);
+    expect(laminationAdhesiveGsm([], opts)).toBe(0);
   });
 });
 

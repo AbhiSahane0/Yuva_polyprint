@@ -186,6 +186,7 @@ export function useRateCosting(
         orderQtyKg: 0, // set per quantity below
         wastagePercent: wastagePercentFor({
           pouchType: line.pouchType,
+          hasDPunch: line.hasDPunch ?? false,
           override: overrides.wastagePercent,
           defaultWastagePercent: settings.defaultWastagePercent,
           pouchWastagePercent: settings.pouchWastagePercent,
@@ -199,11 +200,17 @@ export function useRateCosting(
         /* The Estimation sheet's blended figure, not a purchase rate. */
         flatInk: { ratePerKg: rate(settings.defaultFlatInkMaterial) },
         adhesive: {
-          /* Worked out from the structure, as the sheet does. */
-          gsm: adhesiveGsmFor(line.layers, {
+          /* Whichever of the works' two documents costs this style — the
+             Estimation sheet's coat per lamination, or the pouch workbook's
+             flat figure. See `adhesiveGsmFor`. */
+          gsm: adhesiveGsmFor({
+            pouchType: line.pouchType,
+            hasDPunch: line.hasDPunch ?? false,
+            plies: line.layers,
             thinGsm: settings.adhesiveCoatThinGsm,
             thickGsm: settings.adhesiveCoatThickGsm,
             thickPlyMicron: settings.adhesiveThickPlyMicron,
+            pouchAdhesiveGsm: settings.pouchAdhesiveGsm,
           }),
           flatRatePerKg: rate(settings.defaultFlatAdhesiveMaterial),
           ratio: settings.defaultAdhesiveRatio,
@@ -228,6 +235,7 @@ export function useRateCosting(
            two — see `inkGsmFor`. */
         inkGsmOverride: inkGsmFor({
           pouchType: line.pouchType,
+          hasDPunch: line.hasDPunch ?? false,
           inkGsm: settings.inkGsm,
           pouchInkGsm: settings.pouchInkGsm,
         }),

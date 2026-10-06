@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { computeItemGeometry, structureGsm, workbookStructureGsm } from './quotation-math.js';
+import { adhesiveGsmFor } from './rate-costing.js';
+import { inkGsmFor, isWorkbookPouch, wastagePercentFor } from './pouch-making.js';
 
 /**
  * **The works weighs a pouch two different ways, and both are kept.**
@@ -90,5 +92,79 @@ describe('what a pouch weighs', () => {
     expect(geometry(workbookStructureGsm(SHAMALI, COATS)).pouchesPerKg).toBeLessThan(
       geometry(0).pouchesPerKg,
     );
+  });
+});
+
+/**
+ * **A D punch is costed on the pouch workbook, whatever it is punched into.**
+ *
+ * The client files it that way: "D Punch Pouch" is a sheet of that workbook,
+ * beside Only Standup and Standup Zipper. It stopped being read that way when
+ * the punch became a tick on a base style — a three side seal with a punch is
+ * still a three side seal, so it fell back to the Estimation sheet and was
+ * costed on the wrong document's ink, wastage and adhesive. The punch now
+ * carries the line across.
+ */
+describe('a punched pouch', () => {
+  const PUNCHED = { pouchType: 'THREE_SIDE_SEAL' as const, hasDPunch: true };
+  const PLAIN = { pouchType: 'THREE_SIDE_SEAL' as const, hasDPunch: false };
+
+  it('is read off the workbook although its style is not', () => {
+    expect(isWorkbookPouch(PLAIN.pouchType)).toBe(false);
+    expect(isWorkbookPouch(PUNCHED.pouchType, PUNCHED)).toBe(true);
+  });
+
+  it('takes the workbook’s wastage and ink with it', () => {
+    const wastage = (line: typeof PLAIN) =>
+      wastagePercentFor({ ...line, defaultWastagePercent: 8, pouchWastagePercent: 7 });
+    expect(wastage(PLAIN)).toBe(8);
+    expect(wastage(PUNCHED)).toBe(7);
+
+    const ink = (line: typeof PLAIN) => inkGsmFor({ ...line, inkGsm: 1.8, pouchInkGsm: 1.2 });
+    expect(ink(PLAIN)).toBe(1.8);
+    expect(ink(PUNCHED)).toBe(1.2);
+  });
+
+  it('still reaches the workbook through the old style, for a line written before the tick', () => {
+    expect(isWorkbookPouch('D_PUNCH')).toBe(true);
+  });
+});
+
+/**
+ * **The glue, and which of the two documents states it.**
+ *
+ * The Estimation sheet works a coat out per lamination and takes a heavier one
+ * under a thick ply, so a three-ply reaches 6. Every block of the pouch
+ * workbook writes a flat 2 whatever the structure, and the client has
+ * confirmed that is what the works lays.
+ *
+ * Unlike the pouch WEIGHT basis, this is a physical quantity — so it is the
+ * figure production draws the shelf down on as well as the one the quotation
+ * is priced with, and these pin that it is one number, not two.
+ */
+describe('which adhesive a line carries', () => {
+  const OPTS = { thinGsm: 2, thickGsm: 3, thickPlyMicron: 40, pouchAdhesiveGsm: 2 };
+  const THREE_PLY = [{ micron: 12 }, { micron: 12 }, { micron: 75 }];
+
+  it('works it out per lamination on the Estimation sheet', () => {
+    // Two joins, and the 75µ ply is thick, so 3 a coat.
+    expect(adhesiveGsmFor({ pouchType: 'CENTRE_SEAL', plies: THREE_PLY, ...OPTS })).toBe(6);
+  });
+
+  it('lays the workbook’s flat coat on a workbook style', () => {
+    expect(adhesiveGsmFor({ pouchType: 'STANDUP', plies: THREE_PLY, ...OPTS })).toBe(2);
+    expect(adhesiveGsmFor({ pouchType: 'STANDUP_ZIPPER', plies: THREE_PLY, ...OPTS })).toBe(2);
+  });
+
+  it('follows the punch across, like the wastage and the ink', () => {
+    expect(
+      adhesiveGsmFor({ pouchType: 'THREE_SIDE_SEAL', hasDPunch: true, plies: THREE_PLY, ...OPTS }),
+    ).toBe(2);
+  });
+
+  it('charges nothing on a single ply, on either document', () => {
+    // Nothing is stuck to anything, and the flat figure is the weight of a bond.
+    expect(adhesiveGsmFor({ pouchType: 'STANDUP', plies: [{ micron: 12 }], ...OPTS })).toBe(0);
+    expect(adhesiveGsmFor({ pouchType: 'CENTRE_SEAL', plies: [{ micron: 12 }], ...OPTS })).toBe(0);
   });
 });

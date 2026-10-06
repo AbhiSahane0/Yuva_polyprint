@@ -517,6 +517,17 @@ export const settingsSchema = z.object({
    */
   pouchInkGsm: z.coerce.number().min(0).max(50),
   /**
+   * And the adhesive a pouch-workbook laminate carries.
+   *
+   * The same split again, and the same reason. The Estimation sheet works the
+   * coat out from the structure — heavier under a thick ply, one coat per
+   * lamination, so a three-ply reaches 6. The pouch workbook does not: every
+   * one of its blocks writes a flat 2 on its ADHESIVE row whether the laminate
+   * is two plies or three, and the client has confirmed that is what the works
+   * lays. It decides what a pouch WEIGHS as well as what the glue costs.
+   */
+  pouchAdhesiveGsm: z.coerce.number().min(0).max(50),
+  /**
    * Adhesive is worked out from the structure, not stated — the sheet takes a
    * heavier coat under a thick ply and one coat per lamination. These three
    * are its numbers; `adhesiveGsm` is no longer used for costing.
@@ -753,6 +764,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Averages of what the imported jobs actually record.
   inkGsm: 1.8,
   pouchInkGsm: 1.2,
+  /* The flat figure every block of the works' pouch workbook carries. */
+  pouchAdhesiveGsm: 2,
   adhesiveGsm: 2.5,
   adhesiveCoatThinGsm: 2,
   adhesiveCoatThickGsm: 3,

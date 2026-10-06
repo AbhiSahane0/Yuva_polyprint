@@ -749,13 +749,19 @@ export default function QuotationFormPage() {
        * both the material cost and the geometry below have to agree on it.
        */
       const pouchTypeOfItem = (item?.pouchType || null) as PouchType | null;
-      const coatGsm = adhesiveGsmFor(layers, {
+      const hasDPunch = item?.hasDPunch === true;
+      const coatGsm = adhesiveGsmFor({
+        pouchType: pouchTypeOfItem,
+        hasDPunch,
+        plies: layers,
         thinGsm: settings?.adhesiveCoatThinGsm ?? 2,
         thickGsm: settings?.adhesiveCoatThickGsm ?? 3,
         thickPlyMicron: settings?.adhesiveThickPlyMicron ?? 40,
+        pouchAdhesiveGsm: settings?.pouchAdhesiveGsm ?? 2,
       });
       const inkGsm = inkGsmFor({
         pouchType: pouchTypeOfItem,
+        hasDPunch,
         inkGsm: settings?.inkGsm ?? 1.8,
         pouchInkGsm: settings?.pouchInkGsm ?? 1.2,
       });
@@ -783,7 +789,7 @@ export default function QuotationFormPage() {
              figure stays in `gsm`, because that is what the material cost and
              production's film reservation are built from.
           */
-          workbookGsm: isWorkbookPouch(pouchTypeOfItem)
+          workbookGsm: isWorkbookPouch(pouchTypeOfItem, { hasDPunch })
             ? workbookStructureGsm(layers, { inkGsm, adhesiveGsm: coatGsm })
             : 0,
           widthMm: num(item?.widthMm),

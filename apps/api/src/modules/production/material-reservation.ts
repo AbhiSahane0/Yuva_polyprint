@@ -72,6 +72,10 @@ export async function requirementsForCards(
       quotationItem: {
         select: {
           pouchType: true,
+          /* A punched pouch is costed on the pouch workbook whatever its base
+             style, and the workbook lays a different coat of adhesive — so the
+             shelf has to know about the tick too. */
+          hasDPunch: true,
           compositeGsm: true,
           /* The web this job runs at: film width × lanes + trim. A reel
              narrower than that cannot run it — film is slit down, never
@@ -144,6 +148,7 @@ export async function requirementsForCards(
 
     const wastagePercent = wastagePercentFor({
       pouchType: item.pouchType,
+      hasDPunch: item.hasDPunch,
       override:
         item.quotation.wastagePercent === null ? null : toNumber(item.quotation.wastagePercent),
       defaultWastagePercent: settings.defaultWastagePercent,
@@ -199,17 +204,21 @@ export async function requirementsForCards(
         : [];
 
     const adhesive = adhesiveRequirements({
-      adhesiveGsm: adhesiveGsmFor(
-        item.layers.map((layer) => ({
+      /* The coat the works actually lays on this style — see
+         `adhesiveGsmFor`. A physical quantity, so the shelf is drawn down on
+         the same figure the quotation was priced with. */
+      adhesiveGsm: adhesiveGsmFor({
+        pouchType: item.pouchType,
+        hasDPunch: item.hasDPunch,
+        plies: item.layers.map((layer) => ({
           micron: toNumber(layer.micron),
           density: toNumber(layer.density),
         })),
-        {
-          thinGsm: settings.adhesiveCoatThinGsm,
-          thickGsm: settings.adhesiveCoatThickGsm,
-          thickPlyMicron: settings.adhesiveThickPlyMicron,
-        },
-      ),
+        thinGsm: settings.adhesiveCoatThinGsm,
+        thickGsm: settings.adhesiveCoatThickGsm,
+        thickPlyMicron: settings.adhesiveThickPlyMicron,
+        pouchAdhesiveGsm: settings.pouchAdhesiveGsm,
+      }),
       substrateGsm,
       consumedKg,
       splitRatio: settings.adhesiveSplitRatio,

@@ -6,12 +6,11 @@
  * "7 of 7 exact" and this one must keep every pouch count on the nose, or the
  * two documents have drifted apart again.
  *
- * **The adhesive is the sheet's, not the app's.** Each block passes the GSM
- * printed on its own ADHESIVE row — a flat 2 whatever the structure — where
- * `adhesiveGsmFor` charges a coat per lamination and so reaches 3 on a
- * two-ply and 6 on a three-ply. That is a real disagreement with the works'
- * sheets and it is not settled yet; feeding the sheet's figure here keeps this
- * check about the WEIGHT FORMULA, which is what it exists to pin.
+ * **The adhesive comes from the app, not the sheet.** It used to be fed in,
+ * because the two disagreed: every block writes a flat 2 on its ADHESIVE row
+ * whatever the structure, where the app worked a coat out per lamination and
+ * reached 6 on a three-ply. The client has confirmed the flat 2, so the app
+ * now answers for itself and this check tests it rather than being told.
  *
  * Only the parts that are directly comparable are compared. The sheet replaces
  * the whole of labour, power and machine time with a flat "LIGHT AND LABOUR"
@@ -27,6 +26,7 @@ import {
   computeItemGeometry,
   pouchExpense,
   wastagePercentFor,
+  adhesiveGsmFor,
   isWorkbookPouch,
   workbookStructureGsm,
   type PouchType,
@@ -220,8 +220,17 @@ console.log('-'.repeat(130));
 
 for (const b of BLOCKS) {
   /* The app's geometry, from the structure's real GSM. */
-  const gsm =
-    b.plies.reduce((a, p) => a + p.micron * p.density, 0) + b.inkMicron * 1 + b.adhesiveMicron * 1;
+  /* Whatever the app says this style's coat is — the thing being checked. */
+  const adhesive = adhesiveGsmFor({
+    pouchType: b.pouchType,
+    hasDPunch: b.hasDPunch ?? false,
+    plies: b.plies,
+    thinGsm: 2,
+    thickGsm: 3,
+    thickPlyMicron: 40,
+    pouchAdhesiveGsm: 2,
+  });
+  const gsm = b.plies.reduce((a, p) => a + p.micron * p.density, 0) + b.inkMicron * 1 + adhesive;
   const micron = b.plies.reduce((a, p) => a + p.micron, 0) + b.inkMicron + b.adhesiveMicron;
 
   const geo = computeItemGeometry(
@@ -229,10 +238,10 @@ for (const b of BLOCKS) {
       layerCount: b.plies.length,
       micron,
       gsm,
-      workbookGsm: isWorkbookPouch(b.pouchType)
+      workbookGsm: isWorkbookPouch(b.pouchType, b)
         ? workbookStructureGsm(
             b.plies.map((p) => ({ micron: p.micron, density: p.density })),
-            { inkGsm: b.inkMicron, adhesiveGsm: b.adhesiveMicron },
+            { inkGsm: b.inkMicron, adhesiveGsm: adhesive },
           )
         : 0,
       widthMm: b.widthCm * 10,
@@ -250,6 +259,7 @@ for (const b of BLOCKS) {
 
   const appWastage = wastagePercentFor({
     pouchType: b.pouchType,
+    hasDPunch: b.hasDPunch ?? false,
     defaultWastagePercent: 8,
     pouchWastagePercent: 7,
   });

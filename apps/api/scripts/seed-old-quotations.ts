@@ -21,7 +21,7 @@ import { labourAsAt } from '../src/modules/costing/costing.service.js';
 import { getSettings } from '../src/modules/settings/settings.service.js';
 import {
   costRate,
-  adhesiveGsmFor,
+  laminationAdhesiveGsm,
   parseStationSteps,
   createQuotationSchema,
   type CostingInput,
@@ -224,7 +224,10 @@ async function main() {
       { name: 'W/O Poly', micron: n(s.polyMic), density: 0.94, ratePerKg: n(s.polyRate) },
     ];
     const live = layers.filter((l) => l.micron > 0);
-    const adhGsm = adhesiveGsmFor(live, {
+    /* These seven are Estimation-sheet quotations, so the sheet's own coat per
+       lamination — named outright rather than reached through the chooser,
+       which would ask a style question these rows have already answered. */
+    const adhGsm = laminationAdhesiveGsm(live, {
       thinGsm: settings.adhesiveCoatThinGsm,
       thickGsm: settings.adhesiveCoatThickGsm,
       thickPlyMicron: settings.adhesiveThickPlyMicron,

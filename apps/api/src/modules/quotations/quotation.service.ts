@@ -391,10 +391,14 @@ function priceQuotation(
       adhesiveGsm: costing.settings.adhesiveGsm,
     });
 
-    const coatGsm = adhesiveGsmFor(layers, {
+    const coatGsm = adhesiveGsmFor({
+      pouchType: item.pouchType,
+      hasDPunch: item.hasDPunch,
+      plies: layers,
       thinGsm: costing.settings.adhesiveCoatThinGsm,
       thickGsm: costing.settings.adhesiveCoatThickGsm,
       thickPlyMicron: costing.settings.adhesiveThickPlyMicron,
+      pouchAdhesiveGsm: costing.settings.pouchAdhesiveGsm,
     });
 
     // Geometry holds for every quantity; only the money below changes.
@@ -410,7 +414,7 @@ function priceQuotation(
         /* And the pouch workbook's own basis where that is what prices the
            style — about ten per cent heavier, and the works' own arithmetic.
            See `workbookStructureGsm`. */
-        workbookGsm: isWorkbookPouch(item.pouchType)
+        workbookGsm: isWorkbookPouch(item.pouchType, item)
           ? workbookStructureGsm(layers, {
               inkGsm: costing.settings.inkGsm,
               adhesiveGsm: coatGsm,

@@ -107,8 +107,24 @@ export const WORKBOOK_POUCHES: readonly PouchType[] = [
   'FLAT_BOTTOM',
 ];
 
-/** Whether this line is costed on the pouch workbook rather than the Estimation sheet. */
-export function isWorkbookPouch(pouchType: PouchType | null | undefined): boolean {
+/**
+ * Whether this line is costed on the pouch workbook rather than the Estimation
+ * sheet.
+ *
+ * **A D punch pulls the line onto the workbook whatever its base style**, and
+ * that is the client's own filing: "D Punch Pouch" is a sheet of that workbook
+ * in their own file, sitting beside Only Standup and Standup Zipper. It stopped
+ * being read that way when the punch became a tick on a base style — a three
+ * side seal with a punch is still a three side seal, so it fell back to the
+ * Estimation sheet and was costed on the wrong document's ink, wastage and
+ * weight. The old `D_PUNCH` style is still in the list below, so a line written
+ * either way lands on the same sheet.
+ */
+export function isWorkbookPouch(
+  pouchType: PouchType | null | undefined,
+  line?: { hasDPunch?: boolean | null },
+): boolean {
+  if (line?.hasDPunch === true) return true;
   return pouchType !== null && pouchType !== undefined && WORKBOOK_POUCHES.includes(pouchType);
 }
 
@@ -191,6 +207,8 @@ export function pouchExpense(
 export function wastagePercentFor(input: {
   /** The style. Anything outside the pouch workbook is on the Estimation sheet. */
   pouchType: PouchType | null | undefined;
+  /** Ticked on the line. A punched pouch is costed on the workbook. */
+  hasDPunch?: boolean | null;
   /** What this quotation sets for itself, or null to follow the works. */
   override?: number | null;
   defaultWastagePercent: number;
@@ -199,7 +217,9 @@ export function wastagePercentFor(input: {
   if (input.override !== null && input.override !== undefined && Number.isFinite(input.override)) {
     return input.override;
   }
-  return isWorkbookPouch(input.pouchType) ? input.pouchWastagePercent : input.defaultWastagePercent;
+  return isWorkbookPouch(input.pouchType, input)
+    ? input.pouchWastagePercent
+    : input.defaultWastagePercent;
 }
 
 /**
@@ -213,10 +233,11 @@ export function wastagePercentFor(input: {
  */
 export function inkGsmFor(input: {
   pouchType: PouchType | null | undefined;
+  hasDPunch?: boolean | null;
   inkGsm: number;
   pouchInkGsm: number;
 }): number {
-  return isWorkbookPouch(input.pouchType) ? input.pouchInkGsm : input.inkGsm;
+  return isWorkbookPouch(input.pouchType, input) ? input.pouchInkGsm : input.inkGsm;
 }
 
 /**

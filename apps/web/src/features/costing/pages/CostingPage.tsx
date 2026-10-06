@@ -709,6 +709,11 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
      * per-pouch rate below, which is how everything written before October is
      * still costed.
      */
+    [
+      'pouchAdhesiveGsm',
+      'Adhesive GSM on a pouch job',
+      'The workbook lays a flat coat, whatever the plies',
+    ],
     ['pouchMakingPlainPerKg', 'Making — plain, Rs/kg', 'Centre seal, three side seal'],
     ['pouchMakingGussetPerKg', 'Making — gusset, Rs/kg', 'Ticked as a gazette pouch'],
     [
