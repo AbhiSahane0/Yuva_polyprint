@@ -20,7 +20,8 @@ describe('statusAfter', () => {
   it.each([
     ['ENGRAVED', 'IN_STORE'],
     ['RETURNED', 'IN_STORE'],
-    ['REWORKED', 'IN_STORE'],
+    ['REWORKED', 'REPAIRED'],
+    ['SENT_FOR_REPAIR', 'UNDER_REPAIR'],
     ['ALLOCATED', 'ALLOCATED'],
     ['IN_USE', 'IN_USE'],
     ['DAMAGED', 'DAMAGED'],
@@ -41,11 +42,46 @@ describe('statusAfter', () => {
   });
 
   it('brings a damaged cylinder back only through rework', () => {
-    expect(statusAfter('REWORKED', 'DAMAGED')).toBe('IN_STORE');
+    /* REPAIRED rather than IN_STORE, which is the one thing that moved here:
+       the works asked to be able to see which cylinders have been back to the
+       engraver, and that is a question about the one about to be mounted. It
+       is on the shelf and usable either way. */
+    expect(statusAfter('REWORKED', 'DAMAGED')).toBe('REPAIRED');
     // Returning a damaged one to the shelf does not repair it... but it is
     // still a return, and the works records what happened rather than what
     // ought to have. Rework is the event that says it is usable again.
     expect(statusAfter('RETURNED', 'DAMAGED')).toBe('IN_STORE');
+  });
+
+  /**
+   * **The weeks a cylinder spends at the engraver.**
+   *
+   * The register could say a cylinder was found unusable, and it could say it
+   * was back on the shelf, but it had no word for the time in between — so a
+   * set sent out read as damaged and in store, which is two things at once and
+   * neither of them true.
+   */
+  it('takes it out of the works when it is sent for repair, and back when it returns', () => {
+    expect(statusAfter('SENT_FOR_REPAIR', 'DAMAGED')).toBe('UNDER_REPAIR');
+    expect(statusAfter('REWORKED', 'UNDER_REPAIR')).toBe('REPAIRED');
+  });
+
+  it('counts one at the engraver as neither usable nor on the shelf', () => {
+    expect(isUnusable('UNDER_REPAIR')).toBe(true);
+    expect(isOutOfStore('UNDER_REPAIR')).toBe(true);
+    /* And one that has come back as both usable and there — it is an ordinary
+       cylinder with a history, not a lesser one. */
+    expect(isUnusable('REPAIRED')).toBe(false);
+    expect(isOutOfStore('REPAIRED')).toBe(false);
+  });
+
+  it('reads a set with one away as a set with a problem', () => {
+    // Worst wins: five good cylinders and one at the engraver cannot print.
+    expect(designStatus(['IN_STORE', 'UNDER_REPAIR', 'IN_STORE'])).toBe('UNDER_REPAIR');
+    // ...but one already repaired is not a problem at all.
+    expect(designStatus(['IN_STORE', 'REPAIRED', 'IN_STORE'])).toBe('REPAIRED');
+    // And something nobody has acted on still outranks something away.
+    expect(designStatus(['DAMAGED', 'UNDER_REPAIR'])).toBe('DAMAGED');
   });
 });
 

@@ -11,10 +11,28 @@ import { listOrderBy } from './quotation.service.js';
  * pagination rather than a missing ORDER BY.
  */
 describe('listOrderBy', () => {
-  it('defaults to the work queue, not to a column', () => {
-    // Drafts need finishing, sent ones need chasing, won and lost are settled.
-    // Newest first inside each, because that is what is being worked on.
-    expect(listOrderBy({ page: 1, pageSize: 25 })).toEqual([{ status: 'asc' }, { number: 'desc' }]);
+  it('defaults to newest first, by the date on the document', () => {
+    /*
+     * It used to lead on status — every draft, then every sent one, then the
+     * won and the lost. D sorts before S, so a quotation written this morning
+     * sat below eleven from last year, and the office opens this screen to find
+     * what they wrote today.
+     */
+    expect(listOrderBy({ page: 1, pageSize: 25 })).toEqual([
+      { date: 'desc' },
+      { number: 'desc' },
+      { id: 'desc' },
+    ]);
+  });
+
+  it('breaks a same-day tie all the way down to the id', () => {
+    /* The office writes several a day, so the date alone ties constantly. The
+       number settles almost all of them and the id settles the rest, which is
+       what stops rows jumping about while paging. */
+    const [first, second, third] = listOrderBy({ page: 1, pageSize: 25 });
+    expect(Object.keys(first ?? {})).toEqual(['date']);
+    expect(Object.keys(second ?? {})).toEqual(['number']);
+    expect(Object.keys(third ?? {})).toEqual(['id']);
   });
 
   it('needs no tie-break when sorting by the number itself', () => {

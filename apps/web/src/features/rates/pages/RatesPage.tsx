@@ -228,12 +228,23 @@ export default function RatesPage() {
                           ? ((typed - base) / base) * 100
                           : material.changePercent;
                       const isPreview = typed !== null && typed !== base;
+                      /* Worked out rather than keyed. The box would be a
+                         control that cannot answer: whatever was typed in it
+                         would be overwritten the next time the base moved. */
+                      const follows = material.baseMaterialName !== null;
 
                       return (
                         <tr key={material.id} className="border-ink-100 border-b last:border-0">
                           <td className="px-4 py-2.5">
                             <span className="text-ink-900 font-medium">{material.name}</span>
                             <span className="text-ink-400 ml-2 text-xs">/{material.unit}</span>
+                            {follows ? (
+                              <span className="text-ink-500 block text-xs">
+                                {material.baseMaterialName}
+                                {(material.ratePremium ?? 0) < 0 ? ' − ' : ' + '}
+                                {formatNumber(Math.abs(material.ratePremium ?? 0), 2)}
+                              </span>
+                            ) : null}
                           </td>
                           <td className="text-ink-400 hidden px-4 py-2.5 text-right tabular-nums sm:table-cell">
                             {material.previousRate === null
@@ -244,21 +255,41 @@ export default function RatesPage() {
                             {base === null ? '—' : formatNumber(base, 2)}
                           </td>
                           <td className="px-4 py-2.5">
-                            <NumberInput
-                              aria-label={`New rate for ${material.name}`}
-                              placeholder={base === null ? '0.00' : formatNumber(base, 2)}
-                              value={draft}
-                              onChange={(event) =>
-                                setDrafts((current) => ({
-                                  ...current,
-                                  [material.id]: event.target.value,
-                                }))
-                              }
-                              className={cn(
-                                'py-1.5 text-right tabular-nums',
-                                isPreview && 'border-brand-600 bg-brand-50',
-                              )}
-                            />
+                            {follows ? (
+                              /*
+                                No box. There is one number to key for the whole
+                                LDPE family, and a second one here would sit
+                                there looking authoritative until the base moved
+                                and silently replaced it.
+
+                                A dash rather than the words: the row already
+                                says what it follows, under the name, and
+                                saying it twice in one line reads as two
+                                different statements.
+                              */
+                              <span
+                                className="text-ink-300 block py-1.5 text-center"
+                                title={`Worked out from ${material.baseMaterialName}. Set that rate and this one follows.`}
+                              >
+                                &mdash;
+                              </span>
+                            ) : (
+                              <NumberInput
+                                aria-label={`New rate for ${material.name}`}
+                                placeholder={base === null ? '0.00' : formatNumber(base, 2)}
+                                value={draft}
+                                onChange={(event) =>
+                                  setDrafts((current) => ({
+                                    ...current,
+                                    [material.id]: event.target.value,
+                                  }))
+                                }
+                                className={cn(
+                                  'py-1.5 text-right tabular-nums',
+                                  isPreview && 'border-brand-600 bg-brand-50',
+                                )}
+                              />
+                            )}
                           </td>
                           <td className="px-4 py-2.5 text-right">
                             {delta === null || Number.isNaN(delta) ? (

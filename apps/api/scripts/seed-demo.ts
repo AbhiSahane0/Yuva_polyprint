@@ -103,10 +103,14 @@ async function quoteRate(input: {
       colours: [],
       flatInk: { ratePerKg: priceOf(settings.defaultFlatInkMaterial) },
       adhesive: {
-        gsm: adhesiveGsmFor(input.layers, {
+        gsm: adhesiveGsmFor({
+          pouchType: input.pouchType ?? null,
+          hasDPunch: input.hasDPunch ?? false,
+          plies: input.layers,
           thinGsm: settings.adhesiveCoatThinGsm,
           thickGsm: settings.adhesiveCoatThickGsm,
           thickPlyMicron: settings.adhesiveThickPlyMicron,
+          pouchAdhesiveGsm: settings.pouchAdhesiveGsm,
         }),
         flatRatePerKg: priceOf(settings.defaultFlatAdhesiveMaterial),
         ratio: settings.defaultAdhesiveRatio,

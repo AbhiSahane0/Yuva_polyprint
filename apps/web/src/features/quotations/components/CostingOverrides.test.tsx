@@ -79,19 +79,31 @@ describe('CostingOverrides', () => {
     expect(checkbox().checked).toBe(false);
   });
 
-  it('says what the quotation is priced at while they are away', () => {
-    // Folding them away must not mean the office cannot see the figures — that
-    // would be worse than the boxes. One line, and it is the works' own.
+  /*
+   * It used to say so, in one line, and the client asked for that line to go.
+   * The quotation screen is read with the customer across the desk, and what
+   * the works makes on the job is not theirs to read — the same reason the
+   * margin percentages on the quantity rows lost the words "gross" and "net".
+   * The figures are a tick away, which is the point of the tick.
+   */
+  it('puts no figure on screen at all while they are away', () => {
     render(<Host />);
-    expect(onScreen()).toContain('Margin 9%');
-    expect(onScreen()).toContain('Transport Rs. 6.80/kg');
-    expect(onScreen()).toContain('Wastage 7%');
-    expect(onScreen()).toContain('Pouch making Rs. 11.04/kg');
+    expect(onScreen()).not.toContain('Margin 9%');
+    expect(onScreen()).not.toContain('6.80');
+    expect(onScreen()).not.toContain('Wastage');
+    expect(onScreen()).not.toContain('11.04');
+    /* Nor a heading over it: a heading above one checkbox is noise. */
+    expect(onScreen()).not.toContain('This quotation’s costing');
+    /* The checkbox names the section by itself. */
+    expect(onScreen()).toContain('Edit this quotation’s costing');
   });
 
   it('says what decides making when it cannot be worked out', () => {
+    // Only once the boxes are open, where it belongs on the box it explains.
     render(<Host masters={NO_MAKING} />);
-    expect(onScreen()).toContain('Pouch making by style');
+    expect(onScreen()).not.toContain('by style');
+    fireEvent.click(checkbox());
+    expect(box('pouchMakingPerKg')?.placeholder).toBe('by style');
   });
 
   it('opens the boxes filled in with the works’ own figures', () => {
@@ -151,6 +163,20 @@ describe('CostingOverrides', () => {
     expect(box('pouchMakingPerKg')?.value).toBe('20');
   });
 
+  /*
+   * The margin follows the VOLUME, so there is a single figure to offer only
+   * when every costable quantity falls the same side of the 500 kg break.
+   * Filling one in regardless is what repriced a saved quotation: the box is
+   * an override, so offering the Costing screen's 9% took the margin off every
+   * tier of a document the engine was costing at 15%.
+   */
+  it('leaves the margin empty when the document straddles the volume break', () => {
+    render(<Host masters={{ ...MASTERS, marginPercent: null }} />);
+    fireEvent.click(checkbox());
+    expect(box('marginPercent')?.value).toBe('');
+    expect(box('marginPercent')?.placeholder).toBe('by quantity');
+  });
+
   it('cannot offer a wastage when the jobs disagree about it', () => {
     // Which of the two applies is decided by the STYLE, job by job. A single
     // figure across a mixed document would be wrong for half of it.
@@ -160,11 +186,27 @@ describe('CostingOverrides', () => {
     expect(box('wastagePercent')?.placeholder).toBe('by job kind');
   });
 
-  it('does not overwrite a figure that is already there', () => {
+  /**
+   * **It starts closed even on a quotation that overrode something.**
+   *
+   * It used to open itself, on the reasoning that hiding a figure the document
+   * is actually priced at was worse than showing it. The client's answer is
+   * that it is not: a margin that puts itself on display because of how the
+   * document happens to have been priced is the thing they asked to be rid of,
+   * and this screen is read with the customer across the desk.
+   *
+   * The override is hidden, not lost — one tick shows it, unchanged.
+   */
+  it('stays closed on a quotation that already overrides, and keeps the figure', () => {
     render(<Host defaults={{ marginPercent: '15' } as Partial<CreateQuotationFormValues>} />);
-    // A saved quotation that overrode something opens showing it, rather than
-    // hiding a number this document is actually priced at.
-    expect(checkbox().checked).toBe(true);
+    expect(checkbox().checked).toBe(false);
+    expect(box('marginPercent')).toBeNull();
+    /* Nothing of it on screen either — not the figure, and no hint that this
+       document is priced differently from any other. */
+    expect(onScreen()).not.toContain('15');
+
+    fireEvent.click(checkbox());
+    // Still 15, not overwritten with the works' 9 on the way open.
     expect(box('marginPercent')?.value).toBe('15');
   });
 
@@ -177,7 +219,8 @@ describe('CostingOverrides', () => {
     // Unticking is how an override is taken back, so it has to undo the typing
     // as well as the opening — otherwise 15 would price the document invisibly.
     expect(box('marginPercent')).toBeNull();
-    expect(onScreen()).toContain('Margin 9%');
+    // And 15 is not left on screen in a summary either: closed shows nothing.
+    expect(onScreen()).not.toContain('15');
   });
 });
 
@@ -226,6 +269,15 @@ describe('strippedCosting', () => {
     expect(strippedCosting({ pouchMakingPerKg: '9.80' }, MASTERS, [STANDUP]).pouchMakingPerKg).toBe(
       '9.80',
     );
+  });
+
+  it('keeps a margin the office set on a document that straddles the break', () => {
+    // No master figure to compare against, so nothing can be stripped as equal
+    // to it — which is right: they typed it because neither band would do.
+    expect(
+      strippedCosting({ marginPercent: '12' }, { ...MASTERS, marginPercent: null }, [STANDUP])
+        .marginPercent,
+    ).toBe('12');
   });
 
   it('keeps a wastage the office set on a document its jobs disagree about', () => {

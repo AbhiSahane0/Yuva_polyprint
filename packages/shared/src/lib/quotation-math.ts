@@ -72,6 +72,53 @@ export function structureGsm(
   return round(substrate + Math.max(0, coats.inkGsm) + Math.max(0, coats.adhesiveGsm), 4);
 }
 
+/**
+ * **What the works' pouch workbook weighs a square metre at.**
+ *
+ * Not the same quantity as `structureGsm`, and not an approximation of it. The
+ * workbook reaches a pouch weight a different way:
+ *
+ *     grams = width_cm × height_cm × (average density) × (total micron) ÷ 10,000
+ *
+ * where the average is taken flat across its rows — every film ply, then INKS
+ * and ADHESIVE, both carried at density 1 — and the total micron sums the same
+ * rows. Written here as an effective GSM, `average density × total micron`, so
+ * it drops into exactly the arithmetic `structureGsm` feeds.
+ *
+ * **It is arithmetically wrong and it is what the works prices on.** A flat
+ * mean of 1.4, 1.4, 0.92, 1, 1 over-weights the thick low-density poly, so a
+ * 12/12/75 standup comes out at 116.9 against its real 105.8 — about ten per
+ * cent heavy, and therefore about ten per cent dearer a pouch. The works has
+ * quoted this way for years and asked for it kept; `structureGsm` stays the
+ * physical figure and is what production reserves film against, so the two
+ * must not be substituted for one another.
+ *
+ * Only the pouch workbook's styles use this. The Estimation sheet's — centre
+ * seal, three side seal, spout — weigh with `structureGsm`, which is what the
+ * seven 2022 quotations reproduce to the paisa.
+ */
+export function workbookStructureGsm(
+  plies: { micron: number; density: number | null | undefined }[],
+  coats: { inkGsm: number; adhesiveGsm: number },
+): number {
+  /* A ply left at zero microns is a ply the structure does not have, and it is
+     not a row on the sheet either — so it does not dilute the average. */
+  const live = plies.filter((ply) => ply.micron > 0);
+  if (live.length === 0) return 0;
+  if (live.some((ply) => !(Number(ply.density) > 0))) return 0;
+
+  const ink = Math.max(0, coats.inkGsm);
+  const adhesive = Math.max(0, coats.adhesiveGsm);
+
+  /* The two coats are rows on the sheet like any other, at density 1 — which
+     is why their GSM and their "micron" are the same number there. */
+  const densities = [...live.map((ply) => Number(ply.density)), 1, 1];
+  const averageDensity = densities.reduce((total, d) => total + d, 0) / densities.length;
+  const totalMicron = live.reduce((total, ply) => total + ply.micron, 0) + ink + adhesive;
+
+  return round(averageDensity * totalMicron, 4);
+}
+
 export interface QuotationItemInputs {
   layer: number;
   widthMm: number;
@@ -166,10 +213,12 @@ export function computeItem(
   );
   const cylinderCircumference = round(input.heightMm * input.repeatHeight, 2);
   const costPerCylinder = round(((cylinderWidth * cylinderCircumference) / 100) * cylinderRate, 2);
-  const totalCylinderCost = round(
-    costPerCylinder * input.cylinderCount + (input.transportCost ?? 0),
-    2,
-  );
+  /* No cylinders, no cylinder cost — the transport too, since there is nothing
+     to deliver. See the same rule in `computeItemGeometry`. */
+  const totalCylinderCost =
+    input.cylinderCount > 0
+      ? round(costPerCylinder * input.cylinderCount + (input.transportCost ?? 0), 2)
+      : 0;
 
   return {
     micron,
@@ -227,6 +276,15 @@ export interface ItemGeometryInputs {
    * back to the micron proxy, which is what a ply with no density leaves.
    */
   gsm?: number;
+  /**
+   * The pouch workbook's own weight basis — see `workbookStructureGsm`.
+   *
+   * Set only on the styles that workbook costs, and preferred over `gsm` when
+   * it is. `gsm` stays the physical figure either way: it is what the line's
+   * material cost and production's film reservation work from, and only the
+   * pouch COUNT moves onto the workbook's reading.
+   */
+  workbookGsm?: number;
   /**
    * Cylinder face beyond the web, in millimetres — the engraver's mounting
    * margin. Set on the Costing screen; omitted falls back to the works' 80.
@@ -479,12 +537,38 @@ export function computeItemGeometry(input: ItemGeometryInputs, cylinderRate: num
    * From the structure's real GSM where the plies carry a density — the sheet's
    * own arithmetic — and from the micron proxy where they do not.
    */
+  /*
+   * The workbook's basis first where the style is costed on it, then the real
+   * GSM, then the micron proxy for a structure with no densities at all.
+   */
+  const weighsAt =
+    input.workbookGsm && input.workbookGsm > 0
+      ? input.workbookGsm
+      : input.gsm && input.gsm > 0
+        ? input.gsm
+        : 0;
   const gramsPerPouch =
-    input.gsm && input.gsm > 0
-      ? (filmWidthMm * filmHeightMm * input.gsm) / 1_000_000
+    weighsAt > 0
+      ? (filmWidthMm * filmHeightMm * weighsAt) / 1_000_000
       : ((filmWidthMm * filmHeightMm) / 100) * input.micron * factor * 0.0001;
+  /*
+   * **Rounded UP to a whole pouch on the workbook's basis**, which is what its
+   * own `ROUNDUP(...,0)` does — a 12/12/75 standup at 129.01 is quoted as 130
+   * to the kilogram. It is the works' arithmetic, and it is also the whole
+   * number the office asked to read rather than two decimal places of a thing
+   * that only comes in ones.
+   *
+   * Everything else keeps the two places. A reel has no pouches at all, and
+   * the Estimation sheet's styles are costed to the paisa against documents
+   * that do not round.
+   */
+  const perKg = gramsPerPouch > 0 ? 1000 / gramsPerPouch : 0;
   const pouchesPerKg =
-    (input.makesPouches ?? true) && gramsPerPouch > 0 ? round(1000 / gramsPerPouch, 2) : 0;
+    !(input.makesPouches ?? true) || perKg <= 0
+      ? 0
+      : input.workbookGsm && input.workbookGsm > 0
+        ? Math.ceil(perKg)
+        : round(perKg, 2);
 
   const cylinderWidth = round(
     filmWidthMm * input.repeatWidth + (input.mountingMm ?? DEFAULT_CYLINDER_MOUNTING_MM),
@@ -514,10 +598,22 @@ export function computeItemGeometry(input: ItemGeometryInputs, cylinderRate: num
     (input.repairs ?? []).reduce((total, repair) => total + (Number(repair.cost) || 0), 0),
     2,
   );
-  const totalCylinderCost =
-    (input.chargeCylinders ?? true)
-      ? round(costPerCylinder * input.cylinderCount + (input.transportCost ?? 0) + repairCost, 2)
-      : repairCost;
+  /*
+   * **No cylinders means no cylinder cost**, transport included.
+   *
+   * The arithmetic already gave nought for the cylinders themselves, but it
+   * went on adding the transport — so a line with no cylinders on it quoted a
+   * delivery charge for delivering nothing. It happens on every unprinted job:
+   * a line with no colours asks for no cylinders at all, and the works still
+   * saw a figure on the cylinder line.
+   *
+   * A repair is charged whatever the count: a cylinder being put right is one
+   * that already exists and was never going to be counted here.
+   */
+  const charged = (input.chargeCylinders ?? true) && input.cylinderCount > 0;
+  const totalCylinderCost = charged
+    ? round(costPerCylinder * input.cylinderCount + (input.transportCost ?? 0) + repairCost, 2)
+    : repairCost;
 
   return {
     micron: round(input.micron, 2),

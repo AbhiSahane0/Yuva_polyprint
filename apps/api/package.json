@@ -22,6 +22,8 @@
     "import:legacy": "tsx scripts/import-legacy-jobs.ts",
     "schema:docs": "tsx scripts/generate-schema-docs.ts",
     "seed:materials": "tsx scripts/seed-materials.ts",
+    "seed:ldpe-films": "tsx scripts/seed-ldpe-films.ts",
+    "check:standup": "tsx scripts/check-standup-workbook.ts",
     "db:copy-to-remote": "bash scripts/migrate-data-to-remote.sh",
     "seed:admin": "tsx scripts/seed-admin.ts",
     "seed:costing": "tsx scripts/seed-costing.ts",

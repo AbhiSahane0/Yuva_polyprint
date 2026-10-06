@@ -8,6 +8,8 @@ export interface Cylinder {
   position: number | null;
   ownership: CylinderOwnership;
   status: CylinderStatus;
+  /** Why it is away, while it is away. Empty unless it is UNDER_REPAIR. */
+  repairReason: string;
   location: string;
   diameterMm: number | null;
   circumferenceMm: number | null;
@@ -30,6 +32,8 @@ export interface CylinderEvent {
   reference: string;
   fromLocation: string;
   toLocation: string;
+  /** What needed putting right, on a SENT_FOR_REPAIR event. */
+  repairReason: string;
   notes: string;
   enteredBy: string;
   createdAt: string;

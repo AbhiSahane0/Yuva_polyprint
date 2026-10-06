@@ -51,6 +51,7 @@ export function RecordEventModal({
   const [occurredOn, setOccurredOn] = useState(today());
   const [reference, setReference] = useState('');
   const [toLocation, setToLocation] = useState('');
+  const [repairReason, setRepairReason] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -63,10 +64,12 @@ export function RecordEventModal({
     setOccurredOn(today());
     setReference('');
     setToLocation('');
+    setRepairReason('');
     setNotes('');
   }, [open, cylinders]);
 
   const explains = kind === 'DAMAGED' || kind === 'RETIRED';
+  const sending = kind === 'SENT_FOR_REPAIR';
 
   async function onSubmit() {
     setError(null);
@@ -76,6 +79,7 @@ export function RecordEventModal({
       occurredOn,
       reference,
       toLocation,
+      repairReason,
       notes,
     });
     if (!parsed.success) {
@@ -199,6 +203,26 @@ export function RecordEventModal({
             />
           </Field>
         )}
+
+        {/*
+          Asked here and nowhere else, because the answer is what the engraver
+          is being paid for. A cylinder that goes out with no reason comes back
+          weeks later against a bill the office cannot check.
+        */}
+        {sending ? (
+          <Field
+            label="What needs putting right"
+            htmlFor="repairReason"
+            hint="Required — it is what the engraver is being asked to do"
+          >
+            <Input
+              id="repairReason"
+              value={repairReason}
+              onChange={(event) => setRepairReason(event.target.value)}
+              placeholder="Cyan worn across the gusset"
+            />
+          </Field>
+        ) : null}
 
         <Field
           label={explains ? 'What happened to it' : 'Remarks'}

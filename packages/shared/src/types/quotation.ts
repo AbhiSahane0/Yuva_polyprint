@@ -97,6 +97,10 @@ export interface QuotationItem {
   /** A repeat order quoting one of its existing cylinders put right. */
   repairCylinders: boolean;
   repairs: QuotationCylinderRepair[];
+  /** Who cuts them — engravers do not charge alike, so this is part of the quote. */
+  cylinderManufacturer: string;
+  /** What the set prints, as the customer names it. Often not the job name. */
+  cylinderDesign: string;
   /** The flat film one pouch is cut from: the pouch plus its gussets. */
   filmWidthMm: number;
   filmHeightMm: number;

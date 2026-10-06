@@ -36,7 +36,7 @@ export const POUCH_TYPES = [
   'CENTRE_SEAL',
   'THREE_SIDE_SEAL',
   'THREE_SIDE_SEAL_ZIPPER',
-  'STANDUP_WITH_ZIPPER',
+  'STANDUP_NO_ZIPPER',
   'FLAT_BOTTOM',
   'OTHER',
 ] as const;
@@ -55,7 +55,7 @@ export const POUCH_TYPES_OFFERED: readonly PouchType[] = [
   'STANDUP_ZIPPER',
   'STANDUP',
   'THREE_SIDE_SEAL_ZIPPER',
-  'STANDUP_WITH_ZIPPER',
+  'STANDUP_NO_ZIPPER',
   'FLAT_BOTTOM',
 ];
 
@@ -73,7 +73,7 @@ export const POUCH_TYPE_LABELS: Record<PouchType, string> = {
   CENTRE_SEAL: 'Centre seal',
   THREE_SIDE_SEAL: 'Three side seal',
   THREE_SIDE_SEAL_ZIPPER: 'Three side seal zipper',
-  STANDUP_WITH_ZIPPER: 'Standup with zipper',
+  STANDUP_NO_ZIPPER: 'Standup without zipper',
   FLAT_BOTTOM: 'Flat bottom',
   OTHER: 'Other',
 };
@@ -84,7 +84,7 @@ export const POUCH_TYPE_LABELS: Record<PouchType, string> = {
  * Recorded on the quotation because the office is asked where the work comes
  * from and has been answering from memory.
  */
-export const ENQUIRY_CHANNELS = ['MAIL', 'WHATSAPP', 'PHONE', 'SMS', 'OTHER'] as const;
+export const ENQUIRY_CHANNELS = ['MAIL', 'WHATSAPP', 'PHONE', 'SMS', 'PERSON', 'OTHER'] as const;
 export type EnquiryChannel = (typeof ENQUIRY_CHANNELS)[number];
 
 export const ENQUIRY_CHANNEL_LABELS: Record<EnquiryChannel, string> = {
@@ -92,6 +92,10 @@ export const ENQUIRY_CHANNEL_LABELS: Record<EnquiryChannel, string> = {
   WHATSAPP: 'WhatsApp',
   PHONE: 'Phone',
   SMS: 'SMS',
+  /* Not a wire like the four above it. "Enquiry Source: Person, Referred By:
+     Amit Sharma" is the client's own example, and the two fields are read
+     together — which is why a referral is no longer filed under Other. */
+  PERSON: 'Person',
   OTHER: 'Other',
 };
 

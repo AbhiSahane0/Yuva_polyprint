@@ -205,12 +205,16 @@ describe('QuantityFields', () => {
     expect(screen.queryByText(/the pouch boxes need a film/i)).toBeNull();
   });
 
-  it('reports gross and net side by side once the line can be costed', () => {
+  it('reports both margins side by side once the line can be costed', () => {
     /*
      * The pair exists because one figure was the flattering one. Margin over
      * materials leaves out the wages, the power, the transport, the packing
      * and the press setup — on a real quotation it read 41.9% where the job
      * earned 8%.
+     *
+     * The WORDS "gross" and "net" are not printed: the client did not want
+     * them on a screen a customer might read over somebody's shoulder. The
+     * figures stay, in the same order, each saying what it is when hovered.
      */
     const results: QuantityResult[] = [
       {
@@ -229,11 +233,14 @@ describe('QuantityFields', () => {
 
     render(<Row results={results} costings={[costing]} pouchesPerKg={20} />);
 
-    expect(screen.getByText('50.0% gross')).toBeTruthy();
-    expect(screen.getByText('8.0% net')).toBeTruthy();
+    expect(screen.getByText('50.0%')).toBeTruthy();
+    expect(screen.getByText('8.0%')).toBeTruthy();
+    /* The words themselves are gone from the screen. */
+    expect(screen.queryByText(/gross/i)).toBeNull();
+    expect(screen.queryByText(/\bnet\b/i)).toBeNull();
 
-    // Net names the whole cost, so nobody has to guess what it left in.
-    const net = screen.getByText('8.0% net');
+    // The tooltip still names the whole cost, so nobody has to guess.
+    const net = screen.getByText('8.0%');
     expect(net.getAttribute('title')).toContain('Rs. 368.00');
     expect(net.getAttribute('title')).toContain('setup');
   });
@@ -242,7 +249,7 @@ describe('QuantityFields', () => {
    * No costing supplied, so net is ABSENT rather than zero: 0% would read as a
    * job that earns nothing, which is a different claim from "not costable yet".
    */
-  it('leaves net out rather than reading zero when the line cannot be costed', () => {
+  it('leaves the second figure out rather than reading zero when it cannot be costed', () => {
     const results: QuantityResult[] = [
       {
         quantityKg: 6.16,
@@ -257,10 +264,12 @@ describe('QuantityFields', () => {
 
     render(<Row results={results} pouchesPerKg={162.34} />);
 
-    const gross = screen.getByText(/86\.9% gross/);
+    const gross = screen.getByText('86.9%');
     expect(gross.getAttribute('title')).toContain('Rs. 1,623.38');
     expect(gross.getAttribute('title')).toContain('Film, ink and adhesive only');
-    expect(screen.getByText('net —')).toBeTruthy();
+    /* A dash, not a zero: 0% reads as a job that earns nothing, which is a
+       different claim from "not costable yet". */
+    expect(screen.getByText('—')).toBeTruthy();
   });
 });
 

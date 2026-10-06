@@ -68,7 +68,7 @@ describe('the style list the office is offered', () => {
       'STANDUP_ZIPPER',
       'STANDUP',
       'THREE_SIDE_SEAL_ZIPPER',
-      'STANDUP_WITH_ZIPPER',
+      'STANDUP_NO_ZIPPER',
       'FLAT_BOTTOM',
     ]);
   });
@@ -94,15 +94,21 @@ describe('the style list the office is offered', () => {
    * missing from both is costed as though it were neither zippered nor pouch
    * work, silently.
    */
-  it('costs every new zippered style as zippered', () => {
+  it('charges a zipper on the styles that have one, and only those', () => {
     expect(ZIPPERED_POUCHES).toContain('THREE_SIDE_SEAL_ZIPPER');
-    expect(ZIPPERED_POUCHES).toContain('STANDUP_WITH_ZIPPER');
     expect(pouchExpense('THREE_SIDE_SEAL_ZIPPER', 200, RATES).zipper).toBeGreaterThan(0);
+    /*
+     * "Standup without zipper" was briefly called "standup WITH zipper" and sat
+     * in this list, which charged every one of them for a zipper it does not
+     * have. The name and the costing moved together.
+     */
+    expect(ZIPPERED_POUCHES).not.toContain('STANDUP_NO_ZIPPER');
+    expect(pouchExpense('STANDUP_NO_ZIPPER', 200, RATES).zipper).toBe(0);
     expect(pouchExpense('FLAT_BOTTOM', 200, RATES).zipper).toBe(0);
   });
 
   it('puts the standup-family newcomers on the pouch workbook', () => {
-    expect(WORKBOOK_POUCHES).toContain('STANDUP_WITH_ZIPPER');
+    expect(WORKBOOK_POUCHES).toContain('STANDUP_NO_ZIPPER');
     expect(WORKBOOK_POUCHES).toContain('FLAT_BOTTOM');
     /* A three side seal with a zipper is still a three side seal, and the
        plain one is costed on the Estimation sheet. */

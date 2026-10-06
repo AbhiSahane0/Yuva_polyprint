@@ -15,6 +15,8 @@ import {
   type QuotationTier,
   computeItemGeometry,
   structureGsm,
+  workbookStructureGsm,
+  isWorkbookPouch,
   adhesiveGsmFor,
   computeTier,
   overriddenRate,
@@ -174,6 +176,8 @@ function toItem(row: ItemRow): QuotationItem {
     transportCost: toNumber(row.transportCost),
     chargeCylinders: row.chargeCylinders,
     repairCylinders: row.repairCylinders,
+    cylinderManufacturer: row.cylinderManufacturer,
+    cylinderDesign: row.cylinderDesign,
     repairs: byPosition(row.repairs ?? []).map((repair) => ({
       cylinderId: repair.cylinderId,
       position: repair.position,
@@ -387,6 +391,16 @@ function priceQuotation(
       adhesiveGsm: costing.settings.adhesiveGsm,
     });
 
+    const coatGsm = adhesiveGsmFor({
+      pouchType: item.pouchType,
+      hasDPunch: item.hasDPunch,
+      plies: layers,
+      thinGsm: costing.settings.adhesiveCoatThinGsm,
+      thickGsm: costing.settings.adhesiveCoatThickGsm,
+      thickPlyMicron: costing.settings.adhesiveThickPlyMicron,
+      pouchAdhesiveGsm: costing.settings.pouchAdhesiveGsm,
+    });
+
     // Geometry holds for every quantity; only the money below changes.
     const geometry = computeItemGeometry(
       {
@@ -395,12 +409,17 @@ function priceQuotation(
         /* Each ply at its own density, as the works' sheet weighs it. */
         gsm: structureGsm(layers, {
           inkGsm: costing.settings.inkGsm,
-          adhesiveGsm: adhesiveGsmFor(layers, {
-            thinGsm: costing.settings.adhesiveCoatThinGsm,
-            thickGsm: costing.settings.adhesiveCoatThickGsm,
-            thickPlyMicron: costing.settings.adhesiveThickPlyMicron,
-          }),
+          adhesiveGsm: coatGsm,
         }),
+        /* And the pouch workbook's own basis where that is what prices the
+           style — about ten per cent heavier, and the works' own arithmetic.
+           See `workbookStructureGsm`. */
+        workbookGsm: isWorkbookPouch(item.pouchType, item)
+          ? workbookStructureGsm(layers, {
+              inkGsm: costing.settings.inkGsm,
+              adhesiveGsm: coatGsm,
+            })
+          : 0,
         widthMm: item.widthMm,
         heightMm: item.heightMm,
         // Film on a reel is not pouches; the engine reports zero rather than a
@@ -571,7 +590,19 @@ async function nextQuotationNumber(tx: Prisma.TransactionClient): Promise<number
 export function listOrderBy(
   query: ListQuotationsQuery,
 ): Prisma.QuotationOrderByWithRelationInput[] {
-  if (!query.sort) return [{ status: 'asc' }, { number: 'desc' }];
+  /*
+   * **Newest first, by the date on the document.**
+   *
+   * It used to lead on status — every draft, then every sent one, then the won
+   * and the lost — which put a quotation written this morning below eleven
+   * from last year because D sorts before S. The office opens this screen to
+   * find what they wrote today.
+   *
+   * The number breaks a tie because two quotations written on one day are
+   * ordered by which was raised second, and `id` after that so the page
+   * boundary is stable when even those collide.
+   */
+  if (!query.sort) return [{ date: 'desc' }, { number: 'desc' }, { id: 'desc' }];
 
   const dir = query.dir ?? 'asc';
   if (query.sort === 'number') return [{ number: dir }];
@@ -782,6 +813,8 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
               transportCost: entry.input.transportCost,
               chargeCylinders: entry.input.chargeCylinders,
               repairCylinders: entry.input.repairCylinders,
+              cylinderManufacturer: entry.input.cylinderManufacturer,
+              cylinderDesign: entry.input.cylinderDesign,
               repairs: {
                 create: (entry.input.repairCylinders ? entry.input.repairs : []).map(
                   (repair, position) => ({
@@ -1034,6 +1067,8 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
       transportCost: toNumber(item.transportCost),
       chargeCylinders: item.chargeCylinders,
       repairCylinders: item.repairCylinders,
+      cylinderManufacturer: item.cylinderManufacturer,
+      cylinderDesign: item.cylinderDesign,
       repairs: byPosition(item.repairs).map((repair) => ({
         cylinderId: repair.cylinderId,
         code: repair.code,
@@ -1128,6 +1163,8 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
           transportCost: entry.input.transportCost,
           chargeCylinders: entry.input.chargeCylinders,
           repairCylinders: entry.input.repairCylinders,
+          cylinderManufacturer: entry.input.cylinderManufacturer,
+          cylinderDesign: entry.input.cylinderDesign,
           repairs: {
             create: (entry.input.repairCylinders ? entry.input.repairs : []).map(
               (repair, position) => ({
@@ -1325,6 +1362,8 @@ export async function createQuotationVersion(id: string): Promise<Quotation> {
               transportCost: item.transportCost,
               chargeCylinders: item.chargeCylinders,
               repairCylinders: item.repairCylinders,
+              cylinderManufacturer: item.cylinderManufacturer,
+              cylinderDesign: item.cylinderDesign,
               repairs: {
                 create: byPosition(item.repairs).map((repair) => ({
                   cylinderId: repair.cylinderId,

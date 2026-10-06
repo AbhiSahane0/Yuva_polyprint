@@ -63,6 +63,7 @@ function toCylinder(row: CylinderRow): Cylinder {
     position: row.position,
     ownership: row.ownership,
     status: row.status,
+    repairReason: row.repairReason,
     location: row.location,
     diameterMm: toNumber(row.diameterMm),
     circumferenceMm: toNumber(row.circumferenceMm),
@@ -90,6 +91,7 @@ function toEvent(row: EventRow): CylinderEvent {
     reference: row.reference,
     fromLocation: row.fromLocation,
     toLocation: row.toLocation,
+    repairReason: row.repairReason,
     notes: row.notes,
     enteredBy: row.enteredBy,
     createdAt: row.createdAt.toISOString(),
@@ -338,6 +340,7 @@ export async function recordEvent(
     for (const cylinder of cylinders) {
       const next = statusAfter(input.kind, cylinder.status);
       const moving = input.kind === 'TRANSFERRED';
+      const sending = input.kind === 'SENT_FOR_REPAIR';
 
       const event = await tx.cylinderEvent.create({
         data: {
@@ -348,6 +351,7 @@ export async function recordEvent(
           reference: input.reference,
           fromLocation: moving ? cylinder.location : '',
           toLocation: moving ? input.toLocation.trim() : '',
+          repairReason: sending ? input.repairReason : '',
           notes: input.notes,
           enteredBy,
         },
@@ -361,6 +365,17 @@ export async function recordEvent(
           status: next,
           // A transfer is the only event that changes where it lives.
           ...(moving ? { location: input.toLocation.trim() } : {}),
+          /*
+           * The reason belongs to the repair, so it arrives with the sending
+           * and leaves when the cylinder stops being away. Cleared on anything
+           * that ends the trip rather than only on REWORKED: a cylinder
+           * mounted, returned or retired is not out for repair whatever its
+           * last reason said, and a stale "worn at the edge" on a cylinder
+           * that is currently printing is worse than no reason at all.
+           *
+           * A transfer leaves it alone — moving shelves is not coming back.
+           */
+          ...(sending ? { repairReason: input.repairReason } : moving ? {} : { repairReason: '' }),
         },
       });
     }

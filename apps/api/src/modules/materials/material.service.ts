@@ -151,6 +151,9 @@ export async function listMaterials(options: {
         orderBy: { effectiveDate: 'desc' },
         take: 2,
       },
+      /* Named, not just pointed at: the screen has to say "General Poly + 6"
+         rather than make the office match two ids by eye. */
+      baseMaterial: { select: { name: true } },
     },
   });
 
@@ -170,6 +173,9 @@ export async function listMaterials(options: {
       inkKind: material.inkKind,
       isActive: material.isActive,
       sortOrder: material.sortOrder,
+      baseMaterialId: material.baseMaterialId,
+      baseMaterialName: material.baseMaterial?.name ?? null,
+      ratePremium: toNumber(material.ratePremium),
       currentRate,
       currentRateDate: current ? toISODate(current.effectiveDate) : null,
       previousRate,
@@ -188,6 +194,13 @@ export async function listMaterials(options: {
  * A blank entry means "no change today", not "zero" — the previous rate simply
  * stays in force. Re-saving the same day overwrites rather than duplicating, so
  * correcting a typo an hour later does the obvious thing.
+ *
+ * **A base film carries its grades with it.** The works sells twelve LDPE
+ * grades at General Poly plus a fixed amount each, so keying General Poly
+ * writes all eleven derived rates for the same day — see `writeDerivedRates`.
+ * A derived rate is refused if it is typed directly: there is one number to
+ * key, and quietly accepting a second would leave the two disagreeing until
+ * the next time the base moved.
  */
 export async function saveRates(input: SaveRatesInput): Promise<RatesSaveResult> {
   const effectiveDate = parseDate(input.effectiveDate);
@@ -200,10 +213,25 @@ export async function saveRates(input: SaveRatesInput): Promise<RatesSaveResult>
   const materialIds = entries.map((entry) => entry.materialId);
   const known = await prisma.material.findMany({
     where: { id: { in: materialIds } },
-    select: { id: true },
+    select: {
+      id: true,
+      name: true,
+      baseMaterialId: true,
+      baseMaterial: { select: { name: true } },
+    },
   });
   if (known.length !== new Set(materialIds).size) {
     throw ApiError.badRequest('One or more materials no longer exist');
+  }
+
+  /* Typed where it is worked out. Said by name, because the office is looking
+     at a screen full of films and needs to know which one to key instead. */
+  const derived = known.filter((row) => row.baseMaterialId !== null);
+  if (derived.length > 0) {
+    const first = derived[0]!;
+    throw ApiError.badRequest(
+      `${first.name} follows ${first.baseMaterial?.name ?? 'its base film'} — set that rate instead`,
+    );
   }
 
   const existing = await prisma.materialRate.findMany({
@@ -242,9 +270,87 @@ export async function saveRates(input: SaveRatesInput): Promise<RatesSaveResult>
       if (previous === undefined) created += 1;
       else updated += 1;
     }
+
+    const grades = await writeDerivedRates(
+      tx,
+      entries.map((entry) => entry.materialId),
+      effectiveDate,
+      input.enteredBy,
+    );
+    created += grades.created;
+    updated += grades.updated;
+    unchanged += grades.unchanged;
   }, TX);
 
   return { effectiveDate: toISODate(effectiveDate), created, updated, unchanged };
+}
+
+/**
+ * Writes the grades that follow each of these materials, for the same day.
+ *
+ * Called inside the same transaction as the rates that triggered it, so the
+ * base and its grades are never on file apart: a quotation costed between the
+ * two writes would read a General Poly that had moved and a frosty film that
+ * had not.
+ *
+ * Counted the same way as a typed rate so the office is told the truth about
+ * how many rows its one number wrote.
+ */
+async function writeDerivedRates(
+  tx: Prisma.TransactionClient,
+  baseIds: string[],
+  effectiveDate: Date,
+  enteredBy: string,
+): Promise<{ created: number; updated: number; unchanged: number }> {
+  const grades = await tx.material.findMany({
+    where: { baseMaterialId: { in: baseIds }, ratePremium: { not: null } },
+    select: { id: true, baseMaterialId: true, ratePremium: true },
+  });
+  if (grades.length === 0) return { created: 0, updated: 0, unchanged: 0 };
+
+  /* The rate just written, not the one that was there before — these rows are
+     being derived from the figure this very call put on file. */
+  const bases = await tx.materialRate.findMany({
+    where: { materialId: { in: baseIds }, effectiveDate },
+    select: { materialId: true, rate: true },
+  });
+  const baseRate = new Map(bases.map((row) => [row.materialId, Number(row.rate)]));
+
+  const existing = await tx.materialRate.findMany({
+    where: { materialId: { in: grades.map((grade) => grade.id) }, effectiveDate },
+    select: { materialId: true, rate: true },
+  });
+  const was = new Map(existing.map((row) => [row.materialId, Number(row.rate)]));
+
+  let created = 0;
+  let updated = 0;
+  let unchanged = 0;
+
+  for (const grade of grades) {
+    const base = baseRate.get(grade.baseMaterialId as string);
+    if (base === undefined) continue;
+
+    /* Four places, like every other rate on file. A premium of 7.5 on a base
+       that is itself fractional must not round its way into a different film's
+       price. */
+    const rate = round(base + Number(grade.ratePremium), 4);
+    const previous = was.get(grade.id);
+    if (previous === rate) {
+      unchanged += 1;
+      continue;
+    }
+
+    await tx.materialRate.upsert({
+      where: { materialId_effectiveDate: { materialId: grade.id, effectiveDate } },
+      create: { materialId: grade.id, rate, effectiveDate, enteredBy },
+      update: { rate, enteredBy },
+    });
+
+    if (previous === undefined) created += 1;
+    else updated += 1;
+  }
+
+  return { created, updated, unchanged };
 }
 
 export async function getRateHistory(

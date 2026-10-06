@@ -104,9 +104,13 @@ export function CylinderRepair({
                 {cylinders.map((cylinder) => {
                   const picked = chosen.get(cylinder.code);
                   /* The register already knows which of them are in trouble, so
-                     the row that most likely needs the work says so itself. */
+                     the row that most likely needs the work says so itself.
+                     One already out at the engraver counts twice over: it is
+                     the likeliest thing being quoted here. */
                   const wanting =
-                    cylinder.status === 'DAMAGED' || cylinder.status === 'NEEDS_REWORK';
+                    cylinder.status === 'DAMAGED' ||
+                    cylinder.status === 'NEEDS_REWORK' ||
+                    cylinder.status === 'UNDER_REPAIR';
                   return (
                     <li
                       key={cylinder.id}
@@ -144,6 +148,9 @@ export function CylinderRepair({
                             )}
                           >
                             {CYLINDER_STATUS_LABELS[cylinder.status]}
+                            {/* Why it is away, where the register knows —
+                                which is usually the thing being quoted. */}
+                            {cylinder.repairReason ? ` · ${cylinder.repairReason}` : ''}
                             {cylinder.cost ? ` · engraved at ${formatRs(cylinder.cost)}` : ''}
                           </span>
                         </span>

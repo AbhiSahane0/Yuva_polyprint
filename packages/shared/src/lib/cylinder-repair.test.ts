@@ -83,3 +83,42 @@ describe('what the customer pays for cylinders', () => {
     expect(line.totalCylinderCost).toBe(0);
   });
 });
+
+/**
+ * **A line with no cylinders on it costs nothing for cylinders.**
+ *
+ * Obvious, and it was not true: the count multiplied out to nought but the
+ * transport was added anyway, so an unprinted job quoted a delivery charge for
+ * delivering nothing. It is not a corner case — a line that names no colours
+ * asks for no cylinders at all, and the works saw a figure on the cylinder
+ * line of every one of them.
+ */
+describe('a line that asks for no cylinders', () => {
+  const NONE = { ...LINE, cylinderCount: 0 } as const;
+
+  it('charges nothing, transport included', () => {
+    const line = computeItemGeometry({ ...NONE, transportCost: 1500 } as never, RATE);
+    expect(line.totalCylinderCost).toBe(0);
+  });
+
+  it('still works out what one would have cost, for the screen to decide about', () => {
+    /* The figure follows the SIZE, so it exists whether or not any are cut.
+       The form shows a dash instead of printing it under a nought total. */
+    const line = computeItemGeometry(NONE as never, RATE);
+    expect(line.costPerCylinder).toBe(6750);
+  });
+
+  it('still charges a repair, which is not a cylinder being cut', () => {
+    // A cylinder being put right is one that already exists, so it was never
+    // going to be in the count.
+    const line = computeItemGeometry(
+      {
+        ...NONE,
+        chargeCylinders: false,
+        repairs: [{ cost: 1200 }, { cost: 800 }],
+      } as never,
+      RATE,
+    );
+    expect(line.totalCylinderCost).toBe(2000);
+  });
+});

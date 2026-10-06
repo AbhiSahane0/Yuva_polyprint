@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { carryForwardDates, toISODate } from './material.service.js';
 
 /** DATE columns are UTC midnight; build them the same way the service does. */
@@ -67,5 +69,74 @@ describe('carryForwardDates', () => {
     for (let i = 1; i < dates.length; i += 1) {
       expect(dates[i]!.getTime() - dates[i - 1]!.getTime()).toBe(24 * 60 * 60 * 1000);
     }
+  });
+});
+
+/**
+ * **Twelve LDPE grades priced off one number.**
+ *
+ * The works sells General Poly and eleven grades of it, each the base rate
+ * plus a fixed amount from the client's own rate master — Rs 6 for a 1 kg
+ * packaging film, Rs 55 for a frosty one. Keying all twelve every time the
+ * resin moves is eleven chances to key one wrong, and the table says they
+ * never move apart.
+ *
+ * These pin the two properties that make deriving them safe. Source
+ * inspection, like the cylinder register's, because what matters is where the
+ * writes happen rather than what one call returns.
+ */
+const MATERIAL_SOURCE = readFileSync(
+  fileURLToPath(new URL('./material.service.ts', import.meta.url)),
+  'utf8',
+);
+const MATERIAL_CODE = MATERIAL_SOURCE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+describe('a film whose rate follows another', () => {
+  it('writes the grades inside the transaction that writes the base', () => {
+    /*
+     * Not afterwards. A quotation costed between the two writes would read a
+     * General Poly that had moved and a frosty film that had not — and the
+     * costing screen reads every film at once, so the window is real.
+     */
+    const save = MATERIAL_CODE.slice(
+      MATERIAL_CODE.indexOf('export async function saveRates'),
+      MATERIAL_CODE.indexOf('async function writeDerivedRates'),
+    );
+    const transaction = save.slice(save.indexOf('prisma.$transaction'));
+    expect(transaction).toContain('writeDerivedRates(');
+    /* And through the transaction client, or it would not be in it. */
+    expect(MATERIAL_CODE).toContain('tx.materialRate.upsert');
+  });
+
+  it('refuses a rate typed against a grade rather than quietly losing it', () => {
+    /*
+     * There is one number to key. Accepting a second would leave the two
+     * disagreeing until the next time the base moved and replaced it, which
+     * is the worst of both: a figure somebody chose, overwritten later
+     * without a word.
+     */
+    expect(MATERIAL_CODE).toContain('baseMaterialId !== null');
+    expect(MATERIAL_CODE).toContain('set that rate instead');
+  });
+
+  it('only ever writes the day it was given', () => {
+    /*
+     * The premium is held on the material and is not dated, which is safe only
+     * because a derived rate becomes an ordinary dated row the moment the base
+     * is keyed. Raise a premium tomorrow and every quotation already written
+     * goes on reading the row that existed on its own date.
+     *
+     * So the deriving code must touch exactly one date — the one passed in. A
+     * write that recomputed history would turn a premium change into a silent
+     * repricing of every document on file.
+     */
+    const from = MATERIAL_CODE.indexOf('async function writeDerivedRates');
+    const writer = MATERIAL_CODE.slice(from, MATERIAL_CODE.indexOf('\nexport ', from));
+    expect(writer).toContain('effectiveDate');
+    /* No ranges, and no updateMany sweeping across days. */
+    expect(writer).not.toContain('effectiveDate: { lt');
+    expect(writer).not.toContain('effectiveDate: { gt');
+    expect(writer).not.toContain('updateMany');
+    expect(writer).not.toContain('deleteMany');
   });
 });

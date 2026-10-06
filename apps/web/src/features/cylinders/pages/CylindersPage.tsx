@@ -25,6 +25,10 @@ const STATUS_TONE: Record<CylinderStatus | 'NONE', 'neutral' | 'success' | 'warn
   IN_USE: 'brand',
   DAMAGED: 'warning',
   NEEDS_REWORK: 'warning',
+  /* Away being dealt with: a state to know about, not one to act on. */
+  UNDER_REPAIR: 'warning',
+  /* Back and usable, so it reads like the shelf it is sitting on. */
+  REPAIRED: 'success',
   RETIRED: 'neutral',
   NONE: 'neutral',
 };

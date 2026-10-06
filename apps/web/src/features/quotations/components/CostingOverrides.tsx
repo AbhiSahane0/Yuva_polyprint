@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { UseFormRegister, UseFormSetValue } from 'react-hook-form';
-import {
-  formatRs,
-  isWorkbookPouch,
-  type CreateQuotationFormValues,
-  type PouchType,
-} from '@yuva/shared';
+import { isWorkbookPouch, type CreateQuotationFormValues, type PouchType } from '@yuva/shared';
 import { Field, NumberInput } from '@/components/ui/Field';
 
 /**
@@ -18,11 +13,17 @@ import { Field, NumberInput } from '@/components/ui/Field';
  * client's own sheets carry margins of 5%, 9% and 10% across seven quotations,
  * and nothing charged for pouch making on the two sold as reels.
  *
- * So the section is now one line of what this quotation is priced at, and a
- * checkbox. Ticking it opens the boxes **already filled in with the works' own
- * figures**, which is the other half: a blank box with the number greyed behind
- * it reads as a field that still needs doing, and it is the one place a figure
- * is known and the screen was being coy about it.
+ * So the section is now a single checkbox. Ticking it opens the boxes **already
+ * filled in with the works' own figures**, which is the other half: a blank box
+ * with the number greyed behind it reads as a field that still needs doing, and
+ * it is the one place a figure is known and the screen was being coy about it.
+ *
+ * **Nothing is shown while it is closed, and it starts closed every time.** It
+ * did carry a heading and a line of what the document was priced at, and it
+ * used to open itself on a quotation that had overridden something. The client
+ * asked for all of it to go: the office reads this screen with the customer
+ * across the desk, and the margin is not the customer's business. See the
+ * comments on `open` and on the checkbox.
  *
  * **Untouched means the works' figure, not a copy of it.** Anything still equal
  * to the master when the quotation is saved is sent blank — see
@@ -33,7 +34,21 @@ import { Field, NumberInput } from '@/components/ui/Field';
 
 /** What the works itself charges, from the Costing screen for this date. */
 export interface CostingMasters {
-  marginPercent: number;
+  /**
+   * The margin in force, where one figure covers the whole document.
+   *
+   * Not the Costing screen's figure: since the margin follows the volume —
+   * 15% to 500 kg, 10% above — the margin actually applied is chosen per
+   * QUANTITY, and a document priced at 250, 500 and 1,000 kg is costed at
+   * 15%, 15% and 10%. There is a single figure to offer only when every
+   * costable quantity on it falls the same side of the break.
+   *
+   * Null otherwise, and the box stays empty saying "by quantity" — the same
+   * shape as wastage, and for the same reason. Filling in 9% there, which is
+   * what this used to do, was not a display fault: the box is an override, so
+   * it took the margin off every tier of a document nobody meant to discount.
+   */
+  marginPercent: number | null;
   transportPerKg: number;
   defaultWastagePercent: number;
   pouchWastagePercent: number;
@@ -95,7 +110,7 @@ function mastersFor(
   pouchTypes: (PouchType | null | undefined)[],
 ): Record<CostingField, string> {
   return {
-    marginPercent: String(masters.marginPercent),
+    marginPercent: masters.marginPercent === null ? '' : String(masters.marginPercent),
     transportPerKg: String(masters.transportPerKg),
     pouchMakingPerKg: masters.pouchMakingPerKg === null ? '' : String(masters.pouchMakingPerKg),
     wastagePercent: wastageMaster(masters, pouchTypes),
@@ -145,22 +160,26 @@ export function CostingOverrides({
   masters: CostingMasters;
   pouchTypes: (PouchType | null | undefined)[];
 }) {
+  /*
+   * **Always closed until somebody ticks it.**
+   *
+   * It used to open itself on a quotation that had overridden something, on
+   * the reasoning that hiding a figure the document is actually priced at was
+   * worse than showing it. The client's answer is that it is not: this screen
+   * is read with the customer on the other side of the desk, and a margin that
+   * puts itself on display because of how the document happens to have been
+   * priced is exactly what they asked to be rid of.
+   *
+   * The overrides are not lost by being hidden. They stay in the form, they go
+   * back to the server untouched, and ticking the box shows them — see
+   * `strippedCosting`, which is what keeps opening and closing from leaving a
+   * mark either way.
+   */
   const [open, setOpen] = useState(false);
-  const filled = FIELDS.some((field) => text(values[field]).trim() !== '');
 
   /* What was last written into each box on the works' behalf, so a box still
      holding it can be told apart from one somebody typed. */
   const applied = useRef<Partial<Record<CostingField, string>>>({});
-
-  /*
-   * A saved quotation that overrode something opens with its figures showing,
-   * because hiding a number this document is actually priced at would be worse
-   * than the four empty boxes this replaces. It only ever opens: once the
-   * office unticks, every field is cleared, so nothing here reopens it.
-   */
-  useEffect(() => {
-    if (filled) setOpen(true);
-  }, [filled]);
 
   const own = mastersFor(masters, pouchTypes);
 
@@ -202,41 +221,47 @@ export function CostingOverrides({
     }
   }
 
-  /**
-   * What this quotation is priced at, in one line, while the boxes are away.
-   *
-   * Always the works' own figures, and that is not a simplification: the
-   * section is open whenever any of the four is set, so a closed section has
-   * nothing in it to report. Folding them away must not mean the office cannot
-   * see what the document is priced at — that would be worse than the boxes.
-   */
-  const summary = [
-    `Margin ${own.marginPercent}%`,
-    `Transport ${formatRs(Number(own.transportPerKg), 2)}/kg`,
-    `Wastage ${own.wastagePercent === '' ? 'by job kind' : `${own.wastagePercent}%`}`,
-    `Pouch making ${
-      own.pouchMakingPerKg === '' ? 'by style' : `${formatRs(Number(own.pouchMakingPerKg), 2)}/kg`
-    }`,
-  ].join(' · ');
-
   return (
     <section className="flex flex-col gap-3">
-      <div>
-        <h4 className="text-ink-800 text-xs font-semibold tracking-wider uppercase">
-          This quotation&rsquo;s costing
-        </h4>
-        <p className="text-ink-500 mt-0.5 text-xs">
-          {open ? 'Left as the works’ own figure, a box follows the Costing screen.' : summary}
-        </p>
-      </div>
+      {/*
+        The checkbox is the whole of this section while it is closed.
+
+        It used to carry a heading and a line of what the document was priced
+        at — "Margin 9% · Transport Rs. 6.80/kg · …" — and the client asked for
+        both to go, for the same reason the margin percentages lost their words:
+        a quotation is read across a desk with the customer on the other side of
+        it, and what the works makes on the job is not their business. The
+        figures are still one tick away for the office, and the costing
+        breakdown on the rate still carries all of them.
+      */}
+      <label className="flex w-fit cursor-pointer items-center gap-2.5">
+        <input
+          type="checkbox"
+          className="accent-brand-600 size-4 cursor-pointer"
+          checked={open}
+          onChange={(event) => toggle(event.target.checked)}
+        />
+        <span className="text-ink-700 text-sm">Edit this quotation&rsquo;s costing</span>
+      </label>
 
       {open ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+          <p className="text-ink-500 -mt-1 text-xs sm:col-span-12">
+            Left as the works&rsquo; own figure, a box follows the Costing screen.
+          </p>
           <div className="sm:col-span-4">
-            <Field label="Margin %" htmlFor="marginPercent">
+            {/*
+              Empty where the document straddles the 500 kg break, because
+              there is no one margin in force to show — see `CostingMasters`.
+            */}
+            <Field
+              label="Margin %"
+              htmlFor="marginPercent"
+              hint="Blank follows the volume: 15% to 500 kg, 10% above"
+            >
               <NumberInput
                 id="marginPercent"
-                placeholder={own.marginPercent}
+                placeholder={own.marginPercent === '' ? 'by quantity' : own.marginPercent}
                 {...register('marginPercent')}
               />
             </Field>
@@ -286,16 +311,6 @@ export function CostingOverrides({
           </div>
         </div>
       ) : null}
-
-      <label className="flex w-fit cursor-pointer items-center gap-2.5">
-        <input
-          type="checkbox"
-          className="accent-brand-600 size-4 cursor-pointer"
-          checked={open}
-          onChange={(event) => toggle(event.target.checked)}
-        />
-        <span className="text-ink-700 text-sm">Edit this quotation&rsquo;s costing</span>
-      </label>
     </section>
   );
 }

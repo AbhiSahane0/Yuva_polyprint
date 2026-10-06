@@ -215,6 +215,17 @@ export const quotationItemSchema = z
      */
     repairCylinders: z.boolean().default(false),
     repairs: z.array(cylinderRepairSchema).max(12, 'A set is at most twelve cylinders').default([]),
+
+    /*
+     * Who cuts the set, and what it prints.
+     *
+     * Free text rather than lists. The works deals with a handful of engravers
+     * and names them differently on different days, and a design is called
+     * whatever the customer calls it — a dropdown would force one of those two
+     * to be wrong, and neither is a thing the works keeps a register of.
+     */
+    cylinderManufacturer: z.string().trim().max(120, 'That name is too long').default(''),
+    cylinderDesign: z.string().trim().max(120, 'That name is too long').default(''),
   })
   /*
    * A roll has no pouch style. Rather than reject the combination — which would
@@ -506,6 +517,17 @@ export const settingsSchema = z.object({
    */
   pouchInkGsm: z.coerce.number().min(0).max(50),
   /**
+   * And the adhesive a pouch-workbook laminate carries.
+   *
+   * The same split again, and the same reason. The Estimation sheet works the
+   * coat out from the structure — heavier under a thick ply, one coat per
+   * lamination, so a three-ply reaches 6. The pouch workbook does not: every
+   * one of its blocks writes a flat 2 on its ADHESIVE row whether the laminate
+   * is two plies or three, and the client has confirmed that is what the works
+   * lays. It decides what a pouch WEIGHS as well as what the glue costs.
+   */
+  pouchAdhesiveGsm: z.coerce.number().min(0).max(50),
+  /**
    * Adhesive is worked out from the structure, not stated — the sheet takes a
    * heavier coat under a thick ply and one coat per lamination. These three
    * are its numbers; `adhesiveGsm` is no longer used for costing.
@@ -595,6 +617,18 @@ export const settingsSchema = z.object({
    * pouch is.
    */
   pouchMakingPerPouch: z.coerce.number().min(0).max(1_000),
+  /**
+   * Pouch making by the KILOGRAM, in the three bands the works gave in
+   * October 2026 — see `pouchMakingPerKgFor` for which line falls in which.
+   *
+   * These supersede `pouchMakingPerPouch` for every pouch line. The per-pouch
+   * figure stays on the master because every quotation written before the
+   * change was priced from it, and reopening one of those has to show what it
+   * was sold at rather than what it would cost today.
+   */
+  pouchMakingPlainPerKg: z.coerce.number().min(0).max(10_000),
+  pouchMakingGussetPerKg: z.coerce.number().min(0).max(10_000),
+  pouchMakingGussetHandlePerKg: z.coerce.number().min(0).max(10_000),
   /** The zipper, by the metre, charged across the pouch's mouth. */
   zipperRatePerMetre: z.coerce.number().min(0).max(10_000),
   /** What a D punch costs to make — a flat charge instead of the making rate. */
@@ -730,6 +764,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Averages of what the imported jobs actually record.
   inkGsm: 1.8,
   pouchInkGsm: 1.2,
+  /* The flat figure every block of the works' pouch workbook carries. */
+  pouchAdhesiveGsm: 2,
   adhesiveGsm: 2.5,
   adhesiveCoatThinGsm: 2,
   adhesiveCoatThickGsm: 3,
@@ -777,6 +813,22 @@ export const DEFAULT_SETTINGS: AppSettings = {
    * workbook shows 3.80 on one of its two zipper sheets; 3.60 is the rate.
    */
   pouchMakingPerPouch: 0.25,
+  /*
+   * **Zero on purpose, and the real figures live in the history.**
+   *
+   * The works gave these in October 2026 — plain 20, gusset 25, gusset with
+   * handle 30 — and they are written as dated rows rather than as defaults
+   * here. A quotation from 2022 asks what the works held THEN, finds a band
+   * whose only change is dated after it, and falls back to this zero — which
+   * sends it down the per-pouch path it was actually priced on.
+   *
+   * A default of 20 would have repriced every historical document at today's
+   * figures the moment somebody opened one, which is the one thing the dated
+   * costing exists to prevent.
+   */
+  pouchMakingPlainPerKg: 0,
+  pouchMakingGussetPerKg: 0,
+  pouchMakingGussetHandlePerKg: 0,
   dPunchPerPouch: 0.6,
   dPunchLargePerPouch: 0.8,
   /*

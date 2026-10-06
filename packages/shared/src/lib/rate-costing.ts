@@ -1,8 +1,11 @@
 import type { PouchType } from '../constants/job.js';
 import {
   NO_POUCH_EXPENSE,
+  isWorkbookPouch,
   pouchExpense,
+  pouchMakingInForce,
   type PouchExpense,
+  type PouchMakingBands,
   type PouchMakingRates,
 } from './pouch-making.js';
 import { round } from './quotation-math.js';
@@ -231,6 +234,15 @@ export interface CostingOverheads {
    * became per pouch carry one of these and still price exactly as they did.
    */
   pouchMakingPerKgOverride?: number | null;
+
+  /**
+   * The works' three per-kilogram making bands.
+   *
+   * Absent on a works that has not set them, and on every quotation priced
+   * before they existed — both fall back to the per-pouch rate, so reopening an
+   * old document shows what it was sold at.
+   */
+  pouchMakingBands?: PouchMakingBands | null;
   /**
    * What each printing station beyond the fifth adds, per kilogram. The sheet
    * charges 5.5 for the sixth and 7.5 for the seventh.
@@ -289,7 +301,7 @@ export interface CostingColour {
 }
 
 /**
- * Adhesive laid down, worked out from the structure — as the sheet does.
+ * **The Estimation sheet's** adhesive, worked out from the structure.
  *
  * `IF(ply > 40µ, 3, 2)` for the coat weight, times the number of laminations.
  * The sheet writes that second term as "2 if there is a Met PET ply, else 1",
@@ -298,8 +310,12 @@ export interface CostingColour {
  * everywhere the sheet is actually used.
  *
  * A single ply is not laminated at all and carries no adhesive.
+ *
+ * **Not the figure to reach for directly.** The pouch workbook lays a flat 2
+ * whatever the structure, so which of the two applies depends on the style —
+ * `adhesiveGsmFor` below is what picks, and what callers should use.
  */
-export function adhesiveGsmFor(
+export function laminationAdhesiveGsm(
   plies: { micron: number }[],
   options: { thinGsm: number; thickGsm: number; thickPlyMicron: number },
 ): number {
@@ -310,6 +326,48 @@ export function adhesiveGsmFor(
   const thickest = Math.max(...plies.slice(1).map((ply) => ply.micron), 0);
   const coat = thickest > options.thickPlyMicron ? options.thickGsm : options.thinGsm;
   return round(coat * laminations, 4);
+}
+
+/**
+ * **Which adhesive figure this line carries.**
+ *
+ * The works has two costing documents and they disagree about the glue, the
+ * same way they disagree about the ink and the wastage. The Estimation sheet
+ * works a coat out per lamination and takes a heavier one under a thick ply,
+ * reaching 6 on a three-ply. Every block of the pouch workbook writes a flat 2
+ * on its ADHESIVE row whether the laminate is two plies or three, and the
+ * client has confirmed that is what the works lays.
+ *
+ * It is a physical quantity, not a pricing convention, so this is the figure
+ * everywhere: what the laminate weighs, what the glue costs, and what
+ * production takes off the shelf. The one thing it is NOT is the pouch weight
+ * BASIS — see `workbookStructureGsm`, which is a convention and stays out of
+ * production.
+ *
+ * Named as the old lamination-only function was, deliberately: every caller
+ * that used to get the Estimation rule by default now has to say what style it
+ * is costing, and the compiler asks each one in turn. Three times this module
+ * has grown a second copy of a rule and drifted; it does not get a fourth.
+ */
+export function adhesiveGsmFor(input: {
+  /** The style. Anything outside the pouch workbook is on the Estimation sheet. */
+  pouchType: PouchType | null | undefined;
+  /** Ticked on the line. A punched pouch is costed on the workbook. */
+  hasDPunch?: boolean | null;
+  plies: { micron: number }[];
+  thinGsm: number;
+  thickGsm: number;
+  thickPlyMicron: number;
+  /** The pouch workbook's flat figure, from the Costing screen. */
+  pouchAdhesiveGsm: number;
+}): number {
+  /* No lamination, no glue — on either document. A single ply is not stuck to
+     anything, and the workbook's flat figure is the weight of a bond. */
+  if (input.plies.length < 2) return 0;
+
+  return isWorkbookPouch(input.pouchType, input)
+    ? round(Math.max(0, input.pouchAdhesiveGsm), 4)
+    : laminationAdhesiveGsm(input.plies, input);
 }
 
 /** The five dilutions the works uses, and what each leaves behind. */
@@ -442,6 +500,14 @@ export interface CostingJob {
    * — see `pouchExpense`, which explains why it replaces rather than adds.
    */
   hasDPunch?: boolean;
+
+  /**
+   * A gusseted pouch, as the line has it.
+   *
+   * Reaches the costing for one reason: it chooses the making band. The gusset
+   * depths themselves enlarge the film and are already in the weight.
+   */
+  isGazette?: boolean;
 
   /**
    * The style, which decides what making one costs: a zipper is charged across
@@ -1214,12 +1280,34 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
       )
     : NO_POUCH_EXPENSE;
 
+  /*
+   * **The making charge, by the kilogram.**
+   *
+   * Three sources, in order of who decided:
+   *
+   * 1. The office's own figure on the line, which replaces the whole charge.
+   * 2. The works' three bands — plain, gusset, gusset with handle — which is
+   *    how the works has priced making since October 2026.
+   * 3. The per-pouch rate, for anything priced before those bands existed and
+   *    for a works that has not set them.
+   *
+   * The ZIPPER is added on top of all three: it is a part bought in by the
+   * metre rather than an operation, and the bands say nothing about it.
+   */
   const override = overheads.pouchMakingPerKgOverride;
+
   const pouchMakingPerKg = !job.makesPouches
     ? 0
     : override !== null && override !== undefined
       ? round(override, 4)
-      : round(expense.perPouch * piecesPerKg, 4);
+      : /* Steps 2 and 3, which the quotation form must read the same way —
+           see `pouchMakingInForce`. */
+        pouchMakingInForce(
+          { isGazette: job.isGazette, hasDPunch: job.hasDPunch },
+          expense,
+          overheads.pouchMakingBands,
+          piecesPerKg,
+        );
 
   const ratePerKg = round(baseRatePerKg + stationSurchargePerKg + pouchMakingPerKg, 2);
   const ratePerPiece = piecesPerKg > 0 ? round(ratePerKg / piecesPerKg, 4) : 0;
