@@ -162,6 +162,11 @@ export function useRateCosting(
     overrides.marginPercent,
     overrides.transportPerKg,
     overrides.pouchMakingPerKg,
+    /* Left out until now, so a wastage typed on the quotation changed nothing
+       until some OTHER figure moved and dragged the costing with it. Wastage
+       inflates the film bought and film is four-fifths of a rate, so it is
+       about the worst one to miss. */
+    overrides.wastagePercent,
     overrides.onDate,
     /* So a costing recomputes when the works adds or ends an overhead, which
        the object identity of `master` alone would not guarantee. */

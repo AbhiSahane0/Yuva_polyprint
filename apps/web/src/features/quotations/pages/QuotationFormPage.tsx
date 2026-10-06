@@ -409,7 +409,8 @@ export default function QuotationFormPage() {
    */
   const pricingDate = (watched.date as string | undefined) || today();
   const { data: settings } = useSettings(pricingDate);
-  const { data: materials } = useMaterials(pricingDate);
+  /* Retired films included — see `films` below, and `useMaterials`. */
+  const { data: materials } = useMaterials(pricingDate, true);
 
   /*
    * Which quantity the customer is quoted, 1-based.
@@ -645,18 +646,56 @@ export default function QuotationFormPage() {
 
   /* ----------------------------------------------------------- live costing */
 
-  const films: Film[] = useMemo(
+  /*
+   * The films already named on this document, as a stable key.
+   *
+   * A string rather than a Set so `films` below only rebuilds when the set
+   * genuinely changes — it is watched off the form, which moves on every
+   * keystroke, and `films` feeds the costing memo.
+   */
+  const filmsInUse = useMemo(
     () =>
-      (materials ?? [])
-        .filter((material) => material.category === 'FILM')
-        .map((material) => ({
-          id: material.id,
-          name: material.name,
-          density: material.density,
-          currentRate: material.currentRate,
-        })),
-    [materials],
+      [
+        ...new Set(
+          (watched.items ?? [])
+            .flatMap((item) => item?.layers ?? [])
+            .map((layer) => layer?.materialId)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0),
+        ),
+      ]
+        .sort()
+        .join(','),
+    [watched.items],
   );
+
+  /*
+   * The films the form may show: the ones the works stocks, plus any this
+   * document already names.
+   *
+   * Retiring a film must not reach back into quotations written against it.
+   * The ply is resolved through this list — by FAMILY, which is read off the
+   * names in it — so a retired film missing here does not leave the ply alone:
+   * its family stops existing, the box reads "— Choose a film —", and saving
+   * writes that blank back over a structure somebody quoted. Retiring
+   * "LDPE Milky" for the new LDPE catalogue did exactly that to the five lines
+   * that name it.
+   *
+   * Keyed on the ids in use rather than on every film, so a retired one
+   * reappears only on the documents that actually carry it and stays out of
+   * the dropdown on a new quotation.
+   */
+  const films: Film[] = useMemo(() => {
+    const used = new Set(filmsInUse.split(',').filter(Boolean));
+    return (materials ?? [])
+      .filter((material) => material.category === 'FILM')
+      .filter((material) => material.isActive || used.has(material.id))
+      .map((material) => ({
+        id: material.id,
+        name: material.name,
+        density: material.density,
+        currentRate: material.currentRate,
+      }));
+  }, [materials, filmsInUse]);
 
   const filmById = useMemo(() => new Map(films.map((film) => [film.id, film])), [films]);
   const byName = useMemo(
@@ -1489,6 +1528,21 @@ export default function QuotationFormPage() {
                   transportPerKg: numOrNull(watched.transportPerKg),
                   pouchMakingPerKg: numOrNull(watched.pouchMakingPerKg),
                   wastagePercent: numOrNull(watched.wastagePercent),
+                  /*
+                    The quotation's own date, which is what everything else on
+                    this page is already read at — the film rates above, the
+                    works' four figures below.
+
+                    Without it the job card costed on TODAY: today's wages,
+                    today's power, today's wastage and today's pouch-making
+                    bands, against film rates from the day the quotation was
+                    written. Opening a document from last week showed a rate
+                    the server would never have stored, and the costing
+                    section's own figures disagreed with the costing beside
+                    them — which is the other half of what made ticking that
+                    section reprice a saved line.
+                  */
+                  onDate: pricingDate,
                 }}
                 selectedQuantity={selectedQuantity}
                 onSelectQuantity={(position) =>

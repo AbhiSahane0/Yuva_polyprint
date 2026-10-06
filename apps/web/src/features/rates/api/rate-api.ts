@@ -18,14 +18,26 @@ export const materialKeys = {
 };
 
 /** Materials with the rate in force on `onDate` and the one before it. */
-export function useMaterials(onDate?: string) {
+/**
+ * The materials list, as at a date.
+ *
+ * `includeInactive` is for the screens that have to render something already
+ * written against a retired material — a quotation whose third ply names a
+ * film the works has since stopped stocking. Leaving it out of the list does
+ * not leave the ply alone: the form resolves a ply through the list, so the
+ * selection reads as empty and saving would write the blank back.
+ */
+export function useMaterials(onDate?: string, includeInactive = false) {
   return useQuery({
-    queryKey: materialKeys.list(onDate),
+    queryKey: [...materialKeys.list(onDate), includeInactive ? 'all' : 'active'],
     queryFn: () =>
       request<Material[]>({
         url: '/materials',
         method: 'GET',
-        ...(onDate ? { params: { onDate } } : {}),
+        params: {
+          ...(onDate ? { onDate } : {}),
+          ...(includeInactive ? { includeInactive: 'true' } : {}),
+        },
       }),
   });
 }
