@@ -23,6 +23,17 @@ export interface Material {
   isActive: boolean;
   sortOrder: number;
 
+  /**
+   * The film whose rate this one follows, and what is added to it.
+   *
+   * Null on everything typed by hand. Where it is set, the rate below was
+   * worked out rather than keyed, and the screen says so instead of offering
+   * a box: there is one number to enter for the whole LDPE family.
+   */
+  baseMaterialId: string | null;
+  baseMaterialName: string | null;
+  ratePremium: number | null;
+
   /** Rate in force on the requested date, and the one before it. */
   currentRate: number | null;
   currentRateDate: string | null;
