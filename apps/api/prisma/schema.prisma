@@ -2876,6 +2876,11 @@ model QuotationItemCylinderRepair {
   /// ENGRAVE, which is not what it costs to put right.
   cost Decimal @db.Decimal(12, 2)
 
+  /// What is wrong with it. Carried onto the register's SENT_FOR_REPAIR event
+  /// when the quotation is won, which is where it finally becomes a fact about
+  /// the cylinder rather than a line on an offer.
+  reason String @default("")
+
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([itemId])

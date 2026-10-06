@@ -33,7 +33,6 @@ import {
   type ItemGeometry,
   type Material,
   type MaterialCostResult,
-  PET_MICRON_PER_LAYER,
   JOB_KINDS,
   JOB_KIND_LABELS,
   POUCH_TYPES_OFFERED,
@@ -199,9 +198,23 @@ const BLANK_DESIGN = {
   gazetteRight: 0,
   hasDPunch: false,
   hasVNotch: false,
+  /*
+   * Both plies start at nought.
+   *
+   * They used to open at 12 and 50 — a PET over a poly, which is the common
+   * structure and so looked helpful. It was not: no film was chosen beside
+   * either figure, so the line read as a 62µ laminate of nothing, the total
+   * micron under it agreed, and the office had to notice that two numbers it
+   * had not typed were already deciding a weight.
+   *
+   * Nought says what is true — nothing has been chosen yet — and choosing a
+   * film fills the gauge in from the film's own name, which is where the
+   * figure should come from. See `chooseFamily` in `LayerFields`: an empty box
+   * is exactly the case it fills.
+   */
   layers: [
-    { materialId: null, micron: PET_MICRON_PER_LAYER, rateOverride: '' },
-    { materialId: null, micron: 50, rateOverride: '' },
+    { materialId: null, micron: 0, rateOverride: '' },
+    { materialId: null, micron: 0, rateOverride: '' },
   ],
   repeatWidth: 1,
   repeatHeight: 1,

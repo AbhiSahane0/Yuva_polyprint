@@ -111,7 +111,15 @@ for (const [index, grade] of GRADES.entries()) {
  * written against `LDPE Milky` have to go on reading it, and a material row
  * that disappears takes the ply's name off the document with it.
  */
-for (const name of ['LDPE Natural', 'LDPE Milky']) {
+/*
+ * Named three ways across the two databases this has to run on. The local one
+ * was split into `LDPE Natural` and `LDPE Milky` earlier in the year; Neon
+ * never was and still carries the single `LDPE Milky / Natural` row the five
+ * quotations on it are priced against. All three are the same thing — one
+ * entry for a family of grades that do not share a price — and all three are
+ * replaced by the catalogue above.
+ */
+for (const name of ['LDPE Natural', 'LDPE Milky', 'LDPE Milky / Natural']) {
   const row = await prisma.material.findUnique({
     where: { name },
     select: { id: true, isActive: true },

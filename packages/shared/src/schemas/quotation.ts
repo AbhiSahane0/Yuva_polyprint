@@ -86,6 +86,15 @@ export const cylinderRepairSchema = z.object({
     .number({ message: 'Enter what the repair costs' })
     .min(0, 'Cannot be negative')
     .max(1_000_000, 'That looks wrong — check it'),
+  /**
+   * What is wrong with it.
+   *
+   * Optional while the quotation is only an offer — the office may be pricing
+   * a repair the works has not looked at closely yet. It stops being optional
+   * the moment the quotation is won, because that is when the cylinder is
+   * actually sent and the register will not take an event without one.
+   */
+  reason: z.string().trim().max(300, 'That is too long').default(''),
 });
 
 export const quotationQuantitySchema = z.object({

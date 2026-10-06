@@ -17,6 +17,8 @@ import {
   structureGsm,
   workbookStructureGsm,
   isWorkbookPouch,
+  canRecord,
+  statusAfter,
   adhesiveGsmFor,
   computeTier,
   overriddenRate,
@@ -184,6 +186,7 @@ function toItem(row: ItemRow): QuotationItem {
       code: repair.code,
       colour: repair.colour,
       cost: toNumber(repair.cost),
+      reason: repair.reason,
     })),
     micron: toNumber(row.micron),
     pouchesPerKg: toNumber(row.pouchesPerKg),
@@ -823,6 +826,7 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
                     code: repair.code,
                     colour: repair.colour,
                     cost: repair.cost,
+                    reason: repair.reason,
                   }),
                 ),
               },
@@ -1074,6 +1078,7 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
         code: repair.code,
         colour: repair.colour,
         cost: toNumber(repair.cost),
+        reason: repair.reason,
       })),
     }));
 
@@ -1173,6 +1178,7 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
                 code: repair.code,
                 colour: repair.colour,
                 cost: repair.cost,
+                reason: repair.reason,
               }),
             ),
           },
@@ -1371,6 +1377,7 @@ export async function createQuotationVersion(id: string): Promise<Quotation> {
                   code: repair.code,
                   colour: repair.colour,
                   cost: repair.cost,
+                  reason: repair.reason,
                 })),
               },
               micron: item.micron,
@@ -1610,6 +1617,99 @@ export async function listQuotationEmails(id: string): Promise<QuotationEmailRec
 }
 
 /**
+ * **Sends the cylinders a won quotation quoted a repair for.**
+ *
+ * The register's law is that a cylinder's state is a fact about its last
+ * event, and this is the event: the customer has accepted, so the set is
+ * actually going to the engraver. Quoting one changes nothing — a quotation
+ * is an offer, and an offer that is never taken up must leave no mark on the
+ * shelf. Winning is the moment it becomes true.
+ *
+ * Idempotent, like the jobs and the orders beside it. The quotation's number
+ * is written on the event, so winning the same document twice finds its own
+ * event already there and does nothing. That matters more here than it does
+ * for a job: two SENT_FOR_REPAIR events would be two trips to the engraver in
+ * a history somebody reads to settle a bill.
+ *
+ * A cylinder that has since been deleted from the register leaves `cylinderId`
+ * null and is skipped — the quotation still says what was quoted, which is the
+ * point of keeping the row.
+ */
+async function sendQuotedRepairs(
+  tx: Prisma.TransactionClient,
+  quotationId: string,
+  quotationNumber: number,
+  enteredBy: string,
+): Promise<{ sent: string[]; alreadySent: string[] }> {
+  const reference = `Quotation #${quotationNumber}`;
+  const sent: string[] = [];
+  const alreadySent: string[] = [];
+
+  const repairs = await tx.quotationItemCylinderRepair.findMany({
+    where: { cylinderId: { not: null }, item: { quotationId, repairCylinders: true } },
+    select: {
+      cylinderId: true,
+      code: true,
+      reason: true,
+      cylinder: { select: { id: true, code: true, status: true } },
+    },
+    orderBy: { position: 'asc' },
+  });
+
+  for (const repair of repairs) {
+    const cylinder = repair.cylinder;
+    if (!cylinder) continue;
+
+    const already = await tx.cylinderEvent.findFirst({
+      where: { cylinderId: cylinder.id, kind: 'SENT_FOR_REPAIR', reference },
+      select: { id: true },
+    });
+    if (already) {
+      alreadySent.push(cylinder.code);
+      continue;
+    }
+
+    /*
+     * A retired cylinder is scrapped or back with the customer, so it cannot
+     * go out — `canRecord` refuses it on the register's own screen and it is
+     * refused here for the same reason. Reported rather than thrown: the
+     * quotation is won either way, and failing the whole transaction over one
+     * cylinder somebody retired last week would lose the customer and the
+     * orders with it.
+     */
+    if (!canRecord('SENT_FOR_REPAIR', cylinder.status)) {
+      alreadySent.push(`${cylinder.code} (retired)`);
+      continue;
+    }
+
+    /* The register will not take an event with no fault on it, and nor should
+       this — but the office may have quoted before anybody looked closely, so
+       the quotation's own words stand in rather than blocking the win. */
+    const reason = repair.reason.trim() || `Quoted for repair on ${reference}`;
+    const next = statusAfter('SENT_FOR_REPAIR', cylinder.status);
+
+    await tx.cylinderEvent.create({
+      data: {
+        cylinderId: cylinder.id,
+        kind: 'SENT_FOR_REPAIR',
+        occurredOn: new Date(new Date().toISOString().slice(0, 10)),
+        statusAfter: next,
+        reference,
+        repairReason: reason,
+        enteredBy,
+      },
+    });
+    await tx.cylinder.update({
+      where: { id: cylinder.id },
+      data: { status: next, repairReason: reason },
+    });
+    sent.push(cylinder.code);
+  }
+
+  return { sent, alreadySent };
+}
+
+/**
  * Records the customer's answer, and — on a win — turns the quotation into
  * standing records.
  *
@@ -1649,6 +1749,9 @@ export async function recordOutcome(
       jobsSkipped: [],
       ordersCreated: [],
       ordersSkipped: [],
+      /* Nothing leaves the shelf for a quotation nobody accepted. */
+      cylindersSent: [],
+      cylindersAlreadySent: [],
     };
   }
 
@@ -1747,6 +1850,16 @@ export async function recordOutcome(
      */
     const orders = await ordersFromQuotation(tx, id);
 
+    /*
+     * And the cylinders this document quoted a repair for actually go out.
+     *
+     * Inside the same transaction as the orders, for the same reason: a won
+     * quotation that charged the customer for re-engraving three cylinders,
+     * with the register still showing all three on the shelf, is a works that
+     * cannot find them when the engraver asks.
+     */
+    const repairs = await sendQuotedRepairs(tx, id, quotation.number, 'Office');
+
     return {
       status: 'WON' as const,
       customerId,
@@ -1755,6 +1868,8 @@ export async function recordOutcome(
       jobsSkipped,
       ordersCreated: orders.created,
       ordersSkipped: orders.skipped,
+      cylindersSent: repairs.sent,
+      cylindersAlreadySent: repairs.alreadySent,
     };
   }, TX);
 }

@@ -162,3 +162,54 @@ describe('the repair reason', () => {
     expect(CODE).toContain("repairReason: '' }");
   });
 });
+
+/**
+ * **A quotation that quotes a repair does not touch the shelf until it wins.**
+ *
+ * The register exists to say where a cylinder is. A quotation is an offer, so
+ * quoting a repair of three cylinders must leave all three exactly where they
+ * are — otherwise a quote the customer never answers would have the works
+ * hunting for cylinders that never left. Winning is the moment it becomes
+ * true, and that is the moment the event is written.
+ *
+ * Read from the quotation service, because that is where the rule lives.
+ */
+const QUOTATION_SOURCE = readFileSync(
+  fileURLToPath(new URL('../quotations/quotation.service.ts', import.meta.url)),
+  'utf8',
+);
+const QUOTATION_CODE = QUOTATION_SOURCE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+describe('cylinders quoted for repair', () => {
+  it('go out only on a win, inside the transaction that raises the orders', () => {
+    const win = QUOTATION_CODE.slice(QUOTATION_CODE.indexOf('return prisma.$transaction'));
+    expect(win).toContain('sendQuotedRepairs(tx,');
+    /* Saving or editing a quotation must not reach the register at all. */
+    const beforeOutcome = QUOTATION_CODE.slice(
+      0,
+      QUOTATION_CODE.indexOf('async function sendQuotedRepairs'),
+    );
+    expect(beforeOutcome).not.toContain('cylinderEvent.create');
+    expect(beforeOutcome).not.toContain("kind: 'SENT_FOR_REPAIR'");
+  });
+
+  it('writes the quotation’s number on the event, so winning twice sends once', () => {
+    expect(QUOTATION_CODE).toContain('const reference = `Quotation #${quotationNumber}`');
+    expect(QUOTATION_CODE).toContain("kind: 'SENT_FOR_REPAIR', reference");
+  });
+
+  it('derives the status from the event rather than setting it', () => {
+    // The register's one law, obeyed from this side of the wall too.
+    expect(QUOTATION_CODE).toContain("statusAfter('SENT_FOR_REPAIR', cylinder.status)");
+    expect(QUOTATION_CODE).toContain("canRecord('SENT_FOR_REPAIR', cylinder.status)");
+  });
+
+  it('leaves the shelf alone on a lost quotation', () => {
+    const lost = QUOTATION_CODE.slice(
+      QUOTATION_CODE.indexOf("if (input.outcome === 'LOST')"),
+      QUOTATION_CODE.indexOf('return prisma.$transaction'),
+    );
+    expect(lost).toContain('cylindersSent: []');
+    expect(lost).not.toContain('sendQuotedRepairs');
+  });
+});

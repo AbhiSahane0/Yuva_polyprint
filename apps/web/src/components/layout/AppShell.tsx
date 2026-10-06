@@ -82,7 +82,12 @@ const NAV: { group: string; items: NavItem[] }[] = [
          watches it. Writing to it needs `jobs`, enforced on the API. */
       { to: '/planning', label: 'Planning', icon: CalendarClock },
       { to: '/production', label: 'Production', icon: Factory },
-      { to: '/cylinders', label: 'Design & Cylinders', icon: Disc3, module: 'cylinders' },
+      /* "Cylinder register" and not "Design & Cylinders", which read as a
+         superset of the Designs screen above it and sent the office to the
+         wrong one. Both are views of the same design; this is the one about
+         the metal — which cylinders exist, where they are and what state they
+         are in — and it is what the works calls it. */
+      { to: '/cylinders', label: 'Cylinder register', icon: Disc3, module: 'cylinders' },
       { to: '/job-sheets', label: 'Job sheets', icon: ClipboardList, module: 'jobs' },
       { to: '/quality', label: 'Quality & waste', icon: ShieldAlert },
     ],
