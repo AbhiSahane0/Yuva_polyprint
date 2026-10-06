@@ -15,6 +15,8 @@ import {
   type QuotationTier,
   computeItemGeometry,
   structureGsm,
+  workbookStructureGsm,
+  isWorkbookPouch,
   adhesiveGsmFor,
   computeTier,
   overriddenRate,
@@ -389,6 +391,12 @@ function priceQuotation(
       adhesiveGsm: costing.settings.adhesiveGsm,
     });
 
+    const coatGsm = adhesiveGsmFor(layers, {
+      thinGsm: costing.settings.adhesiveCoatThinGsm,
+      thickGsm: costing.settings.adhesiveCoatThickGsm,
+      thickPlyMicron: costing.settings.adhesiveThickPlyMicron,
+    });
+
     // Geometry holds for every quantity; only the money below changes.
     const geometry = computeItemGeometry(
       {
@@ -397,12 +405,17 @@ function priceQuotation(
         /* Each ply at its own density, as the works' sheet weighs it. */
         gsm: structureGsm(layers, {
           inkGsm: costing.settings.inkGsm,
-          adhesiveGsm: adhesiveGsmFor(layers, {
-            thinGsm: costing.settings.adhesiveCoatThinGsm,
-            thickGsm: costing.settings.adhesiveCoatThickGsm,
-            thickPlyMicron: costing.settings.adhesiveThickPlyMicron,
-          }),
+          adhesiveGsm: coatGsm,
         }),
+        /* And the pouch workbook's own basis where that is what prices the
+           style — about ten per cent heavier, and the works' own arithmetic.
+           See `workbookStructureGsm`. */
+        workbookGsm: isWorkbookPouch(item.pouchType)
+          ? workbookStructureGsm(layers, {
+              inkGsm: costing.settings.inkGsm,
+              adhesiveGsm: coatGsm,
+            })
+          : 0,
         widthMm: item.widthMm,
         heightMm: item.heightMm,
         // Film on a reel is not pouches; the engine reports zero rather than a

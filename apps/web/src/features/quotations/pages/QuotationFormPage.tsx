@@ -45,9 +45,11 @@ import {
   cylinderWarnings,
   defaultJobColours,
   inkGsmFor,
+  isWorkbookPouch,
   resizeColours,
   specialColourFrom,
   structureGsm,
+  workbookStructureGsm,
   adhesiveGsmFor,
   computeMargin,
   computeMaterialCostPerKg,
@@ -746,8 +748,14 @@ export default function QuotationFormPage() {
        * weighs, so it moves the count per kilogram as well as the ink cost, and
        * both the material cost and the geometry below have to agree on it.
        */
+      const pouchTypeOfItem = (item?.pouchType || null) as PouchType | null;
+      const coatGsm = adhesiveGsmFor(layers, {
+        thinGsm: settings?.adhesiveCoatThinGsm ?? 2,
+        thickGsm: settings?.adhesiveCoatThickGsm ?? 3,
+        thickPlyMicron: settings?.adhesiveThickPlyMicron ?? 40,
+      });
       const inkGsm = inkGsmFor({
-        pouchType: (item?.pouchType || null) as PouchType | null,
+        pouchType: pouchTypeOfItem,
         inkGsm: settings?.inkGsm ?? 1.8,
         pouchInkGsm: settings?.pouchInkGsm ?? 1.2,
       });
@@ -766,14 +774,18 @@ export default function QuotationFormPage() {
           layerCount: layers.length,
           micron: totalMicronForLayers(layers),
           /* Each ply at its own density, as the works' sheet weighs it. */
-          gsm: structureGsm(layers, {
-            inkGsm,
-            adhesiveGsm: adhesiveGsmFor(layers, {
-              thinGsm: settings?.adhesiveCoatThinGsm ?? 2,
-              thickGsm: settings?.adhesiveCoatThickGsm ?? 3,
-              thickPlyMicron: settings?.adhesiveThickPlyMicron ?? 40,
-            }),
-          }),
+          gsm: structureGsm(layers, { inkGsm, adhesiveGsm: coatGsm }),
+          /*
+             And, on a style the pouch workbook costs, the basis that workbook
+             counts pouches on — see `workbookStructureGsm`. It runs about ten
+             per cent heavy against the real GSM above, which is the works'
+             long-standing arithmetic and what they asked to keep. The physical
+             figure stays in `gsm`, because that is what the material cost and
+             production's film reservation are built from.
+          */
+          workbookGsm: isWorkbookPouch(pouchTypeOfItem)
+            ? workbookStructureGsm(layers, { inkGsm, adhesiveGsm: coatGsm })
+            : 0,
           widthMm: num(item?.widthMm),
           heightMm: num(item?.heightMm),
           makesPouches: (item?.jobKind ?? 'POUCH') !== 'ROLL',

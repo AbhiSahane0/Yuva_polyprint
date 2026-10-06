@@ -697,11 +697,38 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
       'Printing, lamination and slitting run at once, so a day absorbs several machines’ worth',
     ],
     ['kgPerDay', 'Kilograms a day', 'Only for a line with no costed structure'],
-    ['pouchMakingPerPouch', 'Pouch making, Rs/pouch', 'Forming, sealing and cutting one'],
+    /*
+     * Making, by the kilogram — the three bands the works moved to in October
+     * 2026, and the ones it actually charges now.
+     *
+     * On this screen because they change. They were seeded once and left where
+     * only a migration could reach them, which is the one thing a dated figure
+     * must not be: the works raises making the same way it raises a film, and
+     * a rate it cannot key is a rate that goes stale against the quotations
+     * being written on it. Set a band to 0 and the line falls back to the
+     * per-pouch rate below, which is how everything written before October is
+     * still costed.
+     */
+    ['pouchMakingPlainPerKg', 'Making — plain, Rs/kg', 'Centre seal, three side seal'],
+    ['pouchMakingGussetPerKg', 'Making — gusset, Rs/kg', 'Ticked as a gazette pouch'],
+    [
+      'pouchMakingGussetHandlePerKg',
+      'Making — gusset + handle, Rs/kg',
+      'Gazette with the D punch as well',
+    ],
+    [
+      'pouchMakingPerPouch',
+      'Pouch making, Rs/pouch',
+      'The older basis — used where no band above is set',
+    ],
     ['dPunchPerPouch', 'D punch, Rs/pouch', 'What one costs to make instead'],
     ['dPunchLargePerPouch', 'D punch, wide, Rs/pouch', 'The punch is made across the top'],
     ['dPunchLargeAboveMm', 'A D punch is wide above, mm', 'Pouch width at which the rate steps'],
-    ['zipperRatePerMetre', 'Zipper, Rs/metre', 'Charged across the pouch’s mouth'],
+    [
+      'zipperRatePerMetre',
+      'Zipper, Rs/metre',
+      'Charged across the pouch’s mouth — on top of a band',
+    ],
     ['stationSurcharge6', '6th station, Rs/kg', 'A job past five colours'],
     ['stationSurcharge7', '7th station, Rs/kg', ''],
     ['stationSurcharge8', '8th station, Rs/kg', ''],
