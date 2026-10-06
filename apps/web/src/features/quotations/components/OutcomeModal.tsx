@@ -62,6 +62,10 @@ export function OutcomeModal({
               );
             if (result.jobsSkipped.length > 0)
               parts.push(`${result.jobsSkipped.length} already on file`);
+            /* Said outright, because it moved something physical: those
+               cylinders are now out of the works and the register says so. */
+            if (result.cylindersSent.length > 0)
+              parts.push(`${result.cylindersSent.join(', ')} sent for repair`);
             toast.success(parts.join(' · '));
           }
           onClose();

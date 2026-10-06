@@ -21,6 +21,8 @@ export interface QuotationCylinderRepair {
   code: string;
   colour: string;
   cost: number;
+  /** What is wrong with it, carried onto the register when the quotation wins. */
+  reason: string;
 }
 
 /** One ink a line prints, as it was priced the day the quotation was written. */
@@ -286,4 +288,14 @@ export interface RecordOutcomeResult {
   ordersCreated: number[];
   /** Lines that already had an order. Winning twice raises nothing again. */
   ordersSkipped: number[];
+  /**
+   * Cylinders this quotation quoted a repair for, now recorded as gone out.
+   *
+   * A quotation is an offer and quoting a repair changes nothing on the shelf;
+   * winning is when the set actually goes to the engraver, so that is when the
+   * register is written. Empty on a LOST quotation.
+   */
+  cylindersSent: string[];
+  /** Ones already out against this quotation, or retired and so not sendable. */
+  cylindersAlreadySent: string[];
 }

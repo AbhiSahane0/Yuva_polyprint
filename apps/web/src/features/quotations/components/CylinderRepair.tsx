@@ -1,6 +1,6 @@
 import { CircleAlert, Wrench } from 'lucide-react';
 import { CYLINDER_STATUS_LABELS, formatRs, type QuotationCylinderRepair } from '@yuva/shared';
-import { NumberInput } from '@/components/ui/Field';
+import { Input, NumberInput } from '@/components/ui/Field';
 import { useDesign } from '@/features/cylinders/api/cylinder-api';
 import { cn } from '@/lib/utils';
 
@@ -49,11 +49,18 @@ export function CylinderRepair({
       onChange(repairs.filter((repair) => repair.code !== code));
       return;
     }
-    onChange([...repairs, { cylinderId, code, colour, cost: 0, position: repairs.length + 1 }]);
+    onChange([
+      ...repairs,
+      { cylinderId, code, colour, cost: 0, reason: '', position: repairs.length + 1 },
+    ]);
   }
 
   function setCost(code: string, cost: number) {
     onChange(repairs.map((repair) => (repair.code === code ? { ...repair, cost } : repair)));
+  }
+
+  function setReason(code: string, reason: string) {
+    onChange(repairs.map((repair) => (repair.code === code ? { ...repair, reason } : repair)));
   }
 
   return (
@@ -158,6 +165,22 @@ export function CylinderRepair({
 
                       {picked ? (
                         <span className="flex shrink-0 items-center gap-2">
+                          {/*
+                            What is wrong with it, beside what putting it right
+                            costs. Asked here because this is where somebody is
+                            looking at the cylinder and deciding — and because
+                            winning this quotation sends it to the engraver, and
+                            the register will not take a cylinder out of the
+                            works without a fault recorded against it.
+                          */}
+                          <Input
+                            aria-label={`What is wrong with ${cylinder.code}`}
+                            className="w-48"
+                            placeholder="What is wrong with it"
+                            value={picked.reason}
+                            disabled={disabled}
+                            onChange={(event) => setReason(cylinder.code, event.target.value)}
+                          />
                           <span className="text-ink-500 text-xs">Repair cost</span>
                           <NumberInput
                             aria-label={`Repair cost for ${cylinder.code}`}
@@ -179,7 +202,7 @@ export function CylinderRepair({
                 <span className="text-ink-400 text-xs">
                   {repairs.length === 0
                     ? 'Tick the ones being re-engraved.'
-                    : `${repairs.length} of ${cylinders.length} being repaired`}
+                    : `${repairs.length} of ${cylinders.length} being repaired — they go out when this quotation is won`}
                 </span>
                 {repairs.length > 0 ? (
                   <span className="text-ink-900 text-sm font-semibold tabular-nums">
