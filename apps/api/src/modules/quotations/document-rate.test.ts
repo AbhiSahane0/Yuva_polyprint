@@ -65,6 +65,10 @@ const line = (over: Partial<QuotationItem>): QuotationItem =>
         costPerPouch: 6.52,
       },
     ],
+    /* The document prints what a line is printed in, so a stand-in for a line
+       has to say — an empty list meaning "not recorded", which is what every
+       quotation written before colours were chosen carries. */
+    colours: [],
     ...over,
   }) as unknown as QuotationItem;
 
@@ -104,6 +108,8 @@ const document = (item: QuotationItem): Quotation =>
     terms: [],
     notes: '',
     items: [item],
+    /* No title: the printed document leaves that line out entirely. */
+    title: '',
   }) as unknown as Quotation;
 
 describe('the rate column', () => {
@@ -111,7 +117,7 @@ describe('the rate column', () => {
     const html = renderQuotationHtml(document(line({})));
 
     expect(html).toContain('281.24');
-    expect(html).toContain('<span class="sub">6.52 /pc</span>');
+    expect(html).toContain('Rs. 6.52 a pouch');
   });
 
   it('leaves the rate each off a roll', () => {
@@ -121,7 +127,10 @@ describe('the rate column', () => {
     );
 
     expect(html).toContain('281.24');
-    expect(html).not.toContain('class="sub"');
+    /* Named by the phrase rather than by the markup: every line on the printed
+       document carries sub-lines — its structure, its cylinders — so the class
+       alone no longer says anything about the rate. */
+    expect(html).not.toContain('a pouch');
   });
 
   /*
@@ -150,7 +159,7 @@ describe('the rate column', () => {
       ),
     );
 
-    expect(html).toContain('6.52 /pc</td>');
+    expect(html).toContain('Rs. 6.52 a pouch');
   });
 
   /*
@@ -178,6 +187,8 @@ describe('the rate column', () => {
       ),
     );
 
-    expect(html).not.toContain('class="sub"');
+    expect(html).not.toContain('a pouch');
+    /* The count itself still prints, and reads as the nought it is. */
+    expect(html).toContain('0 pouches');
   });
 });

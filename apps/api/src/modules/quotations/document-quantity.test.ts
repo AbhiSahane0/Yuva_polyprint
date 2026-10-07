@@ -118,6 +118,10 @@ const item: QuotationItem = {
       costPerPouch: 9,
     },
   ],
+  /* The document prints what a line is printed in, so a stand-in for a line
+     has to say — an empty list meaning "not recorded", which is what every
+     quotation written before colours were chosen carries. */
+  colours: [],
 } as unknown as QuotationItem;
 
 const quotation = (selectedQuantity: number, tierCount = 3): Quotation =>
@@ -156,6 +160,8 @@ const quotation = (selectedQuantity: number, tierCount = 3): Quotation =>
     terms: ['18% GST applicable on total value.'],
     notes: '',
     items: [item],
+    /* No title: the printed document leaves that line out entirely. */
+    title: '',
   }) as unknown as Quotation;
 
 /** Rupee figures as they are printed, so a column can be looked for by amount. */

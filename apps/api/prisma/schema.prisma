@@ -309,6 +309,14 @@ model Quotation {
   /// office wants both on the record.
   enquiryFrom String @default("") @map("enquiry_from")
 
+  /// What the document as a whole is for — "Green Peas Packaging Range".
+  ///
+  /// A quotation names each job line, which answers what a LINE is and not
+  /// what the document is. Four lines across a product range are one proposal
+  /// and the customer knows it by the range. Optional; the printed quotation
+  /// leaves the line out entirely when it is blank.
+  title String @default("")
+
   /// How the enquiry arrived — mail, WhatsApp, a phone call, a person. Null on
   /// every quotation written before the question was asked, which is honest:
   /// the office does not remember, and a default would invent an answer.

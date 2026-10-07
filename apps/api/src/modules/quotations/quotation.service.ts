@@ -300,6 +300,7 @@ function toQuotation(row: QuotationRow): Quotation {
     gstNumber: row.gstNumber,
     referredBy: row.referredBy,
     enquiryFrom: row.enquiryFrom,
+    title: row.title,
     generatedThrough: row.generatedThrough,
     decidedAt: row.decidedAt ? row.decidedAt.toISOString() : null,
     lostReason: row.lostReason,
@@ -775,6 +776,7 @@ export async function createQuotation(input: CreateQuotationInput): Promise<Quot
             gstNumber: input.gstNumber,
             referredBy: input.referredBy,
             enquiryFrom: input.enquiryFrom,
+            title: input.title,
             generatedThrough: input.generatedThrough,
             // Clamped against the quantities that actually arrived — see
             // `resolveSelectedQuantity`.
@@ -1121,6 +1123,7 @@ export async function updateQuotation(id: string, input: UpdateQuotationInput): 
         ...(input.gstNumber !== undefined ? { gstNumber: input.gstNumber } : {}),
         ...(input.referredBy !== undefined ? { referredBy: input.referredBy } : {}),
         ...(input.enquiryFrom !== undefined ? { enquiryFrom: input.enquiryFrom } : {}),
+        ...(input.title !== undefined ? { title: input.title } : {}),
         ...(input.generatedThrough !== undefined
           ? { generatedThrough: input.generatedThrough }
           : {}),
@@ -1312,6 +1315,7 @@ export async function createQuotationVersion(id: string): Promise<Quotation> {
                across with the rest of the customer block. */
             referredBy: source.referredBy,
             enquiryFrom: source.enquiryFrom,
+            title: source.title,
             generatedThrough: source.generatedThrough,
             cylinderRate: source.cylinderRate,
             gstPercent: source.gstPercent,

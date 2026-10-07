@@ -395,6 +395,7 @@ export default function QuotationFormPage() {
       transportPerKg: '',
       pouchMakingPerKg: '',
       customerName: '',
+      title: '',
       referredBy: '',
       generatedThrough: null,
       addressLine1: '',
@@ -577,6 +578,7 @@ export default function QuotationFormPage() {
          to the customer — so they come straight back. */
       referredBy: existing.referredBy,
       enquiryFrom: existing.enquiryFrom,
+      title: existing.title,
       generatedThrough: existing.generatedThrough,
       addressLine1: existing.addressLine1,
       addressLine2: existing.addressLine2,
@@ -1366,6 +1368,30 @@ export default function QuotationFormPage() {
                     />
                   </Field>
                 )}
+              </div>
+
+              {/*
+                What the whole document is for.
+
+                The lines below name each job, which answers what a LINE is and
+                not what the quotation is: four lines across a product range
+                are one proposal, and the customer knows it by the range.
+                Optional, and the printed document leaves the line out rather
+                than inventing one from the first job's name.
+              */}
+              <div className="sm:col-span-6">
+                <Field
+                  label="Quotation title"
+                  htmlFor="title"
+                  hint="Printed on the quotation — leave blank to leave it off"
+                >
+                  <Input
+                    id="title"
+                    autoComplete="off"
+                    placeholder="e.g. Green Peas Packaging Range"
+                    {...register('title')}
+                  />
+                </Field>
               </div>
 
               {/*

@@ -384,6 +384,8 @@ const createQuotationBaseSchema = z.object({
    * nobody ever typed.
    */
   enquiryFrom: z.string().trim().max(200).default(''),
+  /** What the whole document is for. Blank leaves the line off the PDF. */
+  title: z.string().trim().max(160, 'That title is too long').default(''),
   generatedThrough: z.enum(ENQUIRY_CHANNELS).nullable().default(null),
   /* "Required" is untrue once a single character has been typed, which is what
    * this rule actually rejects — so the message says what to do instead. */
