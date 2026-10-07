@@ -396,6 +396,7 @@ export default function QuotationFormPage() {
       pouchMakingPerKg: '',
       customerName: '',
       referredBy: '',
+      generatedThrough: null,
       addressLine1: '',
       addressLine2: '',
       addressLine3: '',
@@ -1393,7 +1394,15 @@ export default function QuotationFormPage() {
                 {/* "Enquiry Source" is the client's own name for it, and the
                     one the works uses out loud. "Generated through" was ours. */}
                 <Field label="Enquiry source" htmlFor="generatedThrough" hint="How it reached us">
-                  <Select id="generatedThrough" {...register('generatedThrough')}>
+                  {/* "— Choose —" is the empty string in the DOM, and the
+                      schema's channel enum refuses that — saving with nothing
+                      chosen failed with "Invalid option". Unanswered is null. */}
+                  <Select
+                    id="generatedThrough"
+                    {...register('generatedThrough', {
+                      setValueAs: (value: unknown) => (value === '' ? null : value),
+                    })}
+                  >
                     {/* Nothing chosen is a real answer here: a quotation whose
                         channel nobody recorded should not claim one. Worded the
                         same as the pouch type's, so the two unanswered boxes on
