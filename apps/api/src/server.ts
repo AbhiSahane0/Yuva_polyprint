@@ -2,7 +2,7 @@ import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { logger } from './lib/logger.js';
 import { connectDatabase, disconnectDatabase } from './lib/prisma.js';
-import { closePdfBrowser } from './modules/quotations/quotation-pdf.js';
+import { closePdfBrowser } from './lib/pdf.js';
 
 async function bootstrap() {
   await connectDatabase();

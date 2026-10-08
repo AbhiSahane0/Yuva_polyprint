@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, PackageMinus, Save } from 'lucide-react';
+import { ArrowLeft, Check, PackageMinus, Printer, Save } from 'lucide-react';
 import {
   costJobSheet,
   formatNumber,
@@ -19,11 +19,14 @@ import { Badge } from '@/components/ui/Badge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ApiClientError } from '@/lib/api-client';
+import { openBlobUrl, saveBlob } from '@/lib/download';
 import { toast } from '@/lib/toast';
 import { useProductionOrders } from '@/features/production/api/production-api';
 import { useSettings } from '@/features/quotations/api/quotation-api';
 import { JobCard } from '../components/JobCard';
 import {
+  fetchJobCardPdf,
+  jobCardPdfName,
   useCostJobSheet,
   useJobSheet,
   usePostJobSheetToStock,
@@ -113,6 +116,16 @@ export default function JobSheetPage() {
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [posting, setPosting] = useState(false);
+  /* Chromium renders the card on the server and takes a few seconds, which the
+     button has to show or the office clicks it again. */
+  const [preparingCard, setPreparingCard] = useState(false);
+  const cardUrl = useRef<string | null>(null);
+  useEffect(
+    () => () => {
+      if (cardUrl.current) URL.revokeObjectURL(cardUrl.current);
+    },
+    [],
+  );
 
   /*
    * The server's copy replaces the draft whenever it changes — which is after
@@ -210,13 +223,45 @@ export default function JobSheetPage() {
     (card) => !card.jobSheetId || card.jobSheetId === id,
   );
 
-  async function onSave() {
-    if (!draft) return;
+  /** Reports whether the sheet is now saved, so printing can wait for it. */
+  async function onSave(): Promise<boolean> {
+    if (!draft) return false;
     try {
       await save.mutateAsync({
         date: draft.date,
         productionOrderId: draft.productionOrderId,
         jobName: draft.jobName,
+
+        /*
+         * The job card half of the sheet.
+         *
+         * Every one of these is a box somebody types on the card above, and
+         * for a while none of them was sent: the screen worked, the figures
+         * were right, and Save threw the lot away — the sheet came back from
+         * the server with the card blank again. They are listed one by one
+         * rather than spread from the draft because the draft also holds what
+         * the server works out, and sending a cost per kilogram back as if it
+         * were typed is how a computed figure becomes a stored one.
+         */
+        workOrderNo: draft.workOrderNo,
+        poDate: draft.poDate,
+        dispatchDate: draft.dispatchDate,
+        transport: draft.transport,
+        quantityKg: draft.quantityKg,
+        jobReceivedBy: draft.jobReceivedBy,
+        printingNote: draft.printingNote,
+        printSpeedMPerMin: draft.printSpeedMPerMin,
+        printMetersOverride: draft.printMetersOverride,
+        metPetCoatingGsm: draft.metPetCoatingGsm,
+        polyCoatingGsm: draft.polyCoatingGsm,
+        pouchingSpeedPerMin: draft.pouchingSpeedPerMin,
+        otherSettingMinutes: draft.otherSettingMinutes,
+        singleRollWeight: draft.singleRollWeight,
+        pouchSorting: draft.pouchSorting,
+        specialInstructions: draft.specialInstructions,
+        preparedBy: draft.preparedBy,
+        approvedBy: draft.approvedBy,
+
         operatorName: draft.operatorName,
         filmType: draft.filmType,
         webWidthMm: draft.webWidthMm,
@@ -272,8 +317,47 @@ export default function JobSheetPage() {
         })),
       });
       toast.success('Job sheet saved');
+      return true;
     } catch (error) {
       toast.error(error instanceof ApiClientError ? error.message : 'Could not save the sheet');
+      return false;
+    }
+  }
+
+  /**
+   * The card, on paper.
+   *
+   * **Saved first.** The PDF is rendered by the server from the stored sheet,
+   * so printing an unsaved screen would hand the floor last week's speed in a
+   * document that looks authoritative — and a card is believed, which is the
+   * whole point of printing it.
+   *
+   * It opens in a tab rather than landing in the downloads folder: the office
+   * prints it and takes three signatures on it, and a file nobody meant to
+   * keep is a file somebody has to tidy up. A blocked popup falls back to a
+   * download, and says so.
+   */
+  async function onPrintCard() {
+    if (!draft) return;
+    if (!locked && !(await onSave())) return;
+
+    setPreparingCard(true);
+    try {
+      const { blob, filename } = await fetchJobCardPdf(draft.id);
+
+      /* One object URL, revoked when this page unloads. Revoking it now would
+         pull the document out from under the tab that is showing it. */
+      if (cardUrl.current) URL.revokeObjectURL(cardUrl.current);
+      cardUrl.current = URL.createObjectURL(blob);
+
+      if (!openBlobUrl(cardUrl.current)) {
+        saveBlob(blob, jobCardPdfName(filename, draft.number));
+        toast.success('Your browser blocked the new tab, so the card was downloaded instead');
+      }
+    } catch (error) {
+      toast.error(error instanceof ApiClientError ? error.message : 'Could not print the job card');
+    } finally {
+      setPreparingCard(false);
     }
   }
 
@@ -445,6 +529,20 @@ export default function JobSheetPage() {
           <Button variant="secondary" onClick={onSave} disabled={locked || save.isPending}>
             <Save className="size-4" />
             Save
+          </Button>
+          {/* The card is only worked out where the sheet knows its design. */}
+          <Button
+            variant="secondary"
+            onClick={onPrintCard}
+            disabled={!draft.jobId || preparingCard || save.isPending}
+            title={
+              draft.jobId
+                ? 'Saves the sheet, then opens the card to print'
+                : 'Link this sheet to a job card first — the printed card is worked out from its design'
+            }
+          >
+            <Printer className="size-4" />
+            {preparingCard ? 'Preparing…' : 'Print card'}
           </Button>
           <Button onClick={onCost} disabled={locked || cost.isPending}>
             <Check className="size-4" />

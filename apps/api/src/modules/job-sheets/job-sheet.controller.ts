@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import type { JobSheetInput } from '@yuva/shared';
 import { created, ok, paginated } from '../../utils/api-response.js';
+import { renderJobCardPdf } from './job-card-pdf.js';
 import * as service from './job-sheet.service.js';
 
 /** Whoever is recording it. Falls back to 'Office', matching rates and stock. */
@@ -45,4 +46,27 @@ export async function post(req: Request, res: Response) {
 
 export async function remove(req: Request, res: Response) {
   ok(res, await service.deleteJobSheet(req.params.id as string));
+}
+
+/**
+ * The job card as a real PDF — the paper the office prints and signs.
+ *
+ * `?inline=1` serves it for display rather than download, which is what the
+ * print dialog is opened on: the office wants it on the printer, not in the
+ * downloads folder, and a file it never meant to keep is a file somebody has
+ * to tidy up.
+ */
+export async function card(req: Request, res: Response) {
+  const { pdf, filename } = await renderJobCardPdf(req.params.id as string);
+  const inline = req.query.inline === '1';
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader(
+    'Content-Disposition',
+    `${inline ? 'inline' : 'attachment'}; filename="${filename}"`,
+  );
+  res.setHeader('Content-Length', String(pdf.length));
+  // Helmet's default policy blocks a same-origin PDF from being framed.
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
+  res.end(Buffer.from(pdf));
 }

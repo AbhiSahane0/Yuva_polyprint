@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { JobSheet, JobSheetSummary, Paginated } from '@yuva/shared';
-import { request } from '@/lib/api-client';
+import { request, requestBlob } from '@/lib/api-client';
 import { settle } from '@/lib/query';
 import { inventoryKeys } from '@/features/inventory/api/inventory-api';
 import { productionKeys } from '@/features/production/api/production-api';
@@ -116,4 +116,21 @@ export function useDeleteJobSheet() {
       request<{ id: string }>({ url: `/job-sheets/${id}`, method: 'DELETE' }),
     onSuccess: () => settle(queryClient, jobSheetKeys.all),
   });
+}
+
+/**
+ * The printed job card.
+ *
+ * Fetched by script rather than linked: the endpoint needs a session and the
+ * token travels in a header, which a browser navigation cannot carry — a
+ * plain `<a href>` to it answers 401. Chromium renders the sheet on the
+ * server, so this takes a few seconds and every caller shows that wait.
+ */
+export function fetchJobCardPdf(id: string) {
+  return requestBlob({ url: `/job-sheets/${id}/card`, method: 'GET' });
+}
+
+/** Falls back to a readable name when the server sends no Content-Disposition. */
+export function jobCardPdfName(filename: string | null, number: number | string): string {
+  return filename ?? `Job_Card_${number}.pdf`;
 }
