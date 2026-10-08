@@ -4,6 +4,7 @@ import type {
   AssignDesignCustomerInput,
   DesignMasterList,
   DesignMasterRow,
+  JobSpecification,
   ListDesignsQuery,
 } from '@yuva/shared';
 import { request } from '@/lib/api-client';
@@ -12,7 +13,25 @@ import { settle } from '@/lib/query';
 export const designKeys = {
   all: ['designs'] as const,
   list: (params: Partial<ListDesignsQuery>) => [...designKeys.all, 'list', params] as const,
+  specification: (id: string) => [...designKeys.all, 'specification', id] as const,
 };
+
+/**
+ * One design's full specification — what the job card prints.
+ *
+ * A design's structure does not change while a card is open, so this is left
+ * to sit: refetching it on every focus would reprint the card under the
+ * operator's hands for nothing.
+ */
+export function useJobSpecification(jobId: string | null) {
+  return useQuery({
+    queryKey: designKeys.specification(jobId ?? ''),
+    queryFn: () =>
+      request<JobSpecification>({ url: `/jobs/${jobId}/specification`, method: 'GET' }),
+    enabled: Boolean(jobId),
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 export function useDesigns(params: Partial<ListDesignsQuery>) {
   return useQuery({

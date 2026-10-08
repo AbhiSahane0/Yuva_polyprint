@@ -8,7 +8,12 @@ import {
 import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/async-handler.js';
 import { ok } from '../../utils/api-response.js';
-import { assignDesignCustomer, listDesigns, updateJob } from './job.service.js';
+import {
+  assignDesignCustomer,
+  getJobSpecification,
+  listDesigns,
+  updateJob,
+} from './job.service.js';
 
 /*
  * Creating a job lives under the customer that owns it — see customer.routes —
@@ -30,6 +35,21 @@ router.get(
   validate({ query: listDesignsQuerySchema }),
   asyncHandler(async (req, res) => {
     ok(res, await listDesigns(req.query as never));
+  }),
+);
+
+/**
+ * One design's full specification, for the job card.
+ *
+ * Everything the card prints that an operator does not type comes from here.
+ * Its own route rather than widening the list: the list is a worklist read a
+ * page at a time, and nothing on it needs the viscosities.
+ */
+router.get(
+  '/:id/specification',
+  validate({ params: idParamSchema }),
+  asyncHandler(async (req, res) => {
+    ok(res, await getJobSpecification(req.params.id as string));
   }),
 );
 

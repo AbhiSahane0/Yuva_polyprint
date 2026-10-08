@@ -10,6 +10,7 @@ import {
   mixDrumFor,
   type JobSheet,
   type JobSheetCost,
+  type JobSheetInput,
   type JobSheetLine,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +21,8 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 import { useProductionOrders } from '@/features/production/api/production-api';
+import { useSettings } from '@/features/quotations/api/quotation-api';
+import { JobCard } from '../components/JobCard';
 import {
   useCostJobSheet,
   useJobSheet,
@@ -122,6 +125,10 @@ export default function JobSheetPage() {
   }, [data]);
 
   const locked = Boolean(draft?.stockPostedAt);
+
+  /* The works' figures as at THIS sheet's date, so a card printed last week
+     goes on saying the times the setter was actually given. */
+  const { data: settings } = useSettings(draft?.date);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => (current ? { ...current, [key]: value } : current));
@@ -460,7 +467,28 @@ export default function JobSheetPage() {
         </p>
       ) : null}
 
-      {/* ---- The header of the paper sheet ---- */}
+      {/*
+        The card first, the costing under it.
+
+        One document, two halves, in the order the paper travels: the operator
+        is handed the instruction before the run and the office records what it
+        took afterwards. Putting the consumption first would ask somebody to
+        scroll past a fortnight of hindsight to find out what to do today.
+      */}
+      <JobCard
+        draft={draft as unknown as JobSheetInput}
+        jobId={draft.jobId}
+        rates={{
+          cylinderChangeoverMinutes: settings?.cylinderChangeoverMinutes ?? 15,
+          rubberChangeMinutes: settings?.rubberChangeMinutes ?? 10,
+          jobCardAllowancePercent: settings?.jobCardAllowancePercent ?? 10,
+          dispatchLeadDays: settings?.dispatchLeadDays ?? 15,
+        }}
+        disabled={locked}
+        onChange={(key, value) => set(key as keyof Draft, value as never)}
+      />
+
+      {/* ---- What the run turned out to consume ---- */}
       <section className="border-ink-200 rounded-lg border bg-white p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Date" htmlFor="date">

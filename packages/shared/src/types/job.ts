@@ -54,3 +54,64 @@ export interface DesignMasterList {
   pageSize: number;
   totals: DesignMasterTotals;
 }
+
+/**
+ * **A design, as the job card reads it.**
+ *
+ * Everything on the works' Job Sheet that is not typed by the operator comes
+ * from here — which is their Jobs Data tab, and the columns line up one for
+ * one because the design master was built from that sheet.
+ *
+ * It is deliberately wider than `JobCardDesign`, which carries only what the
+ * arithmetic needs. The rest is what the card PRINTS: the poly's name, the
+ * direction the job is read in, the viscosities the laminator sets, the pouch
+ * it ends up as. Numbers the works keeps as ranges — "15-16", "13-14" — stay
+ * strings, because that is what the works wrote and a midpoint would be an
+ * invention.
+ */
+export interface JobSpecification {
+  id: string;
+  jobCode: string;
+  jobName: string;
+  jobType: string;
+  customerName: string | null;
+
+  /* ---- structure, and what the card weighs it at ---- */
+  petMicron: number;
+  metPetMicron: number;
+  polyMicron: number;
+  polyType: string;
+  petGsm: number;
+  metPetGsm: number;
+  polyGsm: number;
+  compositeGsm: number;
+  layer: number;
+
+  /* ---- printing ---- */
+  jobColours: string;
+  totalCylinders: number;
+  printingType: string;
+  jobFinalDirection: string;
+  ups: number;
+
+  /* ---- tooling. The card calls these the cylinder size and its circumference. ---- */
+  rubberSizeMm: number;
+  cylinderCellMm: number;
+  cylinderDiaMm: number;
+  pouchPlateSize: string;
+  viscosity: string;
+
+  /* ---- slitting ---- */
+  singleRollWidthMm: number;
+  singleRollWeight: string;
+
+  /* ---- what it becomes ---- */
+  pouchSubType: string;
+  pouchHeightMm: number;
+  pouchOpenWidthMm: number;
+  pouchesPerKg: number;
+  dPunchTopSize: string;
+  gusset: string;
+  gussetSize: string;
+  vNotch: string;
+}
