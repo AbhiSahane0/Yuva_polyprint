@@ -115,6 +115,9 @@ export function JobCard({
 
   /* The floor's figure where it has corrected the arithmetic — see the schema. */
   const metres = draft.printMetersOverride ?? card.printMeters;
+  /* Roll Form against Pouch Form, which is the works' own column. A reel is
+     printed, laminated and slit, and then it is finished. */
+  const makesPouches = !/roll/i.test(spec.jobType);
   const mm = (value: number) => (value > 0 ? `${formatNumber(value, 0)} mm` : '');
   const kg = (value: number) => (value > 0 ? `${formatNumber(value, 2)} kg` : '');
 
@@ -315,39 +318,51 @@ export function JobCard({
 
       {/* ---- pouching ---- */}
       <Band title="Pouching department" />
-      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        <Shown label="Pouch type" value={spec.pouchSubType} wide />
-        <Shown label="Open width" value={mm(spec.pouchOpenWidthMm)} />
-        <Shown label="Height" value={mm(spec.pouchHeightMm)} />
+      {!makesPouches ? (
+        /*
+         * A reel is not converted into anything, so there is no pouch to
+         * count. The works' sheet guards every one of these cells on the
+         * pouch type being N/A; without that this card offered an operator a
+         * hundred and twenty thousand pouches on a job that makes none.
+         */
+        <p className="text-ink-500 border-ink-200 rounded-md border border-dashed px-3 py-3 text-sm">
+          This job runs as a reel — nothing is pouched.
+        </p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <Shown label="Pouch type" value={spec.pouchSubType} wide />
+          <Shown label="Open width" value={mm(spec.pouchOpenWidthMm)} />
+          <Shown label="Height" value={mm(spec.pouchHeightMm)} />
 
-        <Shown label="Total pouches" value={formatNumber(card.totalPouches, 0)} />
-        <Shown label="D punch top" value={spec.dPunchTopSize} />
-        <Shown
-          label="Side gusset"
-          value={[spec.gusset, spec.gussetSize].filter(Boolean).join(' · ')}
-        />
-        <Shown label="V notch" value={spec.vNotch} />
+          <Shown label="Total pouches" value={formatNumber(card.totalPouches, 0)} />
+          <Shown label="D punch top" value={spec.dPunchTopSize} />
+          <Shown
+            label="Side gusset"
+            value={[spec.gusset, spec.gussetSize].filter(Boolean).join(' · ')}
+          />
+          <Shown label="V notch" value={spec.vNotch} />
 
-        <Field label="Pouching speed, /min" htmlFor="pouchingSpeed">
-          <NumberInput
-            id="pouchingSpeed"
-            className={TYPED}
-            value={draft.pouchingSpeedPerMin === 0 ? '' : String(draft.pouchingSpeedPerMin)}
-            disabled={disabled}
-            onChange={(event) => onChange('pouchingSpeedPerMin', Number(event.target.value || 0))}
-          />
-        </Field>
-        <Shown label="Pouching time" value={asHoursMinutes(card.pouchingMinutes)} />
-        <Field label="Pouch sorting" htmlFor="pouchSorting">
-          <Input
-            id="pouchSorting"
-            className={TYPED}
-            value={draft.pouchSorting}
-            disabled={disabled}
-            onChange={(event) => onChange('pouchSorting', event.target.value)}
-          />
-        </Field>
-      </div>
+          <Field label="Pouching speed, /min" htmlFor="pouchingSpeed">
+            <NumberInput
+              id="pouchingSpeed"
+              className={TYPED}
+              value={draft.pouchingSpeedPerMin === 0 ? '' : String(draft.pouchingSpeedPerMin)}
+              disabled={disabled}
+              onChange={(event) => onChange('pouchingSpeedPerMin', Number(event.target.value || 0))}
+            />
+          </Field>
+          <Shown label="Pouching time" value={asHoursMinutes(card.pouchingMinutes)} />
+          <Field label="Pouch sorting" htmlFor="pouchSorting">
+            <Input
+              id="pouchSorting"
+              className={TYPED}
+              value={draft.pouchSorting}
+              disabled={disabled}
+              onChange={(event) => onChange('pouchSorting', event.target.value)}
+            />
+          </Field>
+        </div>
+      )}
 
       {/* ---- what the job costs in time ---- */}
       <Band title="Time on the machine" />
