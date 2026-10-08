@@ -172,7 +172,14 @@ function AppRoutes() {
             `quotations`, which is the desk that makes the commitment, and that
             guard is on the route that does it as well as on the API.
           */}
-          <Route path="/orders" element={<OrdersPage />} />
+          <Route
+            path="/orders"
+            element={
+              <RequireModule module="orders">
+                <OrdersPage />
+              </RequireModule>
+            }
+          />
           <Route
             path="/orders/new"
             element={
@@ -191,7 +198,14 @@ function AppRoutes() {
             to raise it — and that guard is on the API, since the board is
             worth reading without it.
           */}
-          <Route path="/planning" element={<PlanningPage />} />
+          <Route
+            path="/planning"
+            element={
+              <RequireModule module="planning">
+                <PlanningPage />
+              </RequireModule>
+            }
+          />
 
           {/*
             Dispatch reads like Orders: what has gone out and what is still in
@@ -200,7 +214,14 @@ function AppRoutes() {
             module, because the despatch clerk is not the quotation desk and
             sending goods completes a customer's order.
           */}
-          <Route path="/dispatch" element={<DispatchPage />} />
+          <Route
+            path="/dispatch"
+            element={
+              <RequireModule module="dispatch">
+                <DispatchPage />
+              </RequireModule>
+            }
+          />
           <Route
             path="/dispatch/new"
             element={
@@ -226,15 +247,36 @@ function AppRoutes() {
             guard is on the API rather than on the route, because the screen is
             useful read-only.
           */}
-          <Route path="/production" element={<ProductionPage />} />
-          <Route path="/production/:id" element={<JobCardPage />} />
+          <Route
+            path="/production"
+            element={
+              <RequireModule module="production">
+                <ProductionPage />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="/production/:id"
+            element={
+              <RequireModule module="production">
+                <JobCardPage />
+              </RequireModule>
+            }
+          />
           {/*
             Quality reads like Production: where material is going and what is
             still wrong is the whole works' question, and the floor fixes most
             of it — hiding the figures from them is how a waste rate stays
             where it is. Raising and closing needs `jobs`, guarded on the API.
           */}
-          <Route path="/quality" element={<QualityPage />} />
+          <Route
+            path="/quality"
+            element={
+              <RequireModule module="production">
+                <QualityPage />
+              </RequireModule>
+            }
+          />
           {/*
             The design master. Gated on `customers`, the module that owns the
             data — the same guard the /jobs API carries, and the same one the
@@ -254,10 +296,24 @@ function AppRoutes() {
             Putting one down needs `jobs`, guarded on the API — what a machine
             COSTS stays on Costing behind `rates`.
           */}
-          <Route path="/machines" element={<MachinesPage />} />
+          <Route
+            path="/machines"
+            element={
+              <RequireModule module="resources">
+                <MachinesPage />
+              </RequireModule>
+            }
+          />
           {/* No guard, like Production: the floor reads this to fill in a job
               card. Adding somebody is refused by the API without `jobs`. */}
-          <Route path="/employees" element={<EmployeesPage />} />
+          <Route
+            path="/employees"
+            element={
+              <RequireModule module="resources">
+                <EmployeesPage />
+              </RequireModule>
+            }
+          />
           <Route
             path="/rates"
             element={
@@ -274,7 +330,7 @@ function AppRoutes() {
           <Route
             path="/costing"
             element={
-              <RequireModule module="rates">
+              <RequireModule module="costing">
                 <CostingPage />
               </RequireModule>
             }

@@ -9,25 +9,63 @@
 export const APP_MODULES = [
   'customers',
   'quotations',
-  'rates',
+  'orders',
+  'dispatch',
   'inventory',
   'purchase',
+  'rates',
+  'costing',
+  'planning',
+  'production',
   'cylinders',
   'jobs',
-  'dispatch',
+  'resources',
 ] as const;
 
 export type AppModule = (typeof APP_MODULES)[number];
 
+/**
+ * What each one is called on the tick list, named after the screen it opens
+ * so the owner is choosing sections rather than decoding our words for them.
+ */
 export const MODULE_LABELS: Record<AppModule, string> = {
-  customers: 'Customers',
+  customers: 'Customers & Designs',
   quotations: 'Quotations',
-  rates: 'Rates',
+  orders: 'Orders',
+  dispatch: 'Dispatch',
   inventory: 'Inventory',
   purchase: 'Purchase & Suppliers',
-  cylinders: 'Design & Cylinders',
-  jobs: 'Jobs',
+  rates: 'Rates',
+  costing: 'Costing',
+  planning: 'Planning',
+  production: 'Production & Quality',
+  cylinders: 'Cylinder register',
+  jobs: 'Job sheets',
+  resources: 'Machines & Employees',
+};
+
+/**
+ * The sections each one opens, for the line under its tick box.
+ *
+ * Several modules cover more than one screen — Designs belongs with the
+ * customer whose artwork it is, and Quality is the same stage as Production —
+ * so the tick list says which screens a tick actually turns on rather than
+ * leaving the owner to find out by unticking it.
+ */
+export const MODULE_SECTIONS: Record<AppModule, string> = {
+  customers: 'Customers, Designs',
+  quotations: 'Quotations',
+  orders: 'Orders',
   dispatch: 'Dispatch',
+  inventory: 'Inventory',
+  purchase: 'Purchase & Suppliers',
+  rates: 'Rates',
+  costing: 'Wages, machine rates and margins',
+  planning: 'Planning',
+  production: 'Production, Quality & waste',
+  cylinders: 'Cylinder register',
+  jobs: 'Job sheets',
+  resources: 'Machines, Employees',
 };
 
 /** Narrows an arbitrary string to a module key. */

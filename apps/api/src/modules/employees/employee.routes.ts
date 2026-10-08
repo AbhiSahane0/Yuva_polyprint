@@ -26,14 +26,14 @@ router.get('/:id', validate({ params: idParamSchema }), asyncHandler(controller.
 
 router.post(
   '/',
-  requireModule('jobs'),
+  requireModule('resources'),
   validate({ body: createEmployeeSchema }),
   asyncHandler(controller.create),
 );
 
 router.patch(
   '/:id',
-  requireModule('jobs'),
+  requireModule('resources'),
   validate({ params: idParamSchema, body: updateEmployeeSchema }),
   asyncHandler(controller.update),
 );
@@ -41,7 +41,7 @@ router.patch(
 /* Only somebody nobody's work names — see the service. */
 router.delete(
   '/:id',
-  requireModule('jobs'),
+  requireModule('resources'),
   validate({ params: idParamSchema }),
   asyncHandler(controller.remove),
 );

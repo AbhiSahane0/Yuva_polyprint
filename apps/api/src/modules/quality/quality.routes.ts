@@ -28,7 +28,7 @@ router.get('/:id', validate({ params: idParamSchema }), asyncHandler(controller.
 
 router.post(
   '/',
-  requireModule('jobs'),
+  requireModule('production'),
   validate({ body: createIssueSchema }),
   asyncHandler(controller.create),
 );
@@ -36,7 +36,7 @@ router.post(
 /* Closing one takes a note — see the service. */
 router.patch(
   '/:id',
-  requireModule('jobs'),
+  requireModule('production'),
   validate({ params: idParamSchema, body: updateIssueSchema }),
   asyncHandler(controller.update),
 );

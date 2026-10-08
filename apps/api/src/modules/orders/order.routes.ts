@@ -26,14 +26,14 @@ router.get('/:id', validate({ params: idParamSchema }), asyncHandler(controller.
 
 router.post(
   '/',
-  requireModule('quotations'),
+  requireModule('orders'),
   validate({ body: createOrderSchema }),
   asyncHandler(controller.create),
 );
 
 router.patch(
   '/:id',
-  requireModule('quotations'),
+  requireModule('orders'),
   validate({ params: idParamSchema, body: updateOrderSchema }),
   asyncHandler(controller.update),
 );
@@ -42,7 +42,7 @@ router.patch(
    for anything further along, and it keeps the record. */
 router.delete(
   '/:id',
-  requireModule('quotations'),
+  requireModule('orders'),
   validate({ params: idParamSchema }),
   asyncHandler(controller.remove),
 );

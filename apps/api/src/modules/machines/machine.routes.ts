@@ -30,14 +30,14 @@ router.get('/:id/history', validate({ params: idParamSchema }), asyncHandler(con
 
 router.post(
   '/maintenance',
-  requireModule('jobs'),
+  requireModule('resources'),
   validate({ body: startMaintenanceSchema }),
   asyncHandler(controller.start),
 );
 
 router.post(
   '/maintenance/:id/end',
-  requireModule('jobs'),
+  requireModule('resources'),
   validate({ params: idParamSchema, body: endMaintenanceSchema }),
   asyncHandler(controller.end),
 );

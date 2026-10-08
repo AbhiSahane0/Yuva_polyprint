@@ -24,7 +24,7 @@ router.get('/:id', validate({ params: idParamSchema }), asyncHandler(controller.
 
 router.put(
   '/:id',
-  requireModule('jobs'),
+  requireModule('planning'),
   validate({ params: idParamSchema, body: planOrderSchema }),
   asyncHandler(controller.plan),
 );

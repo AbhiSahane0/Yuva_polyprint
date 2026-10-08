@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { APP_MODULES, MODULE_LABELS, type AppModule, type User } from '@yuva/shared';
+import {
+  APP_MODULES,
+  MODULE_LABELS,
+  MODULE_SECTIONS,
+  type AppModule,
+  type User,
+} from '@yuva/shared';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Field, Input } from '@/components/ui/Field';
@@ -162,7 +168,7 @@ export function UserFormModal({
               <label
                 key={module}
                 className={
-                  'flex items-center gap-3 rounded-[var(--radius-md)] px-2 py-2 text-sm ' +
+                  'flex items-start gap-3 rounded-[var(--radius-md)] px-2 py-1.5 text-sm ' +
                   (isAdmin ? 'text-ink-400' : 'text-ink-800 hover:bg-ink-50 cursor-pointer')
                 }
               >
@@ -172,9 +178,22 @@ export function UserFormModal({
                   disabled={isAdmin}
                   checked={isAdmin || modules.includes(module)}
                   onChange={() => toggleModule(module)}
-                  className="accent-brand-600 size-4 disabled:cursor-not-allowed"
+                  className="accent-brand-600 mt-0.5 size-4 shrink-0 disabled:cursor-not-allowed"
                 />
-                {MODULE_LABELS[module]}
+                <span className="min-w-0">
+                  {MODULE_LABELS[module]}
+                  {/*
+                    What the tick actually turns on.
+
+                    Several of these cover more than one screen — Designs
+                    belongs with the customer whose artwork it is, Quality is
+                    the same stage as Production — and the owner was left to
+                    find that out by unticking one and seeing what vanished.
+                  */}
+                  {MODULE_SECTIONS[module] !== MODULE_LABELS[module] ? (
+                    <span className="text-ink-400 block text-xs">{MODULE_SECTIONS[module]}</span>
+                  ) : null}
+                </span>
               </label>
             ))}
           </div>
