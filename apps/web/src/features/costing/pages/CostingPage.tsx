@@ -734,6 +734,21 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
       'Zipper, Rs/metre',
       'Charged across the pouch’s mouth — on top of a band',
     ],
+    /*
+      The job card's own figures — how long a job stands on a machine rather
+      than what it costs. Dated like the rest, so a card already printed goes
+      on saying what the operator was actually told.
+    */
+    ['cylinderChangeoverMinutes', 'Cylinder changeover, min', 'Per cylinder, before a run'],
+    ['rubberChangeMinutes', 'Rubber change, min', 'Per cylinder'],
+    ['jobSetupMinutes', 'Other setting, min', 'Everything else the setter does'],
+    ['printingSpeedMPerMin', 'Printing speed, m/min', 'Until the card says otherwise'],
+    [
+      'jobCardAllowancePercent',
+      'Job card allowance %',
+      'Film drawn over — the card runs its own figure',
+    ],
+    ['dispatchLeadDays', 'Despatch lead, days', 'Order date to the date promised'],
     ['stationSurcharge6', '6th station, Rs/kg', 'A job past five colours'],
     ['stationSurcharge7', '7th station, Rs/kg', ''],
     ['stationSurcharge8', '8th station, Rs/kg', ''],

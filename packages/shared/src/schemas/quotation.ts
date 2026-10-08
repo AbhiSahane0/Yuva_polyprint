@@ -648,6 +648,33 @@ export const settingsSchema = z.object({
   dPunchLargePerPouch: z.coerce.number().min(0).max(1_000),
   /** The width at which a D punch becomes the larger job, millimetres. */
   dPunchLargeAboveMm: z.coerce.number().min(0).max(5_000),
+  /*
+   * --- the job card's own figures ----------------------------------------
+   *
+   * The card is a plan for the floor, not a price, so these decide how long a
+   * job stands on a machine rather than what it costs. Read off the works'
+   * Job Sheet, dated like everything else here because the works has said
+   * these move — and a card already printed must go on saying what the
+   * operator was actually told.
+   */
+  /** Minutes to change one cylinder over, and to change its rubber. */
+  cylinderChangeoverMinutes: z.coerce.number().min(0).max(600),
+  rubberChangeMinutes: z.coerce.number().min(0).max(600),
+  /** Everything else the setter does before a run — the card's 40 minutes. */
+  jobSetupMinutes: z.coerce.number().min(0).max(1_440),
+  /** What a press pulls when nobody has said otherwise, metres a minute. */
+  printingSpeedMPerMin: z.coerce.number().min(0).max(1_000),
+  /**
+   * What each ply is drawn over, as a percentage. The card's bare `110%`.
+   *
+   * Film spoiled setting up and running, same as wastage — a DIFFERENT figure
+   * from the quotation's, because the works' two documents say different
+   * things and both are theirs.
+   */
+  jobCardAllowancePercent: z.coerce.number().min(0).max(100),
+  /** Days from the customer's order to the promised despatch. The card's +15. */
+  dispatchLeadDays: z.coerce.number().min(0).max(365),
+
   /** What the sixth, seventh and eighth printing stations each add, per kg. */
   stationSurcharge6: z.coerce.number().min(0).max(10_000),
   stationSurcharge7: z.coerce.number().min(0).max(10_000),
@@ -849,6 +876,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
    */
   dPunchLargeAboveMm: 450,
   zipperRatePerMetre: 3.6,
+  /* The job card's own, off the works' Job Sheet. */
+  cylinderChangeoverMinutes: 15,
+  rubberChangeMinutes: 10,
+  jobSetupMinutes: 40,
+  printingSpeedMPerMin: 80,
+  jobCardAllowancePercent: 10,
+  dispatchLeadDays: 15,
   stationSurcharge6: 5.5,
   stationSurcharge7: 7.5,
   stationSurcharge8: 9,
