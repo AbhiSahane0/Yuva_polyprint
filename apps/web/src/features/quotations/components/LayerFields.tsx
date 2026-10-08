@@ -53,6 +53,13 @@ import { cn } from '@/lib/utils';
  */
 const LAYER_COUNTS = [2, 3] as const;
 
+/**
+ * Where the micron starts for a film whose name states no gauge — every LDPE
+ * grade, `LDPE Milky / Natural`, PP Woven. They are made to whatever thickness
+ * the job asks for, so this is only a starting figure to be typed over.
+ */
+const GAUGELESS_START_MICRON = 12;
+
 /** What the laminate gains in adhesive, as `totalMicron` in the engine counts it. */
 const ADHESIVE_MICRON = 2;
 
@@ -145,7 +152,19 @@ export function LayerFields({
    */
   function chooseFamily(index: number, family: string) {
     const typed = Number(layers[index]?.micron ?? 0);
-    const film = point(index, family, typed);
+    /*
+     * Whether the box still holds what this form put there for the previous
+     * film — its gauge, or the 12 a film with no gauge starts at. That figure
+     * belongs to the old film and follows the new one; only a gauge somebody
+     * typed is theirs to keep. Without this, BOPP 20µm swapped for an LDPE
+     * grade left the grade reading 20, as if the office had asked for it.
+     */
+    const before = filmOf(index);
+    const filledForBefore = before
+      ? (micronFromFilmName(before.name) ?? GAUGELESS_START_MICRON)
+      : null;
+    const untouched = typed <= 0 || typed === filledForBefore;
+    const film = point(index, family, untouched ? 0 : typed);
 
     setValue(`items.${itemIndex}.layers.${index}.rateOverride`, rateText(film) as never, {
       shouldDirty: true,
@@ -153,7 +172,25 @@ export function LayerFields({
 
     if (!film) return;
     const micron = micronFromFilmName(film.name);
-    if (micron === null) return;
+    if (micron === null) {
+      /*
+       * A film whose name states no gauge — the LDPE grades, PP Woven — gives
+       * the box nothing to fill in, and it was left at the row's 0, which the
+       * schema refuses. An empty box starts at the works' usual 12, as does one
+       * still holding the previous film's filled-in gauge; a gauge somebody
+       * typed is the office's own and is left alone.
+       */
+      if (!untouched) return;
+      setValue(
+        `items.${itemIndex}.layers.${index}.micron`,
+        String(GAUGELESS_START_MICRON) as never,
+        {
+          shouldDirty: true,
+          shouldValidate: true,
+        },
+      );
+      return;
+    }
 
     /*
      * The gauge is filled in when the box is empty — and also when the family
@@ -171,7 +208,7 @@ export function LayerFields({
         .map((candidate) => micronFromFilmName(candidate.name))
         .filter((gauge): gauge is number => gauge !== null),
     );
-    if (typed > 0 && stockedGauges.size !== 1) return;
+    if (!untouched && stockedGauges.size !== 1) return;
 
     setValue(`items.${itemIndex}.layers.${index}.micron`, String(micron) as never, {
       shouldDirty: true,

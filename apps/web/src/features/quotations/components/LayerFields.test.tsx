@@ -30,6 +30,11 @@ const FILMS = [
   // Specified by GSM, so its name states no gauge and its rate applies at any
   // thickness the office types.
   { id: 'ppw', name: 'PP Woven', density: null, currentRate: 150 },
+  // An LDPE grade: blown to whatever gauge the job asks for, so no gauge in
+  // the name either.
+  { id: 'nat5', name: 'LDPE Natural 5 KG (NAT-5KG)', density: 0.92, currentRate: 180 },
+  { id: 'shr3', name: 'LDPE 3-Layer Shrink (SHR-3L)', density: 0.92, currentRate: 191 },
+  { id: 'bopp20', name: 'BOPP 20µm', density: 0.91, currentRate: 200 },
 ];
 
 function Host({ layers }: { layers?: unknown[] }) {
@@ -178,6 +183,58 @@ describe('LayerFields', () => {
      */
     expect(onScreen()).toContain('List Rs. 210.00');
     expect(onScreen()).toContain('Rs. 20.00 below');
+  });
+
+  /*
+   * A film whose name states no gauge gave the box nothing to fill in, so it
+   * stayed at the row's 0 — which the schema refuses, leaving the office facing
+   * "Thickness must be more than 0" the moment they picked an LDPE grade.
+   */
+  it('starts a film with no gauge in its name at 12 micron', () => {
+    render(<Host layers={[{ materialId: null, micron: 0, rateOverride: '' }, {}]} />);
+    pick('LDPE Natural 5 KG (NAT-5KG)');
+    expect(micronBox(0).value).toBe('12');
+    expect(rateBox(0)?.value).toBe('180');
+  });
+
+  it('starts an empty box at 12 for PP Woven too', () => {
+    render(<Host layers={[{ materialId: null, micron: '', rateOverride: '' }, {}]} />);
+    pick('PP Woven');
+    expect(micronBox(0).value).toBe('12');
+  });
+
+  it('keeps a gauge already typed when a film with no gauge is chosen', () => {
+    render(<Host />);
+    type('60', 1);
+    pick('LDPE Natural 5 KG (NAT-5KG)', 1);
+    expect(micronBox(1).value).toBe('60');
+  });
+
+  /*
+   * The second pick. BOPP fills in its 20, and swapping it for an LDPE grade
+   * left the grade reading 20 — a figure nobody typed, kept as if they had.
+   */
+  it('drops the previous film’s filled-in gauge for 12 when an LDPE grade replaces it', () => {
+    render(<Host layers={[{ materialId: null, micron: 0, rateOverride: '' }, {}]} />);
+    pick('BOPP');
+    expect(micronBox(0).value).toBe('20');
+    pick('LDPE 3-Layer Shrink (SHR-3L)');
+    expect(micronBox(0).value).toBe('12');
+  });
+
+  it('starts at 12 again on every LDPE grade picked after another', () => {
+    render(<Host layers={[{ materialId: null, micron: 0, rateOverride: '' }, {}]} />);
+    pick('LDPE Natural 5 KG (NAT-5KG)');
+    pick('LDPE 3-Layer Shrink (SHR-3L)');
+    expect(micronBox(0).value).toBe('12');
+  });
+
+  it('keeps a gauge typed against one LDPE grade when switching to another', () => {
+    render(<Host layers={[{ materialId: null, micron: 0, rateOverride: '' }, {}]} />);
+    pick('LDPE Natural 5 KG (NAT-5KG)');
+    type('60');
+    pick('LDPE 3-Layer Shrink (SHR-3L)');
+    expect(micronBox(0).value).toBe('60');
   });
 
   it('offers a rate for a film whose name states no gauge', () => {
