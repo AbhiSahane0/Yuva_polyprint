@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import type { JobSheetInput } from '@yuva/shared';
-import { created, ok, paginated } from '../../utils/api-response.js';
+import { created, ok, paginated, pdf } from '../../utils/api-response.js';
 import { renderJobCardPdf } from './job-card-pdf.js';
 import * as service from './job-sheet.service.js';
 
@@ -57,16 +57,6 @@ export async function remove(req: Request, res: Response) {
  * to tidy up.
  */
 export async function card(req: Request, res: Response) {
-  const { pdf, filename } = await renderJobCardPdf(req.params.id as string);
-  const inline = req.query.inline === '1';
-
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader(
-    'Content-Disposition',
-    `${inline ? 'inline' : 'attachment'}; filename="${filename}"`,
-  );
-  res.setHeader('Content-Length', String(pdf.length));
-  // Helmet's default policy blocks a same-origin PDF from being framed.
-  res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
-  res.end(Buffer.from(pdf));
+  const file = await renderJobCardPdf(req.params.id as string);
+  pdf(res, file.pdf, file.filename, req.query.inline === '1');
 }

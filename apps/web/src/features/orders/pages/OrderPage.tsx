@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Factory, Trash2 } from 'lucide-react';
+import { ArrowLeft, Factory, FileCheck2, Trash2 } from 'lucide-react';
 import {
   canMoveOrderTo,
   formatNumber,
@@ -21,8 +21,15 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { canAccess, useAuthStore } from '@/features/auth/auth-store';
 import { ApiClientError } from '@/lib/api-client';
+import { openBlobUrl, saveBlob } from '@/lib/download';
 import { toast } from '@/lib/toast';
-import { useDeleteOrder, useOrder, useUpdateOrder } from '../api/order-api';
+import {
+  fetchOrderCertificate,
+  useDeleteOrder,
+  useOrder,
+  useUpdateOrder,
+  type CertificateKind,
+} from '../api/order-api';
 import { useCreateProduction, useProductionOrders } from '@/features/production/api/production-api';
 
 const TONE: Record<OrderStatus, 'neutral' | 'brand' | 'success' | 'warning'> = {
@@ -71,6 +78,16 @@ export default function OrderPage() {
   const [cancelling, setCancelling] = useState(false);
   const [reason, setReason] = useState('');
   const [deleting, setDeleting] = useState(false);
+  /* Which certificate is rendering. Chromium takes a few seconds and the
+     office will click twice if the button does not say so. */
+  const [issuing, setIssuing] = useState<CertificateKind | null>(null);
+  const certificateUrl = useRef<string | null>(null);
+  useEffect(
+    () => () => {
+      if (certificateUrl.current) URL.revokeObjectURL(certificateUrl.current);
+    },
+    [],
+  );
 
   if (isPending) return <LoadingState label="Loading the order…" />;
   if (isError || !order) {
@@ -104,6 +121,36 @@ export default function OrderPage() {
     (status) =>
       status !== 'CANCELLED' && status !== order.status && canMoveOrderTo(order.status, status),
   );
+
+  /**
+   * One certificate, opened in a tab for the office to print or attach.
+   *
+   * Nothing is typed into it, so there is nothing to save first: it is read
+   * off the design and the order as they stand. A blocked popup falls back to
+   * a download and says so, rather than appearing to do nothing.
+   */
+  async function issue(kind: CertificateKind) {
+    setIssuing(kind);
+    try {
+      const { blob, filename } = await fetchOrderCertificate(order!.id, kind);
+
+      /* One object URL, revoked when this page unloads — revoking it now would
+         pull the document out from under the tab showing it. */
+      if (certificateUrl.current) URL.revokeObjectURL(certificateUrl.current);
+      certificateUrl.current = URL.createObjectURL(blob);
+
+      if (!openBlobUrl(certificateUrl.current)) {
+        saveBlob(blob, filename ?? `Certificate_Order_${order!.number}.pdf`);
+        toast.success('Your browser blocked the new tab, so it was downloaded instead');
+      }
+    } catch (caught) {
+      toast.error(
+        caught instanceof ApiClientError ? caught.message : 'Could not prepare the certificate',
+      );
+    } finally {
+      setIssuing(null);
+    }
+  }
 
   async function move(status: OrderStatus, cancelledReason?: string) {
     try {
@@ -289,6 +336,48 @@ export default function OrderPage() {
             />
           </Field>
         </div>
+      </section>
+
+      {/*
+        The paperwork that travels with the goods.
+
+        Both certificates state what the laminate is, and both are read off the
+        design — so they cannot disagree with the job card the floor is working
+        from. The PO number above is the only thing on them the office types,
+        which is why they sit under it rather than beside the status buttons.
+      */}
+      <section className="border-ink-200 mb-5 rounded-[var(--radius-lg)] border bg-white p-4 shadow-[var(--shadow-card)] sm:p-5">
+        <h2 className="text-ink-800 mb-3 text-xs font-semibold tracking-wider uppercase">
+          Certificates
+        </h2>
+        {order.jobId === null ? (
+          <p className="text-ink-500 text-sm">
+            This order is not against a design, and a certificate states what the design is made of.
+          </p>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              disabled={issuing !== null}
+              onClick={() => void issue('analysis')}
+            >
+              <FileCheck2 className="size-4" />
+              {issuing === 'analysis' ? 'Preparing…' : 'Certificate of analysis'}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={issuing !== null}
+              onClick={() => void issue('food-grade')}
+            >
+              <FileCheck2 className="size-4" />
+              {issuing === 'food-grade' ? 'Preparing…' : 'Food grade certificate'}
+            </Button>
+            <p className="text-ink-500 text-xs">
+              Dated today, addressed to {order.customerName}
+              {order.customerPoNumber ? ` against PO ${order.customerPoNumber}` : ''}.
+            </p>
+          </div>
+        )}
       </section>
 
       {/*

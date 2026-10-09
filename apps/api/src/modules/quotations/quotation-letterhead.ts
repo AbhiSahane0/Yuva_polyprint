@@ -224,6 +224,9 @@ export const COMPANY = {
   website: 'www.yuvapolyprint.com',
   email: 'info@yuvapolyprint.com',
   gst: '27AIGPH5992Q1ZD',
+  /* The works' pollution-control registration. Printed on every certificate
+     the office issues, because the customer's own auditor asks for it. */
+  mpcb: '0000246123/CR/2507000497',
   services: [
     'Rotogravure Printing',
     'Flexible Packaging Pouch',

@@ -24,6 +24,22 @@ router.get('/', validate({ query: listOrdersQuerySchema }), asyncHandler(control
 router.get('/next-number', asyncHandler(controller.nextNumber));
 router.get('/:id', validate({ params: idParamSchema }), asyncHandler(controller.getOne));
 
+/*
+ * The two certificates that travel with the goods. Reading, not writing: an
+ * office that can see the order can issue the paperwork that goes with it, and
+ * neither certificate changes anything.
+ */
+router.get(
+  '/:id/certificate/analysis',
+  validate({ params: idParamSchema }),
+  asyncHandler(controller.analysisCertificate),
+);
+router.get(
+  '/:id/certificate/food-grade',
+  validate({ params: idParamSchema }),
+  asyncHandler(controller.foodGradeCertificate),
+);
+
 router.post(
   '/',
   requireModule('orders'),
