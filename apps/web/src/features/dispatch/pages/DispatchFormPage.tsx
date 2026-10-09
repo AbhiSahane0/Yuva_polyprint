@@ -482,7 +482,11 @@ export default function DispatchFormPage() {
                                 <Field
                                   label="Weight going"
                                   htmlFor={`kg-${order.orderId}`}
-                                  hint="Or list the reels above and this is their sum"
+                                  hint={
+                                    order.orderedPouches > 0
+                                      ? 'Or list the boxes above and this is their sum'
+                                      : 'Or list the reels above and this is their sum'
+                                  }
                                 >
                                   <NumberInput
                                     id={`kg-${order.orderId}`}
