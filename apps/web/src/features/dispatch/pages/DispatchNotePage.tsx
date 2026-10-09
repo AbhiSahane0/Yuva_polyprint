@@ -6,6 +6,7 @@ import {
   formatNumber,
   formatRs,
   ORDER_STATUS_LABELS,
+  pouchesInBox,
   type DispatchStatus,
 } from '@yuva/shared';
 import { Badge } from '@/components/ui/Badge';
@@ -52,7 +53,7 @@ function Detail({ label, value }: { label: string; value: string }) {
  * A draft until somebody presses Dispatch. That press is the only thing in the
  * module that settles anything: it stamps the lorry, and it completes every order
  * the note finishes. Which is the gap the whole module exists to close — before
- * it, a job card could be finished, costed and off stock while the order it was
+ * it, a production run could be finished, costed and off stock while the order it was
  * for still read "In production", because nothing knew the goods had gone.
  */
 export default function DispatchNotePage() {
@@ -322,7 +323,11 @@ export default function DispatchNotePage() {
                     <span
                       key={pack.id}
                       className="border-ink-200 text-ink-600 rounded-full border bg-white px-2 py-0.5 text-xs whitespace-nowrap tabular-nums"
-                      title={`Reel ${pack.reelNumber || pack.position}`}
+                      title={
+                        line.pouchGrams > 0
+                          ? `Box ${pack.reelNumber || pack.position}`
+                          : `Reel ${pack.reelNumber || pack.position}`
+                      }
                     >
                       {pack.reelNumber || `#${pack.position}`}
                       {pack.widthMm ? (
@@ -330,9 +335,37 @@ export default function DispatchNotePage() {
                       ) : null}
                       <span className="text-ink-400"> · </span>
                       {formatNumber(pack.netKg, 1)} kg
+                      {/* How many are in THIS carton, which is what a customer
+                          opening the third box is checking. */}
+                      {line.pouchGrams > 0 ? (
+                        <span className="text-ink-400">
+                          {' '}
+                          · {formatNumber(pouchesInBox(pack.netKg, line.pouchGrams), 0)}
+                        </span>
+                      ) : null}
                     </span>
                   ))}
                 </div>
+              ) : null}
+
+              {/*
+                How the count was arrived at, kept with the note it is on.
+
+                A customer who counts a carton and makes it 3,210 can be shown
+                the sets that were weighed and the box it came out of, instead
+                of being told the total disagrees.
+              */}
+              {line.pouchWeighings.length > 0 ? (
+                <p className="text-ink-500 mt-2 text-xs tabular-nums">
+                  Counted by weight ·{' '}
+                  {line.pouchWeighings
+                    .map(
+                      (set) =>
+                        `${formatNumber(set.pouchCount, 0)} at ${formatNumber(set.grams, 0)} g`,
+                    )
+                    .join(', ')}{' '}
+                  · a pouch weighs {formatNumber(line.pouchGrams, 2)} g
+                </p>
               ) : null}
             </div>
           ))}

@@ -42,20 +42,20 @@ router.post(
 
 router.post(
   '/machines',
-  requireModule('rates'),
+  requireModule('costing'),
   validate({ body: machineSchema }),
   asyncHandler(controller.createMachine),
 );
 router.patch(
   '/machines/:id',
-  requireModule('rates'),
+  requireModule('costing'),
   validate({ params: idParamSchema, body: updateMachineSchema }),
   asyncHandler(controller.updateMachine),
 );
 /* Retire, not delete — quotations were costed against it. */
 router.post(
   '/machines/:id/retire',
-  requireModule('rates'),
+  requireModule('costing'),
   validate({ params: idParamSchema }),
   asyncHandler(controller.retireMachine),
 );
@@ -67,26 +67,26 @@ router.post(
  */
 router.post(
   '/machines/:id/default',
-  requireModule('rates'),
+  requireModule('costing'),
   validate({ params: idParamSchema, body: defaultMachineSchema }),
   asyncHandler(controller.setDefaultMachine),
 );
 
 router.post(
   '/labour',
-  requireModule('rates'),
+  requireModule('costing'),
   validate({ body: labourSchema }),
   asyncHandler(controller.createLabour),
 );
 router.patch(
   '/labour/:id',
-  requireModule('rates'),
+  requireModule('costing'),
   validate({ params: idParamSchema, body: updateLabourSchema }),
   asyncHandler(controller.updateLabour),
 );
 router.post(
   '/labour/:id/retire',
-  requireModule('rates'),
+  requireModule('costing'),
   validate({ params: idParamSchema }),
   asyncHandler(controller.retireLabour),
 );
@@ -101,19 +101,19 @@ router.post(
  */
 router.post(
   '/overheads',
-  requireModule('rates'),
+  requireModule('costing'),
   validate({ body: costingOverheadSchema }),
   asyncHandler(controller.createOverhead),
 );
 router.patch(
   '/overheads/:id',
-  requireModule('rates'),
+  requireModule('costing'),
   validate({ params: idParamSchema, body: updateCostingOverheadSchema }),
   asyncHandler(controller.updateOverhead),
 );
 router.post(
   '/overheads/:id/end',
-  requireModule('rates'),
+  requireModule('costing'),
   validate({ params: idParamSchema }),
   asyncHandler(controller.endOverhead),
 );

@@ -176,14 +176,14 @@ export default function MaterialStockPage() {
           {/*
            * Under the figure rather than beside it, and only when there is
            * something to say: on hand is what is in the building, free is what
-           * a new job could be given, and they differ by what open job cards
+           * a new job could be given, and they differ by what open production runs
            * have claimed. No stock has moved for a claim — the job sheet is
            * still the only thing that issues material.
            */}
           {summary.committed > 0 ? (
             <div className="text-warning-700 mt-1 text-xs">
               {formatNumber(summary.free, 2)} {summary.unit} free ·{' '}
-              {formatNumber(summary.committed, 2)} on job cards
+              {formatNumber(summary.committed, 2)} on production runs
             </div>
           ) : null}
         </div>

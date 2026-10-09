@@ -8,6 +8,16 @@ export const listDesignsQuerySchema = paginationQuerySchema.extend({
     .union([z.boolean(), z.literal('true'), z.literal('false')])
     .transform((value) => value === true || value === 'true')
     .optional(),
+  /**
+   * Waiting on the customer to settle the roll weight.
+   *
+   * The works kept this as a list of job names on a tab of its job card
+   * workbook. It is a flag on the design now, and this is the list.
+   */
+  confirmRollWeight: z
+    .union([z.boolean(), z.literal('true'), z.literal('false')])
+    .transform((value) => value === true || value === 'true')
+    .optional(),
   /** Only the ones that have actually been priced. */
   quotedOnly: z
     .union([z.boolean(), z.literal('true'), z.literal('false')])

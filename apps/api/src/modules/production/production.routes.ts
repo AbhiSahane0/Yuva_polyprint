@@ -31,14 +31,14 @@ router.get('/:id', validate({ params: idParamSchema }), asyncHandler(controller.
 
 router.post(
   '/',
-  requireModule('jobs'),
+  requireModule('production'),
   validate({ body: createProductionOrderSchema }),
   asyncHandler(controller.create),
 );
 
 router.patch(
   '/:id',
-  requireModule('jobs'),
+  requireModule('production'),
   validate({ params: idParamSchema, body: updateProductionOrderSchema }),
   asyncHandler(controller.update),
 );
@@ -46,14 +46,14 @@ router.patch(
 /* The endpoint the floor actually uses: one stage, as it happens. */
 router.patch(
   '/stages/:stageId',
-  requireModule('jobs'),
+  requireModule('production'),
   validate({ params: stageParamSchema, body: updateProductionStageSchema }),
   asyncHandler(controller.updateStage),
 );
 
 router.post(
   '/:id/stages',
-  requireModule('jobs'),
+  requireModule('production'),
   validate({ params: idParamSchema, body: addProductionStageSchema }),
   asyncHandler(controller.addStage),
 );
@@ -67,7 +67,7 @@ router.post(
  */
 router.post(
   '/:id/override',
-  requireModule('jobs'),
+  requireModule('production'),
   validate({ params: idParamSchema, body: overrideMaterialsSchema }),
   asyncHandler(controller.overrideMaterials),
 );
@@ -75,7 +75,7 @@ router.post(
 /* Only one nobody has started — see the service. */
 router.delete(
   '/:id',
-  requireModule('jobs'),
+  requireModule('production'),
   validate({ params: idParamSchema }),
   asyncHandler(controller.remove),
 );

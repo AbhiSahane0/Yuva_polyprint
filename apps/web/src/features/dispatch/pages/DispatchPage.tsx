@@ -58,7 +58,7 @@ function Stat({ label, value, alarm }: { label: string; value: string; alarm?: b
  * finished goods standing on the floor — because that is what somebody is here to
  * act on. The notes themselves come second: a record, read when a customer rings.
  *
- * Nothing in the godown list is stored. It is what the finished job cards made,
+ * Nothing in the godown list is stored. It is what the finished production runs made,
  * less what the posted notes have taken out, so there is no "ready to dispatch"
  * flag anybody has to remember to tick — which is the flag that would be wrong
  * by Thursday.
@@ -143,7 +143,7 @@ export default function DispatchPage() {
           <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white">
             <EmptyState
               title="Nothing is waiting to go"
-              description="An order turns up here once a job card against it is finished. Until something has been made, there is nothing to send."
+              description="An order turns up here once a production run against it is finished. Until something has been made, there is nothing to send."
             />
           </div>
         ) : (

@@ -1,7 +1,9 @@
 import {
+  averagePouchGrams,
   canMoveDispatchTo,
   DISPATCH_STATUS_LABELS,
   lineNetKg,
+  linePouches,
   lineValue,
   orderDelivery,
   type CancelDispatchInput,
@@ -57,6 +59,7 @@ const kg = (value: number): string => value.toFixed(3);
 
 const LINE_INCLUDE = {
   packages: { orderBy: { position: 'asc' } },
+  pouchWeighings: { orderBy: { position: 'asc' } },
   order: {
     select: {
       id: true,
@@ -226,6 +229,18 @@ function toLine(row: LineRow, delivery: OrderDelivery | undefined): DispatchLine
       grossKg: pack.grossKg === null ? null : toNumber(pack.grossKg),
       widthMm: pack.widthMm,
     })),
+
+    pouchWeighings: row.pouchWeighings.map((set) => ({
+      id: set.id,
+      position: set.position,
+      pouchCount: set.pouchCount,
+      grams: toNumber(set.grams),
+    })),
+    /* Worked out, never stored: the sets are the record and this is what they
+       come to, so the two cannot drift apart. */
+    pouchGrams: averagePouchGrams(
+      row.pouchWeighings.map((set) => ({ pouchCount: set.pouchCount, grams: toNumber(set.grams) })),
+    ),
 
     orderedKg: toNumber(row.order.quantityKg),
     producedKg: delivery?.producedKg ?? 0,
@@ -557,7 +572,10 @@ function lineData(line: DispatchLineInput, jobName: string, position: number) {
     productionOrderId: line.productionOrderId,
     /* The packages ARE the total where there are any — see `lineNetKg`. */
     quantityKg: lineNetKg(line),
-    quantityPouches: line.quantityPouches,
+    /* And where the packer weighed the pouches, the boxes are the count —
+       see `linePouches`. A typed figure beside a weighed one is two answers
+       to what the customer is going to count. */
+    quantityPouches: linePouches(line),
     remarks: line.remarks,
     packages: {
       create: line.packages.map((pack, index) => ({
@@ -566,6 +584,13 @@ function lineData(line: DispatchLineInput, jobName: string, position: number) {
         netKg: pack.netKg,
         grossKg: pack.grossKg,
         widthMm: pack.widthMm,
+      })),
+    },
+    pouchWeighings: {
+      create: line.pouchWeighings.map((set, index) => ({
+        position: index + 1,
+        pouchCount: set.pouchCount,
+        grams: set.grams,
       })),
     },
   };

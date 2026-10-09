@@ -15,7 +15,7 @@ import { useOverrideMaterials } from '../api/production-api';
  *
  * Three figures per ply, and the order they are read in is the point: what the
  * job needs, what is free, and — only when they disagree — what is missing.
- * *Free* is on hand less what other open job cards have claimed, which is why a
+ * *Free* is on hand less what other open production runs have claimed, which is why a
  * job can be short of a film the stock screen shows plenty of. The panel says
  * so in those words rather than making somebody work it out.
  *
@@ -55,8 +55,7 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
         <h2 className="text-ink-800 text-xs font-semibold tracking-wider uppercase">Material</h2>
         <p className="text-ink-500 mt-2 text-sm">
           This order was not priced from a quotation, so there is no structure to work the material
-          out from. Nothing has been reserved for this card — check the stock by hand before it
-          runs.
+          out from. Nothing has been reserved for this run — check the stock by hand before it runs.
         </p>
       </section>
     );
@@ -70,7 +69,7 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
   async function save(text: string) {
     try {
       await override.mutateAsync({ id: card.id, input: { reason: text } });
-      toast.success(text ? 'Recorded — this card can run short' : 'The material block is back on');
+      toast.success(text ? 'Recorded — this run can go short' : 'The material block is back on');
       setOpening(false);
       setReason('');
     } catch (caught) {
@@ -174,7 +173,7 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
                      out here rather than left to be discovered. */
                       title={
                         `${formatNumber(line.onHand, 3)} kg on hand · ` +
-                        `${formatNumber(line.held, 3)} kg claimed by other job cards · ` +
+                        `${formatNumber(line.held, 3)} kg claimed by other production runs · ` +
                         `${formatNumber(line.tooNarrowKg, 3)} kg on reels too narrow for this job`
                       }
                     >
@@ -201,7 +200,7 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
                   /*
                    * The rolls themselves — which is the thing a quantity could
                    * never tell anybody. This is what the floor fetches, and what
-                   * stops two cards being promised one roll.
+                   * stops two runs being promised one roll.
                    *
                    * Not shown once the sheet has posted: the claim is released by
                    * then and these rolls are no longer spoken for.
@@ -249,8 +248,8 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
           {short.length > 0 && !posted && !overridden ? (
             <p className="text-danger-800 mt-3 text-sm">
               This job cannot be started until the film is in. Usable stock is what is on hand, less
-              what other open job cards have claimed, less anything on a reel too narrow to run this
-              job — film can be slit down but never widened.
+              what other open production runs have claimed, less anything on a reel too narrow to
+              run this job — film can be slit down but never widened.
             </p>
           ) : null}
 
@@ -288,7 +287,7 @@ export function MaterialPanel({ card, canEdit }: { card: ProductionOrder; canEdi
                 <Field
                   label="Why should this job run without the film?"
                   htmlFor="material-override-reason"
-                  hint="Recorded against the card with your name. Anyone can read it afterwards."
+                  hint="Recorded against the run with your name. Anyone can read it afterwards."
                 >
                   <Textarea
                     id="material-override-reason"

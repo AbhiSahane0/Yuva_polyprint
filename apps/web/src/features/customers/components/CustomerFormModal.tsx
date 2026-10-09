@@ -55,7 +55,10 @@ function toFormJob(job: CustomerJob): JobFormValues {
   const form: Record<string, unknown> = { id: job.id };
   for (const [key, value] of Object.entries(job)) {
     if (DERIVED_FIELDS.has(key)) continue;
-    form[key] = fromNA(value as string | null);
+    /* A tick is already a tick. Putting a boolean through the 'NA' rule works
+       by accident — false becomes '' and reads as unchecked — and would stop
+       working the first time somebody tightened that rule. */
+    form[key] = typeof value === 'boolean' ? value : fromNA(value as string | null);
   }
   form['jobName'] = job.jobName;
   form['jobType'] =

@@ -38,3 +38,28 @@ export function paginated<T>(
   const body: Paginated<T> = { items, pagination: buildPaginationMeta(page, pageSize, total) };
   return ok(res, body);
 }
+
+/**
+ * A rendered document, served as a file.
+ *
+ * `inline` shows it in the browser's own viewer instead of saving it, which is
+ * what a preview and a print dialog want — three documents were setting the
+ * same four headers, and the one that forgot the framing policy showed the
+ * office an empty grey box.
+ */
+export function pdf(
+  res: Response,
+  file: Uint8Array,
+  filename: string,
+  inline: boolean = false,
+): void {
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader(
+    'Content-Disposition',
+    `${inline ? 'inline' : 'attachment'}; filename="${filename}"`,
+  );
+  res.setHeader('Content-Length', String(file.length));
+  // Helmet's default policy blocks a same-origin PDF from being framed.
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
+  res.end(Buffer.from(file));
+}

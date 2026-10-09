@@ -20,6 +20,7 @@ import {
   Calculator,
   ClipboardList,
   ClipboardCheck,
+  Receipt,
   CalendarClock,
   Factory,
   HardHat,
@@ -57,13 +58,16 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: '/designs', label: 'Designs', icon: Boxes, module: 'customers' },
       { to: '/quotations', label: 'Quotations', icon: FileText, module: 'quotations' },
       /*
-       * No module, on purpose. What is due and when is the floor's question as
-       * much as the office's, so anyone signed in can read the orders; raising
-       * or changing one needs `quotations`, enforced on that route and on the
-       * API rather than by hiding the whole section.
+       * Gated like everything else now.
+       *
+       * These two used to be open to anyone signed in, on the reasoning that
+       * what is due and when is the floor's question as much as the office's.
+       * That was our call to make and it is no longer ours: the owner decides
+       * who sees what, and a section with no tick box is a section they cannot
+       * decide about. Tick it for the floor and nothing changes for them.
        */
-      { to: '/orders', label: 'Orders', icon: ClipboardCheck },
-      { to: '/dispatch', label: 'Dispatch', icon: PackageCheck },
+      { to: '/orders', label: 'Orders', icon: ClipboardCheck, module: 'orders' },
+      { to: '/dispatch', label: 'Dispatch', icon: PackageCheck, module: 'dispatch' },
     ],
   },
   {
@@ -72,24 +76,29 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: '/inventory', label: 'Inventory', icon: Package, module: 'inventory' },
       { to: '/purchase', label: 'Purchase', icon: Truck, module: 'purchase' },
       { to: '/rates', label: 'Rates', icon: IndianRupee, module: 'rates' },
-      { to: '/costing', label: 'Costing', icon: Calculator, module: 'rates' },
+      /* Its own module, not `rates`. This screen holds the wages, the machine
+         tariffs and the margin — a different order of secret from the price of
+         a film, and the owner should be able to show one without the other. */
+      { to: '/costing', label: 'Costing', icon: Calculator, module: 'costing' },
     ],
   },
   {
     group: 'Production',
     items: [
-      /* No module: a job card is the floor's own document and the office
-         watches it. Writing to it needs `jobs`, enforced on the API. */
-      { to: '/planning', label: 'Planning', icon: CalendarClock },
-      { to: '/production', label: 'Production', icon: Factory },
+      { to: '/planning', label: 'Planning', icon: CalendarClock, module: 'planning' },
+      { to: '/production', label: 'Production', icon: Factory, module: 'production' },
       /* "Cylinder register" and not "Design & Cylinders", which read as a
          superset of the Designs screen above it and sent the office to the
          wrong one. Both are views of the same design; this is the one about
          the metal — which cylinders exist, where they are and what state they
          are in — and it is what the works calls it. */
       { to: '/cylinders', label: 'Cylinder register', icon: Disc3, module: 'cylinders' },
-      { to: '/job-sheets', label: 'Job sheets', icon: ClipboardList, module: 'jobs' },
-      { to: '/quality', label: 'Quality & waste', icon: ShieldAlert },
+      /* Two documents, in the order the paper travels: the card is written
+         before the run and handed out, the sheet after it and costed. */
+      { to: '/job-cards', label: 'Job cards', icon: ClipboardList, module: 'jobs' },
+      { to: '/job-sheets', label: 'Job sheets', icon: Receipt, module: 'jobs' },
+      /* The same stage as Production, so the same tick. */
+      { to: '/quality', label: 'Quality & waste', icon: ShieldAlert, module: 'production' },
     ],
   },
   {
@@ -97,11 +106,8 @@ const NAV: { group: string; items: NavItem[] }[] = [
        wireframe groups them this way and so does docs/flow.md. */
     group: 'Resources',
     items: [
-      /* No module, for the same reason as Production: the operator dropdown on
-         a job card is what this is for, and the floor has to be able to read
-         it. Adding somebody needs `jobs`, enforced on the API. */
-      { to: '/machines', label: 'Machines', icon: Cog },
-      { to: '/employees', label: 'Employees', icon: HardHat },
+      { to: '/machines', label: 'Machines', icon: Cog, module: 'resources' },
+      { to: '/employees', label: 'Employees', icon: HardHat, module: 'resources' },
     ],
   },
   {

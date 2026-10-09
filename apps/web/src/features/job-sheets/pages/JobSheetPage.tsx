@@ -203,13 +203,15 @@ export default function JobSheetPage() {
     (card) => !card.jobSheetId || card.jobSheetId === id,
   );
 
-  async function onSave() {
-    if (!draft) return;
+  /** Reports whether the sheet is now saved, so printing can wait for it. */
+  async function onSave(): Promise<boolean> {
+    if (!draft) return false;
     try {
       await save.mutateAsync({
         date: draft.date,
         productionOrderId: draft.productionOrderId,
         jobName: draft.jobName,
+
         operatorName: draft.operatorName,
         filmType: draft.filmType,
         webWidthMm: draft.webWidthMm,
@@ -265,8 +267,10 @@ export default function JobSheetPage() {
         })),
       });
       toast.success('Job sheet saved');
+      return true;
     } catch (error) {
       toast.error(error instanceof ApiClientError ? error.message : 'Could not save the sheet');
+      return false;
     }
   }
 
@@ -460,7 +464,15 @@ export default function JobSheetPage() {
         </p>
       ) : null}
 
-      {/* ---- The header of the paper sheet ---- */}
+      {/*
+        A job sheet is what the run CONSUMED.
+
+        The instruction it worked from — film, sizes, metres, hours — is a job
+        card, which is its own document on its own screen, written before the
+        run by different people. The two were briefly one page; they are not
+        one thing.
+      */}
+      {/* ---- What the run turned out to consume ---- */}
       <section className="border-ink-200 rounded-lg border bg-white p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Date" htmlFor="date">
@@ -483,9 +495,9 @@ export default function JobSheetPage() {
            * Only cards nothing else costs are offered — one run, one costing.
            */}
           <Field
-            label="Job card"
+            label="Production run"
             htmlFor="productionOrderId"
-            hint="Taking this sheet off stock frees the card's claim on its film"
+            hint="Taking this sheet off stock frees the run's claim on its film"
           >
             <Select
               id="productionOrderId"
@@ -493,7 +505,7 @@ export default function JobSheetPage() {
               disabled={locked}
               onChange={(event) => set('productionOrderId', event.target.value || null)}
             >
-              <option value="">Not against a job card</option>
+              <option value="">Not against a production run</option>
               {linkableCards.map((card) => (
                 <option key={card.id} value={card.id}>
                   #{card.number} — {card.customerName} · {card.jobName}

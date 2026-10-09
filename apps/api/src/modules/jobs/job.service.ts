@@ -3,6 +3,7 @@ import type {
   CustomerJob,
   DesignMasterList,
   DesignMasterRow,
+  JobSpecification,
   ListDesignsQuery,
   SaveQuotationJobInput,
 } from '@yuva/shared';
@@ -169,6 +170,7 @@ const DESIGN_SELECT = {
   polyMicron: true,
   polyType: true,
   jobColours: true,
+  confirmRollWeight: true,
   customer: { select: { companyName: true } },
   quotationItems: {
     select: { quotation: { select: { date: true } } },
@@ -203,6 +205,7 @@ function toDesign(row: DesignRowPayload): DesignMasterRow {
     customerId: row.customerId,
     customerName: row.customer?.companyName ?? null,
     needsCustomer: row.customerId === null,
+    confirmRollWeight: row.confirmRollWeight,
 
     structure: structure || '—',
     colours: row.jobColours && row.jobColours !== 'NA' ? row.jobColours : '—',
@@ -219,6 +222,7 @@ export async function listDesigns(query: ListDesignsQuery): Promise<DesignMaster
   const where: Prisma.JobWhereInput = {
     ...(query.needsCustomer ? { customerId: null } : {}),
     ...(query.quotedOnly ? { quotationItems: { some: {} } } : {}),
+    ...(query.confirmRollWeight ? { confirmRollWeight: true } : {}),
     ...(query.customerId ? { customerId: query.customerId } : {}),
     ...(query.q
       ? {
@@ -294,4 +298,76 @@ export async function assignDesignCustomer(
      receives is exactly the shape it already holds — counts and all. */
   const fresh = await prisma.job.findUniqueOrThrow({ where: { id }, select: DESIGN_SELECT });
   return toDesign(fresh);
+}
+
+/**
+ * A design as the job card reads it.
+ *
+ * The works keeps several of these as ranges — "15-16" viscosity, "13-14" kg
+ * a roll — and as the literal string "NA" where nothing was recorded. Both go
+ * out as they are kept: a card that prints 15.5 for a range nobody wrote, or
+ * a blank where the sheet says NA, is a card that disagrees with the paper it
+ * replaces.
+ */
+export async function getJobSpecification(id: string): Promise<JobSpecification> {
+  const job = await prisma.job.findUnique({
+    where: { id },
+    include: { customer: { select: { companyName: true } } },
+  });
+  if (!job) throw ApiError.notFound('Design not found');
+
+  /** Decimal or null to a plain number; nothing on the card is nullable. */
+  const n = (value: Prisma.Decimal | null): number => (value === null ? 0 : Number(value));
+  /** The sheet's own "NA" is not a value — it is the absence of one. */
+  const text = (value: string): string => (value === 'NA' ? '' : value);
+  /** A range the works wrote as text, where a number is wanted. */
+  const fromText = (value: string): number => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  return {
+    id: job.id,
+    jobCode: job.jobCode,
+    jobName: job.jobName,
+    jobType: text(job.jobType),
+    customerName: job.customer?.companyName ?? null,
+
+    petMicron: n(job.petMicron),
+    metPetMicron: n(job.metPetMicron),
+    polyMicron: n(job.polyMicron),
+    polyType: text(job.polyType),
+    petGsm: n(job.petGsm),
+    metPetGsm: n(job.metPetGsm),
+    polyGsm: n(job.polyGsm),
+    compositeGsm: n(job.compositeGsm),
+    layer: n(job.layer),
+
+    jobColours: text(job.jobColours),
+    totalCylinders: n(job.totalCylinders),
+    printingType: text(job.printingType),
+    jobFinalDirection: text(job.jobFinalDirection),
+    ups: n(job.ups),
+
+    rubberSizeMm: n(job.rubberSize),
+    cylinderCellMm: n(job.cylinderCell),
+    cylinderDiaMm: n(job.cylinderDia),
+    pouchPlateSize: text(job.pouchPlateSize),
+    viscosity: text(job.viscosity),
+
+    /* The sheet reads the slitting width off the pouch's open width — one
+       pouch across the web is what the slitter is set to. */
+    singleRollWidthMm: n(job.pouchOpenWidth),
+    singleRollWeight: text(job.singleRollWeight),
+    confirmRollWeight: job.confirmRollWeight,
+
+    pouchSubType: text(job.pouchSubType),
+    pouchHeightMm: n(job.pouchHeight),
+    pouchOpenWidthMm: n(job.pouchOpenWidth),
+    pouchesPerKg: fromText(job.pouchesPerKg),
+    dPunchTopSize: text(job.dPunchTopSize),
+    gusset: text(job.gusset),
+    gussetSize: text(job.gussetSize),
+    vNotch: text(job.vNotch),
+  };
 }

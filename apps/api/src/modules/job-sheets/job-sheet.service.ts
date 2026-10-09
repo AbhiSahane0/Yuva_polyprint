@@ -553,6 +553,8 @@ export async function updateJobSheet(
       where: { id },
       data: {
         ...rest,
+        /* Pulled out of the spread: it arrives as yyyy-mm-dd and the column
+           is a DATE. */
         ...(date ? { date: asDate(date) } : {}),
         ...(jobId !== undefined ? { jobId } : {}),
         ...(productionOrderId !== undefined ? { productionOrderId } : {}),

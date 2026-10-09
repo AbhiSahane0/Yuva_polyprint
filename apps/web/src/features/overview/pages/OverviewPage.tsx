@@ -396,7 +396,7 @@ export default function OverviewPage() {
             onClick={() => go('/production')}
             className="text-ink-500 hover:text-ink-900 flex shrink-0 items-center gap-1 text-xs transition-colors"
           >
-            Every job card
+            Every production run
             <ArrowRight className="size-3.5" />
           </button>
         </div>

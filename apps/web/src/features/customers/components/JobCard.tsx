@@ -44,6 +44,25 @@ export function JobCard({
     const id = `jobs.${index}.${field.name}`;
     const fieldError = jobErrors?.[field.name]?.message;
 
+    /* A tick is its own label, so it does not get the stacked Field treatment
+       — a caption above an empty box reads as a field somebody forgot. */
+    if (field.kind === 'checkbox') {
+      return (
+        <div key={field.name} className={cn('col-span-1', SPAN_CLASS[field.span ?? 3])}>
+          <label className="text-ink-700 flex items-center gap-2 text-sm">
+            <input
+              id={id}
+              type="checkbox"
+              className="accent-brand-600 size-4 cursor-pointer"
+              {...register(`jobs.${index}.${field.name}`)}
+            />
+            {field.label}
+            {field.hint ? <span className="text-ink-400 text-xs">— {field.hint}</span> : null}
+          </label>
+        </div>
+      );
+    }
+
     return (
       <div key={field.name} className={cn('col-span-1', SPAN_CLASS[field.span ?? 3])}>
         <Field

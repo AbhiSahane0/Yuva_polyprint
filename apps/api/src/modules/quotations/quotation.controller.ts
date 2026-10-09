@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { RecordOutcomeInput, SendQuotationInput } from '@yuva/shared';
 import type { CreateQuotationInput, ListQuotationsQuery, UpdateQuotationInput } from '@yuva/shared';
-import { created, ok, paginated } from '../../utils/api-response.js';
+import { created, ok, paginated, pdf as sendPdf } from '../../utils/api-response.js';
 import * as quotationService from './quotation.service.js';
 import { renderQuotationPdf } from './quotation-pdf.js';
 
@@ -47,18 +47,12 @@ export async function pdf(req: Request, res: Response) {
   const file = await renderQuotationPdf(quotation);
 
   const safeName = quotation.customerName.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
-  const filename = `Quotation_${quotation.number}_${safeName || 'Customer'}.pdf`;
-  const inline = req.query.inline === '1';
-
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader(
-    'Content-Disposition',
-    `${inline ? 'inline' : 'attachment'}; filename="${filename}"`,
+  sendPdf(
+    res,
+    file,
+    `Quotation_${quotation.number}_${safeName || 'Customer'}.pdf`,
+    req.query.inline === '1',
   );
-  res.setHeader('Content-Length', String(file.length));
-  // Helmet's default policy blocks a same-origin PDF from being framed.
-  res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
-  res.end(Buffer.from(file));
 }
 
 /** Emails the quotation, with the PDF attached. */

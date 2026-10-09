@@ -8,6 +8,7 @@ import employeeRoutes from '../modules/employees/employee.routes.js';
 import gstinRoutes from '../modules/gstin/gstin.routes.js';
 import inventoryRoutes from '../modules/inventory/inventory.routes.js';
 import jobRoutes from '../modules/jobs/job.routes.js';
+import jobCardRoutes from '../modules/job-cards/job-card.routes.js';
 import jobSheetRoutes from '../modules/job-sheets/job-sheet.routes.js';
 import materialRoutes from '../modules/materials/material.routes.js';
 import monitorRoutes from '../modules/monitor/monitor.routes.js';
@@ -106,7 +107,16 @@ router.use('/overview', authenticate, overviewRoutes);
 router.use('/jobs', authenticate, requireModule('customers'), jobRoutes);
 
 /*
+ * Job cards — the work instruction, written BEFORE the run and handed to the
+ * floor. Readable by anyone signed in, because a setter who cannot read his
+ * own card is back on paper. Writing needs the jobs module.
+ */
+router.use('/job-cards', authenticate, jobCardRoutes);
+
+/*
  * Job sheets — what a run actually cost, as opposed to what it was quoted at.
+ * The other document: written AFTER a stage finishes, from what it drew from
+ * the shelf and what came back.
  * Readable by anyone signed in, because the figure a finished sheet produces is
  * what the office prices repeat work from. Writing needs the jobs module, and
  * taking the material off stock needs inventory as well; both guards are in the
@@ -115,11 +125,11 @@ router.use('/jobs', authenticate, requireModule('customers'), jobRoutes);
 router.use('/job-sheets', authenticate, jobSheetRoutes);
 
 /*
- * Job cards — what the floor actually did, stage by stage. Readable by anyone
- * signed in: it is the floor's own document and the office watches it from the
- * other side of the wall. Writing needs the jobs module, the same permission
- * job sheets use, because both are records of what a run did and both are kept
- * by the same people. The guard is in the module's own routes.
+ * Production runs — what the floor actually did, stage by stage. Readable by
+ * anyone signed in: it is the floor's own record and the office watches it
+ * from the other side of the wall. Writing needs the jobs module, the same
+ * permission job sheets use, because both are records of what a run did and
+ * both are kept by the same people. The guard is in the module's own routes.
  */
 router.use('/production', authenticate, productionRoutes);
 

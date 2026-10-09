@@ -147,7 +147,8 @@ export function PlanModal({ row, onClose }: { row: PlanningRow | null; onClose: 
         {row.shortOf.length > 0 ? (
           <p className="text-warning-800 text-sm">
             Short of {row.shortOf.join(', ')}. Booking it is allowed — a date with the film arriving
-            before it is a real plan — but the job card will refuse to start until the film is in.
+            before it is a real plan — but the production run will refuse to start until the film is
+            in.
           </p>
         ) : null}
 

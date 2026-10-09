@@ -48,8 +48,8 @@ export function useCreateJobSheet() {
   return useMutation({
     mutationFn: (body: Record<string, unknown>) =>
       request<JobSheet>({ url: '/job-sheets', method: 'POST', data: body }),
-    /* A sheet can be raised against a job card, and that card now has one —
-       which is what its screen offers instead of raising a second. */
+    /* A sheet can be raised against a production run, and that run now has one
+       — which is what its screen offers instead of raising a second. */
     onSuccess: () => settle(queryClient, jobSheetKeys.all, productionKeys.all),
   });
 }
@@ -71,7 +71,7 @@ export function useUpdateJobSheet(id: string) {
       /* The server's own answer, so it needs no round trip to confirm — the
          wait below is only for the LIST, which is derived. */
       queryClient.setQueryData(jobSheetKeys.one(id), sheet);
-      /* The job card this sheet points at may have changed with this save. */
+      /* The production run this sheet points at may have changed with this save. */
       return settle(queryClient, jobSheetKeys.all, productionKeys.all);
     },
   });
@@ -101,8 +101,8 @@ export function usePostJobSheetToStock(id: string) {
       queryClient.setQueryData(jobSheetKeys.one(id), result.sheet);
       /*
        * Stock has genuinely moved, so every inventory screen is now stale — and
-       * so is every production screen: posting releases the linked card's claim
-       * on its film, which changes what every OTHER card sees as free.
+       * so is every production screen: posting releases the linked run's claim
+       * on its film, which changes what every OTHER run sees as free.
        */
       return settle(queryClient, jobSheetKeys.all, inventoryKeys.all, productionKeys.all);
     },

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CreateOrderInput, ListOrdersQuery, Order, UpdateOrderInput } from '@yuva/shared';
-import { request } from '@/lib/api-client';
+import { request, requestBlob } from '@/lib/api-client';
 import { settle } from '@/lib/query';
 
 export const orderKeys = {
@@ -76,4 +76,17 @@ export function useDeleteOrder() {
     mutationFn: (id: string) => request<{ id: string }>({ url: `/orders/${id}`, method: 'DELETE' }),
     onSuccess: () => settle(queryClient, orderKeys.all),
   });
+}
+
+/** Which of the two certificates the office is issuing. */
+export type CertificateKind = 'analysis' | 'food-grade';
+
+/**
+ * A certificate for this order, rendered by the server.
+ *
+ * Fetched by script, not linked: the endpoint needs a session and the token
+ * travels in a header, which a browser navigation cannot carry.
+ */
+export function fetchOrderCertificate(id: string, kind: CertificateKind) {
+  return requestBlob({ url: `/orders/${id}/certificate/${kind}`, method: 'GET' });
 }

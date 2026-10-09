@@ -88,7 +88,7 @@ function MaterialCell({ row }: { row: PlanningRow }) {
  * date, because it is the only row on the screen that somebody can still do
  * something about this morning. A board sorted by order number buries it.
  *
- * Nothing here is a status anybody sets. The film check is the job card's own,
+ * Nothing here is a status anybody sets. The film check is the production run's own,
  * asked early; the estimate is the works' own figures; whether a plan makes its
  * date is arithmetic. The only stored facts on the whole screen are the date
  * and the machine somebody chose.
@@ -124,8 +124,8 @@ export default function PlanningPage() {
         <h1 className="text-ink-900 text-xl font-bold sm:text-2xl">Planning</h1>
         <p className="text-ink-500 mt-0.5 max-w-2xl text-sm">
           The gate between an order and the floor: whether the film is in, when the job is meant to
-          start, and which machine it is booked onto. Nothing here holds any stock — the job card
-          still does the claiming.
+          start, and which machine it is booked onto. Nothing here holds any stock — the production
+          run still does the claiming.
         </p>
       </header>
 
