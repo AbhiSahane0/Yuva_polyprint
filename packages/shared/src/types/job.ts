@@ -20,6 +20,8 @@ export interface DesignMasterRow {
    * customer, so no customer's page lists them.
    */
   needsCustomer: boolean;
+  /** Waiting on the customer to settle its roll weight. */
+  confirmRollWeight: boolean;
 
   /** What it is made of, in the shortest form that is still true. */
   structure: string;
@@ -104,6 +106,14 @@ export interface JobSpecification {
   /* ---- slitting ---- */
   singleRollWidthMm: number;
   singleRollWeight: string;
+  /**
+   * The customer settles the roll weight on this design.
+   *
+   * Printed on the card the slitter is handed, because that is the moment it
+   * matters — their own sheet kept it as a list on another tab, which only
+   * helps somebody who already knows to look.
+   */
+  confirmRollWeight: boolean;
 
   /* ---- what it becomes ---- */
   pouchSubType: string;

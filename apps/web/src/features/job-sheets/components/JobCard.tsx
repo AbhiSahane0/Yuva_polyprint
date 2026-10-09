@@ -316,6 +316,14 @@ export function JobCard({
         </Field>
       </div>
 
+      {/* The customer's figure, not the works'. Said here rather than on
+          another screen: this is the line the slitter is reading. */}
+      {spec.confirmRollWeight ? (
+        <p className="border-warning-200 bg-warning-50 text-warning-800 mt-3 rounded-md border px-3 py-2 text-sm">
+          Confirm the roll weight with the customer before slitting.
+        </p>
+      ) : null}
+
       {/* ---- pouching ---- */}
       <Band title="Pouching department" />
       {!makesPouches ? (

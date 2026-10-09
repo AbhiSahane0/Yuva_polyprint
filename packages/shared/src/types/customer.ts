@@ -39,6 +39,8 @@ export interface CustomerJob {
   viscosity: string;
   pouchPlateSize: string;
   singleRollWeight: string;
+  /** True where the customer settles the roll weight, not the works. */
+  confirmRollWeight: boolean;
   pouchesPerKg: string;
 
   pouchHeight: string | null;

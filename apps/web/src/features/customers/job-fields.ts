@@ -17,7 +17,7 @@ export interface JobFieldDef {
    *              so people stop inventing new spellings of the same thing
    *              without being blocked from entering something genuinely new.
    */
-  kind?: 'text' | 'number' | 'select' | 'datalist' | 'textarea';
+  kind?: 'text' | 'number' | 'select' | 'datalist' | 'textarea' | 'checkbox';
   options?: readonly string[];
   placeholder?: string;
   required?: boolean;
@@ -177,6 +177,13 @@ export const JOB_FIELD_GROUPS: JobFieldGroup[] = [
       { name: 'viscosity', label: 'Viscosity', placeholder: '15-16', span: 3 },
       { name: 'pouchPlateSize', label: 'Pouch plate size', placeholder: '315', span: 4 },
       { name: 'singleRollWeight', label: 'Single roll weight', placeholder: '60-70', span: 4 },
+      {
+        name: 'confirmRollWeight',
+        label: 'The customer settles the roll weight',
+        hint: 'The job card then tells the slitter to confirm it before slitting',
+        kind: 'checkbox',
+        span: 12,
+      },
     ],
   },
   {

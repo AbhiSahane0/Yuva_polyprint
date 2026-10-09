@@ -54,6 +54,7 @@ const JOB_FIELDS = {
   viscosity: true,
   pouchPlateSize: true,
   singleRollWeight: true,
+  confirmRollWeight: true,
   pouchesPerKg: true,
   pouchHeight: true,
   pouchOpenWidth: true,
@@ -267,11 +268,19 @@ export async function getCustomerById(id: string): Promise<CustomerDetail> {
     include: { ...withJobCount, jobs: { select: JOB_FIELDS, orderBy: { jobName: 'asc' } } },
   });
   if (!row) throw ApiError.notFound('Customer not found');
-  // Prisma returns Decimal instances; the API contract is strings.
+  /*
+   * Prisma returns Decimal instances; the API contract is strings.
+   *
+   * A boolean is passed through as itself. `String(false)` is "false", which
+   * is a non-empty string and therefore true to anything that asks — a tick
+   * box fed that would come back ticked on every design that has it off.
+   */
   const jobs = row.jobs.map((job) => {
     const serialised: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(job)) {
-      serialised[key] = value === null || value === undefined ? null : String(value);
+      if (value === null || value === undefined) serialised[key] = null;
+      else if (typeof value === 'boolean') serialised[key] = value;
+      else serialised[key] = String(value);
     }
     return serialised as unknown as CustomerJob;
   });

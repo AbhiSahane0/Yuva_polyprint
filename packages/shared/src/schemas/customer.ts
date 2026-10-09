@@ -121,6 +121,9 @@ export const customerJobSchema = z.object({
   viscosity: optionalText(40).default(NA),
   pouchPlateSize: optionalText(60).default(NA),
   singleRollWeight: optionalText(40).default(NA),
+  /* Whose figure the roll weight is. Ticked, the slitter is told on the card
+     to confirm it with the customer before the job is slit. */
+  confirmRollWeight: z.boolean().default(false),
   // `pouchesPerKg` is derived from the pouch size and composite GSM.
 
   // Pouch dimensions

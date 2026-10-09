@@ -65,15 +65,22 @@ function cell(label: string, value: string, options?: { fill?: boolean; wide?: b
  * Four to a row, and the last row is completed with empty cells. A ruled
  * block that stops halfway along its bottom edge reads as a form that was cut
  * short — and on paper somebody will wonder what was meant to be there.
+ *
+ * `alarm` makes the note something to act on rather than something to know.
+ * It rides in the heading on purpose: the card fits one sheet of A4 with no
+ * room to spare, and a banner that pushed the signatures onto a second page
+ * would be a warning that cost the works the thing it is printing.
  */
-function section(title: string, note: string, cells: string[]): string {
+function section(title: string, note: string, cells: string[], alarm = false): string {
   const width = cells.reduce((total, cell) => total + (cell.includes('wide') ? 2 : 1), 0);
   const short = (4 - (width % 4)) % 4;
   const padding = '<div class="cell pad"></div>'.repeat(short);
 
   return `
   <section class="dept">
-    <h2>${esc(title)}${note ? `<span class="note">${esc(note)}</span>` : ''}</h2>
+    <h2>${esc(title)}${
+      note ? `<span class="note${alarm ? ' alarm' : ''}">${esc(note)}</span>` : ''
+    }</h2>
     <dl class="grid">${cells.join('')}${padding}</dl>
   </section>`;
 }
@@ -164,12 +171,24 @@ export function renderJobCardHtml(input: JobCardDocumentInput): string {
     ),
   ]);
 
-  const slitting = section('Slitting department', '', [
-    cell('Single roll width', mm(spec.singleRollWidthMm)),
-    cell('Job direction', spec.jobFinalDirection),
-    cell('No. of ups', count(spec.ups)),
-    cell('Single roll weight', sheet.singleRollWeight || spec.singleRollWeight, { fill: true }),
-  ]);
+  const slitting = section(
+    'Slitting department',
+    /*
+     * The customer settles the roll weight on this design.
+     *
+     * The works kept these as a list of job names on another tab of the
+     * workbook, which only helps a slitter who already knows to go and look.
+     * Here it is in front of the person who is about to slit.
+     */
+    spec.confirmRollWeight ? 'Confirm the roll weight with the customer before slitting' : '',
+    [
+      cell('Single roll width', mm(spec.singleRollWidthMm)),
+      cell('Job direction', spec.jobFinalDirection),
+      cell('No. of ups', count(spec.ups)),
+      cell('Single roll weight', sheet.singleRollWeight || spec.singleRollWeight, { fill: true }),
+    ],
+    spec.confirmRollWeight,
+  );
 
   const pouching = makesPouches
     ? section('Pouching department', '', [
@@ -269,6 +288,10 @@ ${BASE_CSS}
 
   .reel { margin: 0; padding: 2mm; font-size: var(--t-value); color: var(--body);
           font-style: italic; border: 0.5pt dashed var(--hair); }
+
+  /* A note that has to be acted on, in the one colour on the card that is not
+     structural. Still in the heading, so it costs the page no height. */
+  .dept h2 .note.alarm { color: var(--orange); font-weight: 700; font-style: normal; }
 
   /* --- the figure the card builds to ------------------------------------ */
   .time { display: flex; align-items: stretch; border: 0.5pt solid var(--hair); }

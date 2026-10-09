@@ -198,6 +198,14 @@ model Job {
   // ---- Ranges kept as text: the sheet stores values like "15-16", "60-70" ---
   viscosity        String @default("NA")
   singleRollWeight String @default("NA") @map("single_roll_weight")
+
+  /// The customer settles the roll weight on this design, not the works.
+  ///
+  /// Their Party Roll Weight Confirm sheet was a list of four job names on a
+  /// tab of the job card workbook, and the slitter had to know to go and ask.
+  /// As a flag on the design it reaches the two places it matters: the job
+  /// card the slitter is handed, and a worklist of everything still waiting.
+  confirmRollWeight Boolean @default(false) @map("confirm_roll_weight")
   pouchPlateSize   String @default("NA") @map("pouch_plate_size")
   pouchesPerKg     String @default("NA") @map("pouches_per_kg")
 

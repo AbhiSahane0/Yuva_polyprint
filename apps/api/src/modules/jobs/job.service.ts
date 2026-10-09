@@ -170,6 +170,7 @@ const DESIGN_SELECT = {
   polyMicron: true,
   polyType: true,
   jobColours: true,
+  confirmRollWeight: true,
   customer: { select: { companyName: true } },
   quotationItems: {
     select: { quotation: { select: { date: true } } },
@@ -204,6 +205,7 @@ function toDesign(row: DesignRowPayload): DesignMasterRow {
     customerId: row.customerId,
     customerName: row.customer?.companyName ?? null,
     needsCustomer: row.customerId === null,
+    confirmRollWeight: row.confirmRollWeight,
 
     structure: structure || '—',
     colours: row.jobColours && row.jobColours !== 'NA' ? row.jobColours : '—',
@@ -220,6 +222,7 @@ export async function listDesigns(query: ListDesignsQuery): Promise<DesignMaster
   const where: Prisma.JobWhereInput = {
     ...(query.needsCustomer ? { customerId: null } : {}),
     ...(query.quotedOnly ? { quotationItems: { some: {} } } : {}),
+    ...(query.confirmRollWeight ? { confirmRollWeight: true } : {}),
     ...(query.customerId ? { customerId: query.customerId } : {}),
     ...(query.q
       ? {
@@ -356,6 +359,7 @@ export async function getJobSpecification(id: string): Promise<JobSpecification>
        pouch across the web is what the slitter is set to. */
     singleRollWidthMm: n(job.pouchOpenWidth),
     singleRollWeight: text(job.singleRollWeight),
+    confirmRollWeight: job.confirmRollWeight,
 
     pouchSubType: text(job.pouchSubType),
     pouchHeightMm: n(job.pouchHeight),

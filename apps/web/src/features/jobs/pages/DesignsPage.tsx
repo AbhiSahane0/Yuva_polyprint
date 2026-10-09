@@ -58,7 +58,7 @@ export default function DesignsPage() {
   const canEdit = canAccess(user, 'customers');
 
   const [search, setSearch] = useState('');
-  const [view, setView] = useState<'all' | 'needsCustomer' | 'quoted'>('all');
+  const [view, setView] = useState<'all' | 'needsCustomer' | 'quoted' | 'rollWeight'>('all');
   const [page, setPage] = useState(1);
   const [assigning, setAssigning] = useState<DesignMasterRow | null>(null);
 
@@ -70,6 +70,7 @@ export default function DesignsPage() {
       ...(debounced ? { q: debounced } : {}),
       ...(view === 'needsCustomer' ? { needsCustomer: true } : {}),
       ...(view === 'quoted' ? { quotedOnly: true } : {}),
+      ...(view === 'rollWeight' ? { confirmRollWeight: true } : {}),
     }),
     [debounced, view, page],
   );
@@ -125,6 +126,10 @@ export default function DesignsPage() {
             <option value="all">Every design</option>
             <option value="needsCustomer">Needs a customer</option>
             <option value="quoted">Ever quoted</option>
+            {/* The works kept this as a list of job names on a tab of its job
+                card workbook. It is a flag on the design now, and this is the
+                list — the slitter is told on the card itself. */}
+            <option value="rollWeight">Customer settles the roll weight</option>
           </Select>
         </div>
       </div>
@@ -135,12 +140,18 @@ export default function DesignsPage() {
         <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white">
           <EmptyState
             title={
-              view === 'needsCustomer' ? 'Every design has a customer' : 'Nothing matches that'
+              view === 'needsCustomer'
+                ? 'Every design has a customer'
+                : view === 'rollWeight'
+                  ? 'No design is waiting on a roll weight'
+                  : 'Nothing matches that'
             }
             description={
               view === 'needsCustomer'
                 ? 'Nothing is waiting to be claimed.'
-                : 'Try a different search, or show every design.'
+                : view === 'rollWeight'
+                  ? "Tick it on a design where the customer settles the roll weight and it will be listed here — and printed on that design's job card."
+                  : 'Try a different search, or show every design.'
             }
           />
         </div>
@@ -186,6 +197,11 @@ export default function DesignsPage() {
                         ) : (
                           <Badge tone="warning">Needs a customer</Badge>
                         )}
+                        {row.confirmRollWeight ? (
+                          <div className="mt-1">
+                            <Badge tone="neutral">Roll weight to confirm</Badge>
+                          </div>
+                        ) : null}
                       </td>
                       <td className="text-ink-600 px-4 py-2.5 text-xs tabular-nums">
                         {row.structure}
