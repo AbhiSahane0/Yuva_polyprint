@@ -2666,6 +2666,8 @@ model DispatchLine {
   remarks String @default("")
 
   packages DispatchPackage[]
+  /// How the pouch count on this line was arrived at. See PouchWeighing.
+  pouchWeighings PouchWeighing[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -2701,6 +2703,32 @@ model DispatchPackage {
 
   @@unique([lineId, position])
   @@map("dispatch_packages")
+}
+
+/// One set of pouches put on the scale, to find out what one weighs.
+///
+/// Nobody counts thirty thousand pouches. The packer counts a hundred, weighs
+/// them, does it twice more, and every box on the lorry is then counted by
+/// weight off that average — which is what the works' own Pouch Count sheet
+/// does and what `averagePouchGrams` reproduces.
+///
+/// Kept rather than discarded once the count is worked out: a count nobody can
+/// re-check is a number the customer can argue with and the office cannot
+/// defend. These three rows are the defence.
+model PouchWeighing {
+  id       String       @id @default(cuid())
+  lineId   String       @map("line_id")
+  line     DispatchLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  position Int
+
+  /// How many were on the scale. A hundred, unless the packer had fewer.
+  pouchCount Int     @default(100) @map("pouch_count")
+  grams      Decimal @db.Decimal(12, 3)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([lineId, position])
+  @@map("pouch_weighings")
 }
 
 /// What the floor said, and why it stopped.

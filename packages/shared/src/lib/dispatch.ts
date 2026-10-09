@@ -1,3 +1,4 @@
+import { averagePouchGrams, countedPouches, type PouchWeighing } from './pouch-count.js';
 import { round } from './quotation-math.js';
 
 /**
@@ -84,6 +85,26 @@ export function lineNetKg(line: {
   const packages = line.packages ?? [];
   if (packages.length > 0) return packagesNetKg(packages);
   return round(Number.isFinite(line.quantityKg) ? Math.max(0, line.quantityKg) : 0, 3);
+}
+
+/**
+ * How many pouches a line is delivering.
+ *
+ * **Weighed beats typed, the same way the reels beat a typed total.** Where
+ * the packer has weighed a set of pouches and listed the boxes, the count is
+ * worked out from those — box by box, as `countedPouches` explains — and the
+ * form shows it rather than asking for it. Where nobody has weighed anything,
+ * the typed count is all there is and it stands.
+ */
+export function linePouches(line: {
+  quantityPouches: number;
+  packages?: readonly { netKg: number }[];
+  pouchWeighings?: readonly PouchWeighing[];
+}): number {
+  const packages = line.packages ?? [];
+  const grams = averagePouchGrams(line.pouchWeighings ?? []);
+  if (grams > 0 && packages.length > 0) return countedPouches(packages, grams);
+  return Math.max(0, Math.round(line.quantityPouches));
 }
 
 /** How many packages a line is made of. What the driver counts off the lorry. */

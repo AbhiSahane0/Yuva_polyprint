@@ -43,6 +43,7 @@ export * from './types/overview.js';
 
 export * from './lib/quotation-math.js';
 export * from './lib/job-card.js';
+export * from './lib/pouch-count.js';
 export * from './lib/pouch-making.js';
 export * from './lib/job-colours.js';
 export * from './lib/margin-by-volume.js';

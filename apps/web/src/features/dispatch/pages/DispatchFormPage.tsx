@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Truck } from 'lucide-react';
 import {
+  averagePouchGrams,
+  countedPouches,
   formatNumber,
   packagesNetKg,
   type CreateDispatchInput,
@@ -16,7 +18,14 @@ import { useCustomer } from '@/features/customers/api/customer-api';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
-import { PackagesEditor, toPackageInputs, type PackageDraft } from '../components/PackagesEditor';
+import {
+  PackagesEditor,
+  toPackageInputs,
+  toWeighingInputs,
+  WeighingsEditor,
+  type PackageDraft,
+  type WeighingDraft,
+} from '../components/PackagesEditor';
 import {
   useCreateDispatch,
   useDispatch,
@@ -27,6 +36,10 @@ import {
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
+/* Gross less net, to three places. Floating point otherwise reads a 0.6 kg
+   carton back as 0.5999999999999996 in the box it is typed into. */
+const round3 = (value: number) => Math.round(value * 1000) / 1000;
+
 /** One order picked for the lorry, as it is being typed. */
 interface LineDraft {
   orderId: string;
@@ -35,6 +48,8 @@ interface LineDraft {
   quantityPouches: string;
   remarks: string;
   packages: PackageDraft[];
+  /** How the pouches were counted, where they were weighed rather than typed. */
+  pouchWeighings: WeighingDraft[];
 }
 
 /**
@@ -197,6 +212,14 @@ export default function DispatchFormPage() {
           reelNumber: pack.reelNumber,
           netKg: String(pack.netKg),
           widthMm: pack.widthMm === null ? '' : String(pack.widthMm),
+          /* A carton was weighed full, so it reads back as a gross and the
+             tare the two of them leave. A reel has neither. */
+          grossKg: pack.grossKg === null ? '' : String(pack.grossKg),
+          boxKg: pack.grossKg === null ? '' : String(round3(pack.grossKg - pack.netKg)),
+        })),
+        pouchWeighings: line.pouchWeighings.map((set) => ({
+          pouchCount: String(set.pouchCount),
+          grams: String(set.grams),
         })),
       })),
     );
@@ -229,6 +252,7 @@ export default function DispatchFormPage() {
               quantityPouches: order.readyPouches > 0 ? String(order.readyPouches) : '',
               remarks: '',
               packages: [],
+              pouchWeighings: [],
             },
           ],
     );
@@ -242,6 +266,13 @@ export default function DispatchFormPage() {
     const listed = toPackageInputs(line.packages);
     return listed.length > 0 ? packagesNetKg(listed) : Number(line.quantityKg) || 0;
   };
+
+  /** What a line's cartons come to, counted. Mirrors `linePouches` server-side. */
+  const countedOf = (line: LineDraft): number =>
+    countedPouches(
+      toPackageInputs(line.packages),
+      averagePouchGrams(toWeighingInputs(line.pouchWeighings)),
+    );
 
   const totalKg = lines.reduce((sum, line) => sum + netOf(line), 0);
   const canSave = lines.length > 0 && lines.every((line) => netOf(line) > 0);
@@ -266,6 +297,7 @@ export default function DispatchFormPage() {
         quantityPouches: Number(line.quantityPouches) || 0,
         remarks: line.remarks,
         packages: toPackageInputs(line.packages),
+        pouchWeighings: toWeighingInputs(line.pouchWeighings),
       })),
     };
     try {
@@ -418,9 +450,28 @@ export default function DispatchFormPage() {
 
                         {line ? (
                           <div className="border-ink-200 mt-3 space-y-3 border-t pt-3 pl-7">
+                            {/*
+                              A pouch order goes out in cartons, and the packer
+                              counts them the way the works always has: a
+                              hundred pouches on the scale, three times, and
+                              every carton counted by weight off that average.
+                              Without a weighing this is the old reel table and
+                              the count is typed.
+                            */}
+                            {order.orderedPouches > 0 ? (
+                              <WeighingsEditor
+                                rows={line.pouchWeighings}
+                                onChange={(pouchWeighings) =>
+                                  setLine(order.orderId, { pouchWeighings })
+                                }
+                              />
+                            ) : null}
+
                             <PackagesEditor
                               rows={line.packages}
                               onChange={(packages) => setLine(order.orderId, { packages })}
+                              boxes={order.orderedPouches > 0}
+                              pouchGrams={averagePouchGrams(toWeighingInputs(line.pouchWeighings))}
                             />
 
                             {/* Only where the reels are not listed — otherwise the
@@ -456,15 +507,31 @@ export default function DispatchFormPage() {
                                 ) : null}
                               </div>
                             ) : order.orderedPouches > 0 ? (
-                              <Field label="Pouches" htmlFor={`pouches-${order.orderId}`}>
-                                <NumberInput
-                                  id={`pouches-${order.orderId}`}
-                                  value={line.quantityPouches}
-                                  onChange={(event) =>
-                                    setLine(order.orderId, { quantityPouches: event.target.value })
-                                  }
-                                />
-                              </Field>
+                              /* Only while nobody has weighed them. Once the
+                                 cartons are counted the rows above ARE the
+                                 count, and a typed figure beside them is a
+                                 second answer to what the customer will
+                                 count — see `linePouches`. */
+                              countedOf(line) > 0 ? (
+                                <p className="text-ink-600 text-sm">
+                                  <span className="text-ink-900 font-semibold tabular-nums">
+                                    {formatNumber(countedOf(line), 0)} pouches
+                                  </span>{' '}
+                                  counted off the cartons above.
+                                </p>
+                              ) : (
+                                <Field label="Pouches" htmlFor={`pouches-${order.orderId}`}>
+                                  <NumberInput
+                                    id={`pouches-${order.orderId}`}
+                                    value={line.quantityPouches}
+                                    onChange={(event) =>
+                                      setLine(order.orderId, {
+                                        quantityPouches: event.target.value,
+                                      })
+                                    }
+                                  />
+                                </Field>
+                              )
                             ) : null}
 
                             <Field label="Remarks" htmlFor={`remarks-${order.orderId}`}>

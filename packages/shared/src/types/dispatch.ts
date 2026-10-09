@@ -21,6 +21,15 @@ export interface DispatchPackage {
   widthMm: number | null;
 }
 
+/** One set of pouches put on the scale, to find what one weighs. */
+export interface DispatchPouchWeighing {
+  id: string;
+  position: number;
+  /** How many were on the scale. A hundred, as the works does it. */
+  pouchCount: number;
+  grams: number;
+}
+
 /** One order being delivered on this note. */
 export interface DispatchLine {
   id: string;
@@ -49,6 +58,14 @@ export interface DispatchLine {
 
   remarks: string;
   packages: DispatchPackage[];
+
+  /**
+   * How the pouch count was arrived at, where it was weighed rather than
+   * typed. Empty on a reel line and on any line nobody counted.
+   */
+  pouchWeighings: DispatchPouchWeighing[];
+  /** What one pouch weighs, averaged from those. 0 where none were taken. */
+  pouchGrams: number;
 
   /** Where this order's delivery stands, counting this note. */
   orderedKg: number;

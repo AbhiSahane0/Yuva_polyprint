@@ -30,6 +30,26 @@ export const dispatchPackageSchema = z.object({
   widthMm: z.coerce.number().min(0).max(10_000).nullable().default(null),
 });
 
+/**
+ * One set of pouches put on the scale.
+ *
+ * The works weighs a hundred at a time, three times, and the average of the
+ * three is what one pouch weighs. Any count is allowed because a short set is
+ * better than no set — see `averagePouchGrams`, which means the sets rather
+ * than the scale.
+ */
+export const dispatchPouchWeighingSchema = z.object({
+  pouchCount: z.coerce
+    .number({ message: 'How many pouches were on the scale?' })
+    .int('A part pouch is not a pouch')
+    .positive('Put some pouches on the scale')
+    .max(100_000),
+  grams: z.coerce
+    .number({ message: 'What did they weigh?' })
+    .positive('A set of pouches weighs more than 0')
+    .max(1_000_000),
+});
+
 /** One order being delivered on this note. */
 export const dispatchLineSchema = z
   .object({
@@ -55,6 +75,12 @@ export const dispatchLineSchema = z
     packages: z
       .array(dispatchPackageSchema)
       .max(200, 'Two hundred reels is the most one line can carry')
+      .default([]),
+    /* How the pouch count was arrived at. Three sets is the works' habit; ten
+       is room for a packer who kept weighing. */
+    pouchWeighings: z
+      .array(dispatchPouchWeighingSchema)
+      .max(10, 'Ten weighings is more than enough to average')
       .default([]),
   })
   /*
@@ -144,6 +170,7 @@ export const readyToSendQuerySchema = z.object({
 });
 
 export type DispatchPackageInput = z.infer<typeof dispatchPackageSchema>;
+export type DispatchPouchWeighingInput = z.infer<typeof dispatchPouchWeighingSchema>;
 export type DispatchLineInput = z.infer<typeof dispatchLineSchema>;
 export type CreateDispatchInput = z.infer<typeof createDispatchSchema>;
 export type UpdateDispatchInput = z.infer<typeof updateDispatchSchema>;
