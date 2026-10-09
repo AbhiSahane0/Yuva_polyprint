@@ -102,8 +102,8 @@ export default function ProductionPage() {
       <header className="mb-6">
         <h1 className="text-ink-900 text-xl font-bold sm:text-2xl">Production</h1>
         <p className="text-ink-500 mt-0.5 max-w-2xl text-sm">
-          Every job card on the floor, and which stage it has reached. A card is raised from the
-          order it makes — open an order and start it there.
+          Every production run on the floor, and which stage it has reached. A run is started from
+          the order it makes — open an order and start it there.
         </p>
       </header>
 
@@ -138,7 +138,7 @@ export default function ProductionPage() {
             placeholder="Customer, job or card number…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            aria-label="Search job cards"
+            aria-label="Search production runs"
           />
         </div>
         <div className="sm:w-52">
@@ -180,7 +180,7 @@ export default function ProductionPage() {
             description={
               search || status || stage
                 ? 'Try a different search, or clear the filters.'
-                : 'Open a confirmed order and start it — that raises its job card with the stages the job actually needs.'
+                : 'Open a confirmed order and start it — that raises its production run with the stages the job actually needs.'
             }
           />
         </div>

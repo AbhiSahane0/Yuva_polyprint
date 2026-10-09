@@ -75,26 +75,6 @@ export const jobSheetSchema = z.object({
    */
   productionOrderId: z.string().trim().min(1).nullable().default(null),
 
-  // ---- The job card ------------------------------------------------------
-  workOrderNo: z.string().trim().max(60).default(''),
-  poDate: isoDateSchema('PO date').nullable().default(null),
-  dispatchDate: isoDateSchema('despatch date').nullable().default(null),
-  transport: z.string().trim().max(120).default(''),
-  quantityKg: weight.default(0),
-  jobReceivedBy: z.string().trim().max(120).default(''),
-  printingNote: z.string().trim().max(120).default(''),
-  printSpeedMPerMin: z.coerce.number().min(0).max(1_000).default(0),
-  printMetersOverride: z.coerce.number().min(0).max(1_000_000).nullable().default(null),
-  metPetCoatingGsm: z.coerce.number().min(0).max(50).default(0),
-  polyCoatingGsm: z.coerce.number().min(0).max(50).default(0),
-  pouchingSpeedPerMin: z.coerce.number().min(0).max(100_000).default(0),
-  otherSettingMinutes: z.coerce.number().min(0).max(1_440).default(0),
-  singleRollWeight: z.string().trim().max(60).default(''),
-  pouchSorting: z.string().trim().max(120).default(''),
-  specialInstructions: z.string().trim().max(1_000).default(''),
-  preparedBy: z.string().trim().max(120).default(''),
-  approvedBy: z.string().trim().max(120).default(''),
-
   operatorName: z.string().trim().max(120).default(''),
 
   filmType: z.string().trim().max(80).default(''),

@@ -121,6 +121,8 @@ model Customer {
 
   /// Runs costed against this customer's designs.
   jobSheets JobSheet[]
+  /// Work instructions written for their jobs. See JobCard.
+  jobCards  JobCard[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -232,6 +234,8 @@ model Job {
   artwork          JobArtwork[]
   /// Every run of this design, and what each actually cost.
   jobSheets        JobSheet[]
+  /// The work instructions written for it. See JobCard.
+  jobCards         JobCard[]
   orders           Order[]
   productionOrders ProductionOrder[]
 
@@ -1946,6 +1950,9 @@ model Order {
 
   notes String @default("")
 
+  /// The work instructions written for it. See JobCard.
+  jobCards JobCard[]
+
   /// The job cards raised against it. Usually one; several when a big order
   /// is run in batches, which is why this is not a one-to-one.
   productionOrders ProductionOrder[]
@@ -2307,46 +2314,6 @@ model JobSheet {
   productionOrder   ProductionOrder? @relation(fields: [productionOrderId], references: [id], onDelete: SetNull)
 
   operatorName String @default("") @map("operator_name")
-
-  // ---- The job card: the work instruction, written before the run ----------
-  /**
-   * The half of the sheet an operator is HANDED. Everything below this block
-   * is the other half — what the run turned out to consume, written after.
-   *
-   * Only what somebody types lives here. The rest of the card is worked out:
-   * the structure, the cylinder sizes and the pouch dimensions come off the
-   * design master, which already mirrors the works' own Jobs Data tab, and the
-   * times come from the figures on the Costing screen. See `computeJobCard`.
-   */
-  workOrderNo   String    @default("") @map("work_order_no")
-  poDate        DateTime? @map("po_date") @db.Date
-  /// The works' lead after the PO, and typed over where a customer is waiting.
-  dispatchDate  DateTime? @map("dispatch_date") @db.Date
-  transport     String    @default("") @map("transport")
-  quantityKg    Decimal   @default(0) @map("quantity_kg") @db.Decimal(14, 3)
-  jobReceivedBy String    @default("") @map("job_received_by")
-  printingNote  String    @default("") @map("printing_note")
-
-  printSpeedMPerMin Decimal @default(0) @map("print_speed_m_per_min") @db.Decimal(10, 2)
-  /**
-   * Metres, where the floor has corrected the figure.
-   *
-   * Null means the card shows what the PET ply works out to. The works' own
-   * cell is yellow, so the operator is allowed to put the roll in hand ahead
-   * of the arithmetic — and a null says plainly that nobody has.
-   */
-  printMetersOverride Decimal? @map("print_meters_override") @db.Decimal(14, 3)
-
-  metPetCoatingGsm    Decimal @default(0) @map("met_pet_coating_gsm") @db.Decimal(10, 3)
-  polyCoatingGsm      Decimal @default(0) @map("poly_coating_gsm") @db.Decimal(10, 3)
-  pouchingSpeedPerMin Decimal @default(0) @map("pouching_speed_per_min") @db.Decimal(10, 2)
-  otherSettingMinutes Decimal @default(0) @map("other_setting_minutes") @db.Decimal(10, 2)
-
-  singleRollWeight    String @default("") @map("single_roll_weight")
-  pouchSorting        String @default("") @map("pouch_sorting")
-  specialInstructions String @default("") @map("special_instructions")
-  preparedBy          String @default("") @map("prepared_by")
-  approvedBy          String @default("") @map("approved_by")
 
   // ---- The header of the paper sheet ---------------------------------------
   filmType        String   @default("") @map("film_type")
@@ -2737,6 +2704,92 @@ model PouchWeighing {
 
   @@unique([lineId, position])
   @@map("pouch_weighings")
+}
+
+/// **The job card: the work instruction, written before the run.**
+///
+/// The paper an operator is handed before the press starts — what film to
+/// draw, cut to what size, how many kilograms of each ply, how many metres
+/// that is, and how long the job will stand on each machine. It is raised once
+/// the customer's order is in hand, printed, and signed by the three people
+/// who prepared, ran and approved it.
+///
+/// **It is not a JobSheet.** A job sheet is written AFTER a stage finishes and
+/// records what that stage consumed — ink issued and returned, film drawn and
+/// put back — and what the run therefore cost. Two documents, two moments, two
+/// authors. They were briefly one record here, and that was wrong.
+///
+/// Almost nothing on the card is stored: the structure, the weights, the
+/// metreage and the times are all worked out from the design master and the
+/// works' own figures by `computeJobCard`. What is here is only what somebody
+/// types — the nine yellow boxes on the works' own sheet, plus the three names
+/// it is signed by.
+model JobCard {
+  id String @id @default(cuid())
+  /// Sequential and human-facing. Its own series, like an order's.
+  number Int @unique
+  /// The day the card was raised.
+  date DateTime @db.Date
+
+  /// The order it is making. A card without one is a run nobody asked for,
+  /// but the link is nullable so deleting an order leaves the card readable.
+  orderId String? @map("order_id")
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  /// The design every worked-out figure on the card comes from.
+  jobId String? @map("job_id")
+  job   Job?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  customerId String?   @map("customer_id")
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  /// Snapshots, so a printed card still reads after a rename.
+  jobName      String @default("") @map("job_name")
+  customerName String @default("") @map("customer_name")
+
+  // ---- The boxes an operator fills in -------------------------------------
+  workOrderNo String    @default("") @map("work_order_no")
+  poDate      DateTime? @map("po_date") @db.Date
+  /// The works' lead after the PO unless the office typed a date.
+  dispatchDate  DateTime? @map("dispatch_date") @db.Date
+  transport     String    @default("")
+  quantityKg    Decimal   @default(0) @map("quantity_kg") @db.Decimal(14, 3)
+  jobReceivedBy String    @default("") @map("job_received_by")
+  printingNote  String    @default("") @map("printing_note")
+
+  /// Seeded from the works' figure and then the setter's to change.
+  printSpeedMPerMin Decimal @default(0) @map("print_speed_m_per_min") @db.Decimal(10, 2)
+  /// Worked out from the PET ply, and overridable: the works' own cell is
+  /// yellow, so the floor may put the roll in hand ahead of the arithmetic.
+  printMetersOverride Decimal? @map("print_meters_override") @db.Decimal(14, 3)
+
+  metPetCoatingGsm    Decimal @default(0) @map("met_pet_coating_gsm") @db.Decimal(10, 3)
+  polyCoatingGsm      Decimal @default(0) @map("poly_coating_gsm") @db.Decimal(10, 3)
+  pouchingSpeedPerMin Decimal @default(0) @map("pouching_speed_per_min") @db.Decimal(10, 2)
+  otherSettingMinutes Decimal @default(0) @map("other_setting_minutes") @db.Decimal(10, 2)
+
+  singleRollWeight String @default("") @map("single_roll_weight")
+  pouchSorting     String @default("") @map("pouch_sorting")
+
+  specialInstructions String @default("") @map("special_instructions")
+
+  /// Typed, not chosen from the employee list: the office prints the card and
+  /// takes a signature from each of the three, and a dropdown would stop it
+  /// naming somebody who is not on the payroll screen yet.
+  preparedBy String @default("") @map("prepared_by")
+  operatedBy String @default("") @map("operated_by")
+  approvedBy String @default("") @map("approved_by")
+
+  /// Who raised it.
+  enteredBy String @default("") @map("entered_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@index([jobId])
+  @@index([date])
+  @@map("job_cards")
 }
 
 /// What the floor said, and why it stopped.

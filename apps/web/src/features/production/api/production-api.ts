@@ -53,7 +53,7 @@ export function useProductionOrder(id: string | null) {
 /*
  * Every one of these settles the ORDERS cache too.
  *
- * Starting a job card moves its order to in-production, on the server, inside
+ * Starting a production run moves its order to in-production, on the server, inside
  * the same transaction. A screen showing that order as still confirmed a moment
  * later would be the system disagreeing with itself in the one place this
  * module exists to stop it.

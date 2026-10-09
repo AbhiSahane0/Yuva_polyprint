@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Factory, FileCheck2, Trash2 } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Factory, FileCheck2, Trash2 } from 'lucide-react';
 import {
   canMoveOrderTo,
   formatNumber,
@@ -31,6 +31,7 @@ import {
   type CertificateKind,
 } from '../api/order-api';
 import { useCreateProduction, useProductionOrders } from '@/features/production/api/production-api';
+import { useCreateJobCard, useJobCards } from '@/features/job-cards/api/job-card-api';
 
 const TONE: Record<OrderStatus, 'neutral' | 'brand' | 'success' | 'warning'> = {
   CONFIRMED: 'neutral',
@@ -74,6 +75,13 @@ export default function OrderPage() {
   const { data: production } = useProductionOrders({ pageSize: 50 });
   const cards = (production?.items ?? []).filter((card) => card.orderId === id);
   const startProduction = useCreateProduction();
+  const raiseJobCard = useCreateJobCard();
+  /* The works raises a few dozen a month, so they are filtered here rather
+     than by a query parameter for one order. */
+  /* A hundred is the server's own cap. The works raises a few a day, so the
+     card for this order is in the newest hundred by a wide margin. */
+  const { data: cardPage } = useJobCards({ pageSize: 100 });
+  const jobCards = (cardPage?.items ?? []).filter((card) => card.orderNumber === order?.number);
 
   const [cancelling, setCancelling] = useState(false);
   const [reason, setReason] = useState('');
@@ -152,6 +160,22 @@ export default function OrderPage() {
     }
   }
 
+  /** Raises the card for this order and opens it, which is what they want next. */
+  async function onRaiseJobCard() {
+    try {
+      const card = await raiseJobCard.mutateAsync({
+        date: new Date().toISOString().slice(0, 10),
+        orderId: order!.id,
+      });
+      toast.success(`Job card ${card.number} raised`);
+      navigate(`/job-cards/${card.id}`);
+    } catch (caught) {
+      toast.error(
+        caught instanceof ApiClientError ? caught.message : 'Could not raise the job card',
+      );
+    }
+  }
+
   async function move(status: OrderStatus, cancelledReason?: string) {
     try {
       await update.mutateAsync({ id: order!.id, input: { status, cancelledReason } });
@@ -164,7 +188,7 @@ export default function OrderPage() {
   async function raiseCard() {
     try {
       const card = await startProduction.mutateAsync({ orderId: order!.id, notes: '' });
-      toast.success(`Job card #${card.number} raised with ${card.stages.length} stages`);
+      toast.success(`Production run #${card.number} started with ${card.stages.length} stages`);
       navigate(`/production/${card.id}`);
     } catch (caught) {
       toast.error(caught instanceof ApiClientError ? caught.message : 'Could not start it');
@@ -339,6 +363,62 @@ export default function OrderPage() {
       </section>
 
       {/*
+        The job card: the instruction the floor works from.
+
+        Raised here because this is the moment it exists — the customer has
+        committed, and everything the card needs is on this screen. What the
+        run then CONSUMES is a job sheet, which is somebody else's document
+        written afterwards.
+      */}
+      <section className="border-ink-200 mb-5 rounded-[var(--radius-lg)] border bg-white p-4 shadow-[var(--shadow-card)] sm:p-5">
+        <h2 className="text-ink-800 mb-3 text-xs font-semibold tracking-wider uppercase">
+          Job card
+        </h2>
+        {jobCards.length === 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-ink-500 text-sm">
+              None raised. A card works out the film, the sizes, the weights and the hours from this
+              order's design, and is printed for the floor to sign.
+            </p>
+            {canEdit ? (
+              <Button
+                variant="secondary"
+                loading={raiseJobCard.isPending}
+                onClick={() => void onRaiseJobCard()}
+              >
+                <ClipboardList className="size-4" />
+                Raise the job card
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {jobCards.map((card) => (
+              <li key={card.id}>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/job-cards/${card.id}`)}
+                  className="border-ink-200 hover:bg-ink-25 flex w-full items-center justify-between gap-3 rounded-[var(--radius-md)] border px-3 py-2.5 text-left"
+                >
+                  <span className="text-ink-900 text-sm font-medium">
+                    Job card {card.number}
+                    <span className="text-ink-500 ml-2 text-xs font-normal">
+                      {card.workOrderNo
+                        ? `work order ${card.workOrderNo}`
+                        : 'no work order no. yet'}
+                    </span>
+                  </span>
+                  <span className="text-ink-600 text-xs tabular-nums">
+                    {formatNumber(card.quantityKg, 0)} kg
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/*
         The paperwork that travels with the goods.
 
         Both certificates state what the laminate is, and both are read off the
@@ -383,10 +463,10 @@ export default function OrderPage() {
       {/*
         Production, from the order's side.
         
-        The one place a job card is raised, because a card without an order is
-        a run nobody asked for. Once raised it is a link — the card is where the
-        stages live, and duplicating any of them here would be a second place to
-        keep in step.
+        The one place a production run is started, because a run without an
+        order is one nobody asked for. Once started it is a link — the run is
+        where the stages live, and duplicating any of them here would be a
+        second place to keep in step.
       */}
       {order.status !== 'CANCELLED' ? (
         <section className="border-ink-200 mb-5 rounded-[var(--radius-lg)] border bg-white p-4 shadow-[var(--shadow-card)] sm:p-5">
@@ -396,8 +476,8 @@ export default function OrderPage() {
           {cards.length === 0 ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-ink-500 text-sm">
-                Nothing has been started. Raising a job card works out the stages this job needs
-                from its own structure.
+                Nothing has been started. Starting a production run works out the stages this job
+                needs from its own structure.
               </p>
               {canEdit ? (
                 <Button
@@ -420,7 +500,7 @@ export default function OrderPage() {
                     className="border-ink-200 hover:bg-ink-25 flex w-full items-center justify-between gap-3 rounded-[var(--radius-md)] border px-3 py-2.5 text-left"
                   >
                     <span className="text-ink-900 text-sm font-medium">
-                      Job card #{card.number}
+                      Production run #{card.number}
                       <span className="text-ink-500 ml-2 text-xs font-normal">
                         {card.currentStage
                           ? PRODUCTION_STAGE_LABELS[card.currentStage]

@@ -66,7 +66,7 @@ function formatDate(iso: string): string {
  * it lives under factory lighting beside a press.
  *
  * Everything it records goes through the same service the office screen uses,
- * so a job started here is indistinguishable on the job card from one typed in
+ * so a job started here is indistinguishable on the production run from one typed in
  * by a supervisor — except that the operator's name on it is now the person
  * who actually ran the machine, rather than whoever the office remembered on
  * Friday afternoon.

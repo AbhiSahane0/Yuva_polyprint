@@ -53,7 +53,7 @@ function Detail({ label, value }: { label: string; value: string }) {
  * A draft until somebody presses Dispatch. That press is the only thing in the
  * module that settles anything: it stamps the lorry, and it completes every order
  * the note finishes. Which is the gap the whole module exists to close — before
- * it, a job card could be finished, costed and off stock while the order it was
+ * it, a production run could be finished, costed and off stock while the order it was
  * for still read "In production", because nothing knew the goods had gone.
  */
 export default function DispatchNotePage() {

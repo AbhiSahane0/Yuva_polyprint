@@ -202,7 +202,7 @@ export default function InventoryPage() {
                   <th className="px-4 py-3 font-semibold">Material</th>
                   <th className="px-4 py-3 text-right font-semibold">On hand</th>
                   {/* On hand is what is in the building; free is what a new job
-                      could be given. They differ by what open job cards have
+                      could be given. They differ by what open production runs have
                       claimed, and the difference is the whole reason a job can
                       be short of a film the shelf is full of. */}
                   <th className="px-4 py-3 text-right font-semibold">Free</th>
@@ -235,7 +235,7 @@ export default function InventoryPage() {
                     <td
                       className={cn(
                         'px-4 py-3 text-right font-medium',
-                        /* Below zero means more has been promised to job cards
+                        /* Below zero means more has been promised to production runs
                            than the works holds. Not clamped: hiding it behind a
                            zero is how a works finds out at the machine. */
                         item.free < 0
@@ -248,7 +248,7 @@ export default function InventoryPage() {
                         item.free < 0
                           ? `Promised ${formatNumber(-item.free, 3)} ${item.unit} more than the works holds`
                           : item.committed > 0
-                            ? `${formatNumber(item.committed, 3)} ${item.unit} claimed by open job cards`
+                            ? `${formatNumber(item.committed, 3)} ${item.unit} claimed by open production runs`
                             : 'Nothing is claimed against this material'
                       }
                     >

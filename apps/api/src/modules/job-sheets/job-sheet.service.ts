@@ -1,6 +1,5 @@
 import {
   costJobSheet,
-  dispatchDateFrom,
   JOB_SHEET_CREW,
   JOB_SHEET_LINES,
   JOB_SHEET_STAGE_DEFAULTS,
@@ -82,25 +81,6 @@ function toJobSheet(row: SheetRow): JobSheet {
 
     productionOrderId: row.productionOrderId,
     productionOrderNumber: row.productionOrder?.number ?? null,
-
-    workOrderNo: row.workOrderNo,
-    poDate: row.poDate ? day(row.poDate) : null,
-    dispatchDate: row.dispatchDate ? day(row.dispatchDate) : null,
-    transport: row.transport,
-    quantityKg: num(row.quantityKg),
-    jobReceivedBy: row.jobReceivedBy,
-    printingNote: row.printingNote,
-    printSpeedMPerMin: num(row.printSpeedMPerMin),
-    printMetersOverride: maybe(row.printMetersOverride),
-    metPetCoatingGsm: num(row.metPetCoatingGsm),
-    polyCoatingGsm: num(row.polyCoatingGsm),
-    pouchingSpeedPerMin: num(row.pouchingSpeedPerMin),
-    otherSettingMinutes: num(row.otherSettingMinutes),
-    singleRollWeight: row.singleRollWeight,
-    pouchSorting: row.pouchSorting,
-    specialInstructions: row.specialInstructions,
-    preparedBy: row.preparedBy,
-    approvedBy: row.approvedBy,
 
     operatorName: row.operatorName,
 
@@ -303,32 +283,6 @@ export async function createJobSheet(input: JobSheetInput, enteredBy: string): P
       customerId: input.customerId ?? job?.customerId ?? fromCard?.customerId ?? null,
 
       productionOrderId: input.productionOrderId ?? null,
-
-      workOrderNo: input.workOrderNo,
-      poDate: input.poDate ? asDate(input.poDate) : null,
-      /* The works' lead after the PO unless the office typed a date. */
-      dispatchDate: input.dispatchDate
-        ? asDate(input.dispatchDate)
-        : input.poDate
-          ? asDate(dispatchDateFrom(input.poDate, settings.dispatchLeadDays))
-          : null,
-      transport: input.transport,
-      quantityKg: input.quantityKg,
-      jobReceivedBy: input.jobReceivedBy,
-      printingNote: input.printingNote,
-      /* Seeded from the works' figures so the card opens filled in rather
-         than as a row of empty boxes the setter has to know the answers to. */
-      printSpeedMPerMin: input.printSpeedMPerMin || settings.printingSpeedMPerMin,
-      printMetersOverride: input.printMetersOverride,
-      metPetCoatingGsm: input.metPetCoatingGsm,
-      polyCoatingGsm: input.polyCoatingGsm,
-      pouchingSpeedPerMin: input.pouchingSpeedPerMin,
-      otherSettingMinutes: input.otherSettingMinutes || settings.jobSetupMinutes,
-      singleRollWeight: input.singleRollWeight,
-      pouchSorting: input.pouchSorting,
-      specialInstructions: input.specialInstructions,
-      preparedBy: input.preparedBy,
-      approvedBy: input.approvedBy,
 
       operatorName: input.operatorName,
       filmType: input.filmType,
@@ -577,8 +531,7 @@ export async function updateJobSheet(
   await editable(id);
 
   await prisma.$transaction(async (tx) => {
-    const { lines, labour, stages, date, poDate, dispatchDate, jobId, productionOrderId, ...rest } =
-      input;
+    const { lines, labour, stages, date, jobId, productionOrderId, ...rest } = input;
 
     /*
      * Pulled out of the spread on purpose. Linking a sheet to a card is the
@@ -600,13 +553,9 @@ export async function updateJobSheet(
       where: { id },
       data: {
         ...rest,
+        /* Pulled out of the spread: it arrives as yyyy-mm-dd and the column
+           is a DATE. */
         ...(date ? { date: asDate(date) } : {}),
-        /* Pulled out of the spread: these arrive as yyyy-mm-dd and the column
-           is a DATE. Null is a real answer — "no PO date recorded". */
-        ...(poDate !== undefined ? { poDate: poDate ? asDate(poDate) : null } : {}),
-        ...(dispatchDate !== undefined
-          ? { dispatchDate: dispatchDate ? asDate(dispatchDate) : null }
-          : {}),
         ...(jobId !== undefined ? { jobId } : {}),
         ...(productionOrderId !== undefined ? { productionOrderId } : {}),
         /* Blanks only — an office that typed a name meant it. */

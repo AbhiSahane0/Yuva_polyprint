@@ -3,7 +3,7 @@ import {
   computeJobCard,
   dispatchDateFrom,
   formatNumber,
-  type JobSheetInput,
+  type JobCardInput,
 } from '@yuva/shared';
 import { Field, Input, NumberInput } from '@/components/ui/Field';
 import { useJobSpecification } from '@/features/jobs/api/job-api';
@@ -11,6 +11,10 @@ import { cn } from '@/lib/utils';
 
 /**
  * **The job card** — the paper an operator is handed before the press starts.
+ *
+ * Its own document, not half of a job sheet. A sheet is written after a stage
+ * finishes and records what it drew from the shelf; this is written before the
+ * run and says what to do. They were briefly one screen and that was wrong.
  *
  * Laid out as the works' own Job Sheet is, department by department, because
  * the people reading it have read that sheet for years and know where to look.
@@ -46,14 +50,14 @@ function Band({ title }: { title: string }) {
   );
 }
 
-export function JobCard({
+export function JobCardForm({
   draft,
   jobId,
   rates,
   disabled,
   onChange,
 }: {
-  draft: JobSheetInput;
+  draft: JobCardInput;
   jobId: string | null;
   /** The works' figures for this card's date — see the Costing screen. */
   rates: {
@@ -63,7 +67,7 @@ export function JobCard({
     dispatchLeadDays: number;
   };
   disabled: boolean;
-  onChange: <K extends keyof JobSheetInput>(key: K, value: JobSheetInput[K]) => void;
+  onChange: <K extends keyof JobCardInput>(key: K, value: JobCardInput[K]) => void;
 }) {
   const { data: spec, isPending } = useJobSpecification(jobId);
 
@@ -433,9 +437,9 @@ export function JobCard({
           <Input
             id="operatedBy"
             className={TYPED}
-            value={draft.operatorName}
+            value={draft.operatedBy}
             disabled={disabled}
-            onChange={(event) => onChange('operatorName', event.target.value)}
+            onChange={(event) => onChange('operatedBy', event.target.value)}
           />
         </Field>
         <Field label="Approved by" htmlFor="approvedBy">

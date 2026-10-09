@@ -40,7 +40,7 @@ export const MODULE_LABELS: Record<AppModule, string> = {
   planning: 'Planning',
   production: 'Production & Quality',
   cylinders: 'Cylinder register',
-  jobs: 'Job sheets',
+  jobs: 'Job cards & sheets',
   resources: 'Machines & Employees',
 };
 
@@ -64,7 +64,7 @@ export const MODULE_SECTIONS: Record<AppModule, string> = {
   planning: 'Planning',
   production: 'Production, Quality & waste',
   cylinders: 'Cylinder register',
-  jobs: 'Job sheets',
+  jobs: 'Job cards, Job sheets',
   resources: 'Machines, Employees',
 };
 

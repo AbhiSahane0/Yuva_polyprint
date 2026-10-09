@@ -1,8 +1,8 @@
 import {
   asHoursMinutes,
   formatNumber,
+  type JobCard,
   type JobCardWorking,
-  type JobSheet,
   type JobSpecification,
 } from '@yuva/shared';
 /*
@@ -34,10 +34,10 @@ import { esc, longDate } from '../quotations/templates/shared.js';
  */
 
 export interface JobCardDocumentInput {
-  sheet: JobSheet;
+  card: JobCard;
   spec: JobSpecification;
   /** Worked out by `computeJobCard` — the same call the screen makes. */
-  card: JobCardWorking;
+  working: JobCardWorking;
   /** The works' figures this card was worked out on, for the notes. */
   rates: { plyAllowancePercent: number };
 }
@@ -86,7 +86,7 @@ function section(title: string, note: string, cells: string[], alarm = false): s
 }
 
 export function renderJobCardHtml(input: JobCardDocumentInput): string {
-  const { sheet, spec, card, rates } = input;
+  const { card, spec, working, rates } = input;
 
   const mm = (value: number) => (value > 0 ? `${formatNumber(value, 0)} mm` : '');
   const kg = (value: number) => (value > 0 ? `${formatNumber(value, 2)} kg` : '');
@@ -96,12 +96,12 @@ export function renderJobCardHtml(input: JobCardDocumentInput): string {
 
   /* The floor's figure where it has corrected the arithmetic, exactly as the
      screen card does — a metreage somebody measured beats one worked out. */
-  const metres = sheet.printMetersOverride ?? card.printMeters;
-  const printMinutes = sheet.printSpeedMPerMin > 0 ? metres / sheet.printSpeedMPerMin : null;
+  const metres = card.printMetersOverride ?? working.printMeters;
+  const printMinutes = card.printSpeedMPerMin > 0 ? metres / card.printSpeedMPerMin : null;
   const finalMinutes =
-    card.cylinderChangeoverMinutes +
-    card.rubberChangeMinutes +
-    sheet.otherSettingMinutes +
+    working.cylinderChangeoverMinutes +
+    working.rubberChangeMinutes +
+    card.otherSettingMinutes +
     (printMinutes ?? 0);
 
   /* Roll Form against Pouch Form, which is the works' own column. A reel is
@@ -110,16 +110,16 @@ export function renderJobCardHtml(input: JobCardDocumentInput): string {
   const makesPouches = !/roll/i.test(spec.jobType);
 
   const header = section('The job', '', [
-    cell('Customer', spec.customerName ?? sheet.customerName),
+    cell('Customer', spec.customerName ?? card.customerName),
     cell('Design', spec.jobName, { wide: true }),
     cell('Material type', spec.jobType),
-    cell('Work order no.', sheet.workOrderNo, { fill: true }),
-    cell('PO date', date(sheet.poDate), { fill: true }),
-    cell('Date of despatch', date(sheet.dispatchDate), { fill: true }),
-    cell('Transport', sheet.transport, { fill: true }),
-    cell('Job received by', sheet.jobReceivedBy, { fill: true }),
-    cell('Quantity', kg(sheet.quantityKg), { fill: true }),
-    cell('Total micron', micron(card.totalMicron)),
+    cell('Work order no.', card.workOrderNo, { fill: true }),
+    cell('PO date', date(card.poDate), { fill: true }),
+    cell('Date of despatch', date(card.dispatchDate), { fill: true }),
+    cell('Transport', card.transport, { fill: true }),
+    cell('Job received by', card.jobReceivedBy, { fill: true }),
+    cell('Quantity', kg(card.quantityKg), { fill: true }),
+    cell('Total micron', micron(working.totalMicron)),
     cell('No. of cylinders', count(spec.totalCylinders)),
     cell('Cylinder size', mm(spec.cylinderCellMm)),
     cell('Circumference', mm(spec.cylinderDiaMm)),
@@ -131,16 +131,16 @@ export function renderJobCardHtml(input: JobCardDocumentInput): string {
     'Printing department',
     `Film to draw includes the works' ${formatNumber(rates.plyAllowancePercent, 0)}% allowance`,
     [
-      cell('Material size', mm(card.materialSizeMm)),
+      cell('Material size', mm(working.materialSizeMm)),
       cell('Job colours', spec.jobColours, { wide: true }),
       cell('Printing style', spec.printingType),
-      cell('Printing type', sheet.printingNote, { fill: true }),
+      cell('Printing type', card.printingNote, { fill: true }),
       cell('PET micron', micron(spec.petMicron)),
-      cell('PET to draw', kg(card.pet.kg)),
+      cell('PET to draw', kg(working.pet.kg)),
       cell('Metres', metres > 0 ? `${formatNumber(metres, 0)} m` : '', { fill: true }),
       cell(
         'Printing speed',
-        sheet.printSpeedMPerMin > 0 ? `${formatNumber(sheet.printSpeedMPerMin, 0)} m/min` : '',
+        card.printSpeedMPerMin > 0 ? `${formatNumber(card.printSpeedMPerMin, 0)} m/min` : '',
         { fill: true },
       ),
       cell('Printing time', printMinutes === null ? '' : asHoursMinutes(printMinutes), {
@@ -153,20 +153,20 @@ export function renderJobCardHtml(input: JobCardDocumentInput): string {
     cell('Layers', count(spec.layer)),
     cell('Viscosity', spec.viscosity),
     cell('Poly film', spec.polyType, { wide: true }),
-    cell('Met Pet size', mm(card.metPet.sizeMm)),
+    cell('Met Pet size', mm(working.metPet.sizeMm)),
     cell('Met Pet micron', micron(spec.metPetMicron)),
-    cell('Met Pet to draw', kg(card.metPet.kg)),
+    cell('Met Pet to draw', kg(working.metPet.kg)),
     cell(
       'Met Pet coating',
-      sheet.metPetCoatingGsm > 0 ? `${formatNumber(sheet.metPetCoatingGsm, 2)} gsm` : '',
+      card.metPetCoatingGsm > 0 ? `${formatNumber(card.metPetCoatingGsm, 2)} gsm` : '',
       { fill: true },
     ),
-    cell('Poly size', mm(card.poly.sizeMm)),
+    cell('Poly size', mm(working.poly.sizeMm)),
     cell('Poly micron', micron(spec.polyMicron)),
-    cell('Poly to draw', kg(card.poly.kg)),
+    cell('Poly to draw', kg(working.poly.kg)),
     cell(
       'Poly coating',
-      sheet.polyCoatingGsm > 0 ? `${formatNumber(sheet.polyCoatingGsm, 2)} gsm` : '',
+      card.polyCoatingGsm > 0 ? `${formatNumber(card.polyCoatingGsm, 2)} gsm` : '',
       { fill: true },
     ),
   ]);
@@ -185,7 +185,7 @@ export function renderJobCardHtml(input: JobCardDocumentInput): string {
       cell('Single roll width', mm(spec.singleRollWidthMm)),
       cell('Job direction', spec.jobFinalDirection),
       cell('No. of ups', count(spec.ups)),
-      cell('Single roll weight', sheet.singleRollWeight || spec.singleRollWeight, { fill: true }),
+      cell('Single roll weight', card.singleRollWeight || spec.singleRollWeight, { fill: true }),
     ],
     spec.confirmRollWeight,
   );
@@ -195,23 +195,23 @@ export function renderJobCardHtml(input: JobCardDocumentInput): string {
         cell('Pouch type', spec.pouchSubType, { wide: true }),
         cell('Open width', mm(spec.pouchOpenWidthMm)),
         cell('Height', mm(spec.pouchHeightMm)),
-        cell('Total pouches', count(card.totalPouches)),
+        cell('Total pouches', count(working.totalPouches)),
         cell('D punch top', spec.dPunchTopSize),
         cell('Side gusset', [spec.gusset, spec.gussetSize].filter(Boolean).join(' · ')),
         cell('V notch', spec.vNotch),
         cell(
           'Pouching speed',
-          sheet.pouchingSpeedPerMin > 0 ? `${formatNumber(sheet.pouchingSpeedPerMin, 0)} /min` : '',
+          card.pouchingSpeedPerMin > 0 ? `${formatNumber(card.pouchingSpeedPerMin, 0)} /min` : '',
           { fill: true },
         ),
         cell(
           'Pouching time',
-          card.pouchingMinutes === null ? '' : asHoursMinutes(card.pouchingMinutes),
+          working.pouchingMinutes === null ? '' : asHoursMinutes(working.pouchingMinutes),
           {
             fill: true,
           },
         ),
-        cell('Pouch sorting', sheet.pouchSorting, { fill: true }),
+        cell('Pouch sorting', card.pouchSorting, { fill: true }),
       ])
     : `
   <section class="dept">
@@ -221,7 +221,7 @@ export function renderJobCardHtml(input: JobCardDocumentInput): string {
 
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8" />
-<title>Job card ${sheet.number}</title>
+<title>Job card ${card.number}</title>
 <style>
 ${BASE_CSS}
 
@@ -330,7 +330,7 @@ ${BASE_CSS}
     </div>
     <div class="title">
       <div class="what">JOB CARD</div>
-      <div class="no num">No. ${sheet.number} &nbsp;·&nbsp; ${esc(longDate(sheet.date))}</div>
+      <div class="no num">No. ${card.number} &nbsp;·&nbsp; ${esc(longDate(card.date))}</div>
     </div>
   </div>
   ${BAND}
@@ -346,17 +346,17 @@ ${BASE_CSS}
     <dl class="time">
       <div class="part">
         <dt>Cylinder changeover</dt>
-        <dd>${asHoursMinutes(card.cylinderChangeoverMinutes)}</dd>
+        <dd>${asHoursMinutes(working.cylinderChangeoverMinutes)}</dd>
       </div>
       <div class="part">
         <dt>Rubber change</dt>
-        <dd>${asHoursMinutes(card.rubberChangeMinutes)}</dd>
+        <dd>${asHoursMinutes(working.rubberChangeMinutes)}</dd>
       </div>
-      <div class="part${sheet.otherSettingMinutes > 0 ? '' : ' fill'}">
+      <div class="part${card.otherSettingMinutes > 0 ? '' : ' fill'}">
         <dt>Other setting</dt>
         <dd>${
-          sheet.otherSettingMinutes > 0
-            ? asHoursMinutes(sheet.otherSettingMinutes)
+          card.otherSettingMinutes > 0
+            ? asHoursMinutes(card.otherSettingMinutes)
             : '<i class="rule"></i>'
         }</dd>
       </div>
@@ -371,8 +371,8 @@ ${BASE_CSS}
     <h2>Special instructions</h2>
     <div class="instructions">
       ${
-        sheet.specialInstructions.trim()
-          ? `<div class="said">${esc(sheet.specialInstructions)}</div>`
+        card.specialInstructions.trim()
+          ? `<div class="said">${esc(card.specialInstructions)}</div>`
           : '<div class="lines"><i></i><i></i></div>'
       }
     </div>
@@ -387,24 +387,24 @@ ${BASE_CSS}
   -->
   <div class="signs">
     <div class="by">
-      <div class="who">${esc(sheet.preparedBy)}</div>
+      <div class="who">${esc(card.preparedBy)}</div>
       <div class="line"></div>
       <div class="what"><span>Prepared by</span><span>Date</span></div>
     </div>
     <div class="by">
-      <div class="who">${esc(sheet.operatorName)}</div>
+      <div class="who">${esc(card.operatedBy)}</div>
       <div class="line"></div>
       <div class="what"><span>Operated by</span><span>Date</span></div>
     </div>
     <div class="by">
-      <div class="who">${esc(sheet.approvedBy)}</div>
+      <div class="who">${esc(card.approvedBy)}</div>
       <div class="line"></div>
       <div class="what"><span>Approved by</span><span>Date</span></div>
     </div>
   </div>
 
   <div class="running-foot">
-    <span>${esc(COMPANY.name)} &nbsp;·&nbsp; Job card ${sheet.number}</span>
+    <span>${esc(COMPANY.name)} &nbsp;·&nbsp; Job card ${card.number}</span>
     <span>${esc(spec.jobName)}</span>
   </div>
 </div></body></html>`;

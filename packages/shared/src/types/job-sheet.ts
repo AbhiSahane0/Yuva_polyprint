@@ -81,31 +81,6 @@ export interface JobSheet {
   /** The card's human number, carried so the sheet can name it without a lookup. */
   productionOrderNumber: number | null;
 
-  // ---- The job card: the work instruction, written before the run ---------
-  /**
-   * Only what somebody types. The rest of the card is worked out from the
-   * design master and the works' figures — see `computeJobCard`.
-   */
-  workOrderNo: string;
-  poDate: string | null;
-  dispatchDate: string | null;
-  transport: string;
-  quantityKg: number;
-  jobReceivedBy: string;
-  printingNote: string;
-  printSpeedMPerMin: number;
-  /** Null where nobody has corrected the arithmetic against the roll in hand. */
-  printMetersOverride: number | null;
-  metPetCoatingGsm: number;
-  polyCoatingGsm: number;
-  pouchingSpeedPerMin: number;
-  otherSettingMinutes: number;
-  singleRollWeight: string;
-  pouchSorting: string;
-  specialInstructions: string;
-  preparedBy: string;
-  approvedBy: string;
-
   operatorName: string;
 
   filmType: string;

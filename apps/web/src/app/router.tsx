@@ -28,7 +28,7 @@ const DispatchPage = lazy(() => import('@/features/dispatch/pages/DispatchPage')
 const DispatchNotePage = lazy(() => import('@/features/dispatch/pages/DispatchNotePage'));
 const DispatchFormPage = lazy(() => import('@/features/dispatch/pages/DispatchFormPage'));
 const ProductionPage = lazy(() => import('@/features/production/pages/ProductionPage'));
-const JobCardPage = lazy(() => import('@/features/production/pages/JobCardPage'));
+const ProductionRunPage = lazy(() => import('@/features/production/pages/ProductionRunPage'));
 const EmployeesPage = lazy(() => import('@/features/employees/pages/EmployeesPage'));
 const RatesPage = lazy(() => import('@/features/rates/pages/RatesPage'));
 const CostingPage = lazy(() => import('@/features/costing/pages/CostingPage'));
@@ -37,6 +37,8 @@ const MaterialStockPage = lazy(() => import('@/features/inventory/pages/Material
 const PurchasePage = lazy(() => import('@/features/purchase/pages/PurchasePage'));
 const PurchaseOrderPage = lazy(() => import('@/features/purchase/pages/PurchaseOrderPage'));
 const CylindersPage = lazy(() => import('@/features/cylinders/pages/CylindersPage'));
+const JobCardsPage = lazy(() => import('@/features/job-cards/pages/JobCardsPage'));
+const JobCardPage = lazy(() => import('@/features/job-cards/pages/JobCardPage'));
 const JobSheetsPage = lazy(() => import('@/features/job-sheets/pages/JobSheetsPage'));
 const JobSheetPage = lazy(() => import('@/features/job-sheets/pages/JobSheetPage'));
 const DesignPage = lazy(() => import('@/features/cylinders/pages/DesignPage'));
@@ -259,7 +261,7 @@ function AppRoutes() {
             path="/production/:id"
             element={
               <RequireModule module="production">
-                <JobCardPage />
+                <ProductionRunPage />
               </RequireModule>
             }
           />
@@ -380,6 +382,28 @@ function AppRoutes() {
             element={
               <RequireModule module="cylinders">
                 <DesignPage />
+              </RequireModule>
+            }
+          />
+          {/*
+            Job cards and job sheets are two documents, and these are their two
+            screens. A card is the instruction, written before the run; a sheet
+            is what the run consumed, written after it. Both are guarded on
+            `jobs`.
+          */}
+          <Route
+            path="/job-cards"
+            element={
+              <RequireModule module="jobs">
+                <JobCardsPage />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="/job-cards/:id"
+            element={
+              <RequireModule module="jobs">
+                <JobCardPage />
               </RequireModule>
             }
           />

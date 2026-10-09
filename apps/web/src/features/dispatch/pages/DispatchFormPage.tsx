@@ -369,7 +369,7 @@ export default function DispatchFormPage() {
         <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white">
           <EmptyState
             title="Nothing is waiting to go"
-            description="An order appears here once a job card against it is finished. Nothing can be dispatched before something has been made."
+            description="An order appears here once a production run against it is finished. Nothing can be dispatched before something has been made."
             action={
               <Button variant="secondary" onClick={() => navigate('/production')}>
                 Production

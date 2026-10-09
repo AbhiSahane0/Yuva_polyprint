@@ -28,13 +28,6 @@ router.get('/next-number', asyncHandler(controller.nextNumber));
 router.get('/', validate({ query: jobSheetQuerySchema }), asyncHandler(controller.list));
 router.get('/:id', validate({ params: idParamSchema }), asyncHandler(controller.get));
 
-/**
- * The printed card. Reading, not writing — anyone who can see the sheet can
- * print the paper that goes with it, and the floor is not given the jobs
- * module just to be handed its own instruction.
- */
-router.get('/:id/card', validate({ params: idParamSchema }), asyncHandler(controller.card));
-
 router.post(
   '/',
   requireModule('jobs'),

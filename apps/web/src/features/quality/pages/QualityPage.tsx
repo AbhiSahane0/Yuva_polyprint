@@ -70,7 +70,7 @@ function Stat({
  *
  * **Where is the material going?** Waste by process, and the last fortnight
  * day by day. Nothing here is newly recorded — every stage has said what went
- * on and what came off since the job card was built. Grouping it by process is
+ * on and what came off since the production run was built. Grouping it by process is
  * the whole point: a works losing 6% at lamination and 1% everywhere else has
  * a laminator problem, and no amount of staring at individual jobs says so.
  *

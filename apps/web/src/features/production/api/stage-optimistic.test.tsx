@@ -6,7 +6,7 @@ import { productionKeys, useUpdateStage } from './production-api';
 import { request } from '@/lib/api-client';
 
 /**
- * **A field on a job card must show what was picked, not what the server has
+ * **A field on a production run must show what was picked, not what the server has
  * got round to confirming.**
  *
  * The bug this pins: the machine and operator selects were bound to server
@@ -102,7 +102,7 @@ function deferred<T>() {
   return { promise, settle, fail };
 }
 
-describe('a job card field shows at once', () => {
+describe('a production run field shows at once', () => {
   it('puts the picked machine in the cache before the server answers', async () => {
     const { client, result } = harness();
     const pending = deferred<ProductionOrder>();

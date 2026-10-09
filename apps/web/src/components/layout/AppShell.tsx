@@ -20,6 +20,7 @@ import {
   Calculator,
   ClipboardList,
   ClipboardCheck,
+  Receipt,
   CalendarClock,
   Factory,
   HardHat,
@@ -92,7 +93,10 @@ const NAV: { group: string; items: NavItem[] }[] = [
          the metal — which cylinders exist, where they are and what state they
          are in — and it is what the works calls it. */
       { to: '/cylinders', label: 'Cylinder register', icon: Disc3, module: 'cylinders' },
-      { to: '/job-sheets', label: 'Job sheets', icon: ClipboardList, module: 'jobs' },
+      /* Two documents, in the order the paper travels: the card is written
+         before the run and handed out, the sheet after it and costed. */
+      { to: '/job-cards', label: 'Job cards', icon: ClipboardList, module: 'jobs' },
+      { to: '/job-sheets', label: 'Job sheets', icon: Receipt, module: 'jobs' },
       /* The same stage as Production, so the same tick. */
       { to: '/quality', label: 'Quality & waste', icon: ShieldAlert, module: 'production' },
     ],

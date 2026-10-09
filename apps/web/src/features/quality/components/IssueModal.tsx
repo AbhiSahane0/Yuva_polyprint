@@ -146,7 +146,7 @@ export function IssueModal({
       <div className="space-y-3">
         {issue ? null : (
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Job card" htmlFor="issue-card">
+            <Field label="Production run" htmlFor="issue-card">
               <Select
                 id="issue-card"
                 value={cardId}

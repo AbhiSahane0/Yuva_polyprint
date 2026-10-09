@@ -74,7 +74,7 @@ function stageTitle(stage: ProductionStageRow, card: ProductionOrder): Laminatio
 }
 
 /**
- * **The job card — what the floor actually did, stage by stage.**
+ * **The production run — what the floor actually did, stage by stage.**
  *
  * One block per stage rather than a table, because a stage is filled in by
  * somebody standing at a machine with two weights and a name, not read across
@@ -82,7 +82,7 @@ function stageTitle(stage: ProductionStageRow, card: ProductionOrder): Laminatio
  * "Skipped — not required": a gap would read as something nobody has got to
  * yet, which is the opposite of what it means.
  */
-export default function JobCardPage() {
+export default function ProductionRunPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
@@ -102,12 +102,12 @@ export default function JobCardPage() {
   const startSheet = useCreateJobSheet();
   const [deleting, setDeleting] = useState(false);
 
-  if (isPending) return <LoadingState label="Loading the job card…" />;
+  if (isPending) return <LoadingState label="Loading the production run…" />;
   if (isError || !card) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
         <EmptyState
-          title="That job card is not on record"
+          title="That production run is not on record"
           description="It may have been deleted."
           action={
             <Button variant="secondary" onClick={() => navigate('/production')}>
@@ -212,7 +212,9 @@ export default function JobCardPage() {
       <header className="mb-6 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-ink-900 text-xl font-bold sm:text-2xl">Job card #{card.number}</h1>
+            <h1 className="text-ink-900 text-xl font-bold sm:text-2xl">
+              Production run #{card.number}
+            </h1>
             <Badge tone={TONE[card.status]}>{PRODUCTION_STATUS_LABELS[card.status]}</Badge>
           </div>
           <p className="text-ink-500 mt-0.5 text-sm">
@@ -270,7 +272,7 @@ export default function JobCardPage() {
             </div>
             <ActionMenu
               className="sm:hidden"
-              label={`Actions for job card ${card.number}`}
+              label={`Actions for production run ${card.number}`}
               actions={[
                 card.jobSheetId
                   ? {
@@ -510,21 +512,21 @@ export default function JobCardPage() {
         <div className="border-ink-200 mt-6 flex justify-end border-t pt-4">
           <Button variant="dangerGhost" onClick={() => setDeleting(true)}>
             <Trash2 className="size-4" />
-            Delete this job card
+            Delete this production run
           </Button>
         </div>
       ) : null}
 
       <ConfirmDialog
         open={deleting}
-        title={`Delete job card #${card.number}?`}
+        title={`Delete production run #${card.number}?`}
         confirmLabel="Delete"
         loading={remove.isPending}
         onClose={() => setDeleting(false)}
         onConfirm={() =>
           remove.mutate(card.id, {
             onSuccess: () => {
-              toast.success(`Job card #${card.number} deleted`);
+              toast.success(`Production run #${card.number} deleted`);
               navigate('/production');
             },
             onError: (caught) =>
