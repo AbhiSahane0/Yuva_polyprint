@@ -75,7 +75,7 @@ export function JobCardForm({
     return (
       <section className="border-ink-200 rounded-lg border border-dashed bg-white p-6 text-center">
         <p className="text-ink-500 text-sm">
-          Pick the design this run is for and its card fills itself in.
+          Choose the order above, and the design behind it fills this card in.
         </p>
       </section>
     );

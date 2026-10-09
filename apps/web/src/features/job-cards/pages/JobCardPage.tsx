@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Printer, Save } from 'lucide-react';
-import { formatNumber, type JobCard, type JobCardInput } from '@yuva/shared';
+import { dispatchDateFrom, formatNumber, type JobCard, type JobCardInput } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
 import { Field, Select } from '@/components/ui/Field';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -59,11 +59,46 @@ export default function JobCardPage() {
   const { data: settings } = useSettings(draft?.date);
 
   const orderOptions = useMemo(() => orders?.items ?? [], [orders]);
+  const lead = settings?.dispatchLeadDays ?? 15;
 
   if (isLoading || !draft) return <LoadingState label="Loading the job card…" />;
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => (current ? { ...current, [key]: value } : current));
+
+  /**
+   * Picking the order fills the card in **here and now**.
+   *
+   * The server does the same on save, and that is what is stored — but a card
+   * that stays blank until somebody presses Save reads as one that did not
+   * understand the question. Everything taken is the order's own: its design,
+   * its customer, its quantity and the day they ordered.
+   *
+   * Only blanks are filled. A quantity somebody typed is a part delivery, and
+   * a card for less than the order is a real card.
+   */
+  function pickOrder(orderId: string | null) {
+    const picked = orderOptions.find((order) => order.id === orderId) ?? null;
+
+    setDraft((current) => {
+      if (!current) return current;
+      if (!picked) return { ...current, orderId: null, orderNumber: null };
+
+      const poDate = current.poDate ?? picked.orderDate;
+      return {
+        ...current,
+        orderId: picked.id,
+        orderNumber: picked.number,
+        jobId: picked.jobId,
+        jobName: picked.jobName,
+        customerId: picked.customerId,
+        customerName: picked.customerName,
+        quantityKg: current.quantityKg > 0 ? current.quantityKg : picked.quantityKg,
+        poDate,
+        dispatchDate: current.dispatchDate ?? (poDate ? dispatchDateFrom(poDate, lead) : null),
+      };
+    });
+  }
 
   const payload = (): Partial<JobCardInput> => ({
     date: draft.date,
@@ -188,7 +223,7 @@ export default function JobCardPage() {
           <Select
             id="orderId"
             value={draft.orderId ?? ''}
-            onChange={(event) => set('orderId', event.target.value || null)}
+            onChange={(event) => pickOrder(event.target.value || null)}
           >
             <option value="">Not against an order</option>
             {orderOptions.map((order) => (
