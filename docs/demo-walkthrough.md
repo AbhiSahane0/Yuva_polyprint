@@ -125,6 +125,16 @@ and every step since has left a record:
    the high-clarity LDPE, the inks and solvents against their drums, the
    overheads, the labour: **923 kg out at ₹269.90 a kilogram**, 3.14% wasted.
    Posting it took the film **off stock**, oldest batch first.
+
+   Look at the third film row: it says **LDPE Natural High Clarity (NAT-HC)**,
+   not the generic "LDPE" the works' printed form has. The sheet works out
+   which of the dozen LDPE grades this job ran — from the plies it was priced
+   on — and binds that one, at the rate in force on the sheet's own date. The
+   other two rows keep the works' own wording, because the works buys one PET
+   and one metallised PET and their form can name them. Where a sheet has no
+   job behind it to read, the row asks: **"which film?"**, with the catalogue
+   behind it.
+
 5. **Dispatch note #1** — half of it gone: 461.5 kg on three reels, by Sai
    Roadlines on MH 15 AB 1234, LR-5521.
 6. **Dispatch note #2** — the balance, loaded but **not sent**. A draft counts
@@ -218,16 +228,16 @@ that is the local database. Point it at the deployed one only when you mean to.
 
 ## Where this does not go
 
-Two things in the chain above are **not** settled, and the demonstration does
+One thing in the chain above is **not** settled, and the demonstration does
 not pretend otherwise:
 
 - **The production run's In kg / Out kg.** The works does not record a weight
   in and a weight out at every stage, so what those boxes should hold — or
   whether they should be there at all — is a question for the client. The
   module is untouched until that is answered.
-- **The job sheet's poly row.** The works' printed form has one "LDPE" line,
-  and the rates master now carries twelve derived LDPE grades. Nothing binds
-  them, so an LDPE line arrives with no material behind it and would cost
-  nothing. The demonstration picks the grade the job actually ran, which is
-  what the office would do — but the form and the master should be joined up
-  properly.
+
+The other one is closed. The job sheet's poly row used to arrive naming a
+retired film — costing nothing, and unable to come off stock when the sheet
+was posted. It now binds the grade the job was actually priced on, and where
+that cannot be worked out the office picks it on the row itself. See the note
+under sheet 851 above.

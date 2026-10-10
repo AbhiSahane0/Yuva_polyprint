@@ -20,6 +20,7 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 import { useProductionOrders } from '@/features/production/api/production-api';
+import { useMaterials } from '@/features/rates/api/rate-api';
 import {
   useCostJobSheet,
   useJobSheet,
@@ -122,6 +123,16 @@ export default function JobSheetPage() {
   }, [data]);
 
   const locked = Boolean(draft?.stockPostedAt);
+
+  /*
+   * The films the office may put against a row the sheet could not name —
+   * priced as at THIS sheet's date, like everything else on it.
+   */
+  const { data: materials } = useMaterials(draft?.date);
+  const films = useMemo(
+    () => (materials ?? []).filter((material) => material.category === 'FILM'),
+    [materials],
+  );
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => (current ? { ...current, [key]: value } : current));
@@ -313,7 +324,38 @@ export default function JobSheetPage() {
                 {formatNumber(line.mixSharePercent, 0)}% of mix
               </span>
             ) : null}
-            {!line.materialId ? (
+            {/*
+              A film row the sheet could not name for itself.
+
+              The works' form has one LDPE line and the rates master has a
+              dozen grades, so a sheet that cannot work out which one this job
+              ran asks. It matters more than the rate: a line with no material
+              behind it cannot come off stock when the sheet is posted, so the
+              film would leave the building without leaving the ledger.
+            */}
+            {!line.materialId && line.kind === 'FILM' ? (
+              <Select
+                className="mt-1 w-56 text-xs"
+                value=""
+                disabled={locked}
+                aria-label={`Which film is ${line.name}?`}
+                onChange={(event) => {
+                  const picked = films.find((film) => film.id === event.target.value);
+                  if (!picked) return;
+                  /* The rate is left at nought on purpose — the server prices
+                     it from this material as at the sheet's own date. */
+                  setLine(line.position, { materialId: picked.id, name: picked.name });
+                }}
+              >
+                <option value="">— which film? —</option>
+                {films.map((film) => (
+                  <option key={film.id} value={film.id}>
+                    {film.name}
+                  </option>
+                ))}
+              </Select>
+            ) : null}
+            {!line.materialId && line.kind !== 'FILM' ? (
               <span className="text-warning-700 ml-1.5 text-xs">no catalogue rate</span>
             ) : null}
           </td>

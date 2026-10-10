@@ -1120,9 +1120,6 @@ async function main() {
     const used = new Map(
       layers.map((l) => [l.materialId, Math.round((plan.kg * 1.08) / layers.length)]),
     );
-    const polyId = materialId(plan.poly);
-    const polyRate = rateOf(plan.poly);
-
     await updateJobSheet(
       sheet.id,
       {
@@ -1135,33 +1132,23 @@ async function main() {
         pouchingWeightKg: isRoll ? 0 : inKg,
         productionDays: 2,
         makeReadyDays: 0.75,
-        lines: sheet.lines.map((line) => {
-          /*
-           * The poly row, bound to the grade this job actually ran.
-           *
-           * The works' printed form has ONE "LDPE Milky / Natural" row, and
-           * the rates master now carries twelve derived LDPE grades — so the
-           * row arrives with no material behind it and costs nothing. The
-           * office would pick the grade; the demo picks it too, or the
-           * finished sheet would quietly price a third of its film at zero.
-           */
-          if (line.kind === 'FILM' && !line.materialId && /ldpe|poly/i.test(line.name)) {
-            return {
-              ...line,
-              name: plan.poly,
-              materialId: polyId,
-              ratePerKg: polyRate,
-              issuedKg: Math.round((plan.kg * 1.08) / layers.length),
-            };
-          }
-          return {
-            ...line,
-            issuedKg: (line.materialId && used.get(line.materialId)) || line.issuedKg,
-          };
-        }),
+        /*
+         * The film the run actually took, put against the sheet's own rows.
+         *
+         * Matched on the MATERIAL rather than the row's name: the sheet is the
+         * works' printed form and calls its first row "12 PET Polyester",
+         * which is not what the rates master calls that film. Every film row
+         * already knows its own grade — the sheet binds them when it is
+         * raised, from the structure the job was priced on.
+         */
+        lines: sheet.lines.map((line) => ({
+          ...line,
+          issuedKg: (line.materialId && used.get(line.materialId)) || line.issuedKg,
+        })),
       } as never,
       'Demo',
     );
+
     await costSheet(sheet.id);
     const posted = await postToStock(sheet.id, 'Demo');
 

@@ -365,3 +365,34 @@ export function mixDrumFor(
     ? { issued: pools.printMixIssuedKg, returned: pools.printMixReturnedKg }
     : { issued: pools.lamMixIssuedKg, returned: pools.lamMixReturnedKg };
 }
+
+/**
+ * **Which film goes on which row of the works' printed sheet.**
+ *
+ * Their form has three film lines — the print web, the metallised ply and the
+ * sealant — and for two of them the works buys exactly one thing, so the form
+ * can name it. The sealant it cannot: the rates master carries a dozen derived
+ * LDPE grades and which one a job ran is a fact about that job.
+ *
+ * So the plies are assigned by POSITION, which is structural rather than a
+ * guess about names: a laminate is built print web first and sealant last, and
+ * anything in between is the metallised ply. A two-ply job has a web and a
+ * sealant and no middle. One film is a sealant on its own — an unlaminated
+ * job is still sealed.
+ */
+export function filmRowsFromPlies<T>(plies: readonly T[]): {
+  pet: T | null;
+  metPet: T | null;
+  poly: T | null;
+} {
+  if (plies.length === 0) return { pet: null, metPet: null, poly: null };
+  if (plies.length === 1) return { pet: null, metPet: null, poly: plies[0] as T };
+
+  return {
+    pet: plies[0] as T,
+    /* Three or more: everything between the web and the sealant is metallised,
+       and the works' form has one row for it, so the first of them wins. */
+    metPet: plies.length > 2 ? (plies[1] as T) : null,
+    poly: plies[plies.length - 1] as T,
+  };
+}

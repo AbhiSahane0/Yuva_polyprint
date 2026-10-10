@@ -1,5 +1,6 @@
 import {
   costJobSheet,
+  filmRowsFromPlies,
   JOB_SHEET_CREW,
   JOB_SHEET_LINES,
   JOB_SHEET_STAGE_DEFAULTS,
@@ -235,6 +236,105 @@ async function ratesForTemplate(
   );
 }
 
+/**
+ * **The films this job is actually made of, in ply order.**
+ *
+ * The works' printed sheet names its own film rows — "12 PET Polyester", "Met
+ * PET", "LDPE" — and for two of the three that is enough, because the works
+ * buys one PET and one metallised PET. The sealant is the problem: the rates
+ * master carries twelve derived LDPE grades, and which one a job ran is a fact
+ * about THAT job, not about the form.
+ *
+ * So it is looked up rather than named. The quotation's own layers are the
+ * answer — they are the plies the job was priced on, in order, each against a
+ * real catalogue row — and they are reached from whichever of the sheet's two
+ * links exists: the run it costs, or the design it is for.
+ *
+ * Ply order is structural, not a guess: the first film is the print web and
+ * the LAST is the sealant, which is what the LDPE row is. Anything between
+ * them is the metallised ply.
+ */
+async function filmsForJob(input: {
+  jobId: string | null;
+  productionOrderId: string | null;
+}): Promise<{ pet: string | null; metPet: string | null; poly: string | null }> {
+  /* The run's own order knows which quotation line it came from, which is the
+     closest thing to "what this exact run is made of". */
+  const fromRun = input.productionOrderId
+    ? await prisma.productionOrder.findUnique({
+        where: { id: input.productionOrderId },
+        select: {
+          order: {
+            select: {
+              quotationItem: {
+                select: {
+                  layers: {
+                    orderBy: { position: 'asc' },
+                    select: { materialId: true, material: { select: { isActive: true } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      })
+    : null;
+
+  /*
+   * Failing that, the newest quotation that priced this design. A works
+   * re-quotes the same job for years and the structure rarely moves, so the
+   * last one priced is a better answer than no answer — and it is only ever a
+   * STARTING point, because every row on the sheet can be changed.
+   */
+  const layers =
+    fromRun?.order?.quotationItem?.layers ??
+    (input.jobId
+      ? ((
+          await prisma.quotationItem.findFirst({
+            where: { jobId: input.jobId },
+            orderBy: { quotation: { date: 'desc' } },
+            select: {
+              layers: {
+                orderBy: { position: 'asc' },
+                select: { materialId: true, material: { select: { isActive: true } } },
+              },
+            },
+          })
+        )?.layers ?? [])
+      : []);
+
+  /* A retired film is not an answer: it is how this row came to name one in
+     the first place. */
+  const films = layers
+    .filter((layer) => layer.materialId && layer.material?.isActive)
+    .map((layer) => layer.materialId as string);
+
+  /* The rule itself is pure and lives in shared, where it is tested against
+     the two, three and four ply cases. */
+  return filmRowsFromPlies(films);
+}
+
+/** A material's name and its rate as at a day. Null when it is not on record. */
+async function materialAsAt(
+  materialId: string,
+  onDate: string,
+): Promise<{ name: string; rate: number } | null> {
+  const material = await prisma.material.findUnique({
+    where: { id: materialId },
+    select: {
+      name: true,
+      rates: {
+        where: { effectiveDate: { lte: asDate(onDate) } },
+        orderBy: { effectiveDate: 'desc' },
+        take: 1,
+        select: { rate: true },
+      },
+    },
+  });
+  if (!material) return null;
+  return { name: material.name, rate: num(material.rates[0]?.rate) };
+}
+
 /** What the mix columns of a line start as, given which drum it draws from. */
 function mixFor(template: JobSheetLineTemplate): { share: number } {
   return { share: template.mixSource === 'NONE' ? 0 : template.mixSharePercent };
@@ -270,6 +370,29 @@ export async function createJobSheet(input: JobSheetInput, enteredBy: string): P
     ? await resolveCardLink(prisma, null, input.productionOrderId)
     : null;
 
+  /*
+   * Which films, by grade. Only the rows the works' form cannot name for
+   * itself are overridden — and the sealant row is the reason this exists.
+   */
+  const structure = await filmsForJob({
+    jobId: job?.id ?? fromCard?.jobId ?? null,
+    productionOrderId: input.productionOrderId ?? null,
+  });
+  const films: Record<string, { id: string; name: string; rate: number } | null> = {
+    pet: null,
+    metpet: null,
+    ldpe: null,
+  };
+  for (const [key, materialId] of [
+    ['pet', structure.pet],
+    ['metpet', structure.metPet],
+    ['ldpe', structure.poly],
+  ] as const) {
+    if (!materialId) continue;
+    const found = await materialAsAt(materialId, input.date);
+    if (found) films[key] = { id: materialId, name: found.name, rate: found.rate };
+  }
+
   const number = await peekNextNumber();
 
   const created = await prisma.jobSheet.create({
@@ -304,14 +427,25 @@ export async function createJobSheet(input: JobSheetInput, enteredBy: string): P
       lines: {
         create: JOB_SHEET_LINES.map((template, index) => {
           const material = template.materialName ? rates.get(template.materialName) : undefined;
+          /* The three film rows, bound to the grades this job is made of —
+             see `filmsForJob`. Named for the grade, because "LDPE" alone does
+             not tell the laminator which reel to fetch. */
+          const bound = films[template.key as keyof typeof films];
           return {
             position: index + 1,
             section: template.section,
             kind: template.kind,
-            materialId: material?.id ?? null,
-            name: template.name,
+            materialId: bound?.id ?? material?.id ?? null,
+            /*
+             * The works' own wording stays where the works has a word for it:
+             * their form says "12 PET Polyester" and that is what the person
+             * filling it in is reading. Only the row that cannot name its own
+             * material takes the grade's name, because "LDPE" on its own does
+             * not tell the laminator which reel to fetch.
+             */
+            name: template.materialName ? template.name : (bound?.name ?? template.name),
             mixSharePercent: mixFor(template).share,
-            ratePerKg: material?.rate ?? 0,
+            ratePerKg: bound?.rate ?? material?.rate ?? 0,
           };
         }),
       },
@@ -530,6 +664,13 @@ export async function updateJobSheet(
 ): Promise<JobSheet> {
   await editable(id);
 
+  /* The day this sheet costs at, which is its own and not today's. */
+  const current = await prisma.jobSheet.findUniqueOrThrow({
+    where: { id },
+    select: { date: true },
+  });
+  const sheetDate = input.date ?? current.date.toISOString().slice(0, 10);
+
   await prisma.$transaction(async (tx) => {
     const { lines, labour, stages, date, jobId, productionOrderId, ...rest } = input;
 
@@ -575,6 +716,21 @@ export async function updateJobSheet(
      * rather than a diff that could leave a colour behind.
      */
     for (const line of lines ?? []) {
+      /*
+       * A row the office has just put a material against prices itself.
+       *
+       * Only when it has no rate: a figure somebody typed is the drum in
+       * front of them and beats the catalogue, which is the same rule the
+       * consumption column follows. Priced as at the SHEET's date, not
+       * today's, so a sheet keyed from last month's paper costs what that
+       * month cost.
+       */
+      let ratePerKg = line.ratePerKg;
+      if (line.materialId && ratePerKg === 0) {
+        const priced = await materialAsAt(line.materialId, sheetDate);
+        if (priced) ratePerKg = priced.rate;
+      }
+
       await tx.jobSheetLine.updateMany({
         where: { sheetId: id, position: line.position },
         data: {
@@ -586,7 +742,7 @@ export async function updateJobSheet(
           mixReturnedKg: line.mixReturnedKg,
           mixSharePercent: line.mixSharePercent,
           consumedOverrideKg: line.consumedOverrideKg,
-          ratePerKg: line.ratePerKg,
+          ratePerKg,
         },
       });
     }

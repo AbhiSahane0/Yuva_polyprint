@@ -132,13 +132,29 @@ export const JOB_SHEET_LINES: readonly JobSheetLineTemplate[] = [
     materialName: 'MET PET 12µm',
   },
   {
+    /**
+     * The sealant ply, and the one row on this form that cannot name its own
+     * material.
+     *
+     * The works' printed sheet has a single "LDPE Milky / Natural" line, which
+     * was true when the rates master had a single LDPE. It now carries twelve
+     * derived grades — natural, milky, high clarity, nitrogen flush, vacuum,
+     * easy tear and the rest — and they are different films at different
+     * prices. A fixed name here resolved to a RETIRED row, so the line arrived
+     * with no material behind it: it priced at nothing and could not be taken
+     * off stock, which on a three-ply job is a third of the film.
+     *
+     * So it names nothing, and the sheet binds the grade the job actually ran
+     * — see `filmsForJob` in the job sheet service. Where that cannot be
+     * worked out, the office picks it on the screen.
+     */
     key: 'ldpe',
-    name: 'LDPE Milky / Natural',
+    name: 'LDPE',
     section: 'LAMINATION',
     kind: 'FILM',
     mixSource: 'NONE',
     mixSharePercent: 0,
-    materialName: 'LDPE Milky / Natural',
+    materialName: '',
   },
   {
     key: 'adhesive',

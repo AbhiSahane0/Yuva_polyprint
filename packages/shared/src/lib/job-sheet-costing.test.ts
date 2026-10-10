@@ -3,6 +3,7 @@ import { JOB_SHEET_STAGE_DEFAULTS, JOB_SHEET_STAGE_SHARE_TOTAL } from '../consta
 import {
   consumedKg,
   costJobSheet,
+  filmRowsFromPlies,
   JOB_SHEET_STAGES,
   labourAmount,
   mixDrumFor,
@@ -1385,5 +1386,55 @@ describe('the stage shares a new sheet starts with', () => {
 
   it('covers every stage exactly once', () => {
     expect(JOB_SHEET_STAGE_DEFAULTS.map((stage) => stage.stage)).toEqual([...JOB_SHEET_STAGES]);
+  });
+});
+
+/**
+ * **The three film rows on the works' printed sheet.**
+ *
+ * The rule exists because their form has one "LDPE" line and the rates master
+ * has twelve LDPE grades. Assigning by position rather than by name is what
+ * stops the sealant row naming a film the works retired — which it did, and
+ * which cost a third of the film on every laminated job nothing at all.
+ */
+describe('which film goes on which row', () => {
+  it('puts the web first and the sealant last on a three-ply', () => {
+    expect(filmRowsFromPlies(['PET 12µm', 'MET PET 12µm', 'LDPE Natural GP'])).toEqual({
+      pet: 'PET 12µm',
+      metPet: 'MET PET 12µm',
+      poly: 'LDPE Natural GP',
+    });
+  });
+
+  it('leaves the metallised row empty on a two-ply', () => {
+    /* PET + poly is the ordinary unmetallised laminate, and the sealant is
+       still the last ply — not the second row of three. */
+    expect(filmRowsFromPlies(['PET 12µm', 'LDPE Milky White 3-Layer'])).toEqual({
+      pet: 'PET 12µm',
+      metPet: null,
+      poly: 'LDPE Milky White 3-Layer',
+    });
+  });
+
+  it('reads one film as a sealant, not as a print web', () => {
+    /* An unlaminated job is still sealed, and the one film it has is what
+       seals it. Putting it on the PET row would leave the sealant row empty
+       and the job unable to come off stock. */
+    expect(filmRowsFromPlies(['LDPE Natural GP'])).toEqual({
+      pet: null,
+      metPet: null,
+      poly: 'LDPE Natural GP',
+    });
+  });
+
+  it('takes the first middle ply where a structure has two', () => {
+    const four = filmRowsFromPlies(['PET', 'MET PET', 'Nylon', 'LDPE']);
+    expect(four.pet).toBe('PET');
+    expect(four.metPet).toBe('MET PET');
+    expect(four.poly).toBe('LDPE');
+  });
+
+  it('has nothing to say about a structure with no films', () => {
+    expect(filmRowsFromPlies([])).toEqual({ pet: null, metPet: null, poly: null });
   });
 });
