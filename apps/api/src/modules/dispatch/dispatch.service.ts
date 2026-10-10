@@ -587,7 +587,9 @@ function lineData(line: DispatchLineInput, jobName: string, position: number) {
       })),
     },
     pouchWeighings: {
-      create: line.pouchWeighings.map((set, index) => ({
+      /* A reel line carries none, and a caller that predates the field sends
+         none at all — neither is an error, and neither should be a crash. */
+      create: (line.pouchWeighings ?? []).map((set, index) => ({
         position: index + 1,
         pouchCount: set.pouchCount,
         grams: set.grams,

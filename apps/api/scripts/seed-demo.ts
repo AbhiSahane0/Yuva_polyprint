@@ -40,6 +40,7 @@ import {
   updateStage,
 } from '../src/modules/production/production.service.js';
 import { createEmployee } from '../src/modules/employees/employee.service.js';
+import { createJobCard, updateJobCard } from '../src/modules/job-cards/job-card.service.js';
 import {
   createDispatch,
   postDispatch,
@@ -74,6 +75,16 @@ async function quoteRate(input: {
   ups: number;
   cylinders: number;
   layers: { name: string; micron: number; density: number; ratePerKg: number }[];
+  /*
+   * The style, which the price genuinely turns on: a standup zipper carries
+   * the zipper by the metre, a D punch sixty paise a pouch, and a reel carries
+   * no making charge at all. These were missing from this signature while the
+   * body already read them — the scripts folder is not typechecked, so it
+   * compiled and quietly priced every job as a centre seal.
+   */
+  makesPouches: boolean;
+  pouchType: string | null;
+  hasDPunch?: boolean;
 }): Promise<number> {
   const settings = await getSettings();
   const master = await getMasterData();
@@ -104,7 +115,7 @@ async function quoteRate(input: {
       flatInk: { ratePerKg: priceOf(settings.defaultFlatInkMaterial) },
       adhesive: {
         gsm: adhesiveGsmFor({
-          pouchType: input.pouchType ?? null,
+          pouchType: (input.pouchType ?? null) as never,
           hasDPunch: input.hasDPunch ?? false,
           plies: input.layers,
           thinGsm: settings.adhesiveCoatThinGsm,
@@ -125,8 +136,8 @@ async function quoteRate(input: {
         ethylAcetateRatePerKg: priceOf(settings.defaultEthylAcetateMaterial),
         tolueneRatePerKg: priceOf(settings.defaultTolueneMaterial),
       },
-      makesPouches: true,
-      pouchType: 'CENTRE_SEAL',
+      makesPouches: input.makesPouches,
+      pouchType: input.pouchType,
       adhesiveSplitRatio: settings.adhesiveSplitRatio,
     },
     machines: master.machines.map((m) => ({
@@ -235,6 +246,86 @@ async function clear(quiet = false) {
   console.log(`        ${batches.length} stock batches, ${people.count} employees.`);
 }
 
+/* ------------------------------------------------------------------- wipe */
+
+/**
+ * **Everything the works has DONE, gone — and everything it KNOWS, kept.**
+ *
+ * `--clear` above removes only what this script made, which is right when a
+ * demo is sitting on top of real work. This is the other thing: a clean floor
+ * to build a fresh demonstration on.
+ *
+ * What goes is every transaction — quotations, orders, cards, runs, sheets,
+ * challans, stock and its movements, issues, plans and purchases. What stays
+ * is everything the works would have to type in again: its customers, its
+ * designs, its rates and costing figures, its machines, its people, its
+ * cylinders, and the sign-ins.
+ *
+ * Order matters. A dispatch line points at its order with a RESTRICT, so the
+ * challans go before the orders they name; stock movements point at batches;
+ * reservations and stages cascade from the run.
+ */
+async function wipe() {
+  const counted: [string, number][] = [];
+  const note = async (what: string, run: Promise<{ count: number }>) =>
+    counted.push([what, (await run).count]);
+
+  /* Out of the godown first: a challan names an order and holds it there. */
+  await prisma.pouchWeighing.deleteMany({});
+  await prisma.dispatchPackage.deleteMany({});
+  await prisma.dispatchLine.deleteMany({});
+  await note('dispatch notes', prisma.dispatch.deleteMany({}));
+
+  /* Then the floor. */
+  await prisma.qualityIssue.deleteMany({});
+  await prisma.floorEvent.deleteMany({});
+  await prisma.stockReservation.deleteMany({});
+  await prisma.productionStage.deleteMany({});
+  await note('production runs', prisma.productionOrder.deleteMany({}));
+
+  /* The two documents. */
+  await note('job cards', prisma.jobCard.deleteMany({}));
+  await prisma.jobSheetStageUsage.deleteMany({});
+  await prisma.jobSheetLabour.deleteMany({});
+  await prisma.jobSheetLine.deleteMany({});
+  await note('job sheets', prisma.jobSheet.deleteMany({}));
+
+  /* The ledger. Movements point at batches, so they go first. */
+  await prisma.stockMovement.deleteMany({});
+  await note('stock batches', prisma.stockBatch.deleteMany({}));
+
+  /* Buying. */
+  await prisma.purchaseReceipt.deleteMany({});
+  await prisma.purchaseOrderLine.deleteMany({});
+  await note('purchase orders', prisma.purchaseOrder.deleteMany({}));
+
+  /* And the commercial end. */
+  await note('orders', prisma.order.deleteMany({}));
+  await prisma.quotationEmail.deleteMany({});
+  await note('quotations', prisma.quotation.deleteMany({}));
+
+  /* Machine servicing is a record of work done, so it goes with the rest. */
+  await note('maintenance records', prisma.maintenanceRecord.deleteMany({}));
+
+  console.log('Wiped — the works keeps what it knows, and forgets what it did:');
+  for (const [what, count] of counted) console.log(`  ${String(count).padStart(5)}  ${what}`);
+
+  const kept = {
+    customers: await prisma.customer.count(),
+    designs: await prisma.job.count(),
+    materials: await prisma.material.count(),
+    machines: await prisma.costingMachine.count(),
+    employees: await prisma.employee.count(),
+    cylinders: await prisma.cylinder.count(),
+    users: await prisma.user.count(),
+  };
+  console.log('Kept:');
+  for (const [what, count] of Object.entries(kept)) {
+    console.log(`  ${String(count).padStart(5)}  ${what}`);
+  }
+  console.log('');
+}
+
 /** One line per job, so the run reads as the list it is. */
 const say = (level: string, what: string, detail: string) =>
   console.log(`  ${level.padEnd(15)} ${what.padEnd(26)} ${detail}`);
@@ -274,60 +365,56 @@ const say = (level: string, what: string, detail: string) =>
  * uses a film nothing stocks, which is what makes it short.
  */
 const PLAN = [
-  { design: 'Maharaja Atta 5kg.', level: 'sent', kg: 800, poly: 'W/O Poly 110µm', polyMicron: 85 },
-  { design: 'Lokraja Atta 5kg.', level: 'sent', kg: 500, poly: 'W/O Poly 110µm', polyMicron: 60 },
-  { design: 'Kanik Atta 5kg.', level: 'lost', kg: 900, poly: 'W/O Poly 110µm', polyMicron: 85 },
   {
-    design: 'Sanvi Atta 5kg.',
-    level: 'ordered',
-    kg: 1200,
-    poly: 'W/O Poly 110µm',
-    polyMicron: 85,
-  },
-  {
-    design: 'Nutrilex 500gm. (Boron)',
-    level: 'ordered-late',
-    kg: 700,
-    poly: 'W/O Poly 110µm',
-    polyMicron: 45,
-  },
-  {
+    /* A printed reel. No pouch style, no pouch making, and priced at two
+       quantities because the customer asked what a bigger run would cost. */
     design: 'Chitra Wafers 10Rs.',
-    level: 'printing',
-    kg: 600,
-    poly: 'LDPE Milky / Natural',
+    level: 'draft',
+    kind: 'ROLL',
+    kg: 2000,
+    tiers: [1000, 2000],
+    poly: 'LDPE Natural Nitrogen Flush (NAT-NF)',
     polyMicron: 25,
   },
   {
-    design: 'Sarthak Sonpapadi Mango',
-    level: 'laminating',
-    kg: 850,
-    poly: 'LDPE Milky / Natural',
-    polyMicron: 40,
-    /* Five colours: CMYK and the brand's own orange on the fifth station. */
-    spot: { name: 'Mango Orange (spot)', ink: 'Ink — Orange', laydownGsm: 0.22 },
+    /* A flat bottom bag — the dearest style to make, and the one a customer
+       takes longest to answer on. */
+    design: 'Nutrilex 500gm. (Boron)',
+    level: 'sent',
+    pouchType: 'FLAT_BOTTOM',
+    kg: 400,
+    poly: 'LDPE Natural 5 KG (NAT-5KG)',
+    polyMicron: 110,
+  },
+  {
+    /* Won, carded, and waiting for the press. The D punch is ticked on the
+       line rather than being a style of its own — see POUCH_TYPES. */
+    design: 'Paradise Frozen Green Pease 500g.',
+    level: 'carded',
+    pouchType: 'CENTRE_SEAL',
+    hasDPunch: true,
+    kg: 650,
+    poly: 'LDPE Milky White 3-Layer (MW-3L)',
+    polyMicron: 55,
   },
   {
     design: 'Mauli Bhell',
-    level: 'slitting',
+    level: 'laminating',
+    pouchType: 'THREE_SIDE_SEAL',
     kg: 750,
-    poly: 'LDPE Milky / Natural',
+    poly: 'LDPE Natural GP (NAT-GP)',
     polyMicron: 45,
   },
   {
-    design: 'Amrut Sugar Gold 1kg',
+    /* The whole journey: quoted, won, carded, run, costed and half of it
+       gone. Five colours — CMYK and the brand's own orange. */
+    design: 'Sarthak Sonpapadi Mango',
     level: 'finished',
+    pouchType: 'STANDUP_ZIPPER',
     kg: 1000,
-    poly: 'LDPE Milky / Natural',
-    polyMicron: 60,
-  },
-  {
-    design: 'Paradise Frozen Green Pease 500g.',
-    level: 'short',
-    kg: 650,
-    /* Nothing stocks this one, which is the point of the row. */
-    poly: 'PE 60µm',
-    polyMicron: 55,
+    poly: 'LDPE Natural High Clarity (NAT-HC)',
+    polyMicron: 40,
+    spot: { name: 'Mango Orange (spot)', ink: 'Ink — Orange', laydownGsm: 0.22 },
   },
 ] as const;
 
@@ -342,7 +429,20 @@ const PLAN = [
  * shape. A seed that put every run on one afternoon would draw one spike and
  * thirteen empty days, which teaches nobody anything.
  */
-const FIRST_RAN_ON = [13, 11, 8, 6, 3] as const;
+const FIRST_RAN_ON = [11, 6, 3] as const;
+
+/**
+ * How long ago each quotation went out, counting back from today.
+ *
+ * The two nobody has answered are the recent ones, and the job that is
+ * finished and half delivered was quoted a month ago — which is the shape of
+ * a real pipeline, and what makes the quotation list read as a list rather
+ * than as a batch somebody typed in one sitting.
+ */
+const QUOTED_ON = [6, 9, 18, 24, 31] as const;
+
+/** Days from today each won job is promised for. A works owes several dates. */
+const DUE_IN = [0, 0, 12, 6, 2] as const;
 
 /**
  * What each job prints.
@@ -383,6 +483,16 @@ async function main() {
   }
 
   /*
+   * `--wipe` empties the whole works of its transactions first. Without it the
+   * demo lands on top of whatever is there, which is what you want on a
+   * database with real work in it and not what you want before a walkthrough.
+   */
+  if (process.argv.includes('--wipe')) {
+    await wipe();
+    if (process.argv.includes('--only-wipe')) return;
+  }
+
+  /*
    * Cleared first, every time, so the script can be run again after a change
    * and land in a known state — including after one of its own runs failed
    * halfway and left people on the books with no jobs behind them.
@@ -403,6 +513,14 @@ async function main() {
     ['Suresh Kale', 'Lamination Operator', 'MORNING'],
     ['Manoj Jadhav', 'Slitting Operator', 'AFTERNOON'],
   ] as const) {
+    /* Idempotent: the wipe keeps the works' people, so a second run must not
+       take the same four on again. */
+    const already = await prisma.employee.findFirst({ where: { name }, select: { id: true } });
+    if (already) {
+      people[name] = already.id;
+      continue;
+    }
+
     const made = await createEmployee({
       name,
       code: '',
@@ -437,10 +555,17 @@ async function main() {
   for (const [name, kg] of [
     ['PET 12µm', 4000],
     ['MET PET 12µm', 2500],
-    ['W/O Poly 110µm', 5000],
-    ['LDPE Milky / Natural', 4000],
-    /* PE 60µm is deliberately NOT received. One job is built on it, and that
-       is what puts a real shortage on the floor to look at. */
+    /*
+     * One poly a job, and each is the grade that job is actually built from —
+     * the nitrogen flush for the wafer reel, the milky white for the peas, the
+     * high clarity for the sweet pack. They are derived grades off General
+     * Poly on the rates master, which is why none of them is priced by hand.
+     */
+    ['LDPE Natural Nitrogen Flush (NAT-NF)', 1200],
+    ['LDPE Natural 5 KG (NAT-5KG)', 900],
+    ['LDPE Milky White 3-Layer (MW-3L)', 1400],
+    ['LDPE Natural GP (NAT-GP)', 1600],
+    ['LDPE Natural High Clarity (NAT-HC)', 1800],
 
     /*
      * The ink store. Drums, not reels — no width, and none is asked for.
@@ -550,7 +675,14 @@ async function main() {
     ];
     const layers = plies.map((ply) => ({ materialId: materialId(ply.name), micron: ply.micron }));
 
+    const isRoll = 'kind' in plan && plan.kind === 'ROLL';
+    const pouchType = 'pouchType' in plan ? plan.pouchType : null;
+    const hasDPunch = 'hasDPunch' in plan ? Boolean(plan.hasDPunch) : false;
+
     const ratePerKg = await quoteRate({
+      makesPouches: !isRoll,
+      pouchType: isRoll ? null : (pouchType ?? null),
+      hasDPunch,
       kg: plan.kg,
       widthMm: Number(design.designOpenWidth),
       heightMm: Number(design.designHeight),
@@ -566,7 +698,9 @@ async function main() {
 
     const quotation = await createQuotation(
       createQuotationSchema.parse({
-        date: daysAgo(14),
+        /* A works quotes as the enquiries come in, not five on one morning.
+           Spread back across a month, newest plan row first. */
+        date: daysAgo(QUOTED_ON[PLAN.indexOf(plan)] ?? 14),
         customerId: design.customerId,
         customerName: design.customer.companyName,
         /*
@@ -583,8 +717,11 @@ async function main() {
           {
             jobId: design.id,
             jobName: design.jobName,
-            jobKind: 'POUCH',
-            pouchType: 'CENTRE_SEAL',
+            jobKind: isRoll ? 'ROLL' : 'POUCH',
+            /* A reel has no style and the schema nulls the pouch fields for
+               it; a pouch must name one. */
+            pouchType: isRoll ? null : pouchType,
+            hasDPunch,
             pricingBasis: 'PER_KG',
             widthMm: Number(design.designOpenWidth),
             heightMm: Number(design.designHeight),
@@ -612,7 +749,38 @@ async function main() {
                   ]
                 : []),
             ],
-            quantities: [{ quantityKg: plan.kg, ratePerKg, quantityPouches: 0, ratePerPouch: 0 }],
+            /*
+             * One quantity unless the customer asked what a bigger run costs.
+             * The second is priced on its own: a longer run spreads the
+             * make-ready over more kilograms, so it is not the first rate
+             * repeated.
+             */
+            quantities:
+              'tiers' in plan && plan.tiers
+                ? await Promise.all(
+                    plan.tiers.map(async (kg) => ({
+                      quantityKg: kg,
+                      ratePerKg: await quoteRate({
+                        makesPouches: !isRoll,
+                        pouchType: isRoll ? null : (pouchType ?? null),
+                        hasDPunch,
+                        kg,
+                        widthMm: Number(design.designOpenWidth),
+                        heightMm: Number(design.designHeight),
+                        ups: Number(design.ups ?? 1),
+                        cylinders: Number(design.totalCylinders ?? 4),
+                        layers: plies.map((ply) => ({
+                          name: ply.name,
+                          micron: ply.micron,
+                          density: densityOf(ply.name),
+                          ratePerKg: rateOf(ply.name),
+                        })),
+                      }),
+                      quantityPouches: 0,
+                      ratePerPouch: 0,
+                    })),
+                  )
+                : [{ quantityKg: plan.kg, ratePerKg, quantityPouches: 0, ratePerPouch: 0 }],
             repeatWidth: Number(design.ups ?? 1),
             repeatHeight: 1,
             cylinderCount: Number(design.totalCylinders ?? 4),
@@ -624,8 +792,13 @@ async function main() {
       }),
     );
 
+    if (plan.level === 'draft') {
+      say('Draft', `quotation #${quotation.number}`, `${design.jobName} — priced, not sent`);
+      continue;
+    }
+
     if (plan.level === 'sent') {
-      say('Sent', `quotation #${quotation.number}`, design.jobName);
+      say('Sent', `quotation #${quotation.number}`, `${design.jobName} — waiting on an answer`);
       continue;
     }
 
@@ -649,10 +822,23 @@ async function main() {
 
     /* One of them is past the day it was promised, so the floor's "past due"
        count is not always a zero nobody has ever seen move. */
-    const due = plan.level === 'ordered-late' ? daysAgo(3) : daysAgo(-9);
+    const due =
+      plan.level === 'ordered-late' ? daysAgo(3) : daysAgo(-(DUE_IN[PLAN.indexOf(plan)] ?? 9));
+    /*
+     * Put the order back to the day the customer said yes.
+     *
+     * Winning a quotation stamps the order with today, which is right in use
+     * and wrong here: every demo order would be raised this morning, and the
+     * job card raised against it would be dated before the order existed.
+     */
+    const saidYes = daysAgo(Math.max(1, (QUOTED_ON[PLAN.indexOf(plan)] ?? 14) - 3));
     await prisma.order.update({
       where: { id: order.id },
-      data: { notes: MARK, dueDate: new Date(`${due}T00:00:00.000Z`) },
+      data: {
+        notes: MARK,
+        orderDate: new Date(`${saidYes}T00:00:00.000Z`),
+        dueDate: new Date(`${due}T00:00:00.000Z`),
+      },
     });
 
     if (plan.level === 'ordered' || plan.level === 'ordered-late') {
@@ -686,6 +872,61 @@ async function main() {
         `order #${order.number}`,
         `${design.jobName} — booked ${planned.plannedStart}${planned.landsLate ? `, ${planned.daysLate}d past its date` : ''}`,
       );
+      continue;
+    }
+
+    /*
+     * The job card: the instruction, written before anybody touches a machine.
+     *
+     * Raised here because this is the moment it exists in the works — the
+     * customer has committed and the design is known. It is NOT the production
+     * run below: a card is a sheet of paper an operator is handed and three
+     * people sign, and the run is what the floor then did. Two documents.
+     */
+    const jobCard = await createJobCard(
+      {
+        date: daysAgo(Math.max(1, (QUOTED_ON[PLAN.indexOf(plan)] ?? 14) - 4)),
+        orderId: order.id,
+        jobId: design.id,
+        customerId: design.customerId,
+        jobName: design.jobName,
+        quantityKg: plan.kg,
+        workOrderNo: `WO-${String(order.number).padStart(4, '0')}`,
+        poDate: daysAgo(Math.max(1, (QUOTED_ON[PLAN.indexOf(plan)] ?? 14) - 2)),
+        dispatchDate: null,
+        transport: 'Company vehicle',
+        jobReceivedBy: 'Sagar Hase',
+        printingNote: 'Regular',
+        printSpeedMPerMin: 0,
+        printMetersOverride: null,
+        metPetCoatingGsm: 3.2,
+        polyCoatingGsm: 3.5,
+        pouchingSpeedPerMin: isRoll ? 0 : 55,
+        otherSettingMinutes: 0,
+        singleRollWeight: '13-14',
+        pouchSorting: isRoll ? '' : 'Two sorters, 100% check',
+        specialInstructions: 'Print to the approved shade card. Reject any reel under 12 kg.',
+        preparedBy: 'Office',
+        operatedBy: '',
+        approvedBy: '',
+      },
+      'Demo',
+    );
+
+    if (plan.level === 'carded') {
+      say(
+        'Carded',
+        `card ${jobCard.number}`,
+        `${design.jobName} — ${plan.kg} kg, printed and waiting for the press`,
+      );
+      /* The run is raised too, which is what holds the film: a card on its own
+         claims nothing, and the godown has to know this job is coming. */
+      const waiting = await createProduction({
+        orderId: order.id,
+        quantityKg: plan.kg,
+        notes: MARK,
+      });
+      say('Reserved', `run #${waiting.number}`, `${design.jobName} — film held, nothing started`);
       continue;
     }
 
@@ -831,15 +1072,29 @@ async function main() {
         say('Problem', `issue ${raised.number}`, `${design.jobName} — closed, with what was done`);
       }
 
+      /* Signed by the people who are actually running it. */
+      await updateJobCard(jobCard.id, {
+        operatedBy: 'Rahul Patil',
+        approvedBy: 'A. K. Hase',
+        printSpeedMPerMin: 80,
+        otherSettingMinutes: 40,
+      });
+
       say(
         'On the floor',
-        `card #${card.number}`,
-        `${design.jobName} — on the ${runningAt.toLowerCase()}`,
+        `run #${card.number}`,
+        `${design.jobName} — on the ${runningAt.toLowerCase()}, card ${jobCard.number}`,
       );
       continue;
     }
 
     /* --- finished: completed, costed, and off the shelf ------------------- */
+    await updateJobCard(jobCard.id, {
+      operatedBy: 'Rahul Patil',
+      approvedBy: 'A. K. Hase',
+      printSpeedMPerMin: 80,
+      otherSettingMinutes: 40,
+    });
     await updateProduction(card.id, { status: 'COMPLETED' });
 
     const sheet = await createJobSheet(
@@ -865,18 +1120,45 @@ async function main() {
     const used = new Map(
       layers.map((l) => [l.materialId, Math.round((plan.kg * 1.08) / layers.length)]),
     );
+    const polyId = materialId(plan.poly);
+    const polyRate = rateOf(plan.poly);
+
     await updateJobSheet(
       sheet.id,
       {
         producedGrossKg: inKg,
         producedCoreKg: 0,
         finalOutputKg: Math.round(inKg * 0.97),
+        /* What went through the pouching machine. Nought on a reel, and the
+           sheet reads that as "this job was never pouched" — which is how its
+           own list tells a pouch job from a roll. */
+        pouchingWeightKg: isRoll ? 0 : inKg,
         productionDays: 2,
         makeReadyDays: 0.75,
-        lines: sheet.lines.map((line) => ({
-          ...line,
-          issuedKg: (line.materialId && used.get(line.materialId)) || line.issuedKg,
-        })),
+        lines: sheet.lines.map((line) => {
+          /*
+           * The poly row, bound to the grade this job actually ran.
+           *
+           * The works' printed form has ONE "LDPE Milky / Natural" row, and
+           * the rates master now carries twelve derived LDPE grades — so the
+           * row arrives with no material behind it and costs nothing. The
+           * office would pick the grade; the demo picks it too, or the
+           * finished sheet would quietly price a third of its film at zero.
+           */
+          if (line.kind === 'FILM' && !line.materialId && /ldpe|poly/i.test(line.name)) {
+            return {
+              ...line,
+              name: plan.poly,
+              materialId: polyId,
+              ratePerKg: polyRate,
+              issuedKg: Math.round((plan.kg * 1.08) / layers.length),
+            };
+          }
+          return {
+            ...line,
+            issuedKg: (line.materialId && used.get(line.materialId)) || line.issuedKg,
+          };
+        }),
       } as never,
       'Demo',
     );
@@ -885,7 +1167,7 @@ async function main() {
 
     say(
       'Finished',
-      `card #${card.number}, sheet ${sheet.number}`,
+      `run #${card.number}, sheet ${sheet.number}`,
       `${design.jobName} — ${posted.posted} material line${posted.posted === 1 ? '' : 's'} off stock`,
     );
 
@@ -944,6 +1226,7 @@ async function main() {
               quantityPouches: bags,
               remarks: 'First half — balance to follow',
               packages: reels,
+              pouchWeighings: [],
             },
           ],
         },
@@ -978,6 +1261,7 @@ async function main() {
                 quantityPouches: standing.orderedPouches - bags,
                 remarks: 'Balance',
                 packages: [],
+                pouchWeighings: [],
               },
             ],
           },
