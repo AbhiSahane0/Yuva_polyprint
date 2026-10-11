@@ -339,6 +339,7 @@ Workspace scripts worth knowing:
 | `npm run check:job-sheets -w @yuva/api`         | cost the works' job-sheet workbook and check all fourteen                                                                    |
 | `npm run seed:job-sheet-materials -w @yuva/api` | the ten materials the job sheet needs                                                                                        |
 | `npm run quote:job-sheets -w @yuva/api`         | quote the works' own finished jobs and check the quote covers the cost                                                       |
+| `npm run check:october -w @yuva/api`            | type the works' October costing sheet in reel by reel and check it still reaches Rs 261.82 a kg                              |
 | `npm run seed:demo -w @yuva/api -- --wipe`      | empty every transaction and build the five demonstration jobs — see [`docs/demo-walkthrough.md`](./docs/demo-walkthrough.md) |
 | `npm run seed:demo -w @yuva/api -- --clear`     | remove only what the demonstration made, leaving real work alone                                                             |
 

@@ -39,7 +39,8 @@
     "seed:demo": "tsx scripts/seed-demo.ts",
     "import:stock": "tsx scripts/import-stock-sheet.ts",
     "sync:materials": "tsx scripts/sync-neon-materials.ts",
-    "audit": "tsx scripts/audit.ts"
+    "audit": "tsx scripts/audit.ts",
+    "check:october": "tsx scripts/check-october-sheet.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",

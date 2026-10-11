@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, PackageMinus, Save } from 'lucide-react';
 import {
@@ -8,9 +8,13 @@ import {
   JOB_SHEET_STAGE_LABELS,
   JOB_SHEET_STATUS_LABELS,
   mixDrumFor,
+  weighedTotal,
   type JobSheet,
   type JobSheetCost,
   type JobSheetLine,
+  type JobSheetReel,
+  type JobSheetReelInput,
+  type JobSheetStage,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, NumberInput, Select } from '@/components/ui/Field';
@@ -19,8 +23,10 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
+import { cn } from '@/lib/utils';
 import { useProductionOrders } from '@/features/production/api/production-api';
 import { useMaterials } from '@/features/rates/api/rate-api';
+import { Weighings } from '../components/Weighings';
 import {
   useCostJobSheet,
   useJobSheet,
@@ -93,6 +99,23 @@ function Weight({
   );
 }
 
+/**
+ * A weighing as the draft holds it.
+ *
+ * The editor deals in weights; the server deals in rows with ids. A reel the
+ * office has just typed has no id yet — it is a number in a box — so it gets
+ * an empty one and takes its position from where it sits. The server replaces
+ * the whole list on save anyway: a reel has no identity of its own.
+ */
+const asReels = (reels: JobSheetReelInput[]): JobSheetReel[] =>
+  reels.map((reel, index) => ({
+    ...reel,
+    id: '',
+    position: index + 1,
+    coreKg: reel.coreKg ?? 0,
+    reelNumber: reel.reelNumber ?? '',
+  }));
+
 export default function JobSheetPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -111,6 +134,8 @@ export default function JobSheetPage() {
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [posting, setPosting] = useState(false);
+  /* Which row has its reels open. One at a time: the table is 21 rows deep. */
+  const [weighing, setWeighing] = useState<number | null>(null);
 
   /*
    * The server's copy replaces the draft whenever it changes — which is after
@@ -136,6 +161,33 @@ export default function JobSheetPage() {
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => (current ? { ...current, [key]: value } : current));
+
+  /**
+   * Replaces the rolls for one machine, leaving the other machine's alone.
+   *
+   * The two lists live in one column on the sheet because they are one kind of
+   * thing — a roll that came off something — and which machine it came off is
+   * what decides whether it swells the printed figure or the laminated one.
+   */
+  const setOutput = (stage: JobSheetStage, reels: JobSheetReelInput[]) =>
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            outputReels: [
+              ...current.outputReels.filter((reel) => reel.stage !== stage),
+              ...reels.map((reel, index) => ({
+                id: '',
+                position: index + 1,
+                stage,
+                weightKg: reel.weightKg,
+                coreKg: reel.coreKg ?? 0,
+                reelNumber: reel.reelNumber ?? '',
+              })),
+            ],
+          }
+        : current,
+    );
 
   const setLine = (position: number, patch: Partial<JobSheetLine>) =>
     setDraft((current) =>
@@ -262,6 +314,24 @@ export default function JobSheetPage() {
           mixSharePercent: line.mixSharePercent,
           consumedOverrideKg: line.consumedOverrideKg,
           ratePerKg: line.ratePerKg,
+          /* Weights only — the server gives them their rows back, and the
+             issued and returned totals above are recomputed from them. */
+          issueReels: line.issueReels.map((reel) => ({
+            weightKg: reel.weightKg,
+            coreKg: 0,
+            reelNumber: reel.reelNumber,
+          })),
+          returnReels: line.returnReels.map((reel) => ({
+            weightKg: reel.weightKg,
+            coreKg: 0,
+            reelNumber: reel.reelNumber,
+          })),
+        })),
+        outputReels: draft.outputReels.map((reel) => ({
+          stage: reel.stage,
+          weightKg: reel.weightKg,
+          coreKg: reel.coreKg,
+          reelNumber: reel.reelNumber,
         })),
         labour: draft.labour.map((role) => ({
           position: role.position,
@@ -315,16 +385,19 @@ export default function JobSheetPage() {
     lines.map((line) => {
       const corrected = line.consumedOverrideKg !== null;
       const costed = live.lines[indexOf(line.position)];
+      const weighed = line.issueReels.length > 0 || line.returnReels.length > 0;
+      const open = weighing === line.position;
       return (
-        <tr key={line.id} className="border-ink-100 border-b last:border-b-0">
-          <td className="text-ink-800 px-2 py-1.5 whitespace-nowrap">
-            {line.name}
-            {line.mixSharePercent > 0 ? (
-              <span className="text-ink-400 ml-1.5 text-xs">
-                {formatNumber(line.mixSharePercent, 0)}% of mix
-              </span>
-            ) : null}
-            {/*
+        <Fragment key={line.id}>
+          <tr className="border-ink-100 border-b last:border-b-0">
+            <td className="text-ink-800 px-2 py-1.5 whitespace-nowrap">
+              {line.name}
+              {line.mixSharePercent > 0 ? (
+                <span className="text-ink-400 ml-1.5 text-xs">
+                  {formatNumber(line.mixSharePercent, 0)}% of mix
+                </span>
+              ) : null}
+              {/*
               A film row the sheet could not name for itself.
 
               The works' form has one LDPE line and the rates master has a
@@ -333,110 +406,164 @@ export default function JobSheetPage() {
               behind it cannot come off stock when the sheet is posted, so the
               film would leave the building without leaving the ledger.
             */}
-            {!line.materialId && line.kind === 'FILM' ? (
-              <Select
-                className="mt-1 w-56 text-xs"
-                value=""
-                disabled={locked}
-                aria-label={`Which film is ${line.name}?`}
-                onChange={(event) => {
-                  const picked = films.find((film) => film.id === event.target.value);
-                  if (!picked) return;
-                  /* The rate is left at nought on purpose — the server prices
+              {!line.materialId && line.kind === 'FILM' ? (
+                <Select
+                  className="mt-1 w-56 text-xs"
+                  value=""
+                  disabled={locked}
+                  aria-label={`Which film is ${line.name}?`}
+                  onChange={(event) => {
+                    const picked = films.find((film) => film.id === event.target.value);
+                    if (!picked) return;
+                    /* The rate is left at nought on purpose — the server prices
                      it from this material as at the sheet's own date. */
-                  setLine(line.position, { materialId: picked.id, name: picked.name });
-                }}
+                    setLine(line.position, { materialId: picked.id, name: picked.name });
+                  }}
+                >
+                  <option value="">— which film? —</option>
+                  {films.map((film) => (
+                    <option key={film.id} value={film.id}>
+                      {film.name}
+                    </option>
+                  ))}
+                </Select>
+              ) : null}
+              {!line.materialId && line.kind !== 'FILM' ? (
+                <span className="text-warning-700 ml-1.5 text-xs">no catalogue rate</span>
+              ) : null}
+              {/* The reels behind this row, which is how the works writes it. */}
+              <button
+                type="button"
+                className={cn(
+                  'ml-1.5 rounded px-1.5 py-0.5 text-[11px] font-medium',
+                  weighed ? 'bg-brand-50 text-brand-700' : 'text-ink-400 hover:text-ink-700',
+                )}
+                aria-expanded={open}
+                onClick={() => setWeighing(open ? null : line.position)}
               >
-                <option value="">— which film? —</option>
-                {films.map((film) => (
-                  <option key={film.id} value={film.id}>
-                    {film.name}
-                  </option>
-                ))}
-              </Select>
-            ) : null}
-            {!line.materialId && line.kind !== 'FILM' ? (
-              <span className="text-warning-700 ml-1.5 text-xs">no catalogue rate</span>
-            ) : null}
-          </td>
-          <td className="px-1 py-1">
-            <Weight
-              value={line.issuedKg}
-              disabled={locked}
-              onChange={(next) => setLine(line.position, { issuedKg: next })}
-            />
-          </td>
-          <td className="px-1 py-1">
-            <Weight
-              value={line.returnedKg}
-              disabled={locked}
-              onChange={(next) => setLine(line.position, { returnedKg: next })}
-            />
-          </td>
-          {/* Its own drum, for an ink. The solvents draw from the pooled one above. */}
-          <td className="px-1 py-1">
-            {line.kind === 'INK' ? (
-              <Weight
-                value={line.mixIssuedKg}
+                {weighed
+                  ? `${line.issueReels.length + line.returnReels.length} weighed`
+                  : 'weigh reels'}
+              </button>
+            </td>
+            {/*
+            Typed, unless the reels were weighed — then the sum is the figure
+            and typing a second one beside it would be a second answer.
+          */}
+            <td className="px-1 py-1">
+              {line.issueReels.length > 0 ? (
+                <div className="text-ink-900 px-1 text-right text-sm font-medium tabular-nums">
+                  {formatNumber(weighedTotal(line.issueReels, 0), 3)}
+                </div>
+              ) : (
+                <Weight
+                  value={line.issuedKg}
+                  disabled={locked}
+                  onChange={(next) => setLine(line.position, { issuedKg: next })}
+                />
+              )}
+            </td>
+            <td className="px-1 py-1">
+              {line.returnReels.length > 0 ? (
+                <div className="text-ink-900 px-1 text-right text-sm font-medium tabular-nums">
+                  {formatNumber(weighedTotal(line.returnReels, 0), 3)}
+                </div>
+              ) : (
+                <Weight
+                  value={line.returnedKg}
+                  disabled={locked}
+                  onChange={(next) => setLine(line.position, { returnedKg: next })}
+                />
+              )}
+            </td>
+            {/* Its own drum, for an ink. The solvents draw from the pooled one above. */}
+            <td className="px-1 py-1">
+              {line.kind === 'INK' ? (
+                <Weight
+                  value={line.mixIssuedKg}
+                  disabled={locked}
+                  onChange={(next) => setLine(line.position, { mixIssuedKg: next })}
+                />
+              ) : (
+                <span className="text-ink-300 block text-center">—</span>
+              )}
+            </td>
+            <td className="px-1 py-1">
+              {line.kind === 'INK' ? (
+                <Weight
+                  value={line.mixReturnedKg}
+                  disabled={locked}
+                  onChange={(next) => setLine(line.position, { mixReturnedKg: next })}
+                />
+              ) : (
+                <span className="text-ink-300 block text-center">—</span>
+              )}
+            </td>
+            <td className="px-1 py-1">
+              <NumberInput
                 disabled={locked}
-                onChange={(next) => setLine(line.position, { mixIssuedKg: next })}
+                value={line.ratePerKg === 0 ? '' : String(line.ratePerKg)}
+                onChange={(event) =>
+                  setLine(line.position, { ratePerKg: Number(event.target.value || 0) })
+                }
+                placeholder="0"
+                className={cell}
               />
-            ) : (
-              <span className="text-ink-300 block text-center">—</span>
-            )}
-          </td>
-          <td className="px-1 py-1">
-            {line.kind === 'INK' ? (
-              <Weight
-                value={line.mixReturnedKg}
-                disabled={locked}
-                onChange={(next) => setLine(line.position, { mixReturnedKg: next })}
-              />
-            ) : (
-              <span className="text-ink-300 block text-center">—</span>
-            )}
-          </td>
-          <td className="px-1 py-1">
-            <NumberInput
-              disabled={locked}
-              value={line.ratePerKg === 0 ? '' : String(line.ratePerKg)}
-              onChange={(event) =>
-                setLine(line.position, { ratePerKg: Number(event.target.value || 0) })
-              }
-              placeholder="0"
-              className={cell}
-            />
-          </td>
-          {/*
+            </td>
+            {/*
             Computed as they type, and typed over where the drum says otherwise.
             The computed figure stays beside it, so a correction is visible on
             the page rather than lost behind the number that replaced it.
           */}
-          <td className="px-1 py-1">
-            <NumberInput
-              allowNegative
-              disabled={locked}
-              value={corrected ? String(line.consumedOverrideKg) : ''}
-              onChange={(event) =>
-                setLine(line.position, {
-                  consumedOverrideKg: event.target.value === '' ? null : Number(event.target.value),
-                })
-              }
-              placeholder={formatNumber(costed?.computedKg ?? 0, 3)}
-              className={
-                corrected ? `${cell} border-warning-400 bg-warning-50 font-semibold` : consumedCell
-              }
-            />
-            {corrected ? (
-              <div className="text-warning-700 mt-0.5 text-right text-[11px] tabular-nums">
-                was {formatNumber(costed?.computedKg ?? 0, 3)}
-              </div>
-            ) : null}
-          </td>
-          <td className="text-ink-900 px-2 py-1.5 text-right font-medium tabular-nums">
-            {formatRs(costed?.amount ?? 0)}
-          </td>
-        </tr>
+            <td className="px-1 py-1">
+              <NumberInput
+                allowNegative
+                disabled={locked}
+                value={corrected ? String(line.consumedOverrideKg) : ''}
+                onChange={(event) =>
+                  setLine(line.position, {
+                    consumedOverrideKg:
+                      event.target.value === '' ? null : Number(event.target.value),
+                  })
+                }
+                placeholder={formatNumber(costed?.computedKg ?? 0, 3)}
+                className={
+                  corrected
+                    ? `${cell} border-warning-400 bg-warning-50 font-semibold`
+                    : consumedCell
+                }
+              />
+              {corrected ? (
+                <div className="text-warning-700 mt-0.5 text-right text-[11px] tabular-nums">
+                  was {formatNumber(costed?.computedKg ?? 0, 3)}
+                </div>
+              ) : null}
+            </td>
+            <td className="text-ink-900 px-2 py-1.5 text-right font-medium tabular-nums">
+              {formatRs(costed?.amount ?? 0)}
+            </td>
+          </tr>
+          {open ? (
+            <tr className="bg-ink-25 border-ink-100 border-b">
+              <td colSpan={8} className="px-3 py-2.5">
+                <div className="flex flex-wrap gap-x-10 gap-y-3">
+                  <Weighings
+                    label={`${line.name} — on the machine`}
+                    reels={line.issueReels}
+                    disabled={locked}
+                    onChange={(reels) => setLine(line.position, { issueReels: asReels(reels) })}
+                  />
+                  <Weighings
+                    label="Sent back"
+                    reels={line.returnReels}
+                    disabled={locked}
+                    onChange={(reels) => setLine(line.position, { returnReels: asReels(reels) })}
+                  />
+                </div>
+              </td>
+            </tr>
+          ) : null}
+        </Fragment>
       );
     });
 
@@ -693,6 +820,30 @@ export default function JobSheetPage() {
       {/* ---- Output and time ---- */}
       <section className="border-ink-200 rounded-lg border bg-white p-4">
         <h2 className="text-ink-900 mb-3 font-semibold">Output and time</h2>
+
+        {/*
+          The rolls that came off each machine, weighed one at a time with the
+          core written underneath — which is what the works' own form has a
+          column for. Where they are listed the two figures below are their
+          sums and are shown rather than asked for.
+        */}
+        <div className="border-ink-100 mb-4 flex flex-wrap gap-x-10 gap-y-3 rounded-md border bg-ink-25 p-3">
+          <Weighings
+            withCores
+            label="Rolls off the press"
+            reels={draft.outputReels.filter((reel) => reel.stage === 'PRINTING')}
+            disabled={locked}
+            onChange={(reels) => setOutput('PRINTING', reels)}
+          />
+          <Weighings
+            withCores
+            label="Rolls off the laminator"
+            reels={draft.outputReels.filter((reel) => reel.stage === 'LAMINATION_1')}
+            disabled={locked}
+            onChange={(reels) => setOutput('LAMINATION_1', reels)}
+          />
+        </div>
+
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Printed rolls gross (kg)" htmlFor="pg">
             <NumberInput

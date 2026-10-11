@@ -11,6 +11,21 @@ export const JOB_SHEET_STATUS_LABELS: Record<JobSheetStatus, string> = {
 };
 
 /** One consumable on a sheet, as the API returns it. Decimals serialise as numbers. */
+/** One weighing on the sheet: a reel issued, a reel back, or a roll made. */
+export interface JobSheetReel {
+  id: string;
+  position: number;
+  weightKg: number;
+  /** The core an output roll was wound on. Zero on anything issued. */
+  coreKg: number;
+  reelNumber: string;
+}
+
+/** A roll off a machine, and which machine it came off. */
+export interface JobSheetOutputReel extends JobSheetReel {
+  stage: JobSheetStage;
+}
+
 export interface JobSheetLine {
   id: string;
   position: number;
@@ -22,6 +37,10 @@ export interface JobSheetLine {
 
   issuedKg: number;
   returnedKg: number;
+
+  /** The weighings the two above are the sum of, where the works listed them. */
+  issueReels: JobSheetReel[];
+  returnReels: JobSheetReel[];
 
   mixIssuedKg: number;
   mixReturnedKg: number;
@@ -149,6 +168,8 @@ export interface JobSheet {
   enteredBy: string;
 
   lines: JobSheetLine[];
+  /** The rolls that came off the machines, with their cores. */
+  outputReels: JobSheetOutputReel[];
   labour: JobSheetLabour[];
   stages: JobSheetStageUsage[];
 

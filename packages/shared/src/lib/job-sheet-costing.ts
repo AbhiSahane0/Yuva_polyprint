@@ -396,3 +396,61 @@ export function filmRowsFromPlies<T>(plies: readonly T[]): {
     poly: plies[plies.length - 1] as T,
   };
 }
+
+/** One weighing off the scale: a reel issued, a reel back, or a roll made. */
+export interface WeighedReel {
+  weightKg: number;
+  /** The core an OUTPUT roll was wound on. Zero on anything issued. */
+  coreKg?: number;
+}
+
+/**
+ * **What a set of weighings comes to, against what somebody typed.**
+ *
+ * The works weighs reels: 257.3 and 250.25 is how 507.55 kg of polyester
+ * reaches their sheet. Where the reels are listed they ARE the figure — a
+ * typed total that disagrees with the rows above it is two answers to one
+ * question, and the one with the weighings behind it is the one that can be
+ * checked. Where nothing is listed, the typed total is all there is and it
+ * stands, because a sheet keyed from a scrap of paper must still cost.
+ *
+ * Deliberately the same rule as a dispatch note's packages. Two places in this
+ * system let somebody list what they weighed instead of totalling it, and they
+ * had better behave the same way.
+ */
+export function weighedTotal(reels: readonly WeighedReel[] | undefined, typedKg: number): number {
+  if (!reels || reels.length === 0) {
+    return Number.isFinite(typedKg) ? typedKg : 0;
+  }
+  return round(
+    reels.reduce((sum, reel) => sum + (Number.isFinite(reel.weightKg) ? reel.weightKg : 0), 0),
+    3,
+  );
+}
+
+/**
+ * The net of a set of output rolls: what came off the machine, less its cores.
+ *
+ * The works weighs a roll with the core in it and writes the core underneath,
+ * because that is what the scale shows. The net is never typed — it is what
+ * those two leave, and a third figure that can disagree with them is a figure
+ * nobody can trust.
+ */
+export function outputNet(reels: readonly WeighedReel[]): {
+  grossKg: number;
+  coreKg: number;
+  netKg: number;
+} {
+  const grossKg = round(
+    reels.reduce((sum, reel) => sum + (Number.isFinite(reel.weightKg) ? reel.weightKg : 0), 0),
+    3,
+  );
+  const coreKg = round(
+    reels.reduce(
+      (sum, reel) => sum + (Number.isFinite(reel.coreKg ?? 0) ? (reel.coreKg ?? 0) : 0),
+      0,
+    ),
+    3,
+  );
+  return { grossKg, coreKg, netKg: round(grossKg - coreKg, 3) };
+}

@@ -4,10 +4,12 @@ import {
   consumedKg,
   costJobSheet,
   filmRowsFromPlies,
+  outputNet,
   JOB_SHEET_STAGES,
   labourAmount,
   mixDrumFor,
   stageElectricity,
+  weighedTotal,
   type JobSheetCostInput,
   type JobSheetLineInput,
 } from './job-sheet-costing.js';
@@ -1436,5 +1438,55 @@ describe('which film goes on which row', () => {
 
   it('has nothing to say about a structure with no films', () => {
     expect(filmRowsFromPlies([])).toEqual({ pet: null, metPet: null, poly: null });
+  });
+});
+
+/**
+ * **The weighings behind a figure**, against the works' own October sheet for
+ * Radhey Murmura — the one that reaches Rs 261.82 a kilogram.
+ */
+describe('reels, and the totals they make', () => {
+  it('adds the polyester reels the way their sheet does', () => {
+    // Row 8: 257.3 and 250.25 across the page, 507.55 in the Total column.
+    expect(weighedTotal([{ weightKg: 257.3 }, { weightKg: 250.25 }], 0)).toBe(507.55);
+  });
+
+  it('adds the four drums of ethyl acetate', () => {
+    // Row 10: 20, 21.5, 21.4, 20 → 82.9.
+    const drums = [20, 21.5, 21.4, 20].map((weightKg) => ({ weightKg }));
+    expect(weighedTotal(drums, 0)).toBe(82.9);
+  });
+
+  it('lets the weighings beat a total somebody typed', () => {
+    /* Two answers to one question, and the one with the reels behind it is
+       the one that can be checked against the scale. */
+    expect(weighedTotal([{ weightKg: 257.3 }, { weightKg: 250.25 }], 999)).toBe(507.55);
+  });
+
+  it('keeps a typed total where nothing was weighed', () => {
+    /* A sheet keyed from a scrap of paper must still cost. */
+    expect(weighedTotal([], 507.55)).toBe(507.55);
+    expect(weighedTotal(undefined, 507.55)).toBe(507.55);
+  });
+
+  it('takes the cores off the rolls that came off the press', () => {
+    // Rows 29 and 30: 172.0 and 145.1 gross, 2.0 and 2.5 of core.
+    expect(
+      outputNet([
+        { weightKg: 172, coreKg: 2 },
+        { weightKg: 145.1, coreKg: 2.5 },
+      ]),
+    ).toEqual({ grossKg: 317.1, coreKg: 4.5, netKg: 312.6 });
+  });
+
+  it('takes the cores off the laminated rolls too', () => {
+    // Rows 62 and 63: 401 + 324 + 338 gross, 4 of core → 1,059.
+    expect(outputNet([{ weightKg: 401, coreKg: 4 }, { weightKg: 324 }, { weightKg: 338 }])).toEqual(
+      { grossKg: 1063, coreKg: 4, netKg: 1059 },
+    );
+  });
+
+  it('treats a roll with no core as all net', () => {
+    expect(outputNet([{ weightKg: 100 }])).toEqual({ grossKg: 100, coreKg: 0, netKg: 100 });
   });
 });

@@ -1,10 +1,12 @@
 import {
   costJobSheet,
   filmRowsFromPlies,
+  outputNet,
   JOB_SHEET_CREW,
   JOB_SHEET_LINES,
   JOB_SHEET_STAGE_DEFAULTS,
   mixDrumFor,
+  weighedTotal,
   type JobSheet,
   type JobSheetInput,
   type JobSheetLineTemplate,
@@ -44,12 +46,21 @@ const SHEET_INCLUDE = {
   customer: { select: { companyName: true } },
   /* Only its number: the sheet names the card it costs, it does not restate it. */
   productionOrder: { select: { number: true } },
-  lines: { orderBy: { position: 'asc' } },
+  lines: {
+    orderBy: { position: 'asc' },
+    include: { reels: { orderBy: { position: 'asc' } } },
+  },
   labour: { orderBy: { position: 'asc' } },
   stages: { orderBy: { stage: 'asc' } },
+  /* The rolls that came off the machines. Belong to the sheet, not to a row:
+     they are production, not consumption. */
+  reels: { where: { role: 'OUTPUT' }, orderBy: { position: 'asc' } },
 } satisfies Prisma.JobSheetInclude;
 
 type SheetRow = Prisma.JobSheetGetPayload<{ include: typeof SHEET_INCLUDE }>;
+
+/** Three places, which is what every weight on this form is kept to. */
+const round3 = (value: number): number => Math.round(value * 1000) / 1000;
 
 const num = (value: Prisma.Decimal | number | null | undefined): number =>
   value === null || value === undefined ? 0 : Number(value);
@@ -147,6 +158,15 @@ function toJobSheet(row: SheetRow): JobSheet {
     notes: row.notes,
     enteredBy: row.enteredBy,
 
+    outputReels: row.reels.map((reel) => ({
+      id: reel.id,
+      position: reel.position,
+      /* Only an OUTPUT row is loaded, and every one of them has a stage. */
+      stage: (reel.stage ?? 'PRINTING') as JobSheetStage,
+      weightKg: num(reel.weightKg),
+      coreKg: num(reel.coreKg),
+      reelNumber: reel.reelNumber,
+    })),
     lines: row.lines.map((line) => ({
       id: line.id,
       position: line.position,
@@ -156,6 +176,24 @@ function toJobSheet(row: SheetRow): JobSheet {
       name: line.name,
       issuedKg: num(line.issuedKg),
       returnedKg: num(line.returnedKg),
+      issueReels: line.reels
+        .filter((reel) => reel.role === 'ISSUE')
+        .map((reel) => ({
+          id: reel.id,
+          position: reel.position,
+          weightKg: num(reel.weightKg),
+          coreKg: num(reel.coreKg),
+          reelNumber: reel.reelNumber,
+        })),
+      returnReels: line.reels
+        .filter((reel) => reel.role === 'RETURN')
+        .map((reel) => ({
+          id: reel.id,
+          position: reel.position,
+          weightKg: num(reel.weightKg),
+          coreKg: num(reel.coreKg),
+          reelNumber: reel.reelNumber,
+        })),
       mixIssuedKg: num(line.mixIssuedKg),
       mixReturnedKg: num(line.mixReturnedKg),
       mixSharePercent: num(line.mixSharePercent),
@@ -672,7 +710,47 @@ export async function updateJobSheet(
   const sheetDate = input.date ?? current.date.toISOString().slice(0, 10);
 
   await prisma.$transaction(async (tx) => {
-    const { lines, labour, stages, date, jobId, productionOrderId, ...rest } = input;
+    const { lines, labour, stages, outputReels, date, jobId, productionOrderId, ...rest } = input;
+
+    /*
+     * The rolls that came off the machines decide what the run produced.
+     *
+     * The works weighs each roll with its core in it and writes the core
+     * underneath, because that is what the scale shows — so the gross and the
+     * core are the sums of those two rows, and the net is what they leave.
+     *
+     * Two machines produce, and the sheet has a pair of figures for each: the
+     * press makes printed film and the laminator makes laminate. A roll is
+     * counted against the machine it came off, so printing rolls never swell
+     * the laminated figure the cost is worked out from.
+     *
+     * Where no roll was listed for a stage, that stage's typed figures stand.
+     */
+    /*
+     * The printing mix drum, added up rather than typed again.
+     *
+     * The works' form has a mix column against every colour and a Total at the
+     * foot of it — `=sum(J15:J26)` — and that total is the drum the solvents
+     * book back 40% and 20% of. We were asking for it a second time in its own
+     * box, which is how one figure becomes two that disagree.
+     *
+     * Only where the colours carry mix figures. A sheet keyed from paper with
+     * nothing but a pooled total still has its typed one, because that is all
+     * there is.
+     */
+    const inkMix = (lines ?? []).filter((line) => line.kind === 'INK');
+    const mixed = inkMix.some((line) => line.mixIssuedKg !== 0 || line.mixReturnedKg !== 0);
+    const printPool = mixed
+      ? {
+          printMixIssuedKg: round3(inkMix.reduce((sum, line) => sum + line.mixIssuedKg, 0)),
+          printMixReturnedKg: round3(inkMix.reduce((sum, line) => sum + line.mixReturnedKg, 0)),
+        }
+      : null;
+
+    const printedRolls = (outputReels ?? []).filter((reel) => reel.stage === 'PRINTING');
+    const laminatedRolls = (outputReels ?? []).filter((reel) => reel.stage !== 'PRINTING');
+    const printed = printedRolls.length > 0 ? outputNet(printedRolls) : null;
+    const produced = laminatedRolls.length > 0 ? outputNet(laminatedRolls) : null;
 
     /*
      * Pulled out of the spread on purpose. Linking a sheet to a card is the
@@ -694,6 +772,9 @@ export async function updateJobSheet(
       where: { id },
       data: {
         ...rest,
+        ...(printPool ?? {}),
+        ...(printed ? { printedGrossKg: printed.grossKg, printedCoreKg: printed.coreKg } : {}),
+        ...(produced ? { producedGrossKg: produced.grossKg, producedCoreKg: produced.coreKg } : {}),
         /* Pulled out of the spread: it arrives as yyyy-mm-dd and the column
            is a DATE. */
         ...(date ? { date: asDate(date) } : {}),
@@ -731,13 +812,24 @@ export async function updateJobSheet(
         if (priced) ratePerKg = priced.rate;
       }
 
+      /*
+       * The reels are the figure where the works listed them.
+       *
+       * Their sheet has a column per reel — "257.3 and 250.25" is how 507.55
+       * kg of polyester gets onto it — and a typed total beside them would be
+       * a second answer to the same question. Where nothing was weighed the
+       * typed total stands. See `weighedTotal`.
+       */
+      const issuedKg = weighedTotal(line.issueReels, line.issuedKg);
+      const returnedKg = weighedTotal(line.returnReels, line.returnedKg);
+
       await tx.jobSheetLine.updateMany({
         where: { sheetId: id, position: line.position },
         data: {
           materialId: line.materialId,
           name: line.name,
-          issuedKg: line.issuedKg,
-          returnedKg: line.returnedKg,
+          issuedKg,
+          returnedKg,
           mixIssuedKg: line.mixIssuedKg,
           mixReturnedKg: line.mixReturnedKg,
           mixSharePercent: line.mixSharePercent,
@@ -745,6 +837,56 @@ export async function updateJobSheet(
           ratePerKg,
         },
       });
+
+      /*
+       * Replaced wholesale rather than diffed. A reel has no identity of its
+       * own — it is a weight somebody wrote in the next column along — so
+       * matching them up would be inventing one.
+       */
+      const row = await tx.jobSheetLine.findFirst({
+        where: { sheetId: id, position: line.position },
+        select: { id: true },
+      });
+      if (row) {
+        await tx.jobSheetReel.deleteMany({ where: { lineId: row.id } });
+        const weighings = [
+          ...line.issueReels.map((reel, index) => ({ ...reel, role: 'ISSUE' as const, index })),
+          ...line.returnReels.map((reel, index) => ({ ...reel, role: 'RETURN' as const, index })),
+        ];
+        if (weighings.length > 0) {
+          await tx.jobSheetReel.createMany({
+            data: weighings.map((reel) => ({
+              sheetId: id,
+              lineId: row.id,
+              role: reel.role,
+              position: reel.index + 1,
+              weightKg: reel.weightKg,
+              coreKg: 0,
+              reelNumber: reel.reelNumber,
+            })),
+          });
+        }
+      }
+    }
+
+    /* Replaced wholesale, like the line reels: a roll is a weight somebody
+       wrote, not a record with a life of its own. */
+    if (outputReels) {
+      await tx.jobSheetReel.deleteMany({ where: { sheetId: id, role: 'OUTPUT' } });
+      if (outputReels.length > 0) {
+        await tx.jobSheetReel.createMany({
+          data: outputReels.map((reel, index) => ({
+            sheetId: id,
+            lineId: null,
+            stage: reel.stage,
+            role: 'OUTPUT' as const,
+            position: index + 1,
+            weightKg: reel.weightKg,
+            coreKg: reel.coreKg,
+            reelNumber: reel.reelNumber,
+          })),
+        });
+      }
     }
 
     for (const role of labour ?? []) {
