@@ -30,7 +30,7 @@ export const TYPED = 'bg-[#FFFDE7] border-[#E6D98A] focus:border-[#CBB94A]';
 /** The head of a block, as the document groups itself. */
 export function Band({ title, right }: { title: string; right?: ReactNode }) {
   return (
-    <div className="bg-ink-100 text-ink-700 -mx-4 mt-5 mb-3 flex items-center justify-between gap-3 px-4 py-1.5 text-xs font-semibold tracking-wider uppercase first:mt-0">
+    <div className="bg-ink-100 text-ink-700 -mx-4 mt-4 mb-2.5 flex items-center justify-between gap-3 px-4 py-1 text-xs font-semibold tracking-wider uppercase first:mt-0">
       <span>{title}</span>
       {right ? <span className="text-ink-500 normal-case">{right}</span> : null}
     </div>
@@ -57,7 +57,7 @@ export function Shown({
       <div className="text-ink-500 text-[11px] font-medium tracking-wide uppercase">{label}</div>
       <div
         className={cn(
-          'mt-0.5 truncate text-sm font-medium tabular-nums',
+          'mt-0.5 truncate text-sm leading-tight font-medium tabular-nums',
           tone === 'good' && 'text-success-700',
           tone === 'bad' && 'text-danger-700',
           (!tone || tone === 'default') && 'text-ink-900',
@@ -92,7 +92,7 @@ export function Answer({
     <div
       className={cn(
         'border-brand-200 bg-brand-50/60 rounded-md border',
-        size === 'large' ? 'px-4 py-3' : 'px-3 py-2',
+        size === 'large' ? 'px-4 py-2.5' : 'px-3 py-2',
       )}
     >
       <div className="text-brand-700 text-[11px] font-semibold tracking-wide uppercase">
@@ -101,12 +101,12 @@ export function Answer({
       <div
         className={cn(
           'text-ink-900 mt-0.5 font-bold tabular-nums',
-          size === 'large' ? 'text-3xl leading-none' : 'text-lg',
+          size === 'large' ? 'text-[28px] leading-none' : 'text-lg',
         )}
       >
         {value}
       </div>
-      {note ? <div className="text-brand-700/80 mt-1.5 text-[11px]">{note}</div> : null}
+      {note ? <div className="text-brand-700/80 mt-1 text-[11px]">{note}</div> : null}
     </div>
   );
 }
@@ -114,7 +114,7 @@ export function Answer({
 /** One sheet of the document: white, bordered, with bands inside it. */
 export function DocCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <section className={cn('border-ink-200 rounded-lg border bg-white p-4', className)}>
+    <section className={cn('border-ink-200 rounded-lg border bg-white px-4 py-3', className)}>
       {children}
     </section>
   );

@@ -307,6 +307,8 @@ describe('the Final Costing screen, on sheet 851', () => {
       'Act. Wastage Kg.',
       'Final Output Kg.',
       'Pouching Weight Kg.',
+      'Make Ready Time',
+      'Production Time',
       'WORKERS SALARY',
       'Salary Expense',
       'Electricity/day cost',
@@ -315,6 +317,24 @@ describe('the Final Costing screen, on sheet 851', () => {
     ]) {
       expect(screen.getAllByText(name), `${name} is not on the screen`).not.toHaveLength(0);
     }
+  });
+
+  /*
+   * Production Time multiplies the electricity, the wages and the EMI. It and
+   * Make Ready Time were on the record and in the costing from the first
+   * migration with no screen able to set either.
+   */
+  it('lets the office set the two times their sheet types', () => {
+    const onField = vi.fn();
+    show({}, { onField });
+
+    const days = screen.getByLabelText('Production time, days');
+    expect(days).toHaveValue('1.2');
+    fireEvent.change(days, { target: { value: '2' } });
+    expect(onField).toHaveBeenCalledWith('productionDays', 2);
+
+    fireEvent.change(screen.getByLabelText('Make ready time, days'), { target: { value: '0.5' } });
+    expect(onField).toHaveBeenCalledWith('makeReadyDays', 0.5);
   });
 
   it('reads Roll Form until something is pouched', () => {

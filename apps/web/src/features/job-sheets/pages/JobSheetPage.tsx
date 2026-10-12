@@ -517,7 +517,7 @@ export default function JobSheetPage() {
   const chemicalRatio = filmConsumed > 0 ? (chemicalConsumed / filmConsumed) * 100 : 0;
 
   return (
-    <div className="space-y-5 px-4 py-6 sm:px-6">
+    <div className="space-y-4 px-4 py-5 sm:px-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <button

@@ -82,17 +82,17 @@ export function FinalCosting({
   const isPouch = draft.pouchingWeightKg > 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* ================= what it came to ================= */}
       <DocCard>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
           <Answer
             label="Cost / Kg."
             value={formatRs(live.costPerKg, 2)}
             note="Effective Price ÷ Final Output Kg."
             size="large"
           />
-          <div className="grid grid-cols-2 gap-4 self-center sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 self-center sm:grid-cols-3">
             <Shown
               label="Effective Price"
               value={formatRs(live.effectivePrice)}
@@ -112,7 +112,7 @@ export function FinalCosting({
         </div>
 
         <Band title="Production" />
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid gap-x-4 gap-y-2.5 sm:grid-cols-3 lg:grid-cols-6">
           <Field label="Pouching Weight Kg." htmlFor="pouchingWeightKg">
             <NumberInput
               id="pouchingWeightKg"
@@ -135,6 +135,33 @@ export function FinalCosting({
               value={draft.finalOutputKg === 0 ? '' : String(draft.finalOutputKg)}
               disabled={locked}
               onChange={(event) => onField('finalOutputKg', Number(event.target.value || 0))}
+            />
+          </Field>
+          {/*
+            I43 and I44 on their sheet, and the two most load-bearing figures
+            on this screen: Production Time multiplies the electricity, the
+            wages and the EMI. Both were on the record and in the costing from
+            the first migration with no screen able to set either, so a job
+            that ran a day and a half was costed as though it ran none.
+          */}
+          <Field label="Make Ready Time" htmlFor="makeReadyDays" hint="Days of setting up.">
+            <NumberInput
+              id="makeReadyDays"
+              className={TYPED}
+              aria-label="Make ready time, days"
+              value={draft.makeReadyDays === 0 ? '' : String(draft.makeReadyDays)}
+              disabled={locked}
+              onChange={(event) => onField('makeReadyDays', Number(event.target.value || 0))}
+            />
+          </Field>
+          <Field label="Production Time" htmlFor="productionDays" hint="Days the job ran.">
+            <NumberInput
+              id="productionDays"
+              className={TYPED}
+              aria-label="Production time, days"
+              value={draft.productionDays === 0 ? '' : String(draft.productionDays)}
+              disabled={locked}
+              onChange={(event) => onField('productionDays', Number(event.target.value || 0))}
             />
           </Field>
           <Shown
@@ -176,7 +203,7 @@ export function FinalCosting({
       </DocCard>
 
       {/* ================= what it cost beyond the material ================= */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <DocCard>
           <Band title="Basic Cost and Expenses" />
           <Expenses draft={draft} live={live} locked={locked} onField={onField} isPouch={isPouch} />
@@ -218,11 +245,14 @@ export function FinalCosting({
               note="Ethyle and Tolluene"
             />
           </div>
+
+          <Band title="Rates this sheet costs at" />
+          <Rates draft={draft} locked={locked} onField={onField} />
         </DocCard>
       </div>
 
       {/* ================= the works, and the meter ================= */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         <DocCard>
           <Band title="WORKERS SALARY" right={`Salary Expense ${formatRs(live.salaryCost)}`} />
           <Salary draft={draft} live={live} locked={locked} onLabour={onLabour} />
@@ -249,11 +279,6 @@ export function FinalCosting({
           <Electricity draft={draft} live={live} locked={locked} onStage={onStage} />
         </DocCard>
       </div>
-
-      <DocCard>
-        <Band title="Rates this sheet costs at" />
-        <Rates draft={draft} locked={locked} onField={onField} />
-      </DocCard>
     </div>
   );
 }
@@ -347,12 +372,12 @@ function Items({
           })}
 
           <tr className="border-ink-300 border-t">
-            <td className="text-ink-900 py-3 text-sm font-semibold">Total</td>
-            <td className="text-ink-900 py-3 pr-3 text-right text-sm font-semibold tabular-nums">
+            <td className="text-ink-900 py-2.5 text-sm font-semibold">Total</td>
+            <td className="text-ink-900 py-2.5 pr-3 text-right text-sm font-semibold tabular-nums">
               {formatNumber(live.materialKg, 2)}
             </td>
             <td />
-            <td className="text-ink-900 py-3 text-right text-sm font-semibold tabular-nums">
+            <td className="text-ink-900 py-2 text-right text-sm font-semibold tabular-nums">
               {formatRs(live.materialCost)}
             </td>
           </tr>
@@ -394,7 +419,7 @@ function ItemRow({
     <>
       {sectionHead ? (
         <tr>
-          <td colSpan={4} className="pt-4 pb-1">
+          <td colSpan={4} className="pt-3 pb-1">
             <div className="text-ink-400 text-[11px] font-semibold tracking-wider uppercase">
               {sectionHead}
             </div>
@@ -403,7 +428,7 @@ function ItemRow({
       ) : null}
 
       <tr className="group border-ink-100 border-b align-top">
-        <td className="py-2.5 pr-3">
+        <td className="py-2 pr-3">
           <div className={cn('text-sm font-medium', quiet ? 'text-ink-400' : 'text-ink-900')}>
             {name}
           </div>
@@ -442,7 +467,7 @@ function ItemRow({
           is corrected, because on their sheet every quantity is a formula and
           only the rate is yellow.
         */}
-        <td className="py-2.5 pr-3 text-right">
+        <td className="py-2 pr-3 text-right">
           {corrected ? (
             <div className="flex flex-col items-end gap-1">
               <NumberInput
@@ -494,7 +519,7 @@ function ItemRow({
         </td>
 
         {/* Yellow on every row of their sheet: the rate is theirs to set. */}
-        <td className="py-2.5 pr-3 text-right">
+        <td className="py-2 pr-3 text-right">
           <NumberInput
             disabled={locked}
             className={cn(TYPED, 'w-24 px-2 py-1.5 text-right text-sm')}
@@ -506,7 +531,7 @@ function ItemRow({
           />
         </td>
 
-        <td className="py-2.5 text-right">
+        <td className="py-2 text-right">
           <div
             className={cn(
               'text-sm tabular-nums',
@@ -591,7 +616,7 @@ function Expenses({
         locked={locked}
       />
       {/* The one expense their sheet types outright: cartons, tape, stretch film. */}
-      <div className="border-ink-100 flex items-center justify-between gap-3 border-b py-2.5">
+      <div className="border-ink-100 flex items-center justify-between gap-3 border-b py-2">
         <dt className="text-ink-700 text-sm">Packaging Exp.</dt>
         <dd>
           <NumberInput
@@ -662,7 +687,7 @@ function Expense({
   const canSettle = Boolean(onOverride) && !locked;
 
   return (
-    <div className="group border-ink-100 flex items-center justify-between gap-3 border-b py-2.5">
+    <div className="group border-ink-100 flex items-center justify-between gap-3 border-b py-2">
       <dt className="min-w-0">
         <div className="text-ink-700 text-sm">{label}</div>
         <div className={cn('text-[11px]', settled ? 'text-warning-700' : 'text-ink-400')}>
@@ -870,10 +895,10 @@ function Salary({
             </tr>
           ))}
           <tr className="border-ink-300 border-t">
-            <td className="text-ink-900 py-2.5 text-sm font-semibold" colSpan={4}>
+            <td className="text-ink-900 py-2 text-sm font-semibold" colSpan={4}>
               Salary Expense
             </td>
-            <td className="text-ink-900 py-2.5 text-right text-sm font-semibold tabular-nums">
+            <td className="text-ink-900 py-2 text-right text-sm font-semibold tabular-nums">
               {formatRs(live.salaryCost)}
             </td>
           </tr>
@@ -946,10 +971,10 @@ function Electricity({
               );
             })}
             <tr className="border-ink-300 border-t">
-              <td className="text-ink-900 py-2.5 text-sm font-semibold" colSpan={4}>
+              <td className="text-ink-900 py-2 text-sm font-semibold" colSpan={4}>
                 Total
               </td>
-              <td className="text-ink-900 py-2.5 text-right text-sm font-semibold tabular-nums">
+              <td className="text-ink-900 py-2 text-right text-sm font-semibold tabular-nums">
                 {formatRs(total)}
               </td>
             </tr>
@@ -995,7 +1020,7 @@ function Rates({
   ];
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-x-4 gap-y-2.5 sm:grid-cols-2">
       {rates.map((rate) => (
         <Field key={rate.key} label={rate.label} htmlFor={rate.key} hint={rate.hint}>
           <NumberInput
