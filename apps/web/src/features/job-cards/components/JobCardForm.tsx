@@ -6,8 +6,8 @@ import {
   type JobCardInput,
 } from '@yuva/shared';
 import { Field, Input, NumberInput } from '@/components/ui/Field';
+import { Answer, Band, Shown, TYPED } from '@/components/ui/Document';
 import { useJobSpecification } from '@/features/jobs/api/job-api';
-import { cn } from '@/lib/utils';
 
 /**
  * **The job card** — the paper an operator is handed before the press starts.
@@ -26,29 +26,6 @@ import { cn } from '@/lib/utils';
  * in the same places — it is the one piece of formatting on their sheet that
  * carries meaning rather than decoration.
  */
-
-/** A figure the card worked out. Never a box: nothing here is typed. */
-function Shown({ label, value, wide }: { label: string; value: string; wide?: boolean }) {
-  return (
-    <div className={cn('min-w-0', wide && 'sm:col-span-2')}>
-      <div className="text-ink-500 text-[11px] font-medium tracking-wide uppercase">{label}</div>
-      <div className="text-ink-900 mt-0.5 truncate text-sm font-medium tabular-nums">
-        {value || '—'}
-      </div>
-    </div>
-  );
-}
-
-/** The works' own yellow: a box somebody has to fill in. */
-const TYPED = 'bg-[#FFFDE7] border-[#E6D98A]';
-
-function Band({ title }: { title: string }) {
-  return (
-    <div className="bg-ink-100 text-ink-700 -mx-4 mt-5 mb-3 px-4 py-1.5 text-xs font-semibold tracking-wider uppercase first:mt-0">
-      {title}
-    </div>
-  );
-}
 
 export function JobCardForm({
   draft,
@@ -391,19 +368,15 @@ export function JobCardForm({
           />
         </Field>
         {/* The one figure the whole card builds to, so it reads like one. */}
-        <div className="border-brand-200 bg-brand-50/60 rounded-md border px-3 py-2">
-          <div className="text-brand-700 text-[11px] font-semibold tracking-wide uppercase">
-            Final time
-          </div>
-          <div className="text-ink-900 mt-0.5 text-lg font-bold tabular-nums">
-            {asHoursMinutes(
-              card.cylinderChangeoverMinutes +
-                card.rubberChangeMinutes +
-                draft.otherSettingMinutes +
-                (draft.printSpeedMPerMin > 0 ? metres / draft.printSpeedMPerMin : 0),
-            )}
-          </div>
-        </div>
+        <Answer
+          label="Final time"
+          value={asHoursMinutes(
+            card.cylinderChangeoverMinutes +
+              card.rubberChangeMinutes +
+              draft.otherSettingMinutes +
+              (draft.printSpeedMPerMin > 0 ? metres / draft.printSpeedMPerMin : 0),
+          )}
+        />
       </div>
 
       {/* ---- instructions and signatures ---- */}

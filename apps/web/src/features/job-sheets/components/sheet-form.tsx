@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { formatNumber } from '@yuva/shared';
 import { Input, NumberInput } from '@/components/ui/Field';
+import { TYPED } from '@/components/ui/Document';
 import { cn } from '@/lib/utils';
 
 /**
@@ -18,15 +19,23 @@ import { cn } from '@/lib/utils';
  * works types it, and nothing white can be typed into.
  */
 
-/** The works' own yellow. Sampled from the fill their workbook uses. */
-export const YELLOW = 'bg-[#FFFF99] border-[#D9C94A] focus:border-[#B9A72A]';
+/**
+ * The works' own yellow, at a weight a screen can hold.
+ *
+ * Their workbook fills 237 cells with a highlighter yellow, which is right on
+ * paper under a workshop light and wrong on a monitor somebody sits in front
+ * of for an hour. Same signal, same meaning — a box a person fills in — pitched
+ * down to where it reads as a field rather than as a warning. Shared with the
+ * job card so the two documents are the same document.
+ */
+export const YELLOW = TYPED;
 
-/** A grey band, as the sheet uses to start a section. */
+/** A band, as the sheet uses to start a section. The job card's band. */
 export function Band({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
-    <div className="bg-ink-200/70 text-ink-800 -mx-4 mb-2 flex items-center justify-between gap-3 px-4 py-1 text-[13px] font-bold">
+    <div className="bg-ink-100 text-ink-700 -mx-4 mb-3 flex items-center justify-between gap-3 px-4 py-1.5 text-xs font-semibold tracking-wider uppercase">
       <span>{children}</span>
-      {right ? <span className="text-ink-600 text-xs font-medium">{right}</span> : null}
+      {right ? <span className="text-ink-500 text-xs font-normal normal-case">{right}</span> : null}
     </div>
   );
 }
@@ -90,7 +99,7 @@ export function Worked({
   return (
     <div
       className={cn(
-        'text-ink-900 border-ink-200 min-w-16 rounded border bg-white px-2 py-1 text-right text-sm tabular-nums',
+        'text-ink-900 border-ink-100 bg-ink-50/70 min-w-16 rounded border px-2 py-1.5 text-right text-sm tabular-nums',
         className,
       )}
     >

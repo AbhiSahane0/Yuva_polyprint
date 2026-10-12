@@ -268,12 +268,12 @@ function row(name: string): HTMLElement {
 }
 
 describe('the Final Costing screen, on sheet 851', () => {
-  it('puts their cost per kilogram in the green cell', () => {
+  it('puts their cost per kilogram where the card puts its final time', () => {
     show();
-    const cell = screen.getByText('Cost / Kg.').parentElement as HTMLElement;
-    expect(within(cell).getByText('Rs. 261.82')).toBeInTheDocument();
-    /* Their green, sampled off the fill their workbook uses. */
-    expect(cell.className).toContain('#E8F5E9');
+    const answer = screen.getByText('Cost / Kg.').parentElement as HTMLElement;
+    expect(within(answer).getByText('Rs. 261.82')).toBeInTheDocument();
+    /* The job card's treatment for the one figure a document builds to. */
+    expect(answer.className).toContain('bg-brand-50/60');
   });
 
   it('agrees with their sheet on every total', () => {
