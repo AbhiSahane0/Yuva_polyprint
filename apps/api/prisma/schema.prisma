@@ -2588,6 +2588,22 @@ model JobSheetStageUsage {
   shifts       Decimal @default(1) @db.Decimal(6, 2)
   amount       Decimal @default(0) @db.Decimal(12, 2)
 
+  /**
+   * The remarks box on the works' own stage card.
+   *
+   * None of these four reaches the costing — the cost of a run comes from what
+   * it consumed and what it produced. They are what the operator writes down
+   * about the shift, and the works keeps them: how much was lost at THIS
+   * machine, how long the power was off, when the job was taken, and how long
+   * registration and shade matching took. Their sheet has a box for each and
+   * the office reads them when a job goes wrong.
+   */
+  wastageKg        Decimal @default(0) @map("wastage_kg") @db.Decimal(12, 3)
+  noPowerMinutes   Decimal @default(0) @map("no_power_minutes") @db.Decimal(8, 2)
+  /// Written as the works writes them — "9:30", "0:45" — and never computed on.
+  jobTakenTime     String  @default("") @map("job_taken_time")
+  registrationTime String  @default("") @map("registration_time")
+
   @@unique([sheetId, stage])
   @@map("job_sheet_stage_usage")
 }

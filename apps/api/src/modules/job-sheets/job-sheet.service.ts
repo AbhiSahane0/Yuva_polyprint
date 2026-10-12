@@ -219,6 +219,10 @@ function toJobSheet(row: SheetRow): JobSheet {
       days: num(stage.days),
       shifts: num(stage.shifts),
       amount: num(stage.amount),
+      wastageKg: num(stage.wastageKg),
+      noPowerMinutes: num(stage.noPowerMinutes),
+      jobTakenTime: stage.jobTakenTime,
+      registrationTime: stage.registrationTime,
     })),
 
     createdAt: row.createdAt.toISOString(),
@@ -904,7 +908,16 @@ export async function updateJobSheet(
     for (const stage of stages ?? []) {
       await tx.jobSheetStageUsage.updateMany({
         where: { sheetId: id, stage: stage.stage as JobSheetStage },
-        data: { sharePercent: stage.sharePercent, days: stage.days, shifts: stage.shifts },
+        data: {
+          sharePercent: stage.sharePercent,
+          days: stage.days,
+          shifts: stage.shifts,
+          /* The operator's remarks about this machine's shift. Never costed. */
+          wastageKg: stage.wastageKg,
+          noPowerMinutes: stage.noPowerMinutes,
+          jobTakenTime: stage.jobTakenTime,
+          registrationTime: stage.registrationTime,
+        },
       });
     }
   }, TX);

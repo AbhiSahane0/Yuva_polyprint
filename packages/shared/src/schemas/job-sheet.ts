@@ -84,6 +84,13 @@ export const jobSheetStageSchema = z.object({
   sharePercent: percent.default(0),
   days: days.default(0),
   shifts: z.coerce.number().min(0).max(4).default(1),
+
+  /* The remarks box on the works' stage card. None of these is costed — see
+     the model — and all four are what the operator writes about the shift. */
+  wastageKg: weight.default(0),
+  noPowerMinutes: z.coerce.number().min(0).max(100_000).default(0),
+  jobTakenTime: z.string().trim().max(20).default(''),
+  registrationTime: z.string().trim().max(20).default(''),
 });
 
 export const jobSheetSchema = z.object({

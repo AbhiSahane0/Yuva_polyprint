@@ -74,6 +74,12 @@ export interface JobSheetStageUsage {
   days: number;
   shifts: number;
   amount: number;
+
+  /** The remarks box on the works' stage card. None of it is costed. */
+  wastageKg: number;
+  noPowerMinutes: number;
+  jobTakenTime: string;
+  registrationTime: string;
 }
 
 /** One run, costed. */
