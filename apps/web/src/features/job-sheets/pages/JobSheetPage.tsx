@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Check, PackageMinus, Save } from 'lucide-react';
 import {
   costJobSheet,
   formatNumber,
-  formatRs,
-  JOB_SHEET_STAGE_LABELS,
   JOB_SHEET_STATUS_LABELS,
   mixDrumFor,
   type JobSheet,
   type JobSheetCost,
+  type JobSheetLabour,
   type JobSheetLine,
   type JobSheetReel,
   type JobSheetReelInput,
@@ -17,7 +16,7 @@ import {
   type JobSheetStageUsage,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
-import { Field, Input, NumberInput, Select } from '@/components/ui/Field';
+import { Input, Select } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -30,6 +29,7 @@ import { Weighings } from '../components/Weighings';
 import { InkGrid } from '../components/InkGrid';
 import { RollRow } from '../components/RollRow';
 import { StageCard, type StageCardRow } from '../components/StageCard';
+import { FinalCosting } from '../components/FinalCosting';
 import { Band, Head, RowName, Typed, Worked, YELLOW } from '../components/sheet-form';
 import {
   useCostJobSheet,
@@ -70,17 +70,19 @@ type Draft = Omit<JobSheet, 'lines' | 'labour' | 'stages'> & {
   stages: JobSheet['stages'];
 };
 
-const cell = 'w-full rounded-md border border-ink-200 px-2 py-1 text-right text-sm tabular-nums';
-
-/*
- * The consumed box shows the computed figure as its placeholder, because typing
- * over it is what an override IS. But a placeholder at the browser's default
- * grey reads as an empty box, and this is the column the office checks — so it
- * is darkened to near body text. Still lighter than a typed figure, which is
- * the distinction that matters.
+/**
+ * The two halves of the sheet.
+ *
+ * `?view=costing` rather than component state, so the office can keep a link to
+ * the costing of a job and land on it — and so the back button behaves the way
+ * anybody who has used a browser expects it to.
  */
+const VIEWS = [
+  { key: 'entry', label: 'Stage entry' },
+  { key: 'costing', label: 'Final Costing' },
+] as const;
 
-/** A weight box. Signed, because a drum genuinely can come back fuller. */
+type View = (typeof VIEWS)[number]['key'];
 
 /**
  * A weighing as the draft holds it.
@@ -109,16 +111,6 @@ function SheetPair({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-/** One line of the costing column: a name and what it came to. */
-function Money({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="border-ink-100 flex justify-between border-b py-1.5">
-      <dt className="text-ink-600">{label}</dt>
-      <dd className="text-ink-900 tabular-nums">{formatRs(value)}</dd>
-    </div>
-  );
-}
-
 export default function JobSheetPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -134,6 +126,15 @@ export default function JobSheetPage() {
   const { data: cards } = useProductionOrders({ pageSize: 200 });
   const cost = useCostJobSheet(id ?? '');
   const post = usePostJobSheetToStock(id ?? '');
+
+  const [params, setParams] = useSearchParams();
+  const view: View = params.get('view') === 'costing' ? 'costing' : 'entry';
+  const setView = (next: View) => {
+    const copy = new URLSearchParams(params);
+    if (next === 'entry') copy.delete('view');
+    else copy.set('view', next);
+    setParams(copy, { replace: true });
+  };
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [posting, setPosting] = useState(false);
@@ -197,6 +198,17 @@ export default function JobSheetPage() {
                 reelNumber: reel.reelNumber ?? '',
               })),
             ],
+          }
+        : current,
+    );
+
+  /** One line of the wage bill. */
+  const setLabour = (id: string, patch: Partial<JobSheetLabour>) =>
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            labour: current.labour.map((role) => (role.id === id ? { ...role, ...patch } : role)),
           }
         : current,
     );
@@ -303,6 +315,20 @@ export default function JobSheetPage() {
         emiPerDay: draft.emiPerDay,
         profitPercent: draft.profitPercent,
         expectedWastagePercent: draft.expectedWastagePercent,
+        /*
+         * The six overheads the office may settle by hand.
+         *
+         * They have been on the record and in the costing since the beginning
+         * and no screen could set one, so an office that disagreed with the
+         * worked-out electricity had nowhere to say so. Null is the ordinary
+         * state and means "work it out".
+         */
+        electricityOverride: draft.electricityOverride,
+        salaryOverride: draft.salaryOverride,
+        transportOverride: draft.transportOverride,
+        pouchingOverride: draft.pouchingOverride,
+        emiOverride: draft.emiOverride,
+        profitOverride: draft.profitOverride,
         notes: draft.notes,
         lines: draft.lines.map((line) => ({
           position: line.position,
@@ -542,6 +568,46 @@ export default function JobSheetPage() {
       ) : null}
 
       {/*
+        Two readers, two screens, one record.
+
+        **Stage entry** is filled in at a machine by whoever is standing there,
+        a drum in front of them, reading down a form they have used for years.
+        **Final Costing** is read afterwards by the office, which is not filling
+        anything in — it is checking a figure and wants to see what moved it.
+        Their paper has both, one after the other on the same sheet; on a screen
+        that made a page nobody could find anything on, because every block
+        either mattered enormously or not at all depending on which of the two
+        jobs you had come to do.
+
+        It is still one record, and Save still saves all of it.
+      */}
+      <div
+        className="border-ink-200 -mb-1 flex gap-1 border-b"
+        role="tablist"
+        aria-label="Job sheet"
+      >
+        {VIEWS.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            role="tab"
+            aria-selected={view === item.key}
+            onClick={() => setView(item.key)}
+            className={cn(
+              'cursor-pointer rounded-t-md px-4 py-2 text-sm font-semibold transition-colors',
+              view === item.key
+                ? 'border-brand-600 text-brand-700 -mb-px border-b-2 bg-white'
+                : 'text-ink-500 hover:text-ink-800',
+            )}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'entry' ? (
+        <div className="space-y-5">
+          {/*
         A job sheet is what the run CONSUMED.
 
         The instruction it worked from — film, sizes, metres, hours — is a job
@@ -549,700 +615,290 @@ export default function JobSheetPage() {
         run by different people. The two were briefly one page; they are not
         one thing.
       */}
-      {/* ======================= the works' own sheet ======================= */}
+          {/* ======================= the works' own sheet ======================= */}
 
-      {/*
+          {/*
         The head of the paper: who, what and how big.
 
         Laid out as their form reads it — Sr. No. and Date along the top, then
         the job, the material and the cylinder. Yellow is theirs: every box on
         this sheet that the works types is yellow, and nothing else is.
       */}
-      <section className="border-ink-300 rounded border bg-white p-4">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-          <div className="flex items-end gap-2">
-            <Head>Sr. No.</Head>
-            <Worked value={draft.number} places={0} className="w-20 font-semibold" />
-          </div>
-          <div className="flex items-end gap-2">
-            <Head>Date</Head>
-            <Input
-              type="date"
-              className={cn(YELLOW, 'w-40')}
-              aria-label="Date"
-              value={draft.date}
-              disabled={locked}
-              onChange={(event) => set('date', event.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-x-6 gap-y-2 md:grid-cols-2">
-          <SheetPair label="Job Name:">
-            <Input
-              className={cn(YELLOW, 'w-full')}
-              aria-label="Job name"
-              value={draft.jobName}
-              disabled={locked}
-              onChange={(event) => set('jobName', event.target.value)}
-            />
-          </SheetPair>
-          <SheetPair label="Width:">
-            <Typed
-              width="w-24"
-              label="Width in mm"
-              value={draft.webWidthMm ?? 0}
-              disabled={locked}
-              onChange={(next) => set('webWidthMm', Number(next || 0))}
-            />
-          </SheetPair>
-          <SheetPair label="Material:">
-            <Input
-              className={cn(YELLOW, 'w-full')}
-              aria-label="Material"
-              placeholder="Polyster / HSPP"
-              value={draft.filmType}
-              disabled={locked}
-              onChange={(event) => set('filmType', event.target.value)}
-            />
-          </SheetPair>
-          <SheetPair label="Thickness:">
-            <Typed
-              width="w-24"
-              label="Thickness in micron"
-              value={draft.micron ?? 0}
-              disabled={locked}
-              onChange={(next) => set('micron', Number(next || 0))}
-            />
-          </SheetPair>
-          <SheetPair label="No. of Cylinder:">
-            <Typed
-              width="w-24"
-              label="Number of cylinders"
-              value={draft.cylinderCount}
-              disabled={locked}
-              onChange={(next) => set('cylinderCount', Number(next || 0))}
-            />
-          </SheetPair>
-          <SheetPair label="Circumference:">
-            <Typed
-              width="w-24"
-              label="Circumference in mm"
-              value={draft.circumferenceMm ?? 0}
-              disabled={locked}
-              onChange={(next) => set('circumferenceMm', Number(next || 0))}
-            />
-          </SheetPair>
-          <SheetPair label="Operator Name:">
-            <Input
-              className={cn(YELLOW, 'w-full')}
-              aria-label="Operator name"
-              value={draft.operatorName}
-              disabled={locked}
-              onChange={(event) => set('operatorName', event.target.value)}
-            />
-          </SheetPair>
-          <SheetPair label="Production run:">
-            <Select
-              className="w-full"
-              aria-label="Production run"
-              value={draft.productionOrderId ?? ''}
-              disabled={locked}
-              onChange={(event) => set('productionOrderId', event.target.value || null)}
-            >
-              <option value="">Not against a production run</option>
-              {linkableCards.map((card) => (
-                <option key={card.id} value={card.id}>
-                  #{card.number} — {card.customerName} · {card.jobName}
-                </option>
-              ))}
-            </Select>
-          </SheetPair>
-        </div>
-      </section>
-
-      {/* ---- Details of Roll, and the other items beside it ---- */}
-      <section className="border-ink-300 overflow-hidden rounded border bg-white px-4 pb-3">
-        <Band>Details of Roll</Band>
-        {filmRow ? (
-          <RollRow
-            name="Material Net Weight"
-            reels={filmRow.issueReels}
-            onReels={(reels) => setLine(filmRow.position, { issueReels: asReels(reels) })}
-            balance={filmRow.returnedKg}
-            onBalance={(next) => setLine(filmRow.position, { returnedKg: next })}
-            disabled={locked}
-            extra={{
-              head: 'Westage',
-              node: (
-                <Typed
-                  width="w-[72px]"
-                  label="Printing wastage, kg"
-                  value={printingStage?.wastageKg ?? 0}
-                  disabled={locked}
-                  onChange={(next) => setStage('PRINTING', { wastageKg: Number(next || 0) })}
-                />
-              ),
-            }}
-          />
-        ) : null}
-
-        <Band right={`Consumed together: ${formatNumber(otherItemsConsumed, 3)} kg`}>
-          Other Items
-        </Band>
-        {otherItems.map((line) => (
-          <RollRow
-            key={line.id}
-            name={line.name}
-            reels={line.issueReels}
-            onReels={(reels) => setLine(line.position, { issueReels: asReels(reels) })}
-            balance={line.returnedKg}
-            onBalance={(next) => setLine(line.position, { returnedKg: next })}
-            disabled={locked}
-          />
-        ))}
-      </section>
-
-      {/* ---- Fresh Ink and Mix Ink ---- */}
-      <section className="border-ink-300 overflow-hidden rounded border bg-white px-4 pb-3">
-        <Band>Fresh Ink &nbsp;·&nbsp; Mix Ink</Band>
-        <InkGrid lines={draft.lines} onLine={setLine} disabled={locked} />
-      </section>
-
-      {/* ---- Output Rolls Gross Weight ---- */}
-      <section className="border-ink-300 overflow-hidden rounded border bg-white px-4 pb-3">
-        <Band>Output Rolls Gross Weight</Band>
-        <div className="py-2">
-          <Weighings
-            withCores
-            label="Rolls off the press"
-            reels={draft.outputReels.filter((reel) => reel.stage === 'PRINTING')}
-            disabled={locked}
-            onChange={(reels) => setOutput('PRINTING', reels)}
-          />
-        </div>
-      </section>
-
-      {/* ---- JOB CARD (PRINTING) ---- */}
-      <StageCard
-        title="JOB CARD (PRINTING)"
-        srNo={draft.number}
-        date={draft.date}
-        rows={printingCardRows}
-        usage={printingStage}
-        onUsage={setStage}
-        disabled={locked}
-      />
-
-      {/* ---- Lamination Job card (Stage 2): what went on ---- */}
-      <section className="border-ink-300 overflow-hidden rounded border bg-white px-4 pb-3">
-        <Band>Lamination Job card (Stage 2)</Band>
-        {laminationFilms.map((line) => (
-          <RollRow
-            key={line.id}
-            name={line.name}
-            reels={line.issueReels}
-            onReels={(reels) => setLine(line.position, { issueReels: asReels(reels) })}
-            balance={line.returnedKg}
-            onBalance={(next) => setLine(line.position, { returnedKg: next })}
-            disabled={locked}
-          />
-        ))}
-
-        <Band>Quanity Received</Band>
-        {laminationChemicals.map((line) => (
-          <RollRow
-            key={line.id}
-            name={line.name}
-            reels={line.issueReels}
-            onReels={(reels) => setLine(line.position, { issueReels: asReels(reels) })}
-            balance={line.returnedKg}
-            onBalance={(next) => setLine(line.position, { returnedKg: next })}
-            disabled={locked}
-          />
-        ))}
-        <div className="border-ink-100 flex flex-wrap items-end gap-3 border-t pt-2">
-          <RowName>Mix</RowName>
-          <div>
-            <Head>Total</Head>
-            <Typed
-              label="Lamination mix out"
-              value={draft.lamMixIssuedKg}
-              disabled={locked}
-              onChange={(next) => set('lamMixIssuedKg', Number(next || 0))}
-            />
-          </div>
-          <div>
-            <Head>Bal.</Head>
-            <Typed
-              label="Lamination mix back"
-              value={draft.lamMixReturnedKg}
-              disabled={locked}
-              onChange={(next) => set('lamMixReturnedKg', Number(next || 0))}
-            />
-          </div>
-          <div>
-            <Head>Cons.</Head>
-            <Worked value={draft.lamMixIssuedKg - draft.lamMixReturnedKg} />
-          </div>
-          <p className="text-ink-500 ml-2 text-xs">
-            The adhesive takes 40% of this drum, the hardener 5% and the ethyl 60%.
-          </p>
-        </div>
-
-        <Band>Produced Quantity</Band>
-        <div className="py-2">
-          <Weighings
-            withCores
-            label="Rolls off the laminator"
-            reels={draft.outputReels.filter((reel) => reel.stage === 'LAMINATION_1')}
-            disabled={locked}
-            onChange={(reels) => setOutput('LAMINATION_1', reels)}
-          />
-        </div>
-      </section>
-
-      {/* ---- Lamination Job card (Stage 2): the card ---- */}
-      <StageCard
-        title="Lamination Job card (Stage 2)"
-        srNo={draft.number}
-        date={draft.date}
-        rows={laminationCardRows}
-        usage={laminationStage}
-        onUsage={setStage}
-        disabled={locked}
-      />
-
-      {/* ---- Manufacturing Job Card (Final Costing) ---- */}
-      <section className="border-ink-300 overflow-hidden rounded border bg-white px-4 pb-4">
-        <Band right={`Final Output ${formatNumber(draft.finalOutputKg, 2)} kg`}>
-          Manufacturing Job Card (Final Costing)
-        </Band>
-
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-          {/* The item table, as their form rules it. */}
-          <div className="overflow-x-auto pt-2">
-            <table className="w-full min-w-[32rem] text-sm">
-              <thead>
-                <tr className="border-ink-300 border-b text-left">
-                  <th className="pb-1">
-                    <Head>Item Name</Head>
-                  </th>
-                  <th className="pb-1 text-right">
-                    <Head className="text-right">Quantity in Kg.</Head>
-                  </th>
-                  <th className="pb-1 text-right">
-                    <Head className="text-right">Rate in Rs.</Head>
-                  </th>
-                  <th className="pb-1 text-right">
-                    <Head className="text-right">Amount in Rs.</Head>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {draft.lines.map((line) => {
-                  const costed = live.lines[indexOf(line.position)];
-                  const corrected = line.consumedOverrideKg !== null;
-                  return (
-                    <tr key={line.id} className="border-ink-100 border-b last:border-b-0">
-                      <td className="text-ink-800 py-1 pr-2">
-                        {line.name}
-                        {!line.materialId && line.kind === 'FILM' ? (
-                          <Select
-                            className="mt-1 w-52 text-xs"
-                            value=""
-                            disabled={locked}
-                            aria-label={`Which film is ${line.name}?`}
-                            onChange={(event) => {
-                              const picked = films.find((f) => f.id === event.target.value);
-                              if (picked) {
-                                setLine(line.position, {
-                                  materialId: picked.id,
-                                  name: picked.name,
-                                });
-                              }
-                            }}
-                          >
-                            <option value="">— which film? —</option>
-                            {films.map((film) => (
-                              <option key={film.id} value={film.id}>
-                                {film.name}
-                              </option>
-                            ))}
-                          </Select>
-                        ) : null}
-                      </td>
-                      {/*
-                        Worked out from the rows above, and typed over only
-                        where the drum in front of them says otherwise — the
-                        computed figure stays visible beside the correction.
-                      */}
-                      <td className="py-1 pr-2">
-                        <div className="flex items-center justify-end gap-1">
-                          <NumberInput
-                            allowNegative
-                            disabled={locked}
-                            className={cn(
-                              'w-24 text-right',
-                              corrected ? `${YELLOW} font-semibold` : 'bg-white',
-                            )}
-                            aria-label={`${line.name}, quantity`}
-                            value={corrected ? String(line.consumedOverrideKg) : ''}
-                            placeholder={formatNumber(costed?.computedKg ?? 0, 3)}
-                            onChange={(event) =>
-                              setLine(line.position, {
-                                consumedOverrideKg:
-                                  event.target.value === '' ? null : Number(event.target.value),
-                              })
-                            }
-                          />
-                        </div>
-                        {corrected ? (
-                          <div className="text-warning-700 text-right text-[11px] tabular-nums">
-                            was {formatNumber(costed?.computedKg ?? 0, 3)}
-                          </div>
-                        ) : null}
-                      </td>
-                      <td className="py-1 pr-2">
-                        <Typed
-                          width="w-20"
-                          label={`${line.name}, rate`}
-                          value={line.ratePerKg}
-                          disabled={locked}
-                          onChange={(next) =>
-                            setLine(line.position, { ratePerKg: Number(next || 0) })
-                          }
-                        />
-                      </td>
-                      <td className="text-ink-900 py-1 text-right font-medium tabular-nums">
-                        {formatRs(costed?.amount ?? 0)}
-                      </td>
-                    </tr>
-                  );
-                })}
-                <tr className="border-ink-400 border-t-2">
-                  <td className="text-ink-900 py-1.5 font-semibold">Total</td>
-                  <td className="text-ink-900 py-1.5 text-right font-semibold tabular-nums">
-                    {formatNumber(live.materialKg, 2)}
-                  </td>
-                  <td />
-                  <td className="text-ink-900 py-1.5 text-right font-semibold tabular-nums">
-                    {formatRs(live.materialCost)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="text-ink-700 py-1.5">Basic Value</td>
-                  <td />
-                  <td />
-                  <td className="text-ink-900 py-1.5 text-right font-semibold tabular-nums">
-                    {formatRs(live.basicValuePerKg, 2)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* The right-hand column of their form: what it came to. */}
-          <div className="pt-2">
-            <dl className="text-sm">
-              <Money label="Basic Cost" value={live.materialCost} />
-              <Money label="Electricity Expense" value={live.electricityCost} />
-              <Money label="Salary" value={live.salaryCost} />
-              <Money label="Transport Expense" value={live.transportCost} />
-              <Money label="Pouching Expense" value={live.pouchingCost} />
-              <Money label="Packaging Exp." value={live.packagingCost} />
-              <Money label="Bank EMI" value={live.emiCost} />
-              <Money label="Profit" value={live.profit} />
-              <div className="border-ink-400 flex justify-between border-t-2 py-2">
-                <dt className="text-ink-900 font-semibold">Effective Price</dt>
-                <dd className="text-ink-900 font-semibold tabular-nums">
-                  {formatRs(live.effectivePrice)}
-                </dd>
+          <section className="border-ink-300 rounded border bg-white p-4">
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+              <div className="flex items-end gap-2">
+                <Head>Sr. No.</Head>
+                <Worked value={draft.number} places={0} className="w-20 font-semibold" />
               </div>
-            </dl>
-
-            {/* Their green cell: the figure the whole sheet is for. */}
-            <div className="mt-2 flex items-baseline justify-between rounded border border-[#4CAF50] bg-[#E8F5E9] px-3 py-2">
-              <span className="text-ink-900 font-semibold">Cost / Kg.</span>
-              <span className="text-lg font-bold tabular-nums text-[#1B5E20]">
-                {formatRs(live.costPerKg, 2)}
-              </span>
+              <div className="flex items-end gap-2">
+                <Head>Date</Head>
+                <Input
+                  type="date"
+                  className={cn(YELLOW, 'w-40')}
+                  aria-label="Date"
+                  value={draft.date}
+                  disabled={locked}
+                  onChange={(event) => set('date', event.target.value)}
+                />
+              </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <SheetPair label="Pouching Weight Kg.">
-                <Typed
-                  width="w-24"
-                  label="Pouching weight"
-                  value={draft.pouchingWeightKg}
+            <div className="grid gap-x-6 gap-y-2 md:grid-cols-2">
+              <SheetPair label="Job Name:">
+                <Input
+                  className={cn(YELLOW, 'w-full')}
+                  aria-label="Job name"
+                  value={draft.jobName}
                   disabled={locked}
-                  onChange={(next) => set('pouchingWeightKg', Number(next || 0))}
+                  onChange={(event) => set('jobName', event.target.value)}
                 />
               </SheetPair>
-              <SheetPair label="Final Output Kg.">
+              <SheetPair label="Width:">
                 <Typed
                   width="w-24"
-                  label="Final output"
-                  value={draft.finalOutputKg}
+                  label="Width in mm"
+                  value={draft.webWidthMm ?? 0}
                   disabled={locked}
-                  onChange={(next) => set('finalOutputKg', Number(next || 0))}
+                  onChange={(next) => set('webWidthMm', Number(next || 0))}
                 />
               </SheetPair>
+              <SheetPair label="Material:">
+                <Input
+                  className={cn(YELLOW, 'w-full')}
+                  aria-label="Material"
+                  placeholder="Polyster / HSPP"
+                  value={draft.filmType}
+                  disabled={locked}
+                  onChange={(event) => set('filmType', event.target.value)}
+                />
+              </SheetPair>
+              <SheetPair label="Thickness:">
+                <Typed
+                  width="w-24"
+                  label="Thickness in micron"
+                  value={draft.micron ?? 0}
+                  disabled={locked}
+                  onChange={(next) => set('micron', Number(next || 0))}
+                />
+              </SheetPair>
+              <SheetPair label="No. of Cylinder:">
+                <Typed
+                  width="w-24"
+                  label="Number of cylinders"
+                  value={draft.cylinderCount}
+                  disabled={locked}
+                  onChange={(next) => set('cylinderCount', Number(next || 0))}
+                />
+              </SheetPair>
+              <SheetPair label="Circumference:">
+                <Typed
+                  width="w-24"
+                  label="Circumference in mm"
+                  value={draft.circumferenceMm ?? 0}
+                  disabled={locked}
+                  onChange={(next) => set('circumferenceMm', Number(next || 0))}
+                />
+              </SheetPair>
+              <SheetPair label="Operator Name:">
+                <Input
+                  className={cn(YELLOW, 'w-full')}
+                  aria-label="Operator name"
+                  value={draft.operatorName}
+                  disabled={locked}
+                  onChange={(event) => set('operatorName', event.target.value)}
+                />
+              </SheetPair>
+              <SheetPair label="Production run:">
+                <Select
+                  className="w-full"
+                  aria-label="Production run"
+                  value={draft.productionOrderId ?? ''}
+                  disabled={locked}
+                  onChange={(event) => set('productionOrderId', event.target.value || null)}
+                >
+                  <option value="">Not against a production run</option>
+                  {linkableCards.map((card) => (
+                    <option key={card.id} value={card.id}>
+                      #{card.number} — {card.customerName} · {card.jobName}
+                    </option>
+                  ))}
+                </Select>
+              </SheetPair>
+            </div>
+          </section>
+
+          {/* ---- Details of Roll, and the other items beside it ---- */}
+          <section className="border-ink-300 overflow-hidden rounded border bg-white px-4 pb-3">
+            <Band>Details of Roll</Band>
+            {filmRow ? (
+              <RollRow
+                name="Material Net Weight"
+                reels={filmRow.issueReels}
+                onReels={(reels) => setLine(filmRow.position, { issueReels: asReels(reels) })}
+                balance={filmRow.returnedKg}
+                onBalance={(next) => setLine(filmRow.position, { returnedKg: next })}
+                disabled={locked}
+                extra={{
+                  head: 'Westage',
+                  node: (
+                    <Typed
+                      width="w-[72px]"
+                      label="Printing wastage, kg"
+                      value={printingStage?.wastageKg ?? 0}
+                      disabled={locked}
+                      onChange={(next) => setStage('PRINTING', { wastageKg: Number(next || 0) })}
+                    />
+                  ),
+                }}
+              />
+            ) : null}
+
+            <Band right={`Consumed together: ${formatNumber(otherItemsConsumed, 3)} kg`}>
+              Other Items
+            </Band>
+            {otherItems.map((line) => (
+              <RollRow
+                key={line.id}
+                name={line.name}
+                reels={line.issueReels}
+                onReels={(reels) => setLine(line.position, { issueReels: asReels(reels) })}
+                balance={line.returnedKg}
+                onBalance={(next) => setLine(line.position, { returnedKg: next })}
+                disabled={locked}
+              />
+            ))}
+          </section>
+
+          {/* ---- Fresh Ink and Mix Ink ---- */}
+          <section className="border-ink-300 overflow-hidden rounded border bg-white px-4 pb-3">
+            <Band>Fresh Ink &nbsp;·&nbsp; Mix Ink</Band>
+            <InkGrid lines={draft.lines} onLine={setLine} disabled={locked} />
+          </section>
+
+          {/* ---- Output Rolls Gross Weight ---- */}
+          <section className="border-ink-300 overflow-hidden rounded border bg-white px-4 pb-3">
+            <Band>Output Rolls Gross Weight</Band>
+            <div className="py-2">
+              <Weighings
+                withCores
+                label="Rolls off the press"
+                reels={draft.outputReels.filter((reel) => reel.stage === 'PRINTING')}
+                disabled={locked}
+                onChange={(reels) => setOutput('PRINTING', reels)}
+              />
+            </div>
+          </section>
+
+          {/* ---- JOB CARD (PRINTING) ---- */}
+          <StageCard
+            title="JOB CARD (PRINTING)"
+            srNo={draft.number}
+            date={draft.date}
+            rows={printingCardRows}
+            usage={printingStage}
+            onUsage={setStage}
+            disabled={locked}
+          />
+
+          {/* ---- Lamination Job card (Stage 2): what went on ---- */}
+          <section className="border-ink-300 overflow-hidden rounded border bg-white px-4 pb-3">
+            <Band>Lamination Job card (Stage 2)</Band>
+            {laminationFilms.map((line) => (
+              <RollRow
+                key={line.id}
+                name={line.name}
+                reels={line.issueReels}
+                onReels={(reels) => setLine(line.position, { issueReels: asReels(reels) })}
+                balance={line.returnedKg}
+                onBalance={(next) => setLine(line.position, { returnedKg: next })}
+                disabled={locked}
+              />
+            ))}
+
+            <Band>Quanity Received</Band>
+            {laminationChemicals.map((line) => (
+              <RollRow
+                key={line.id}
+                name={line.name}
+                reels={line.issueReels}
+                onReels={(reels) => setLine(line.position, { issueReels: asReels(reels) })}
+                balance={line.returnedKg}
+                onBalance={(next) => setLine(line.position, { returnedKg: next })}
+                disabled={locked}
+              />
+            ))}
+            <div className="border-ink-100 flex flex-wrap items-end gap-3 border-t pt-2">
+              <RowName>Mix</RowName>
+              <div>
+                <Head>Total</Head>
+                <Typed
+                  label="Lamination mix out"
+                  value={draft.lamMixIssuedKg}
+                  disabled={locked}
+                  onChange={(next) => set('lamMixIssuedKg', Number(next || 0))}
+                />
+              </div>
+              <div>
+                <Head>Bal.</Head>
+                <Typed
+                  label="Lamination mix back"
+                  value={draft.lamMixReturnedKg}
+                  disabled={locked}
+                  onChange={(next) => set('lamMixReturnedKg', Number(next || 0))}
+                />
+              </div>
+              <div>
+                <Head>Cons.</Head>
+                <Worked value={draft.lamMixIssuedKg - draft.lamMixReturnedKg} />
+              </div>
+              <p className="text-ink-500 ml-2 text-xs">
+                The adhesive takes 40% of this drum, the hardener 5% and the ethyl 60%.
+              </p>
             </div>
 
-            <dl className="text-ink-600 mt-3 space-y-1 text-sm">
-              <div className="flex justify-between">
-                <dt>Material Type</dt>
-                <dd className="text-ink-900 font-medium">
-                  {draft.pouchingWeightKg > 0 ? 'Pouch Form' : 'Roll Form'}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt>Exp. Wastage Kg.</dt>
-                <dd className="tabular-nums">{formatNumber(live.expectedWastageKg, 2)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt>Act. Wastage Kg.</dt>
-                <dd
-                  className={
-                    live.actualWastageKg > live.expectedWastageKg
-                      ? 'text-danger-700 font-semibold tabular-nums'
-                      : 'tabular-nums'
-                  }
-                >
-                  {formatNumber(live.actualWastageKg, 2)}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt>Wastage %</dt>
-                <dd className="tabular-nums">{formatNumber(live.wastagePercent, 2)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt>Excess Rs.</dt>
-                <dd
-                  className={
-                    live.excessCost > 0
-                      ? 'text-danger-700 font-semibold tabular-nums'
-                      : 'text-success-700 tabular-nums'
-                  }
-                >
-                  {formatRs(live.excessCost)}
-                </dd>
-              </div>
-            </dl>
-
-            {/* Their Ratio block: a sanity check on the ink and the chemical. */}
-            <div className="border-ink-200 mt-3 rounded border p-2.5">
-              <Head>Ratio</Head>
-              <dl className="text-ink-600 mt-1 space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <dt>Ink</dt>
-                  <dd className="tabular-nums">{formatNumber(inkRatio, 2)}%</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt>Chemical</dt>
-                  <dd className="tabular-nums">{formatNumber(chemicalRatio, 2)}%</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt>Total Output</dt>
-                  <dd className="tabular-nums">
-                    {formatNumber((draft.producedGrossKg - draft.producedCoreKg) * 0.97, 2)} kg
-                  </dd>
-                </div>
-              </dl>
+            <Band>Produced Quantity</Band>
+            <div className="py-2">
+              <Weighings
+                withCores
+                label="Rolls off the laminator"
+                reels={draft.outputReels.filter((reel) => reel.stage === 'LAMINATION_1')}
+                disabled={locked}
+                onChange={(reels) => setOutput('LAMINATION_1', reels)}
+              />
             </div>
-          </div>
+          </section>
+
+          {/* ---- Lamination Job card (Stage 2): the card ---- */}
+          <StageCard
+            title="Lamination Job card (Stage 2)"
+            srNo={draft.number}
+            date={draft.date}
+            rows={laminationCardRows}
+            usage={laminationStage}
+            onUsage={setStage}
+            disabled={locked}
+          />
         </div>
-      </section>
+      ) : null}
 
-      {/*
-        WORKERS SALARY, the electricity split and the overheads — the three
-        blocks their form carries at the foot of the costing, in their order.
-      */}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <section className="border-ink-200 overflow-hidden rounded-lg border bg-white">
-          <h2 className="text-ink-900 border-ink-200 border-b px-4 py-3 font-semibold">
-            WORKERS SALARY
-          </h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-ink-200 text-ink-500 border-b text-xs tracking-wide uppercase">
-                <th className="px-3 py-2 text-left font-semibold">Role</th>
-                <th className="px-1 py-2 text-right font-semibold">Nos</th>
-                <th className="px-1 py-2 text-right font-semibold">A day</th>
-                <th className="px-1 py-2 text-right font-semibold">Days</th>
-                <th className="px-3 py-2 text-right font-semibold">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {draft.labour.map((role) => (
-                <tr key={role.id} className="border-ink-100 border-b last:border-b-0">
-                  <td className="text-ink-800 px-3 py-1.5">{role.role}</td>
-                  {(
-                    [
-                      ['headcount', role.headcount],
-                      ['ratePerDay', role.ratePerDay],
-                      ['days', role.days],
-                    ] as const
-                  ).map(([key, value]) => (
-                    <td key={key} className="px-1 py-1">
-                      <NumberInput
-                        disabled={locked}
-                        value={value === 0 ? '' : String(value)}
-                        placeholder="0"
-                        className={cell}
-                        onChange={(event) =>
-                          setDraft((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  labour: current.labour.map((item) =>
-                                    item.id === role.id
-                                      ? { ...item, [key]: Number(event.target.value || 0) }
-                                      : item,
-                                  ),
-                                }
-                              : current,
-                          )
-                        }
-                      />
-                    </td>
-                  ))}
-                  <td className="text-ink-900 px-3 py-1.5 text-right tabular-nums">
-                    {formatRs(live.labour[draft.labour.indexOf(role)]?.amount ?? 0)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-
-        <section className="border-ink-200 overflow-hidden rounded-lg border bg-white">
-          <div className="border-ink-200 flex items-end justify-between gap-3 border-b px-4 py-3">
-            <h2 className="text-ink-900 font-semibold">Electricity</h2>
-            <Field label="A day (Rs)" htmlFor="epd">
-              <NumberInput
-                id="epd"
-                className="w-28 text-right"
-                value={draft.electricityPerDay || ''}
-                disabled={locked}
-                onChange={(event) => set('electricityPerDay', Number(event.target.value || 0))}
-              />
-            </Field>
-          </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-ink-200 text-ink-500 border-b text-xs tracking-wide uppercase">
-                <th className="px-3 py-2 text-left font-semibold">Stage</th>
-                <th className="px-1 py-2 text-right font-semibold">Share %</th>
-                <th className="px-1 py-2 text-right font-semibold">Days</th>
-                <th className="px-1 py-2 text-right font-semibold">Shifts</th>
-                <th className="px-3 py-2 text-right font-semibold">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {draft.stages.map((stage) => (
-                <tr key={stage.id} className="border-ink-100 border-b last:border-b-0">
-                  <td className="text-ink-800 px-3 py-1.5">
-                    {JOB_SHEET_STAGE_LABELS[stage.stage]}
-                  </td>
-                  {(
-                    [
-                      ['sharePercent', stage.sharePercent],
-                      ['days', stage.days],
-                      ['shifts', stage.shifts],
-                    ] as const
-                  ).map(([key, value]) => (
-                    <td key={key} className="px-1 py-1">
-                      <NumberInput
-                        disabled={locked}
-                        value={value === 0 ? '' : String(value)}
-                        placeholder="0"
-                        className={cell}
-                        onChange={(event) =>
-                          setDraft((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  stages: current.stages.map((item) =>
-                                    item.id === stage.id
-                                      ? { ...item, [key]: Number(event.target.value || 0) }
-                                      : item,
-                                  ),
-                                }
-                              : current,
-                          )
-                        }
-                      />
-                    </td>
-                  ))}
-                  <td className="text-ink-900 px-3 py-1.5 text-right tabular-nums">
-                    {formatRs(live.stages[draft.stages.indexOf(stage)]?.amount ?? 0)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {/* A stage that did not run is zero days and costs nothing. */}
-          <p className="text-ink-500 border-ink-100 border-t px-4 py-2 text-xs">
-            A stage that did not run takes zero days and costs nothing.
-          </p>
-        </section>
-
-        <section className="border-ink-200 rounded-lg border bg-white p-4 lg:col-span-2">
-          <h2 className="text-ink-900 mb-3 font-semibold">Overheads</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Transport (Rs a kg)" htmlFor="tpk" hint="Charged on material brought in.">
-              <NumberInput
-                id="tpk"
-                value={draft.transportPerKg || ''}
-                disabled={locked}
-                onChange={(event) => set('transportPerKg', Number(event.target.value || 0))}
-              />
-            </Field>
-            <Field label="Pouching (Rs a kg)" htmlFor="ppk">
-              <NumberInput
-                id="ppk"
-                value={draft.pouchingPerKg || ''}
-                disabled={locked}
-                onChange={(event) => set('pouchingPerKg', Number(event.target.value || 0))}
-              />
-            </Field>
-            <Field label="Packaging (Rs)" htmlFor="pkg">
-              <NumberInput
-                id="pkg"
-                value={draft.packagingCost || ''}
-                disabled={locked}
-                onChange={(event) => set('packagingCost', Number(event.target.value || 0))}
-              />
-            </Field>
-            <Field label="Bank EMI (Rs a day)" htmlFor="emi">
-              <NumberInput
-                id="emi"
-                value={draft.emiPerDay || ''}
-                disabled={locked}
-                onChange={(event) => set('emiPerDay', Number(event.target.value || 0))}
-              />
-            </Field>
-            <Field label="Profit %" htmlFor="pp" hint="Taken on the material.">
-              <NumberInput
-                id="pp"
-                value={draft.profitPercent || ''}
-                disabled={locked}
-                onChange={(event) => set('profitPercent', Number(event.target.value || 0))}
-              />
-            </Field>
-            <Field label="Wastage allowed %" htmlFor="ew">
-              <NumberInput
-                id="ew"
-                value={draft.expectedWastagePercent || ''}
-                disabled={locked}
-                onChange={(event) => set('expectedWastagePercent', Number(event.target.value || 0))}
-              />
-            </Field>
-          </div>
-        </section>
-      </div>
+      {view === 'costing' ? (
+        <FinalCosting
+          draft={draft}
+          live={live}
+          locked={locked}
+          films={films}
+          indexOf={indexOf}
+          onField={set}
+          onLine={setLine}
+          onLabour={setLabour}
+          onStage={setStage}
+          ratio={{
+            ink: inkRatio,
+            chemical: chemicalRatio,
+            totalOutput: (draft.producedGrossKg - draft.producedCoreKg) * 0.97,
+          }}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={posting}

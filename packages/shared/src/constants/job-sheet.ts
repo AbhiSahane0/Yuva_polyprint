@@ -243,3 +243,47 @@ export const JOB_SHEET_STAGE_DEFAULTS: readonly {
 
 /** What the shares must add up to: one day's bill, divided between machines. */
 export const JOB_SHEET_STAGE_SHARE_TOTAL = 100;
+
+/**
+ * **What the final costing block calls each row.**
+ *
+ * Their workbook names the same material twice, differently. The stage blocks
+ * say `Tolvin` and `Ethyle`, because that is what is written on the drum; the
+ * costing block at the foot of the sheet says `Tolluene` and `Ethyle Acetate`,
+ * because that is what the invoice says. `Hardner`, `METPET`, `Polysyter` and
+ * `Mily` are theirs too, spelled as their sheet spells them.
+ *
+ * The spellings are kept rather than corrected, and kept *per block* rather
+ * than globally, for one reason: the office cross-checks the screen against the
+ * paper line by line, and a row that reads differently in the two places is a
+ * row somebody has to stop and think about. The stored name is untouched — this
+ * is what the costing screen prints above it.
+ *
+ * Keyed by the row's template key. The twelve colours are deliberately absent:
+ * their sheet writes `=A15` there, so a colour's costing name IS its row name.
+ */
+export const JOB_SHEET_COSTING_NAMES: Readonly<Record<string, string>> = {
+  pet: '12 PET Polysyter',
+  ethyl_print: 'Ethyle Acetate',
+  toluene: 'Tolluene',
+  mibk: 'MIBK',
+  metpet: 'METPET',
+  ldpe: 'LDPE Mily/Natural',
+  adhesive: 'Adhesive',
+  hardener: 'Hardner',
+  ethyl_lam: 'Ethyle Acetate',
+};
+
+/**
+ * The costing block's name for the row at this position, or the row's own.
+ *
+ * Positions are one-based and follow `JOB_SHEET_LINES`, which is how the rest
+ * of the sheet addresses its rows. A position off the end of the form — an
+ * imported sheet with a row the template does not have — falls back to the
+ * stored name rather than inventing one.
+ */
+export function costingNameAt(position: number, storedName: string): string {
+  const template = JOB_SHEET_LINES[position - 1];
+  if (!template) return storedName;
+  return JOB_SHEET_COSTING_NAMES[template.key] ?? storedName;
+}
