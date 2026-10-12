@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { formatNumber } from '@yuva/shared';
 import { Input, NumberInput } from '@/components/ui/Field';
-import { TYPED } from '@/components/ui/Document';
+import { Band as DocBand, TYPED } from '@/components/ui/Document';
 import { cn } from '@/lib/utils';
 
 /**
@@ -30,20 +30,22 @@ import { cn } from '@/lib/utils';
  */
 export const YELLOW = TYPED;
 
-/** A band, as the sheet uses to start a section. The job card's band. */
+/**
+ * A band, as the sheet uses to start a section.
+ *
+ * The job card's band, by way of being the same component. The wrapper exists
+ * only because the sheet's blocks name themselves in children rather than in a
+ * `title` prop, and rewriting thirty call sites to change nothing on screen is
+ * not worth the diff.
+ */
 export function Band({ children, right }: { children: ReactNode; right?: ReactNode }) {
-  return (
-    <div className="bg-ink-100 text-ink-700 -mx-4 mb-3 flex items-center justify-between gap-3 px-4 py-1.5 text-xs font-semibold tracking-wider uppercase">
-      <span>{children}</span>
-      {right ? <span className="text-ink-500 text-xs font-normal normal-case">{right}</span> : null}
-    </div>
-  );
+  return <DocBand title={children as string} right={right} />;
 }
 
 /** A column heading, as it reads on the paper: Total, Bal., Cons. */
 export function Head({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('text-ink-500 text-[11px] font-semibold tracking-wide', className)}>
+    <div className={cn('text-ink-500 text-[11px] font-medium tracking-wide uppercase', className)}>
       {children}
     </div>
   );
@@ -83,7 +85,12 @@ export function Typed({
 
 /**
  * A figure the sheet worked out. Never a box — nothing here can be typed, and
- * a white cell that looks like a box is an invitation to try.
+ * a cell that looks like a box is an invitation to try.
+ *
+ * It had a border and a fill once, to rule it like the spreadsheet's columns.
+ * That was the mistake the whole module made: ruled cells are how a worked-out
+ * figure and a typed one end up looking alike. A figure is text here, as it is
+ * on the job card and everywhere else in the app.
  */
 export function Worked({
   value,
@@ -99,7 +106,7 @@ export function Worked({
   return (
     <div
       className={cn(
-        'text-ink-900 border-ink-100 bg-ink-50/70 min-w-16 rounded border px-2 py-1.5 text-right text-sm tabular-nums',
+        'text-ink-900 min-w-16 px-2 py-1.5 text-right text-sm font-medium tabular-nums',
         className,
       )}
     >

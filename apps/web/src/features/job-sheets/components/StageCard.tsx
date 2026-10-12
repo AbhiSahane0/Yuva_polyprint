@@ -1,5 +1,6 @@
 import type { JobSheetStage, JobSheetStageUsage } from '@yuva/shared';
 import { Head, Typed, Worked } from './sheet-form';
+import { Band, DocCard } from '@/components/ui/Document';
 
 /** One line of the card: what went on, what came back, what it cost the job. */
 export interface StageCardRow {
@@ -45,15 +46,17 @@ export function StageCard({
   const change = (patch: Partial<JobSheetStageUsage>) => stage && onUsage(stage, patch);
 
   return (
-    <div className="border-ink-300 rounded border">
-      <div className="border-ink-300 bg-ink-100 flex flex-wrap items-baseline justify-between gap-2 border-b px-3 py-1.5">
-        <span className="text-ink-900 text-[13px] font-bold">{title}</span>
-        <span className="text-ink-600 text-xs tabular-nums">
-          Sr. No. {srNo} · Date {date}
-        </span>
-      </div>
+    <DocCard>
+      <Band
+        title={title}
+        right={
+          <span className="tabular-nums">
+            Sr. No. {srNo} · Date {date}
+          </span>
+        }
+      />
 
-      <div className="grid gap-4 p-3 lg:grid-cols-[minmax(0,1fr)_16rem]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
         <div>
           <div className="mb-1 grid grid-cols-[9rem_repeat(3,minmax(0,1fr))] gap-2">
             <Head>&nbsp;</Head>
@@ -75,7 +78,7 @@ export function StageCard({
         </div>
 
         {/* The remarks box. Typed, and none of it costed. */}
-        <div className="border-ink-200 bg-ink-25 space-y-2 rounded border p-2.5">
+        <div className="border-ink-200 bg-ink-25 space-y-2 rounded-lg border p-3">
           <Head>Production remark</Head>
           <div className="flex items-center justify-between gap-2">
             <span className="text-ink-600 text-xs">Wastage</span>
@@ -123,6 +126,6 @@ export function StageCard({
           </div>
         </div>
       </div>
-    </div>
+    </DocCard>
   );
 }

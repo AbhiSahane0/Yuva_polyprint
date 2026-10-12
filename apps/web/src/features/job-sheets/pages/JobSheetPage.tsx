@@ -31,6 +31,7 @@ import { RollRow } from '../components/RollRow';
 import { StageCard, type StageCardRow } from '../components/StageCard';
 import { FinalCosting } from '../components/FinalCosting';
 import { Band, Head, RowName, Typed, Worked, YELLOW } from '../components/sheet-form';
+import { DocCard } from '@/components/ui/Document';
 import {
   useCostJobSheet,
   useJobSheet,
@@ -517,17 +518,12 @@ export default function JobSheetPage() {
   const chemicalRatio = filmConsumed > 0 ? (chemicalConsumed / filmConsumed) * 100 : 0;
 
   return (
-    <div className="space-y-4 px-4 py-5 sm:px-6">
+    <div className="space-y-5 px-4 py-6 sm:px-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/job-sheets')}
-            aria-label="Back to job sheets"
-            className="text-ink-500 hover:text-ink-900 mt-1"
-          >
-            <ArrowLeft className="size-5" />
-          </button>
+          <Button variant="ghost" onClick={() => navigate('/job-sheets')} aria-label="Back">
+            <ArrowLeft className="size-4" />
+          </Button>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-ink-900 text-xl font-semibold">Job sheet {draft.number}</h1>
@@ -624,7 +620,7 @@ export default function JobSheetPage() {
         the job, the material and the cylinder. Yellow is theirs: every box on
         this sheet that the works types is yellow, and nothing else is.
       */}
-          <section className="border-ink-300 rounded border bg-white p-4">
+          <DocCard>
             <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
               <div className="flex items-end gap-2">
                 <Head>Sr. No.</Head>
@@ -725,10 +721,10 @@ export default function JobSheetPage() {
                 </Select>
               </SheetPair>
             </div>
-          </section>
+          </DocCard>
 
           {/* ---- Details of Roll, and the other items beside it ---- */}
-          <section className="border-ink-300 overflow-hidden rounded border bg-white px-4 pb-3">
+          <DocCard>
             <Band>Details of Roll</Band>
             {filmRow ? (
               <RollRow
@@ -767,16 +763,16 @@ export default function JobSheetPage() {
                 disabled={locked}
               />
             ))}
-          </section>
+          </DocCard>
 
           {/* ---- Fresh Ink and Mix Ink ---- */}
-          <section className="border-ink-300 overflow-hidden rounded border bg-white px-4 pb-3">
+          <DocCard>
             <Band>Fresh Ink &nbsp;·&nbsp; Mix Ink</Band>
             <InkGrid lines={draft.lines} onLine={setLine} disabled={locked} />
-          </section>
+          </DocCard>
 
           {/* ---- Output Rolls Gross Weight ---- */}
-          <section className="border-ink-300 overflow-hidden rounded border bg-white px-4 pb-3">
+          <DocCard>
             <Band>Output Rolls Gross Weight</Band>
             <div className="py-2">
               <Weighings
@@ -787,7 +783,7 @@ export default function JobSheetPage() {
                 onChange={(reels) => setOutput('PRINTING', reels)}
               />
             </div>
-          </section>
+          </DocCard>
 
           {/* ---- JOB CARD (PRINTING) ---- */}
           <StageCard
@@ -801,7 +797,7 @@ export default function JobSheetPage() {
           />
 
           {/* ---- Lamination Job card (Stage 2): what went on ---- */}
-          <section className="border-ink-300 overflow-hidden rounded border bg-white px-4 pb-3">
+          <DocCard>
             <Band>Lamination Job card (Stage 2)</Band>
             {laminationFilms.map((line) => (
               <RollRow
@@ -866,7 +862,7 @@ export default function JobSheetPage() {
                 onChange={(reels) => setOutput('LAMINATION_1', reels)}
               />
             </div>
-          </section>
+          </DocCard>
 
           {/* ---- Lamination Job card (Stage 2): the card ---- */}
           <StageCard
