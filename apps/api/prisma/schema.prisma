@@ -2418,6 +2418,8 @@ model JobSheet {
   lines  JobSheetLine[]
   labour JobSheetLabour[]
   stages JobSheetStageUsage[]
+  /// Every weighing on this sheet: reels issued, reels back, rolls made.
+  reels  JobSheetReel[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -2448,6 +2450,9 @@ model JobSheetLine {
 
   issuedKg   Decimal @default(0) @map("issued_kg") @db.Decimal(14, 3)
   returnedKg Decimal @default(0) @map("returned_kg") @db.Decimal(14, 3)
+
+  /// The individual weighings those two are the sum of. See JobSheetReel.
+  reels JobSheetReel[]
 
   /**
    * The mixed drum this line draws a share of, and how much of it is this.
@@ -2482,6 +2487,63 @@ model JobSheetLine {
 }
 
 /// One role's wages for the run.
+/// Where a weighing was taken: what went out, what came back, what came off.
+enum JobSheetReelRole {
+  /// A reel, drum or tin drawn from the shelf and put on the machine.
+  ISSUE
+  /// What was left on it and went back.
+  RETURN
+  /// A roll that came OFF the machine. Carries a core weight.
+  OUTPUT
+}
+
+/// **One reel on the scale.**
+///
+/// The works does not weigh a job, it weighs reels: "257.3 and 250.25" is how
+/// 507.55 kg of polyester reaches the sheet, and their own form has a column
+/// for each one. Typing the total instead throws away the only record of which
+/// reel was light — and asks somebody to add up in their head on a form whose
+/// whole purpose is arithmetic.
+///
+/// A line's issued and returned figures are the SUM of its reels where it has
+/// any, the same rule a dispatch note's packages follow. Where it has none the
+/// typed total stands, because a sheet keyed from a scrap of paper must still
+/// be costable.
+///
+/// An OUTPUT row belongs to the sheet rather than to a line — it is production,
+/// not consumption — and carries the core it was wound on, because the works
+/// weighs the roll and takes the core off to get the net.
+model JobSheetReel {
+  id String @id @default(cuid())
+
+  sheetId String   @map("sheet_id")
+  sheet   JobSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  /// The row it belongs to. Null on an OUTPUT roll, which belongs to no row.
+  lineId String?       @map("line_id")
+  line   JobSheetLine? @relation(fields: [lineId], references: [id], onDelete: Cascade)
+
+  /// Which machine it came off. Only set on an OUTPUT roll.
+  stage JobSheetStage?
+
+  role     JobSheetReelRole
+  /// 1..n, in the order the works wrote them across the page.
+  position Int
+
+  weightKg Decimal @map("weight_kg") @db.Decimal(14, 3)
+  /// The core, on an OUTPUT roll. Zero everywhere else.
+  coreKg   Decimal @default(0) @map("core_kg") @db.Decimal(14, 3)
+
+  /// What is written on the reel, where anything is.
+  reelNumber String @default("") @map("reel_number")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([sheetId, role])
+  @@index([lineId])
+  @@map("job_sheet_reels")
+}
+
 model JobSheetLabour {
   id String @id @default(cuid())
 
@@ -2525,6 +2587,22 @@ model JobSheetStageUsage {
   /// Pouching routinely runs two, and the meter runs with it.
   shifts       Decimal @default(1) @db.Decimal(6, 2)
   amount       Decimal @default(0) @db.Decimal(12, 2)
+
+  /**
+   * The remarks box on the works' own stage card.
+   *
+   * None of these four reaches the costing — the cost of a run comes from what
+   * it consumed and what it produced. They are what the operator writes down
+   * about the shift, and the works keeps them: how much was lost at THIS
+   * machine, how long the power was off, when the job was taken, and how long
+   * registration and shade matching took. Their sheet has a box for each and
+   * the office reads them when a job goes wrong.
+   */
+  wastageKg        Decimal @default(0) @map("wastage_kg") @db.Decimal(12, 3)
+  noPowerMinutes   Decimal @default(0) @map("no_power_minutes") @db.Decimal(8, 2)
+  /// Written as the works writes them — "9:30", "0:45" — and never computed on.
+  jobTakenTime     String  @default("") @map("job_taken_time")
+  registrationTime String  @default("") @map("registration_time")
 
   @@unique([sheetId, stage])
   @@map("job_sheet_stage_usage")

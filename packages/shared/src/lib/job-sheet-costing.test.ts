@@ -3,10 +3,13 @@ import { JOB_SHEET_STAGE_DEFAULTS, JOB_SHEET_STAGE_SHARE_TOTAL } from '../consta
 import {
   consumedKg,
   costJobSheet,
+  filmRowsFromPlies,
+  outputNet,
   JOB_SHEET_STAGES,
   labourAmount,
   mixDrumFor,
   stageElectricity,
+  weighedTotal,
   type JobSheetCostInput,
   type JobSheetLineInput,
 } from './job-sheet-costing.js';
@@ -1385,5 +1388,105 @@ describe('the stage shares a new sheet starts with', () => {
 
   it('covers every stage exactly once', () => {
     expect(JOB_SHEET_STAGE_DEFAULTS.map((stage) => stage.stage)).toEqual([...JOB_SHEET_STAGES]);
+  });
+});
+
+/**
+ * **The three film rows on the works' printed sheet.**
+ *
+ * The rule exists because their form has one "LDPE" line and the rates master
+ * has twelve LDPE grades. Assigning by position rather than by name is what
+ * stops the sealant row naming a film the works retired — which it did, and
+ * which cost a third of the film on every laminated job nothing at all.
+ */
+describe('which film goes on which row', () => {
+  it('puts the web first and the sealant last on a three-ply', () => {
+    expect(filmRowsFromPlies(['PET 12µm', 'MET PET 12µm', 'LDPE Natural GP'])).toEqual({
+      pet: 'PET 12µm',
+      metPet: 'MET PET 12µm',
+      poly: 'LDPE Natural GP',
+    });
+  });
+
+  it('leaves the metallised row empty on a two-ply', () => {
+    /* PET + poly is the ordinary unmetallised laminate, and the sealant is
+       still the last ply — not the second row of three. */
+    expect(filmRowsFromPlies(['PET 12µm', 'LDPE Milky White 3-Layer'])).toEqual({
+      pet: 'PET 12µm',
+      metPet: null,
+      poly: 'LDPE Milky White 3-Layer',
+    });
+  });
+
+  it('reads one film as a sealant, not as a print web', () => {
+    /* An unlaminated job is still sealed, and the one film it has is what
+       seals it. Putting it on the PET row would leave the sealant row empty
+       and the job unable to come off stock. */
+    expect(filmRowsFromPlies(['LDPE Natural GP'])).toEqual({
+      pet: null,
+      metPet: null,
+      poly: 'LDPE Natural GP',
+    });
+  });
+
+  it('takes the first middle ply where a structure has two', () => {
+    const four = filmRowsFromPlies(['PET', 'MET PET', 'Nylon', 'LDPE']);
+    expect(four.pet).toBe('PET');
+    expect(four.metPet).toBe('MET PET');
+    expect(four.poly).toBe('LDPE');
+  });
+
+  it('has nothing to say about a structure with no films', () => {
+    expect(filmRowsFromPlies([])).toEqual({ pet: null, metPet: null, poly: null });
+  });
+});
+
+/**
+ * **The weighings behind a figure**, against the works' own October sheet for
+ * Radhey Murmura — the one that reaches Rs 261.82 a kilogram.
+ */
+describe('reels, and the totals they make', () => {
+  it('adds the polyester reels the way their sheet does', () => {
+    // Row 8: 257.3 and 250.25 across the page, 507.55 in the Total column.
+    expect(weighedTotal([{ weightKg: 257.3 }, { weightKg: 250.25 }], 0)).toBe(507.55);
+  });
+
+  it('adds the four drums of ethyl acetate', () => {
+    // Row 10: 20, 21.5, 21.4, 20 → 82.9.
+    const drums = [20, 21.5, 21.4, 20].map((weightKg) => ({ weightKg }));
+    expect(weighedTotal(drums, 0)).toBe(82.9);
+  });
+
+  it('lets the weighings beat a total somebody typed', () => {
+    /* Two answers to one question, and the one with the reels behind it is
+       the one that can be checked against the scale. */
+    expect(weighedTotal([{ weightKg: 257.3 }, { weightKg: 250.25 }], 999)).toBe(507.55);
+  });
+
+  it('keeps a typed total where nothing was weighed', () => {
+    /* A sheet keyed from a scrap of paper must still cost. */
+    expect(weighedTotal([], 507.55)).toBe(507.55);
+    expect(weighedTotal(undefined, 507.55)).toBe(507.55);
+  });
+
+  it('takes the cores off the rolls that came off the press', () => {
+    // Rows 29 and 30: 172.0 and 145.1 gross, 2.0 and 2.5 of core.
+    expect(
+      outputNet([
+        { weightKg: 172, coreKg: 2 },
+        { weightKg: 145.1, coreKg: 2.5 },
+      ]),
+    ).toEqual({ grossKg: 317.1, coreKg: 4.5, netKg: 312.6 });
+  });
+
+  it('takes the cores off the laminated rolls too', () => {
+    // Rows 62 and 63: 401 + 324 + 338 gross, 4 of core → 1,059.
+    expect(outputNet([{ weightKg: 401, coreKg: 4 }, { weightKg: 324 }, { weightKg: 338 }])).toEqual(
+      { grossKg: 1063, coreKg: 4, netKg: 1059 },
+    );
+  });
+
+  it('treats a roll with no core as all net', () => {
+    expect(outputNet([{ weightKg: 100 }])).toEqual({ grossKg: 100, coreKg: 0, netKg: 100 });
   });
 });

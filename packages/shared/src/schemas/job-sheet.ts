@@ -24,6 +24,25 @@ const money = z.coerce.number().min(0).max(100_000_000);
 const percent = z.coerce.number().min(0).max(100);
 const days = z.coerce.number().min(0).max(366);
 
+/**
+ * One weighing: a reel put on the machine, a reel sent back, or a roll made.
+ *
+ * Allowed to be zero but never negative — a reel on a scale weighs something,
+ * and a minus here is a typing slip rather than the real event a negative
+ * CONSUMPTION can be (a drum topped up from an earlier job).
+ */
+export const jobSheetReelSchema = z.object({
+  weightKg: z.coerce.number().min(0).max(100_000),
+  /** Only on a roll that came off the machine. */
+  coreKg: z.coerce.number().min(0).max(10_000).default(0),
+  reelNumber: z.string().trim().max(60).default(''),
+});
+
+/** A roll that came off a machine, and which machine it came off. */
+export const jobSheetOutputReelSchema = jobSheetReelSchema.extend({
+  stage: z.enum(JOB_SHEET_STAGES),
+});
+
 export const jobSheetLineSchema = z.object({
   position: z.coerce.number().int().min(1),
   section: z.enum(['PRINTING', 'LAMINATION']),
@@ -33,6 +52,15 @@ export const jobSheetLineSchema = z.object({
 
   issuedKg: weight.default(0),
   returnedKg: weight.default(0),
+
+  /*
+   * The individual weighings the two figures above are the sum of.
+   *
+   * Where there are any they WIN — see `weighedTotal`. Twenty is more reels
+   * than any one row of the works' own form has ever carried.
+   */
+  issueReels: z.array(jobSheetReelSchema).max(20).default([]),
+  returnReels: z.array(jobSheetReelSchema).max(20).default([]),
 
   mixIssuedKg: weight.default(0),
   mixReturnedKg: weight.default(0),
@@ -56,6 +84,13 @@ export const jobSheetStageSchema = z.object({
   sharePercent: percent.default(0),
   days: days.default(0),
   shifts: z.coerce.number().min(0).max(4).default(1),
+
+  /* The remarks box on the works' stage card. None of these is costed — see
+     the model — and all four are what the operator writes about the shift. */
+  wastageKg: weight.default(0),
+  noPowerMinutes: z.coerce.number().min(0).max(100_000).default(0),
+  jobTakenTime: z.string().trim().max(20).default(''),
+  registrationTime: z.string().trim().max(20).default(''),
 });
 
 export const jobSheetSchema = z.object({
@@ -116,10 +151,17 @@ export const jobSheetSchema = z.object({
   notes: z.string().trim().max(2000).default(''),
 
   lines: z.array(jobSheetLineSchema).max(60).default([]),
+  /*
+   * The rolls that came off the machines, with the cores they were wound on.
+   * Where there are any, the produced gross and core figures are their sums.
+   */
+  outputReels: z.array(jobSheetOutputReelSchema).max(60).default([]),
   labour: z.array(jobSheetLabourSchema).max(40).default([]),
   stages: z.array(jobSheetStageSchema).max(10).default([]),
 });
 
+export type JobSheetReelInput = z.infer<typeof jobSheetReelSchema>;
+export type JobSheetOutputReelInput = z.infer<typeof jobSheetOutputReelSchema>;
 export type JobSheetInput = z.infer<typeof jobSheetSchema>;
 export type JobSheetFormValues = z.input<typeof jobSheetSchema>;
 

@@ -39,11 +39,15 @@ technical knowledge.
                                           ▼
                                        ORDER          what they committed to
                                           │
+                         ┌────────────────┴────────────────┐
+                         ▼                                 ▼
+                     JOB CARD                          PLANNING
+              the instruction, printed           can it run, and when —
+              and signed before the run          and on which machine
+                         │                                 │
+                         └────────────────┬────────────────┘
                                           ▼
-                                      PLANNING        can it run, and when —
-                                          │             and on which machine
-                                          ▼
-                                      JOB CARD        what the floor will do
+                                   PRODUCTION RUN     what the floor did
                                           │             + claims the film, ink
                                           │               and adhesive it needs
                                           │
@@ -53,6 +57,8 @@ technical knowledge.
                          └────────────────┼────────────────┘
                                           ▼
                                      JOB SHEET        what it actually cost
+                                                      — written after each
+                                                        stage, not before
                                           │
                                           ▼
                                      STOCK GOES DOWN
@@ -70,7 +76,7 @@ and since that is the page signing in lands on, it comes first.
 Two things are worth saying before any of the detail.
 
 **Each step is fed by the one before it.** Nobody retypes the customer onto the
-order, or the design onto the job card, or the quantity onto the job sheet. It
+order, or the design onto the production run, or the quantity onto the job sheet. It
 travels. That is the whole point — a number typed twice is a number that will
 disagree with itself eventually.
 
@@ -227,16 +233,16 @@ Name, what they do, which shift. Their role points at one of the wages from
 Step 2, so nobody's pay is typed twice.
 
 This is deliberately not a personnel system: no attendance, no leave, no
-payroll. It exists so that the floor **picks** a name on a job card instead of
+payroll. It exists so that the floor **picks** a name on a production run instead of
 typing one — which is how the same person ends up recorded five different ways.
 
-On a job card the operator box lists the people whose role belongs to that
+On a production run the operator box lists the people whose role belongs to that
 machine first, under **On this machine**, and everybody else under **Anyone
 else**. Nobody is hidden: the day the slitting man covers the press is exactly
 the day worth recording.
 
 The screen also shows who is on a machine right now. That is not stored anywhere
-and nobody has to keep it up to date: if a job card stage is running with
+and nobody has to keep it up to date: if a production run stage is running with
 somebody's name on it, they are working, and that is the only thing that can
 make it true.
 
@@ -267,9 +273,9 @@ The Inventory screen then shows, for every material:
 | **On hand** | what is physically in the building     |
 | **Free**    | what a new job could actually be given |
 
-They differ by what open job cards have already claimed. This is the figure
+They differ by what open production runs have already claimed. This is the figure
 everything downstream is measured against, and it is explained properly in Part
-two. **Free below zero** means more has been promised to job cards than the
+two. **Free below zero** means more has been promised to production runs than the
 works holds — it is shown in red rather than hidden behind a nought, because a
 works that finds that out at the machine finds out too late.
 
@@ -342,14 +348,14 @@ typed here directly.
 
 ## Step 5 — the gate before the floor · **Planning**
 
-Between an order and a job card there is a decision nothing used to record:
+Between an order and a production run there is a decision nothing used to record:
 **when it runs, and on what machine.** The order carries a due date, which is
-the customer's. The job card carries stages, which are the floor's. Neither of
+the customer's. The production run carries stages, which are the floor's. Neither of
 them said which press a job was booked onto next Tuesday.
 
 ### Can it run?
 
-The board asks the job card's own material question **early** — before a card
+The board asks the production run's own material question **early** — before a card
 exists. The check is the same one, reels and all: every ply, every ink, the
 adhesive, and a reel too narrow counted as no use whatever it weighs. Until
 now the only way to find out an order could not be made was to raise the card
@@ -392,7 +398,7 @@ planning screen that only tells you afterwards has already let it happen.
 An order can still be dated while it is short — "Tuesday, press 1, film
 arriving Monday" is a real plan, and a system that refuses to write it down is
 one the works keeps on paper instead. The board goes on showing it in red, and
-the job card will still refuse to start until the film is in.
+the production run will still refuse to start until the film is in.
 
 ### What each machine has coming
 
@@ -403,15 +409,15 @@ onto the same Tuesday.
 
 ### Planning ends where the floor begins
 
-Once a job card is raised the order drops off the board. The card has real
+Once a production run is raised the order drops off the board. The card has real
 stages, a real claim on the film and a real operator, and a date typed here
 afterwards would be a second opinion about a job already running.
 
 ---
 
-## Step 6 — raise the job card · on the order, **Start production**
+## Step 6 — raise the production run · on the order, **Start production**
 
-A job card is what the floor works from. It is raised **from the order**, never
+A production run is what the floor works from. It is raised **from the order**, never
 on its own — a card with no order behind it is a run nobody asked for.
 
 Two things happen the moment it is raised.
@@ -444,7 +450,7 @@ A claim is not an issue. The film is still on the shelf and still counted as on
 hand. What changes is what the **next** job sees:
 
 ```
-free    =  on hand  −  what open job cards have already claimed
+free    =  on hand  −  what open production runs have already claimed
 usable  =  free     −  anything on a reel too narrow to run THIS job
 ```
 
@@ -662,7 +668,7 @@ what the difference cost.
 On the costed sheet, press **Take off stock**.
 
 **Nothing else in a job's life reduces stock.** Not the quotation, not the
-order, not the job card — only the sheet, because only the sheet knows what
+order, not the production run — only the sheet, because only the sheet knows what
 was actually weighed at the machine. (Film arriving on a delivery, and a
 stocktake correction typed on the Inventory screen, are the other two ways
 stock moves; neither belongs to a job.)
@@ -670,7 +676,7 @@ stock moves; neither belongs to a job.)
 It does two things at once:
 
 1. Writes the run's real consumption against the stock batches, oldest first.
-2. **Releases the job card's claim.** The film has genuinely left the shelf now,
+2. **Releases the production run's claim.** The film has genuinely left the shelf now,
    so the claim that was standing in for it stops counting.
 
 That pairing is what guarantees material is never deducted twice. A claim and an
@@ -691,7 +697,7 @@ nothing knew about delivery.
 ### The godown
 
 The Dispatch screen opens on **what is waiting to go**, and nothing in that list
-is stored anywhere. It is what the finished job cards made, less what has already
+is stored anywhere. It is what the finished production runs made, less what has already
 gone out:
 
 | Column            | Where it comes from                                                                                                   |
@@ -842,8 +848,8 @@ whichever machine of the right kind reaches it first.
 Start and Complete are the **same write the office screen makes** — so the
 material re-check still happens at the moment film goes on a machine, the card
 still starts itself, and the reel is still handed on with its weight. A tablet
-that recorded jobs its own way would drift from the job card within a month,
-and the job card is the document the works is paid against. A job whose film is
+that recorded jobs its own way would drift from the production run within a month,
+and the production run is the document the works is paid against. A job whose film is
 not in is refused here too, in the same words.
 
 ### Why a machine is standing idle
@@ -875,7 +881,7 @@ Two questions on one screen, and they are deliberately **different numbers**.
 
 ### Waste is read, not recorded
 
-Every stage has said what went on and what came off since the job card was
+Every stage has said what went on and what came off since the production run was
 built. Nothing new is entered here; the screen groups what the floor has been
 typing all along.
 
@@ -1015,7 +1021,7 @@ time. A status somebody has to remember to change is wrong most of the time.
 
 ### 3. Stock moves exactly once
 
-The job card **claims**. The job sheet **issues**. Only the second touches the
+The production run **claims**. The job sheet **issues**. Only the second touches the
 ledger.
 
 ### 4. Nothing is deleted once it has been used
@@ -1069,7 +1075,7 @@ because it is a screen people leave open on a desk.
 
 **Answers** — who we sell to, and what designs they have.
 **Needs first** — nothing. This is where a works starts.
-**Feeds** — every quotation, and through it every order, job card and invoice
+**Feeds** — every quotation, and through it every order, production run and invoice
 line. A customer's designs are what the quotation wizard offers.
 
 Company, brand, GST number, address, contact. The brand is what the office
@@ -1092,7 +1098,7 @@ that came off the old sheets with no customer. Assigning one is all it writes.
 **Answers** — what we have offered, at what price, and what came of it.
 **Needs first** — Rates and Costing, or the price is wrong and nothing says
 so. A customer and a design.
-**Feeds** — orders, and through them the job card's bill of materials. **The
+**Feeds** — orders, and through them the production run's bill of materials. **The
 quotation is the only place a job's structure is recorded**, which is why a
 job typed straight into Orders can never have its film worked out.
 
@@ -1105,7 +1111,7 @@ quotation sent last month.
 **Answers** — what the customer committed to, at what price, and when it is
 wanted.
 **Needs first** — a won quotation, or the office typing one for repeat work.
-**Feeds** — Planning, job cards, and Dispatch.
+**Feeds** — Planning, production runs, and Dispatch.
 
 One order per quotation **line**, not per quotation: three jobs on one
 quotation are made, finished and delivered separately, and one order holding
@@ -1115,7 +1121,7 @@ all three could never say that two are done and one is late.
 
 **Answers** — what has left the building, on whose lorry, and what is still
 standing in the godown.
-**Needs first** — a finished job card, so there is something to send.
+**Needs first** — a finished production run, so there is something to send.
 **Feeds** — the order's status. Sending the last of an order is what completes
 it.
 
@@ -1130,7 +1136,7 @@ per reel beneath it.
 
 **Answers** — what the works holds, what it is worth, and what is running out.
 **Needs first** — Rates, for a material to exist at all.
-**Feeds** — every job card's material check, and the job sheet that finally
+**Feeds** — every production run's material check, and the job sheet that finally
 takes stock down.
 
 **The single source of truth for stock.** Where a thing is sitting is a free
@@ -1174,7 +1180,7 @@ rates permission.
 **Feeds** — nothing automatically. It is a note of intent: it reserves no film
 and raises no card.
 
-Asks the job card's own material question **before** a card exists, so nobody
+Asks the production run's own material question **before** a card exists, so nobody
 finds out a job cannot be made by trying to make it.
 
 ### Production
@@ -1183,7 +1189,7 @@ finds out a job cannot be made by trying to make it.
 **Needs first** — an order. The film, unless somebody allows it to run short.
 **Feeds** — the job sheet, and the godown once a card finishes.
 
-The job card **claims** film; it never takes it off the shelf.
+The production run **claims** film; it never takes it off the shelf.
 
 ### Machine screen
 
@@ -1208,7 +1214,7 @@ from.
 
 **Answers** — what a run actually consumed and what it actually cost a
 kilogram.
-**Needs first** — a finished job card.
+**Needs first** — a finished production run.
 **Feeds** — **stock.** Posting a sheet is the only thing in the entire system
 that reduces it.
 
@@ -1242,7 +1248,7 @@ and a record with no end **is** the machine being down.
 
 **Answers** — who is here, what they do, and what they are on right now.
 **Needs first** — the wages on the Costing screen, for a role to point at.
-**Feeds** — the operator box on every job card and machine screen.
+**Feeds** — the operator box on every production run and machine screen.
 
 Deliberately not a personnel system: no attendance, no leave, no payroll.
 
@@ -1259,16 +1265,16 @@ everything; everybody else sees the sections ticked for them.
 
 There are eight ticks, and this is what each one is for:
 
-| Tick                     | Unlocks                                                                                                                                    |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Customers**            | Customers, and Designs                                                                                                                     |
-| **Quotations**           | Quotations, and raising or changing an order                                                                                               |
-| **Rates**                | Rates, Costing, and the costing settings — the margin and the wastage allowance                                                            |
-| **Inventory**            | Inventory, and moving stock by hand                                                                                                        |
-| **Purchase & Suppliers** | Purchase and suppliers                                                                                                                     |
-| **Cylinder register**    | the cylinder sets, and the artwork on them                                                                                                 |
-| **Jobs**                 | everything the floor writes: a job card, a stage, Job sheets, Planning's booking, a quality issue, a machine's service record, an operator |
-| **Dispatch**             | raising, sending and cancelling a delivery note                                                                                            |
+| Tick                     | Unlocks                                                                                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Customers**            | Customers, and Designs                                                                                                                           |
+| **Quotations**           | Quotations, and raising or changing an order                                                                                                     |
+| **Rates**                | Rates, Costing, and the costing settings — the margin and the wastage allowance                                                                  |
+| **Inventory**            | Inventory, and moving stock by hand                                                                                                              |
+| **Purchase & Suppliers** | Purchase and suppliers                                                                                                                           |
+| **Cylinder register**    | the cylinder sets, and the artwork on them                                                                                                       |
+| **Jobs**                 | everything the floor writes: a production run, a stage, Job sheets, Planning's booking, a quality issue, a machine's service record, an operator |
+| **Dispatch**             | raising, sending and cancelling a delivery note                                                                                                  |
 
 Two of them need **two** ticks, because the action crosses a boundary:
 booking a purchase delivery in needs _Purchase_ **and** _Inventory_, since it
@@ -1313,17 +1319,17 @@ moves when you change something, and the one rule about stock.
 ## Nothing is typed twice
 
 A fact is entered once and travels. Nobody retypes the customer onto the
-order, the design onto the job card, or the quantity onto the job sheet.
+order, the design onto the production run, or the quantity onto the job sheet.
 
 ```
-   Customer ──► Quotation ──► Order ──► Job card ──► Job sheet ──► Dispatch
+   Customer ──► Quotation ──► Order ──► Production run ──► Job sheet ──► Dispatch
                     │                      │
                     │                      └─► claims film from Inventory
                     └─► priced from Rates + Costing, as at its own date
 ```
 
 The one place this breaks is deliberate: **an order typed straight into
-Orders, with no quotation behind it, has no structure** — so the job card
+Orders, with no quotation behind it, has no structure** — so the production run
 cannot work out what film it needs and says so, rather than guessing.
 
 ## Most of what you see is worked out, not stored
@@ -1332,17 +1338,17 @@ If a figure can be calculated from something else, it is — every time it is
 shown. Nothing on this list is a field anybody maintains, and none of it can
 go stale:
 
-| Figure                       | Worked out from                                               |
-| ---------------------------- | ------------------------------------------------------------- |
-| How far a job card has got   | its stages that are done                                      |
-| Whether an order is late     | its due date against today                                    |
-| What is free in stock        | on hand, less what open job cards have claimed                |
-| What a job is short of       | what it needs, against what is free and wide enough           |
-| Who is on a machine          | the stage running on it                                       |
-| What is in the godown        | what finished cards made, less what has gone, less rejections |
-| Whether a machine is down    | a maintenance record with no end                              |
-| How long a machine has stood | the pauses, problems and repairs recorded on it               |
-| Waste at a stage             | what went on, less what came off                              |
+| Figure                           | Worked out from                                               |
+| -------------------------------- | ------------------------------------------------------------- |
+| How far a production run has got | its stages that are done                                      |
+| Whether an order is late         | its due date against today                                    |
+| What is free in stock            | on hand, less what open production runs have claimed          |
+| What a job is short of           | what it needs, against what is free and wide enough           |
+| Who is on a machine              | the stage running on it                                       |
+| What is in the godown            | what finished cards made, less what has gone, less rejections |
+| Whether a machine is down        | a maintenance record with no end                              |
+| How long a machine has stood     | the pauses, problems and repairs recorded on it               |
+| Waste at a stage                 | what went on, less what came off                              |
 
 ## Change this, and this follows
 
@@ -1352,7 +1358,7 @@ go stale:
 | A machine speed, wage or overhead   | the same — from now on only                                                                                                                         |
 | A costing setting (margin, wastage) | the same. Which is why it needs the rates permission                                                                                                |
 | Win a quotation                     | one order per line, plus a design record for any line that did not already have one. Both idempotent: winning twice creates nothing the second time |
-| Raise a job card                    | film, ink and adhesive are **claimed** — free stock drops, the shelf does not                                                                       |
+| Raise a production run              | film, ink and adhesive are **claimed** — free stock drops, the shelf does not                                                                       |
 | Start a stage                       | the card starts, and the order moves to In production                                                                                               |
 | Finish a stage                      | the reel passes to the next machine with its weight                                                                                                 |
 | Post a job sheet                    | **stock comes down**, and the card's claim is released                                                                                              |
@@ -1366,7 +1372,7 @@ go stale:
 **A job's material comes off the shelf exactly once, and only the job sheet
 does it.**
 
-- A **job card claims** film. This is a promise, not a movement — the shelf is
+- A **production run claims** film. This is a promise, not a movement — the shelf is
   untouched, and another job simply cannot promise the same roll.
 - A **job sheet issues** it. Posting a sheet releases the claim at the same
   moment, in the same transaction, so a claim and an issue can never both

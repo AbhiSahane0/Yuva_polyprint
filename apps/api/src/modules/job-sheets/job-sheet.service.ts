@@ -1,9 +1,12 @@
 import {
   costJobSheet,
+  filmRowsFromPlies,
+  outputNet,
   JOB_SHEET_CREW,
   JOB_SHEET_LINES,
   JOB_SHEET_STAGE_DEFAULTS,
   mixDrumFor,
+  weighedTotal,
   type JobSheet,
   type JobSheetInput,
   type JobSheetLineTemplate,
@@ -43,12 +46,21 @@ const SHEET_INCLUDE = {
   customer: { select: { companyName: true } },
   /* Only its number: the sheet names the card it costs, it does not restate it. */
   productionOrder: { select: { number: true } },
-  lines: { orderBy: { position: 'asc' } },
+  lines: {
+    orderBy: { position: 'asc' },
+    include: { reels: { orderBy: { position: 'asc' } } },
+  },
   labour: { orderBy: { position: 'asc' } },
   stages: { orderBy: { stage: 'asc' } },
+  /* The rolls that came off the machines. Belong to the sheet, not to a row:
+     they are production, not consumption. */
+  reels: { where: { role: 'OUTPUT' }, orderBy: { position: 'asc' } },
 } satisfies Prisma.JobSheetInclude;
 
 type SheetRow = Prisma.JobSheetGetPayload<{ include: typeof SHEET_INCLUDE }>;
+
+/** Three places, which is what every weight on this form is kept to. */
+const round3 = (value: number): number => Math.round(value * 1000) / 1000;
 
 const num = (value: Prisma.Decimal | number | null | undefined): number =>
   value === null || value === undefined ? 0 : Number(value);
@@ -146,6 +158,15 @@ function toJobSheet(row: SheetRow): JobSheet {
     notes: row.notes,
     enteredBy: row.enteredBy,
 
+    outputReels: row.reels.map((reel) => ({
+      id: reel.id,
+      position: reel.position,
+      /* Only an OUTPUT row is loaded, and every one of them has a stage. */
+      stage: (reel.stage ?? 'PRINTING') as JobSheetStage,
+      weightKg: num(reel.weightKg),
+      coreKg: num(reel.coreKg),
+      reelNumber: reel.reelNumber,
+    })),
     lines: row.lines.map((line) => ({
       id: line.id,
       position: line.position,
@@ -155,6 +176,24 @@ function toJobSheet(row: SheetRow): JobSheet {
       name: line.name,
       issuedKg: num(line.issuedKg),
       returnedKg: num(line.returnedKg),
+      issueReels: line.reels
+        .filter((reel) => reel.role === 'ISSUE')
+        .map((reel) => ({
+          id: reel.id,
+          position: reel.position,
+          weightKg: num(reel.weightKg),
+          coreKg: num(reel.coreKg),
+          reelNumber: reel.reelNumber,
+        })),
+      returnReels: line.reels
+        .filter((reel) => reel.role === 'RETURN')
+        .map((reel) => ({
+          id: reel.id,
+          position: reel.position,
+          weightKg: num(reel.weightKg),
+          coreKg: num(reel.coreKg),
+          reelNumber: reel.reelNumber,
+        })),
       mixIssuedKg: num(line.mixIssuedKg),
       mixReturnedKg: num(line.mixReturnedKg),
       mixSharePercent: num(line.mixSharePercent),
@@ -180,6 +219,10 @@ function toJobSheet(row: SheetRow): JobSheet {
       days: num(stage.days),
       shifts: num(stage.shifts),
       amount: num(stage.amount),
+      wastageKg: num(stage.wastageKg),
+      noPowerMinutes: num(stage.noPowerMinutes),
+      jobTakenTime: stage.jobTakenTime,
+      registrationTime: stage.registrationTime,
     })),
 
     createdAt: row.createdAt.toISOString(),
@@ -235,6 +278,105 @@ async function ratesForTemplate(
   );
 }
 
+/**
+ * **The films this job is actually made of, in ply order.**
+ *
+ * The works' printed sheet names its own film rows — "12 PET Polyester", "Met
+ * PET", "LDPE" — and for two of the three that is enough, because the works
+ * buys one PET and one metallised PET. The sealant is the problem: the rates
+ * master carries twelve derived LDPE grades, and which one a job ran is a fact
+ * about THAT job, not about the form.
+ *
+ * So it is looked up rather than named. The quotation's own layers are the
+ * answer — they are the plies the job was priced on, in order, each against a
+ * real catalogue row — and they are reached from whichever of the sheet's two
+ * links exists: the run it costs, or the design it is for.
+ *
+ * Ply order is structural, not a guess: the first film is the print web and
+ * the LAST is the sealant, which is what the LDPE row is. Anything between
+ * them is the metallised ply.
+ */
+async function filmsForJob(input: {
+  jobId: string | null;
+  productionOrderId: string | null;
+}): Promise<{ pet: string | null; metPet: string | null; poly: string | null }> {
+  /* The run's own order knows which quotation line it came from, which is the
+     closest thing to "what this exact run is made of". */
+  const fromRun = input.productionOrderId
+    ? await prisma.productionOrder.findUnique({
+        where: { id: input.productionOrderId },
+        select: {
+          order: {
+            select: {
+              quotationItem: {
+                select: {
+                  layers: {
+                    orderBy: { position: 'asc' },
+                    select: { materialId: true, material: { select: { isActive: true } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      })
+    : null;
+
+  /*
+   * Failing that, the newest quotation that priced this design. A works
+   * re-quotes the same job for years and the structure rarely moves, so the
+   * last one priced is a better answer than no answer — and it is only ever a
+   * STARTING point, because every row on the sheet can be changed.
+   */
+  const layers =
+    fromRun?.order?.quotationItem?.layers ??
+    (input.jobId
+      ? ((
+          await prisma.quotationItem.findFirst({
+            where: { jobId: input.jobId },
+            orderBy: { quotation: { date: 'desc' } },
+            select: {
+              layers: {
+                orderBy: { position: 'asc' },
+                select: { materialId: true, material: { select: { isActive: true } } },
+              },
+            },
+          })
+        )?.layers ?? [])
+      : []);
+
+  /* A retired film is not an answer: it is how this row came to name one in
+     the first place. */
+  const films = layers
+    .filter((layer) => layer.materialId && layer.material?.isActive)
+    .map((layer) => layer.materialId as string);
+
+  /* The rule itself is pure and lives in shared, where it is tested against
+     the two, three and four ply cases. */
+  return filmRowsFromPlies(films);
+}
+
+/** A material's name and its rate as at a day. Null when it is not on record. */
+async function materialAsAt(
+  materialId: string,
+  onDate: string,
+): Promise<{ name: string; rate: number } | null> {
+  const material = await prisma.material.findUnique({
+    where: { id: materialId },
+    select: {
+      name: true,
+      rates: {
+        where: { effectiveDate: { lte: asDate(onDate) } },
+        orderBy: { effectiveDate: 'desc' },
+        take: 1,
+        select: { rate: true },
+      },
+    },
+  });
+  if (!material) return null;
+  return { name: material.name, rate: num(material.rates[0]?.rate) };
+}
+
 /** What the mix columns of a line start as, given which drum it draws from. */
 function mixFor(template: JobSheetLineTemplate): { share: number } {
   return { share: template.mixSource === 'NONE' ? 0 : template.mixSharePercent };
@@ -270,6 +412,29 @@ export async function createJobSheet(input: JobSheetInput, enteredBy: string): P
     ? await resolveCardLink(prisma, null, input.productionOrderId)
     : null;
 
+  /*
+   * Which films, by grade. Only the rows the works' form cannot name for
+   * itself are overridden — and the sealant row is the reason this exists.
+   */
+  const structure = await filmsForJob({
+    jobId: job?.id ?? fromCard?.jobId ?? null,
+    productionOrderId: input.productionOrderId ?? null,
+  });
+  const films: Record<string, { id: string; name: string; rate: number } | null> = {
+    pet: null,
+    metpet: null,
+    ldpe: null,
+  };
+  for (const [key, materialId] of [
+    ['pet', structure.pet],
+    ['metpet', structure.metPet],
+    ['ldpe', structure.poly],
+  ] as const) {
+    if (!materialId) continue;
+    const found = await materialAsAt(materialId, input.date);
+    if (found) films[key] = { id: materialId, name: found.name, rate: found.rate };
+  }
+
   const number = await peekNextNumber();
 
   const created = await prisma.jobSheet.create({
@@ -304,14 +469,25 @@ export async function createJobSheet(input: JobSheetInput, enteredBy: string): P
       lines: {
         create: JOB_SHEET_LINES.map((template, index) => {
           const material = template.materialName ? rates.get(template.materialName) : undefined;
+          /* The three film rows, bound to the grades this job is made of —
+             see `filmsForJob`. Named for the grade, because "LDPE" alone does
+             not tell the laminator which reel to fetch. */
+          const bound = films[template.key as keyof typeof films];
           return {
             position: index + 1,
             section: template.section,
             kind: template.kind,
-            materialId: material?.id ?? null,
-            name: template.name,
+            materialId: bound?.id ?? material?.id ?? null,
+            /*
+             * The works' own wording stays where the works has a word for it:
+             * their form says "12 PET Polyester" and that is what the person
+             * filling it in is reading. Only the row that cannot name its own
+             * material takes the grade's name, because "LDPE" on its own does
+             * not tell the laminator which reel to fetch.
+             */
+            name: template.materialName ? template.name : (bound?.name ?? template.name),
             mixSharePercent: mixFor(template).share,
-            ratePerKg: material?.rate ?? 0,
+            ratePerKg: bound?.rate ?? material?.rate ?? 0,
           };
         }),
       },
@@ -530,8 +706,55 @@ export async function updateJobSheet(
 ): Promise<JobSheet> {
   await editable(id);
 
+  /* The day this sheet costs at, which is its own and not today's. */
+  const current = await prisma.jobSheet.findUniqueOrThrow({
+    where: { id },
+    select: { date: true },
+  });
+  const sheetDate = input.date ?? current.date.toISOString().slice(0, 10);
+
   await prisma.$transaction(async (tx) => {
-    const { lines, labour, stages, date, jobId, productionOrderId, ...rest } = input;
+    const { lines, labour, stages, outputReels, date, jobId, productionOrderId, ...rest } = input;
+
+    /*
+     * The rolls that came off the machines decide what the run produced.
+     *
+     * The works weighs each roll with its core in it and writes the core
+     * underneath, because that is what the scale shows — so the gross and the
+     * core are the sums of those two rows, and the net is what they leave.
+     *
+     * Two machines produce, and the sheet has a pair of figures for each: the
+     * press makes printed film and the laminator makes laminate. A roll is
+     * counted against the machine it came off, so printing rolls never swell
+     * the laminated figure the cost is worked out from.
+     *
+     * Where no roll was listed for a stage, that stage's typed figures stand.
+     */
+    /*
+     * The printing mix drum, added up rather than typed again.
+     *
+     * The works' form has a mix column against every colour and a Total at the
+     * foot of it — `=sum(J15:J26)` — and that total is the drum the solvents
+     * book back 40% and 20% of. We were asking for it a second time in its own
+     * box, which is how one figure becomes two that disagree.
+     *
+     * Only where the colours carry mix figures. A sheet keyed from paper with
+     * nothing but a pooled total still has its typed one, because that is all
+     * there is.
+     */
+    const inkMix = (lines ?? []).filter((line) => line.kind === 'INK');
+    const mixed = inkMix.some((line) => line.mixIssuedKg !== 0 || line.mixReturnedKg !== 0);
+    const printPool = mixed
+      ? {
+          printMixIssuedKg: round3(inkMix.reduce((sum, line) => sum + line.mixIssuedKg, 0)),
+          printMixReturnedKg: round3(inkMix.reduce((sum, line) => sum + line.mixReturnedKg, 0)),
+        }
+      : null;
+
+    const printedRolls = (outputReels ?? []).filter((reel) => reel.stage === 'PRINTING');
+    const laminatedRolls = (outputReels ?? []).filter((reel) => reel.stage !== 'PRINTING');
+    const printed = printedRolls.length > 0 ? outputNet(printedRolls) : null;
+    const produced = laminatedRolls.length > 0 ? outputNet(laminatedRolls) : null;
 
     /*
      * Pulled out of the spread on purpose. Linking a sheet to a card is the
@@ -553,6 +776,9 @@ export async function updateJobSheet(
       where: { id },
       data: {
         ...rest,
+        ...(printPool ?? {}),
+        ...(printed ? { printedGrossKg: printed.grossKg, printedCoreKg: printed.coreKg } : {}),
+        ...(produced ? { producedGrossKg: produced.grossKg, producedCoreKg: produced.coreKg } : {}),
         /* Pulled out of the spread: it arrives as yyyy-mm-dd and the column
            is a DATE. */
         ...(date ? { date: asDate(date) } : {}),
@@ -575,20 +801,96 @@ export async function updateJobSheet(
      * rather than a diff that could leave a colour behind.
      */
     for (const line of lines ?? []) {
+      /*
+       * A row the office has just put a material against prices itself.
+       *
+       * Only when it has no rate: a figure somebody typed is the drum in
+       * front of them and beats the catalogue, which is the same rule the
+       * consumption column follows. Priced as at the SHEET's date, not
+       * today's, so a sheet keyed from last month's paper costs what that
+       * month cost.
+       */
+      let ratePerKg = line.ratePerKg;
+      if (line.materialId && ratePerKg === 0) {
+        const priced = await materialAsAt(line.materialId, sheetDate);
+        if (priced) ratePerKg = priced.rate;
+      }
+
+      /*
+       * The reels are the figure where the works listed them.
+       *
+       * Their sheet has a column per reel — "257.3 and 250.25" is how 507.55
+       * kg of polyester gets onto it — and a typed total beside them would be
+       * a second answer to the same question. Where nothing was weighed the
+       * typed total stands. See `weighedTotal`.
+       */
+      const issuedKg = weighedTotal(line.issueReels, line.issuedKg);
+      const returnedKg = weighedTotal(line.returnReels, line.returnedKg);
+
       await tx.jobSheetLine.updateMany({
         where: { sheetId: id, position: line.position },
         data: {
           materialId: line.materialId,
           name: line.name,
-          issuedKg: line.issuedKg,
-          returnedKg: line.returnedKg,
+          issuedKg,
+          returnedKg,
           mixIssuedKg: line.mixIssuedKg,
           mixReturnedKg: line.mixReturnedKg,
           mixSharePercent: line.mixSharePercent,
           consumedOverrideKg: line.consumedOverrideKg,
-          ratePerKg: line.ratePerKg,
+          ratePerKg,
         },
       });
+
+      /*
+       * Replaced wholesale rather than diffed. A reel has no identity of its
+       * own — it is a weight somebody wrote in the next column along — so
+       * matching them up would be inventing one.
+       */
+      const row = await tx.jobSheetLine.findFirst({
+        where: { sheetId: id, position: line.position },
+        select: { id: true },
+      });
+      if (row) {
+        await tx.jobSheetReel.deleteMany({ where: { lineId: row.id } });
+        const weighings = [
+          ...line.issueReels.map((reel, index) => ({ ...reel, role: 'ISSUE' as const, index })),
+          ...line.returnReels.map((reel, index) => ({ ...reel, role: 'RETURN' as const, index })),
+        ];
+        if (weighings.length > 0) {
+          await tx.jobSheetReel.createMany({
+            data: weighings.map((reel) => ({
+              sheetId: id,
+              lineId: row.id,
+              role: reel.role,
+              position: reel.index + 1,
+              weightKg: reel.weightKg,
+              coreKg: 0,
+              reelNumber: reel.reelNumber,
+            })),
+          });
+        }
+      }
+    }
+
+    /* Replaced wholesale, like the line reels: a roll is a weight somebody
+       wrote, not a record with a life of its own. */
+    if (outputReels) {
+      await tx.jobSheetReel.deleteMany({ where: { sheetId: id, role: 'OUTPUT' } });
+      if (outputReels.length > 0) {
+        await tx.jobSheetReel.createMany({
+          data: outputReels.map((reel, index) => ({
+            sheetId: id,
+            lineId: null,
+            stage: reel.stage,
+            role: 'OUTPUT' as const,
+            position: index + 1,
+            weightKg: reel.weightKg,
+            coreKg: reel.coreKg,
+            reelNumber: reel.reelNumber,
+          })),
+        });
+      }
     }
 
     for (const role of labour ?? []) {
@@ -606,7 +908,16 @@ export async function updateJobSheet(
     for (const stage of stages ?? []) {
       await tx.jobSheetStageUsage.updateMany({
         where: { sheetId: id, stage: stage.stage as JobSheetStage },
-        data: { sharePercent: stage.sharePercent, days: stage.days, shifts: stage.shifts },
+        data: {
+          sharePercent: stage.sharePercent,
+          days: stage.days,
+          shifts: stage.shifts,
+          /* The operator's remarks about this machine's shift. Never costed. */
+          wastageKg: stage.wastageKg,
+          noPowerMinutes: stage.noPowerMinutes,
+          jobTakenTime: stage.jobTakenTime,
+          registrationTime: stage.registrationTime,
+        },
       });
     }
   }, TX);

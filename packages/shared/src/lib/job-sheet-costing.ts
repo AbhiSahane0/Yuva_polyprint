@@ -365,3 +365,92 @@ export function mixDrumFor(
     ? { issued: pools.printMixIssuedKg, returned: pools.printMixReturnedKg }
     : { issued: pools.lamMixIssuedKg, returned: pools.lamMixReturnedKg };
 }
+
+/**
+ * **Which film goes on which row of the works' printed sheet.**
+ *
+ * Their form has three film lines — the print web, the metallised ply and the
+ * sealant — and for two of them the works buys exactly one thing, so the form
+ * can name it. The sealant it cannot: the rates master carries a dozen derived
+ * LDPE grades and which one a job ran is a fact about that job.
+ *
+ * So the plies are assigned by POSITION, which is structural rather than a
+ * guess about names: a laminate is built print web first and sealant last, and
+ * anything in between is the metallised ply. A two-ply job has a web and a
+ * sealant and no middle. One film is a sealant on its own — an unlaminated
+ * job is still sealed.
+ */
+export function filmRowsFromPlies<T>(plies: readonly T[]): {
+  pet: T | null;
+  metPet: T | null;
+  poly: T | null;
+} {
+  if (plies.length === 0) return { pet: null, metPet: null, poly: null };
+  if (plies.length === 1) return { pet: null, metPet: null, poly: plies[0] as T };
+
+  return {
+    pet: plies[0] as T,
+    /* Three or more: everything between the web and the sealant is metallised,
+       and the works' form has one row for it, so the first of them wins. */
+    metPet: plies.length > 2 ? (plies[1] as T) : null,
+    poly: plies[plies.length - 1] as T,
+  };
+}
+
+/** One weighing off the scale: a reel issued, a reel back, or a roll made. */
+export interface WeighedReel {
+  weightKg: number;
+  /** The core an OUTPUT roll was wound on. Zero on anything issued. */
+  coreKg?: number;
+}
+
+/**
+ * **What a set of weighings comes to, against what somebody typed.**
+ *
+ * The works weighs reels: 257.3 and 250.25 is how 507.55 kg of polyester
+ * reaches their sheet. Where the reels are listed they ARE the figure — a
+ * typed total that disagrees with the rows above it is two answers to one
+ * question, and the one with the weighings behind it is the one that can be
+ * checked. Where nothing is listed, the typed total is all there is and it
+ * stands, because a sheet keyed from a scrap of paper must still cost.
+ *
+ * Deliberately the same rule as a dispatch note's packages. Two places in this
+ * system let somebody list what they weighed instead of totalling it, and they
+ * had better behave the same way.
+ */
+export function weighedTotal(reels: readonly WeighedReel[] | undefined, typedKg: number): number {
+  if (!reels || reels.length === 0) {
+    return Number.isFinite(typedKg) ? typedKg : 0;
+  }
+  return round(
+    reels.reduce((sum, reel) => sum + (Number.isFinite(reel.weightKg) ? reel.weightKg : 0), 0),
+    3,
+  );
+}
+
+/**
+ * The net of a set of output rolls: what came off the machine, less its cores.
+ *
+ * The works weighs a roll with the core in it and writes the core underneath,
+ * because that is what the scale shows. The net is never typed — it is what
+ * those two leave, and a third figure that can disagree with them is a figure
+ * nobody can trust.
+ */
+export function outputNet(reels: readonly WeighedReel[]): {
+  grossKg: number;
+  coreKg: number;
+  netKg: number;
+} {
+  const grossKg = round(
+    reels.reduce((sum, reel) => sum + (Number.isFinite(reel.weightKg) ? reel.weightKg : 0), 0),
+    3,
+  );
+  const coreKg = round(
+    reels.reduce(
+      (sum, reel) => sum + (Number.isFinite(reel.coreKg ?? 0) ? (reel.coreKg ?? 0) : 0),
+      0,
+    ),
+    3,
+  );
+  return { grossKg, coreKg, netKg: round(grossKg - coreKg, 3) };
+}
