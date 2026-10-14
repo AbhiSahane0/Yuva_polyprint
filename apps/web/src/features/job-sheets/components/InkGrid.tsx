@@ -34,39 +34,25 @@ export function InkGrid({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[46rem] border-separate border-spacing-y-0.5 text-sm">
+      <table className="w-full min-w-[46rem] text-sm">
         <thead>
-          <tr className="text-left align-bottom">
-            <th className="w-28 pb-1">
+          <tr className="border-ink-200 border-b align-bottom">
+            <th className="w-28 pb-1.5 text-left">
               <Head>Fresh Ink</Head>
             </th>
-            <th className="pb-1">
-              <Head>Rec</Head>
-            </th>
-            <th className="pb-1">
-              <Head>Total</Head>
-            </th>
-            <th className="pb-1">
-              <Head>Bal.</Head>
-            </th>
-            <th className="pb-1">
-              <Head>Con.</Head>
-            </th>
-            <th className="border-ink-200 w-24 border-l pb-1 pl-3">
+            {['Rec', 'Total', 'Bal.', 'Con.'].map((head) => (
+              <th key={head} className="w-[5.5rem] pr-1 pb-1.5">
+                <Head className="text-right">{head}</Head>
+              </th>
+            ))}
+            <th className="border-ink-200 w-28 border-l pb-1.5 pl-3 text-left">
               <Head>Mix Ink</Head>
             </th>
-            <th className="pb-1">
-              <Head>Rec</Head>
-            </th>
-            <th className="pb-1">
-              <Head>Bal.</Head>
-            </th>
-            <th className="pb-1">
-              <Head>Cons.</Head>
-            </th>
-            <th className="pb-1">
-              <Head>Total</Head>
-            </th>
+            {['Rec', 'Bal.', 'Cons.', 'Total'].map((head) => (
+              <th key={head} className="w-[5.5rem] pr-1 pb-1.5 last:pr-0">
+                <Head className="text-right">{head}</Head>
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -74,87 +60,87 @@ export function InkGrid({
             const freshCon = line.issuedKg - line.returnedKg;
             const mixCon = line.mixIssuedKg - line.mixReturnedKg;
             return (
-              <tr key={line.id}>
-                <td className="text-ink-800 pr-2 font-medium">{line.name}</td>
-                <td className="pr-1">
+              <tr key={line.id} className="border-ink-100 border-b">
+                <td className="text-ink-800 py-1 pr-2 font-medium">{line.name}</td>
+                <td className="py-1 pr-1">
                   <Typed
-                    width="w-[72px]"
+                    width="w-full"
                     label={`${line.name}, fresh received`}
                     value={line.issuedKg}
                     disabled={disabled}
                     onChange={(next) => onLine(line.position, { issuedKg: Number(next || 0) })}
                   />
                 </td>
-                <td className="pr-1">
+                <td className="py-1 pr-1">
                   <Worked value={freshCon + line.returnedKg} />
                 </td>
-                <td className="pr-1">
+                <td className="py-1 pr-1">
                   <Typed
-                    width="w-[72px]"
+                    width="w-full"
                     label={`${line.name}, fresh balance`}
                     value={line.returnedKg}
                     disabled={disabled}
                     onChange={(next) => onLine(line.position, { returnedKg: Number(next || 0) })}
                   />
                 </td>
-                <td className="pr-1">
+                <td className="py-1 pr-1">
                   <Worked value={freshCon} />
                 </td>
-                <td className="border-ink-200 text-ink-700 border-l pl-3 pr-2">{line.name}</td>
-                <td className="pr-1">
+                <td className="border-ink-200 text-ink-700 border-l py-1 pr-2 pl-3">{line.name}</td>
+                <td className="py-1 pr-1">
                   <Typed
-                    width="w-[72px]"
+                    width="w-full"
                     label={`${line.name}, mix received`}
                     value={line.mixIssuedKg}
                     disabled={disabled}
                     onChange={(next) => onLine(line.position, { mixIssuedKg: Number(next || 0) })}
                   />
                 </td>
-                <td className="pr-1">
+                <td className="py-1 pr-1">
                   <Typed
-                    width="w-[72px]"
+                    width="w-full"
                     label={`${line.name}, mix balance`}
                     value={line.mixReturnedKg}
                     disabled={disabled}
                     onChange={(next) => onLine(line.position, { mixReturnedKg: Number(next || 0) })}
                   />
                 </td>
-                <td className="pr-1">
+                <td className="py-1 pr-1">
                   <Worked value={mixCon} />
                 </td>
                 {/* Their M column: the fresh consumed plus 40% of the mixed. */}
-                <td>
+                <td className="py-1">
                   <Worked value={freshCon + mixCon * 0.4} className="font-semibold" />
                 </td>
               </tr>
             );
           })}
           <tr className="border-ink-300 border-t">
-            <td className="text-ink-700 pt-1 text-right text-xs font-semibold" colSpan={2}>
+            <td className="text-ink-700 pt-2 pr-1 text-right text-xs font-semibold" colSpan={2}>
               Total
             </td>
-            <td className="pt-1">
+            <td className="pt-2 pr-1">
               <Worked value={freshTotal} />
             </td>
-            <td className="pt-1">
+            <td className="pt-2 pr-1">
               <Worked value={freshBal} />
             </td>
-            <td className="pt-1">
+            <td className="pt-2 pr-1">
               <Worked value={freshTotal - freshBal} />
             </td>
             <td className="border-ink-200 border-l pl-3 pt-1 text-right text-xs font-semibold">
               Total
             </td>
-            <td className="pt-1">
+            <td className="pt-2 pr-1">
               <Worked value={mixTotal} />
             </td>
-            <td className="pt-1">
+            <td className="pt-2 pr-1">
               <Worked value={mixBal} />
             </td>
-            <td className="pt-1">
+            <td className="pt-2 pr-1">
               <Worked value={mixTotal - mixBal} />
             </td>
-            <td className="pt-1">
+            <td className="pt-2 pr-1">
               <Worked
                 value={freshTotal - freshBal + (mixTotal - mixBal) * 0.4}
                 className="font-semibold"

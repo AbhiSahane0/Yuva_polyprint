@@ -16,7 +16,7 @@ import {
   type JobSheetStageUsage,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
-import { Input, Select } from '@/components/ui/Field';
+import { Field, Input, NumberInput, Select } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -27,11 +27,11 @@ import { useProductionOrders } from '@/features/production/api/production-api';
 import { useMaterials } from '@/features/rates/api/rate-api';
 import { Weighings } from '../components/Weighings';
 import { InkGrid } from '../components/InkGrid';
-import { RollRow } from '../components/RollRow';
+import { RollHeads, RollRow } from '../components/RollRow';
 import { StageCard, type StageCardRow } from '../components/StageCard';
 import { FinalCosting } from '../components/FinalCosting';
-import { Band, Head, RowName, Typed, Worked, YELLOW } from '../components/sheet-form';
-import { DocCard } from '@/components/ui/Document';
+import { Band, RowName, Typed, Worked, YELLOW } from '../components/sheet-form';
+import { DocCard, Shown } from '@/components/ui/Document';
 import {
   useCostJobSheet,
   useJobSheet,
@@ -101,16 +101,6 @@ const asReels = (reels: JobSheetReelInput[]): JobSheetReel[] =>
     coreKg: reel.coreKg ?? 0,
     reelNumber: reel.reelNumber ?? '',
   }));
-
-/** A label and its box, as the form sets them: name on the left, box right. */
-function SheetPair({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-ink-700 w-32 shrink-0 text-sm font-medium">{label}</span>
-      <div className="min-w-0 flex-1">{children}</div>
-    </div>
-  );
-}
 
 export default function JobSheetPage() {
   const { id } = useParams<{ id: string }>();
@@ -621,93 +611,96 @@ export default function JobSheetPage() {
         this sheet that the works types is yellow, and nothing else is.
       */}
           <DocCard>
-            <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-              <div className="flex items-end gap-2">
-                <Head>Sr. No.</Head>
-                <Worked value={draft.number} places={0} className="w-20 font-semibold" />
-              </div>
-              <div className="flex items-end gap-2">
-                <Head>Date</Head>
+            {/*
+              Labels above the boxes, four across, as every other screen in
+              the app sets a form out. They sat beside them, spreadsheet
+              fashion, which is the one layout nothing else here uses.
+            */}
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <Shown label="Sr. No." value={String(draft.number)} />
+              <Field label="Date" htmlFor="sheetDate">
                 <Input
+                  id="sheetDate"
                   type="date"
-                  className={cn(YELLOW, 'w-40')}
-                  aria-label="Date"
+                  className={YELLOW}
                   value={draft.date}
                   disabled={locked}
                   onChange={(event) => set('date', event.target.value)}
                 />
-              </div>
-            </div>
-
-            <div className="grid gap-x-6 gap-y-2 md:grid-cols-2">
-              <SheetPair label="Job Name:">
+              </Field>
+              <Field label="Job Name" htmlFor="jobName">
                 <Input
-                  className={cn(YELLOW, 'w-full')}
-                  aria-label="Job name"
+                  id="jobName"
+                  className={YELLOW}
                   value={draft.jobName}
                   disabled={locked}
                   onChange={(event) => set('jobName', event.target.value)}
                 />
-              </SheetPair>
-              <SheetPair label="Width:">
-                <Typed
-                  width="w-24"
-                  label="Width in mm"
-                  value={draft.webWidthMm ?? 0}
-                  disabled={locked}
-                  onChange={(next) => set('webWidthMm', Number(next || 0))}
-                />
-              </SheetPair>
-              <SheetPair label="Material:">
+              </Field>
+              <Field label="Operator Name" htmlFor="operatorName">
                 <Input
-                  className={cn(YELLOW, 'w-full')}
-                  aria-label="Material"
+                  id="operatorName"
+                  className={YELLOW}
+                  value={draft.operatorName}
+                  disabled={locked}
+                  onChange={(event) => set('operatorName', event.target.value)}
+                />
+              </Field>
+
+              <Field label="Material" htmlFor="filmType">
+                <Input
+                  id="filmType"
+                  className={YELLOW}
                   placeholder="Polyster / HSPP"
                   value={draft.filmType}
                   disabled={locked}
                   onChange={(event) => set('filmType', event.target.value)}
                 />
-              </SheetPair>
-              <SheetPair label="Thickness:">
-                <Typed
-                  width="w-24"
-                  label="Thickness in micron"
-                  value={draft.micron ?? 0}
+              </Field>
+              <Field label="Width" htmlFor="webWidthMm" hint="mm">
+                <NumberInput
+                  id="webWidthMm"
+                  className={YELLOW}
+                  value={draft.webWidthMm ? String(draft.webWidthMm) : ''}
                   disabled={locked}
-                  onChange={(next) => set('micron', Number(next || 0))}
+                  onChange={(event) => set('webWidthMm', Number(event.target.value || 0))}
                 />
-              </SheetPair>
-              <SheetPair label="No. of Cylinder:">
-                <Typed
-                  width="w-24"
-                  label="Number of cylinders"
-                  value={draft.cylinderCount}
+              </Field>
+              <Field label="Thickness" htmlFor="micron" hint="micron">
+                <NumberInput
+                  id="micron"
+                  className={YELLOW}
+                  value={draft.micron ? String(draft.micron) : ''}
                   disabled={locked}
-                  onChange={(next) => set('cylinderCount', Number(next || 0))}
+                  onChange={(event) => set('micron', Number(event.target.value || 0))}
                 />
-              </SheetPair>
-              <SheetPair label="Circumference:">
-                <Typed
-                  width="w-24"
-                  label="Circumference in mm"
-                  value={draft.circumferenceMm ?? 0}
+              </Field>
+              <Field label="Circumference" htmlFor="circumferenceMm" hint="mm">
+                <NumberInput
+                  id="circumferenceMm"
+                  className={YELLOW}
+                  value={draft.circumferenceMm ? String(draft.circumferenceMm) : ''}
                   disabled={locked}
-                  onChange={(next) => set('circumferenceMm', Number(next || 0))}
+                  onChange={(event) => set('circumferenceMm', Number(event.target.value || 0))}
                 />
-              </SheetPair>
-              <SheetPair label="Operator Name:">
-                <Input
-                  className={cn(YELLOW, 'w-full')}
-                  aria-label="Operator name"
-                  value={draft.operatorName}
+              </Field>
+
+              <Field label="No. of Cylinder" htmlFor="cylinderCount">
+                <NumberInput
+                  id="cylinderCount"
+                  className={YELLOW}
+                  value={draft.cylinderCount ? String(draft.cylinderCount) : ''}
                   disabled={locked}
-                  onChange={(event) => set('operatorName', event.target.value)}
+                  onChange={(event) => set('cylinderCount', Number(event.target.value || 0))}
                 />
-              </SheetPair>
-              <SheetPair label="Production run:">
+              </Field>
+              <Field
+                label="Production run"
+                htmlFor="productionOrderId"
+                hint="Which run this sheet costs"
+              >
                 <Select
-                  className="w-full"
-                  aria-label="Production run"
+                  id="productionOrderId"
                   value={draft.productionOrderId ?? ''}
                   disabled={locked}
                   onChange={(event) => set('productionOrderId', event.target.value || null)}
@@ -719,13 +712,14 @@ export default function JobSheetPage() {
                     </option>
                   ))}
                 </Select>
-              </SheetPair>
+              </Field>
             </div>
           </DocCard>
 
           {/* ---- Details of Roll, and the other items beside it ---- */}
           <DocCard>
             <Band>Details of Roll</Band>
+            <RollHeads extra="Westage" />
             {filmRow ? (
               <RollRow
                 name="Material Net Weight"
@@ -738,7 +732,7 @@ export default function JobSheetPage() {
                   head: 'Westage',
                   node: (
                     <Typed
-                      width="w-[72px]"
+                      width="w-full"
                       label="Printing wastage, kg"
                       value={printingStage?.wastageKg ?? 0}
                       disabled={locked}
@@ -752,6 +746,7 @@ export default function JobSheetPage() {
             <Band right={`Consumed together: ${formatNumber(otherItemsConsumed, 3)} kg`}>
               Other Items
             </Band>
+            <RollHeads />
             {otherItems.map((line) => (
               <RollRow
                 key={line.id}
@@ -799,6 +794,7 @@ export default function JobSheetPage() {
           {/* ---- Lamination Job card (Stage 2): what went on ---- */}
           <DocCard>
             <Band>Lamination Job card (Stage 2)</Band>
+            <RollHeads />
             {laminationFilms.map((line) => (
               <RollRow
                 key={line.id}
@@ -812,6 +808,7 @@ export default function JobSheetPage() {
             ))}
 
             <Band>Quanity Received</Band>
+            <RollHeads />
             {laminationChemicals.map((line) => (
               <RollRow
                 key={line.id}
@@ -823,33 +820,29 @@ export default function JobSheetPage() {
                 disabled={locked}
               />
             ))}
-            <div className="border-ink-100 flex flex-wrap items-end gap-3 border-t pt-2">
+            {/* The drum itself, on the same three columns as the rows above. */}
+            <div className="border-ink-200 flex flex-wrap items-center gap-1.5 border-t py-2">
               <RowName>Mix</RowName>
-              <div>
-                <Head>Total</Head>
+              <p className="text-ink-500 min-w-0 flex-1 text-xs">
+                The adhesive takes 40% of this drum, the hardener 5% and the ethyl 60%.
+              </p>
+              <div className="ml-auto grid auto-cols-[5.5rem] grid-flow-col items-center gap-2">
                 <Typed
+                  width="w-full"
                   label="Lamination mix out"
                   value={draft.lamMixIssuedKg}
                   disabled={locked}
                   onChange={(next) => set('lamMixIssuedKg', Number(next || 0))}
                 />
-              </div>
-              <div>
-                <Head>Bal.</Head>
                 <Typed
+                  width="w-full"
                   label="Lamination mix back"
                   value={draft.lamMixReturnedKg}
                   disabled={locked}
                   onChange={(next) => set('lamMixReturnedKg', Number(next || 0))}
                 />
-              </div>
-              <div>
-                <Head>Cons.</Head>
                 <Worked value={draft.lamMixIssuedKg - draft.lamMixReturnedKg} />
               </div>
-              <p className="text-ink-500 ml-2 text-xs">
-                The adhesive takes 40% of this drum, the hardener 5% and the ethyl 60%.
-              </p>
             </div>
 
             <Band>Produced Quantity</Band>

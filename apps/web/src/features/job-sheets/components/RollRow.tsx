@@ -1,7 +1,11 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { weighedTotal, type JobSheetReelInput } from '@yuva/shared';
 import { IconButton } from '@/components/ui/IconButton';
+import { cn } from '@/lib/utils';
 import { Head, RowName, Typed, Worked } from './sheet-form';
+
+/** The closing columns: Total, Bal., Cons. and, on the film row, Westage. */
+const TAIL = 'grid auto-cols-[5.5rem] grid-flow-col items-center gap-2';
 
 /**
  * **One row of the works' form: reels across, and the three columns.**
@@ -37,7 +41,7 @@ export function RollRow({
     onReels(reels.map((reel, at) => (at === index ? { ...reel, weightKg } : reel)));
 
   return (
-    <div className="border-ink-100 flex flex-wrap items-end gap-1.5 border-b py-1.5 last:border-b-0">
+    <div className="border-ink-100 flex flex-wrap items-center gap-1.5 border-b py-2 last:border-b-0">
       <RowName>{name}</RowName>
 
       {reels.map((reel, index) => (
@@ -70,31 +74,44 @@ export function RollRow({
         <Plus className="size-4" />
       </button>
 
-      <div className="ml-auto flex items-end gap-2">
-        <div>
-          <Head>Total</Head>
-          <Worked value={total} />
-        </div>
-        <div>
-          <Head>Bal.</Head>
+      {/* The closing columns, on the same grid as the heading above them. */}
+      <div className={cn('ml-auto', TAIL, extra && 'pr-0')}>
+        <Worked value={total} />
+        <div className="flex justify-end">
           <Typed
-            width="w-[72px]"
+            width="w-full"
             label={`${name}, balance`}
             value={balance}
             disabled={disabled}
             onChange={(next) => onBalance(Number(next || 0))}
           />
         </div>
-        <div>
-          <Head>Cons.</Head>
-          <Worked value={Math.max(0, total) - balance} className="font-semibold" />
-        </div>
-        {extra ? (
-          <div>
-            <Head>{extra.head}</Head>
-            {extra.node}
-          </div>
-        ) : null}
+        <Worked value={Math.max(0, total) - balance} className="font-semibold" />
+        {extra ? <div className="flex justify-end">{extra.node}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The heading for a block of roll rows — written once, above them.
+ *
+ * It used to be repeated on every row, floated to the right edge: four
+ * two-word headings per line, three lines of them, none of it lining up with
+ * anything. A table has one heading row, and so does this.
+ */
+export function RollHeads({ extra }: { extra?: string }) {
+  return (
+    <div className="border-ink-200 flex items-end gap-1.5 border-b pb-1.5">
+      <RowName>&nbsp;</RowName>
+      <div className="min-w-0 flex-1">
+        <Head>Reels</Head>
+      </div>
+      <div className={cn('ml-auto', TAIL)}>
+        <Head className="text-right">Total</Head>
+        <Head className="text-right">Bal.</Head>
+        <Head className="text-right">Cons.</Head>
+        {extra ? <Head className="text-right">{extra}</Head> : null}
       </div>
     </div>
   );
