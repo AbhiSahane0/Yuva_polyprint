@@ -42,6 +42,16 @@ export interface JobSheetLine {
   issueReels: JobSheetReel[];
   returnReels: JobSheetReel[];
 
+  /**
+   * The draws from this row's own mix drum.
+   *
+   * An ink is mixed in its own tin and taken from it several times across a
+   * run — ten kilograms, then fifteen, then two — which is why their sheet
+   * gives the Rec column four cells and sums them. Where there are any, they
+   * are `mixIssuedKg`.
+   */
+  mixIssueReels: JobSheetReel[];
+
   mixIssuedKg: number;
   mixReturnedKg: number;
   mixSharePercent: number;
@@ -118,6 +128,8 @@ export interface JobSheet {
   printMixReturnedKg: number;
   lamMixIssuedKg: number;
   lamMixReturnedKg: number;
+  /** The draws from the lamination drum, which belongs to the sheet. */
+  lamMixIssueReels: JobSheetReel[];
 
   makeReadyDays: number;
   productionDays: number;

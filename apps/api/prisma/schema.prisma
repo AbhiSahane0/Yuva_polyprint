@@ -2495,6 +2495,11 @@ enum JobSheetReelRole {
   RETURN
   /// A roll that came OFF the machine. Carries a core weight.
   OUTPUT
+  /// A draw from this row's own mix drum. An ink's mixed tin.
+  MIX_ISSUE
+  /// A draw from the lamination mix drum, which belongs to the sheet rather
+  /// than to any one row — so it carries no line.
+  LAM_MIX_ISSUE
 }
 
 /// **One reel on the scale.**

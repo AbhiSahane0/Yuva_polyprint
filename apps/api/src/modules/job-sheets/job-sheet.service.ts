@@ -52,9 +52,13 @@ const SHEET_INCLUDE = {
   },
   labour: { orderBy: { position: 'asc' } },
   stages: { orderBy: { stage: 'asc' } },
-  /* The rolls that came off the machines. Belong to the sheet, not to a row:
-     they are production, not consumption. */
-  reels: { where: { role: 'OUTPUT' }, orderBy: { position: 'asc' } },
+  /* The two kinds of weighing that belong to the sheet rather than to a row:
+     the rolls that came off the machines, and the draws from the lamination
+     drum, which every chemical row takes a share of. */
+  reels: {
+    where: { role: { in: ['OUTPUT', 'LAM_MIX_ISSUE'] } },
+    orderBy: { position: 'asc' },
+  },
 } satisfies Prisma.JobSheetInclude;
 
 type SheetRow = Prisma.JobSheetGetPayload<{ include: typeof SHEET_INCLUDE }>;
@@ -158,15 +162,26 @@ function toJobSheet(row: SheetRow): JobSheet {
     notes: row.notes,
     enteredBy: row.enteredBy,
 
-    outputReels: row.reels.map((reel) => ({
-      id: reel.id,
-      position: reel.position,
-      /* Only an OUTPUT row is loaded, and every one of them has a stage. */
-      stage: (reel.stage ?? 'PRINTING') as JobSheetStage,
-      weightKg: num(reel.weightKg),
-      coreKg: num(reel.coreKg),
-      reelNumber: reel.reelNumber,
-    })),
+    outputReels: row.reels
+      .filter((reel) => reel.role === 'OUTPUT')
+      .map((reel) => ({
+        id: reel.id,
+        position: reel.position,
+        /* Every OUTPUT row has a stage; the fallback is for the type. */
+        stage: (reel.stage ?? 'PRINTING') as JobSheetStage,
+        weightKg: num(reel.weightKg),
+        coreKg: num(reel.coreKg),
+        reelNumber: reel.reelNumber,
+      })),
+    lamMixIssueReels: row.reels
+      .filter((reel) => reel.role === 'LAM_MIX_ISSUE')
+      .map((reel) => ({
+        id: reel.id,
+        position: reel.position,
+        weightKg: num(reel.weightKg),
+        coreKg: num(reel.coreKg),
+        reelNumber: reel.reelNumber,
+      })),
     lines: row.lines.map((line) => ({
       id: line.id,
       position: line.position,
@@ -187,6 +202,15 @@ function toJobSheet(row: SheetRow): JobSheet {
         })),
       returnReels: line.reels
         .filter((reel) => reel.role === 'RETURN')
+        .map((reel) => ({
+          id: reel.id,
+          position: reel.position,
+          weightKg: num(reel.weightKg),
+          coreKg: num(reel.coreKg),
+          reelNumber: reel.reelNumber,
+        })),
+      mixIssueReels: line.reels
+        .filter((reel) => reel.role === 'MIX_ISSUE')
         .map((reel) => ({
           id: reel.id,
           position: reel.position,
@@ -714,7 +738,24 @@ export async function updateJobSheet(
   const sheetDate = input.date ?? current.date.toISOString().slice(0, 10);
 
   await prisma.$transaction(async (tx) => {
-    const { lines, labour, stages, outputReels, date, jobId, productionOrderId, ...rest } = input;
+    const {
+      lines,
+      labour,
+      stages,
+      outputReels,
+      lamMixIssueReels,
+      date,
+      jobId,
+      productionOrderId,
+      ...rest
+    } = input;
+
+    /* The lamination drum: its draws where the works listed them, the typed
+       total where it did not. */
+    const lamPool =
+      lamMixIssueReels && lamMixIssueReels.length > 0
+        ? { lamMixIssuedKg: round3(weighedTotal(lamMixIssueReels, 0)) }
+        : null;
 
     /*
      * The rolls that came off the machines decide what the run produced.
@@ -743,10 +784,14 @@ export async function updateJobSheet(
      * there is.
      */
     const inkMix = (lines ?? []).filter((line) => line.kind === 'INK');
-    const mixed = inkMix.some((line) => line.mixIssuedKg !== 0 || line.mixReturnedKg !== 0);
+    /* A colour's drum is the draws where it listed any, the typed figure where
+       it did not — the same rule the reels follow. */
+    const mixOut = (line: (typeof inkMix)[number]) =>
+      weighedTotal(line.mixIssueReels, line.mixIssuedKg);
+    const mixed = inkMix.some((line) => mixOut(line) !== 0 || line.mixReturnedKg !== 0);
     const printPool = mixed
       ? {
-          printMixIssuedKg: round3(inkMix.reduce((sum, line) => sum + line.mixIssuedKg, 0)),
+          printMixIssuedKg: round3(inkMix.reduce((sum, line) => sum + mixOut(line), 0)),
           printMixReturnedKg: round3(inkMix.reduce((sum, line) => sum + line.mixReturnedKg, 0)),
         }
       : null;
@@ -777,6 +822,7 @@ export async function updateJobSheet(
       data: {
         ...rest,
         ...(printPool ?? {}),
+        ...(lamPool ?? {}),
         ...(printed ? { printedGrossKg: printed.grossKg, printedCoreKg: printed.coreKg } : {}),
         ...(produced ? { producedGrossKg: produced.grossKg, producedCoreKg: produced.coreKg } : {}),
         /* Pulled out of the spread: it arrives as yyyy-mm-dd and the column
@@ -826,6 +872,7 @@ export async function updateJobSheet(
        */
       const issuedKg = weighedTotal(line.issueReels, line.issuedKg);
       const returnedKg = weighedTotal(line.returnReels, line.returnedKg);
+      const mixIssuedKg = weighedTotal(line.mixIssueReels, line.mixIssuedKg);
 
       await tx.jobSheetLine.updateMany({
         where: { sheetId: id, position: line.position },
@@ -834,7 +881,7 @@ export async function updateJobSheet(
           name: line.name,
           issuedKg,
           returnedKg,
-          mixIssuedKg: line.mixIssuedKg,
+          mixIssuedKg,
           mixReturnedKg: line.mixReturnedKg,
           mixSharePercent: line.mixSharePercent,
           consumedOverrideKg: line.consumedOverrideKg,
@@ -856,6 +903,11 @@ export async function updateJobSheet(
         const weighings = [
           ...line.issueReels.map((reel, index) => ({ ...reel, role: 'ISSUE' as const, index })),
           ...line.returnReels.map((reel, index) => ({ ...reel, role: 'RETURN' as const, index })),
+          ...line.mixIssueReels.map((reel, index) => ({
+            ...reel,
+            role: 'MIX_ISSUE' as const,
+            index,
+          })),
         ];
         if (weighings.length > 0) {
           await tx.jobSheetReel.createMany({
@@ -887,6 +939,25 @@ export async function updateJobSheet(
             position: index + 1,
             weightKg: reel.weightKg,
             coreKg: reel.coreKg,
+            reelNumber: reel.reelNumber,
+          })),
+        });
+      }
+    }
+
+    /* The lamination drum's own draws. Same wholesale rule, and they belong to
+       the sheet because every chemical row takes a share of the one drum. */
+    if (lamMixIssueReels) {
+      await tx.jobSheetReel.deleteMany({ where: { sheetId: id, role: 'LAM_MIX_ISSUE' } });
+      if (lamMixIssueReels.length > 0) {
+        await tx.jobSheetReel.createMany({
+          data: lamMixIssueReels.map((reel, index) => ({
+            sheetId: id,
+            lineId: null,
+            role: 'LAM_MIX_ISSUE' as const,
+            position: index + 1,
+            weightKg: reel.weightKg,
+            coreKg: 0,
             reelNumber: reel.reelNumber,
           })),
         });
