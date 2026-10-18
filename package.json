@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Yuva Polyprint — Flexible Packaging Manufacturing ERP",
+  "description": "Yuva Polyprint \u2014 Flexible Packaging Manufacturing ERP",
   "engines": {
     "node": ">=22.0.0",
     "npm": ">=10.0.0"
@@ -52,7 +52,5 @@
       "prettier --write"
     ]
   },
-  "dependencies": {
-    "xlsx": "^0.18.5"
-  }
+  "dependencies": {}
 }

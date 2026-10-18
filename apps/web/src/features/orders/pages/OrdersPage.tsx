@@ -10,6 +10,7 @@ import {
   type OrderStatus,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
+import { ExportButton } from '@/components/ui/ExportButton';
 import { Badge } from '@/components/ui/Badge';
 import { Input, Select } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -99,10 +100,13 @@ export default function OrdersPage() {
             typed here.
           </p>
         </div>
-        <Button onClick={() => navigate('/orders/new')}>
-          <Plus className="size-4" />
-          New order
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ExportButton path="/orders/export" params={{ search, status }} />
+          <Button onClick={() => navigate('/orders/new')}>
+            <Plus className="size-4" />
+            New order
+          </Button>
+        </div>
       </header>
 
       {/*

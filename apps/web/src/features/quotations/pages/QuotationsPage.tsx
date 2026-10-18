@@ -24,6 +24,7 @@ import {
   type SortDirection,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
+import { ExportButton } from '@/components/ui/ExportButton';
 import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
@@ -216,10 +217,16 @@ export default function QuotationsPage() {
             )}
           </p>
         </div>
-        <Button onClick={() => navigate('/quotations/new')}>
-          <Plus className="size-4" />
-          New quotation
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ExportButton
+            path="/quotations/export"
+            params={{ q: debouncedSearch, status: status === 'ALL' ? undefined : status }}
+          />
+          <Button onClick={() => navigate('/quotations/new')}>
+            <Plus className="size-4" />
+            New quotation
+          </Button>
+        </div>
       </header>
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">

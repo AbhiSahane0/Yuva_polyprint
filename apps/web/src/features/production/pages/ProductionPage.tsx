@@ -13,6 +13,7 @@ import {
   type ProductionStatus,
 } from '@yuva/shared';
 import { Badge } from '@/components/ui/Badge';
+import { ExportButton } from '@/components/ui/ExportButton';
 import { Input, Select } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -99,12 +100,15 @@ export default function ProductionPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
-      <header className="mb-6">
-        <h1 className="text-ink-900 text-xl font-bold sm:text-2xl">Production</h1>
-        <p className="text-ink-500 mt-0.5 max-w-2xl text-sm">
-          Every production run on the floor, and which stage it has reached. A run is started from
-          the order it makes — open an order and start it there.
-        </p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-ink-900 text-xl font-bold sm:text-2xl">Production</h1>
+          <p className="text-ink-500 mt-0.5 max-w-2xl text-sm">
+            Every production run on the floor, and which stage it has reached. A run is started from
+            the order it makes — open an order and start it there.
+          </p>
+        </div>
+        <ExportButton path="/production/export" params={{ search, status, stage }} />
       </header>
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:max-w-md">

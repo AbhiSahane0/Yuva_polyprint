@@ -22,6 +22,16 @@ const router = Router();
  * module, because a movement changes what the works believes it holds.
  */
 router.get('/', validate({ query: listStockQuerySchema }), asyncHandler(controller.list));
+/*
+ * The same list, as a spreadsheet. Declared before any `/:id` route, or a
+ * request for `/export` is read as an id — and validated against the same
+ * query schema, so the file and the screen cannot be filtered differently.
+ */
+router.get(
+  '/export',
+  validate({ query: listStockQuerySchema }),
+  asyncHandler(controller.exportList),
+);
 
 /*
  * Before `/:id`, or "reconcile" is read as a material id and answers 404.

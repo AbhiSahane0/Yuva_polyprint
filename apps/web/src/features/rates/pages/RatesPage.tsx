@@ -15,6 +15,7 @@ import {
   type MaterialCategory,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
+import { ExportButton } from '@/components/ui/ExportButton';
 import { IconButton } from '@/components/ui/IconButton';
 import { Field, Input, NumberInput } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
@@ -156,6 +157,9 @@ export default function RatesPage() {
               />
             </Field>
           </div>
+          {/* Dated: "today's rates" is a different sheet from last Tuesday's,
+              and the date on screen is the one that downloads. */}
+          <ExportButton path="/materials/export" params={{ onDate: effectiveDate }} />
           <Button variant="secondary" onClick={() => setAdding(true)}>
             <Plus className="size-4" />
             Add a material

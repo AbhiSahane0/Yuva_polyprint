@@ -1,6 +1,13 @@
 import type { Request, Response } from 'express';
 import type { JobSheetInput } from '@yuva/shared';
-import { created, ok, paginated } from '../../utils/api-response.js';
+import { created, ok, paginated, xlsx } from '../../utils/api-response.js';
+import {
+  buildReport,
+  describe as describeFilters,
+  EXPORT_LIMIT,
+  reportFilename,
+} from '../../lib/report-workbook.js';
+import { JOB_SHEET_STATUS_LABELS } from '@yuva/shared';
 import * as service from './job-sheet.service.js';
 
 /** Whoever is recording it. Falls back to 'Office', matching rates and stock. */
@@ -45,4 +52,46 @@ export async function post(req: Request, res: Response) {
 
 export async function remove(req: Request, res: Response) {
   ok(res, await service.deleteJobSheet(req.params.id as string));
+}
+
+/**
+ * What every run consumed, and what it cost a kilogram.
+ *
+ * The figure the office reconciles the month on, and the one it cannot read
+ * off a screen twenty-five rows at a time.
+ */
+export async function exportList(req: Request, res: Response) {
+  const query = req.query as unknown as Record<string, unknown>;
+  const { items } = await service.listJobSheets({
+    ...query,
+    page: 1,
+    pageSize: EXPORT_LIMIT,
+  } as never);
+
+  const file = await buildReport({
+    title: 'Job sheets',
+    filters: describeFilters(query),
+    rows: items,
+    columns: [
+      { header: 'Sheet', width: 9, format: 'int', value: (s) => s.number },
+      { header: 'Date', width: 12, format: 'date', value: (s) => asDate(s.date) },
+      { header: 'Job', width: 34, value: (s) => s.jobName },
+      { header: 'Customer', width: 28, value: (s) => s.customerName },
+      { header: 'Form', width: 10, value: (s) => (s.isPouchForm ? 'Pouch' : 'Roll') },
+      { header: 'Status', width: 11, value: (s) => JOB_SHEET_STATUS_LABELS[s.status] ?? s.status },
+      { header: 'Output kg', width: 13, format: 'kg', total: true, value: (s) => s.finalOutputKg },
+      { header: 'Material', width: 15, format: 'rs', total: true, value: (s) => s.materialCost },
+      { header: 'Effective', width: 15, format: 'rs', total: true, value: (s) => s.effectivePrice },
+      { header: 'Cost / kg', width: 12, format: 'rs2', value: (s) => s.costPerKg },
+      { header: 'Wastage %', width: 11, format: 'percent', value: (s) => s.wastagePercent },
+      { header: 'Off stock', width: 12, format: 'date', value: (s) => asDate(s.stockPostedAt) },
+    ],
+  });
+  res.setHeader('Cache-Control', 'no-store');
+  xlsx(res, file, reportFilename('Job sheets'));
+}
+
+/** A yyyy-mm-dd string as a date Excel will sort and format. Null stays null. */
+function asDate(value: string | null | undefined): Date | null {
+  return value ? new Date(`${String(value).slice(0, 10)}T00:00:00Z`) : null;
 }

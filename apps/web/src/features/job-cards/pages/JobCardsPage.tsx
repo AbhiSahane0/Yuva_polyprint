@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ClipboardList, Plus, Search, Trash2 } from 'lucide-react';
 import { formatNumber, type JobCardSummary } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
+import { ExportButton } from '@/components/ui/ExportButton';
 import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Field';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -76,10 +77,13 @@ export default function JobCardsPage() {
             printed, and signed by whoever prepares, runs and approves it.
           </p>
         </div>
-        <Button onClick={startCard} disabled={create.isPending}>
-          <Plus className="size-4" />
-          New job card
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ExportButton path="/job-cards/export" params={{ search }} />
+          <Button onClick={startCard} disabled={create.isPending}>
+            <Plus className="size-4" />
+            New job card
+          </Button>
+        </div>
       </header>
 
       <div className="relative max-w-md">
