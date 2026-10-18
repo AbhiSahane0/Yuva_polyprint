@@ -302,6 +302,8 @@ interface Film {
   id: string;
   name: string;
   density: number | null;
+  /** What the works usually buys it at, where the name does not say. */
+  usualMicron: number | null;
   currentRate: number | null;
 }
 
@@ -716,6 +718,7 @@ export default function QuotationFormPage() {
         id: material.id,
         name: material.name,
         density: material.density,
+        usualMicron: material.usualMicron,
         currentRate: material.currentRate,
       }));
   }, [materials, filmsInUse]);

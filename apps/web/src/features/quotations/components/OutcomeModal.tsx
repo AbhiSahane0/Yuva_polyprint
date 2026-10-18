@@ -111,6 +111,17 @@ export function OutcomeModal({
       }
     >
       <div className="flex flex-col gap-4">
+        {/*
+          A quotation that never left this screen can still be accepted — the
+          works quotes over the phone and across a desk. Saying so here, because
+          "Accepted" on something marked Draft reads like a mistake otherwise.
+        */}
+        {quotation?.status === 'DRAFT' ? (
+          <p className="border-ink-200 bg-ink-50 text-ink-600 rounded-[var(--radius-md)] border px-3 py-2 text-xs">
+            This one is still a draft — it was never sent from here. Recording an answer is fine:
+            plenty are quoted by phone. Accepting it still creates the customer and their jobs.
+          </p>
+        ) : null}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {options.map((option) => (
             <button

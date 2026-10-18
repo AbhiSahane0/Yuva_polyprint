@@ -753,6 +753,22 @@ model Material {
   density Decimal? @db.Decimal(6, 4)
 
   /**
+   * The gauge this film is usually bought at, in microns.
+   *
+   * Most film names state it — `PET 12µm` — and the quotation form has always
+   * read it off the name. The LDPE grades, Nylon and PP Woven state nothing,
+   * because the works buys them at whatever thickness the job asks for, and the
+   * form filled those in with 12µ so the row would validate. On a sealant that
+   * is not a starting figure, it is a wrong one: a 50µ poly quoted at 12 is a
+   * third of the laminate costed at a quarter of its weight.
+   *
+   * Null means nobody has said yet, and the form leaves the box empty and asks.
+   * Once it is set, the next quotation starts there. Not dated: it is what the
+   * works buys, not what it pays.
+   */
+  usualMicron Decimal? @map("usual_micron") @db.Decimal(6, 2)
+
+  /**
    * What share of the tin is pigment or resin, for inks and adhesives.
    * The rest evaporates, so the works buys several kilograms of liquid for
    * every kilogram that stays on the film. Costing a laydown against the

@@ -529,21 +529,22 @@ function RowActions({
         <Eye className="size-4" />
       </button>
       {/*
-        Only offered once a quotation has actually gone out. There is no answer
-        to record on a draft nobody has seen, and winning it would create a
-        customer and jobs off the back of an unsent document.
+        Offered on a draft too.
+        It was hidden until a quotation had been emailed, on the reasoning that
+        a draft nobody has seen can have no answer. That is not how the works
+        quotes: most go over the phone or across a desk and are never sent from
+        here at all, so the button was missing on exactly the quotations that
+        get accepted. The dialog says what recording an answer on a draft does.
       */}
-      {quotation.status !== 'DRAFT' ? (
-        <button
-          type="button"
-          onClick={onOutcome}
-          title="Record the answer"
-          aria-label={`Record the answer for quotation ${quotation.number}`}
-          className={iconClass}
-        >
-          <CircleCheckBig className="size-4" />
-        </button>
-      ) : null}
+      <button
+        type="button"
+        onClick={onOutcome}
+        title="Record the answer"
+        aria-label={`Record the answer for quotation ${quotation.number}`}
+        className={iconClass}
+      >
+        <CircleCheckBig className="size-4" />
+      </button>
       <button
         type="button"
         onClick={onSend}

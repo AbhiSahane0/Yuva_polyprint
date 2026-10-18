@@ -54,11 +54,22 @@ import { cn } from '@/lib/utils';
 const LAYER_COUNTS = [2, 3] as const;
 
 /**
- * Where the micron starts for a film whose name states no gauge — every LDPE
- * grade, `LDPE Milky / Natural`, PP Woven. They are made to whatever thickness
- * the job asks for, so this is only a starting figure to be typed over.
+ * What gauge a film arrives at, where anything knows.
+ *
+ * The name first — `PET 12µm` states it — then the thickness the works records
+ * against that film on the Rates screen. Null when neither knows, and the box
+ * is then left EMPTY for somebody to fill in.
+ *
+ * It used to fall back to 12µ so the row would validate. Every LDPE grade,
+ * Nylon and PP Woven states no gauge in its name — fifteen of the eighteen
+ * films the works buys — and on a sealant 12µ is not a starting figure, it is a
+ * wrong one: a 50µ poly quoted at 12 puts a third of the laminate into the
+ * costing at a quarter of its weight, and nothing on the screen says so.
  */
-const GAUGELESS_START_MICRON = 12;
+function knownMicron(film: Film | undefined): number | null {
+  if (!film) return null;
+  return micronFromFilmName(film.name) ?? film.usualMicron ?? null;
+}
 
 /** What the laminate gains in adhesive, as `totalMicron` in the engine counts it. */
 const ADHESIVE_MICRON = 2;
@@ -67,6 +78,8 @@ interface Film {
   id: string;
   name: string;
   density: number | null;
+  /** What the works usually buys it at, where the name does not say. */
+  usualMicron: number | null;
   currentRate: number | null;
 }
 
@@ -160,9 +173,7 @@ export function LayerFields({
      * grade left the grade reading 20, as if the office had asked for it.
      */
     const before = filmOf(index);
-    const filledForBefore = before
-      ? (micronFromFilmName(before.name) ?? GAUGELESS_START_MICRON)
-      : null;
+    const filledForBefore = knownMicron(before);
     const untouched = typed <= 0 || typed === filledForBefore;
     const film = point(index, family, untouched ? 0 : typed);
 
@@ -171,26 +182,31 @@ export function LayerFields({
     });
 
     if (!film) return;
-    const micron = micronFromFilmName(film.name);
+    /*
+     * A gauge stated in the NAME belongs to the film: `MET PET 12µm` is 12µ and
+     * nothing else. A gauge RECORDED against it is only what the works usually
+     * buys, so it fills an empty box and never overwrites a typed figure — the
+     * rules below turn on which of the two this is.
+     */
+    const named = micronFromFilmName(film.name);
+    const micron = named ?? film.usualMicron ?? null;
     if (micron === null) {
       /*
-       * A film whose name states no gauge — the LDPE grades, PP Woven — gives
-       * the box nothing to fill in, and it was left at the row's 0, which the
-       * schema refuses. An empty box starts at the works' usual 12, as does one
-       * still holding the previous film's filled-in gauge; a gauge somebody
-       * typed is the office's own and is left alone.
+       * Nothing knows what this one runs at — no gauge in the name, and none
+       * recorded on the Rates screen. The box is cleared rather than filled
+       * with a guess, and the step will not pass until somebody says. Set the
+       * thickness once against the film and the next quotation starts there.
+       *
+       * Only a box this form filled in is cleared. A gauge somebody typed is
+       * theirs and survives a change of film, exactly as it did before.
        */
       if (!untouched) return;
-      setValue(
-        `items.${itemIndex}.layers.${index}.micron`,
-        String(GAUGELESS_START_MICRON) as never,
-        {
-          shouldDirty: true,
-          shouldValidate: true,
-        },
-      );
+      setValue(`items.${itemIndex}.layers.${index}.micron`, '' as never, { shouldDirty: true });
       return;
     }
+
+    /* A recorded thickness is a default. It fills an empty box and stops. */
+    if (!untouched && named === null) return;
 
     /*
      * The gauge is filled in when the box is empty — and also when the family
@@ -201,6 +217,10 @@ export function LayerFields({
      * not exist at 50. Where a family IS stocked at several gauges, a typed
      * figure is the office's own and is left alone — that is what keeps a 19µ
      * PET from being pulled back to 12.
+     *
+     * Names only. A family whose gauges are recorded rather than named is one
+     * the works buys at whatever the job asks for, which is the opposite of
+     * "stocked at one thickness".
      */
     const stockedGauges = new Set(
       films

@@ -9,6 +9,12 @@ export interface Material {
   unit: string;
   density: number | null;
   /**
+   * The gauge this film is usually bought at. Null where nobody has said —
+   * the quotation form then leaves the thickness blank and asks, rather than
+   * guessing 12µ at a sealant that runs at 50.
+   */
+  usualMicron: number | null;
+  /**
    * For inks and adhesives: what share of the tin stays on the film. The rest
    * evaporates, so several kilograms are bought for every one laid down.
    */
