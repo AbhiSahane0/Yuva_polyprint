@@ -9,6 +9,7 @@ import {
   type PouchMakingRates,
 } from './pouch-making.js';
 import { round } from './quotation-math.js';
+import { NO_VOLUME_PRICING, volumeAdjustmentPerKg, type VolumePricing } from './volume-pricing.js';
 
 /**
  * Working out what a kilogram actually costs to make.
@@ -143,6 +144,11 @@ export interface CostingOverheads {
 
   /** Recovered across machine time, as the sheet does. */
   emiPerMonth: number;
+  /**
+   * What the quantity adds to, or takes off, a kilogram. See `volume-pricing`.
+   * Absent on a quotation written before the works set either figure.
+   */
+  volumePricing?: VolumePricing;
   /** Machine hours a month the EMI is spread over. */
   emiHoursPerMonth: number;
   /**
@@ -686,6 +692,13 @@ export interface CostingBreakdown {
   /** Everything above, over the quantity ORDERED. */
   baseRatePerKg: number;
   stationSurchargePerKg: number;
+  /**
+   * What the quantity itself added or took off: the works' small-order premium
+   * above the minimum order, its bulk discount at the break. Positive adds,
+   * negative takes off, zero between the two bands and on a works that has set
+   * neither figure.
+   */
+  volumeAdjustmentPerKg: number;
   /** The pouch charge spread over a kilogram — what the rate actually carries. */
   pouchMakingPerKg: number;
   /**
@@ -1309,7 +1322,23 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
           piecesPerKg,
         );
 
-  const ratePerKg = round(baseRatePerKg + stationSurchargePerKg + pouchMakingPerKg, 2);
+  /*
+   * The works' own small-order premium and bulk discount, per kilogram.
+   *
+   * Added here rather than folded into the margin because it IS a per-kilogram
+   * figure the works quotes — "three rupees more under the minimum, a rupee off
+   * over four tons" — and a percentage that happened to come to the same thing
+   * on one quantity would come to something else on the next.
+   */
+  const volumeAdjustmentPerKgValue = round(
+    volumeAdjustmentPerKg(job.orderQtyKg, overheads.volumePricing ?? NO_VOLUME_PRICING),
+    4,
+  );
+
+  const ratePerKg = round(
+    baseRatePerKg + stationSurchargePerKg + pouchMakingPerKg + volumeAdjustmentPerKgValue,
+    2,
+  );
   const ratePerPiece = piecesPerKg > 0 ? round(ratePerKg / piecesPerKg, 4) : 0;
 
   /*
@@ -1366,6 +1395,8 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
     costBeforeMargin,
     marginBasis: overheads.marginBasis,
     marginPercent: overheads.marginPercent,
+    /* Positive under the minimum order, negative at the bulk break. */
+    volumeAdjustmentPerKg: volumeAdjustmentPerKgValue,
     marginAmount,
     totalCost,
 

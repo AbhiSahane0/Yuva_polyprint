@@ -261,6 +261,14 @@ export function useRateCosting(
         emiPerMonth: settings.emiPerMonth,
         emiHoursPerMonth: settings.emiHoursPerMonth,
         emiBasis: settings.emiBasis,
+        /* What the quantity itself adds or takes off, dated like every other
+           figure here — so an old quotation keeps the bands it was written on. */
+        volumePricing: {
+          moqKg: settings.moqKg,
+          belowMoqPerKg: settings.belowMoqPerKg,
+          bulkBreakKg: settings.bulkBreakKg,
+          bulkDiscountPerKg: settings.bulkDiscountPerKg,
+        },
         /* How the works' own time is recovered, and what a day of it costs. */
         rateModel: settings.rateModel,
         worksDayCost: settings.worksDayCost,
