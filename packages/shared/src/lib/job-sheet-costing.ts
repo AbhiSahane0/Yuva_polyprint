@@ -454,3 +454,48 @@ export function outputNet(reels: readonly WeighedReel[]): {
   );
   return { grossKg, coreKg, netKg: round(grossKg - coreKg, 3) };
 }
+
+/**
+ * **What a kilogram of mixed ink is worth.**
+ *
+ * A drum of mix is not ink. The works mixes 40% pigment with 40% ethyl acetate
+ * and 20% toluene, so a kilogram drawn out of it is two fifths of what a
+ * kilogram of the colour costs plus three fifths of solvent — on the works'
+ * October rates, a drum of mixed white is worth about Rs 220 a kilogram against
+ * Rs 240 for the white itself.
+ *
+ * **It changes no total.** The costing already books each part at its own rate:
+ * the colour carries 40% of the drum on its own row, and the other 60% lands on
+ * the ethyl and toluene rows below. This is the same arithmetic read the other
+ * way round, for the person standing in front of the drum — who is issuing it
+ * by the kilogram and had no way of knowing what a kilogram of it was worth.
+ *
+ * A colour with no rate yet returns null rather than pricing its share at
+ * nothing, because a mix rate that quietly reads as solvent alone is worse than
+ * no figure at all.
+ */
+export interface MixRatio {
+  /** The pigment's share of the drum, per cent. */
+  pigmentPercent: number;
+  ethylPercent: number;
+  toluenePercent: number;
+}
+
+/** The works' printing mix. Their own figures, and they come to 100. */
+export const PRINT_MIX_RATIO: MixRatio = {
+  pigmentPercent: 40,
+  ethylPercent: 40,
+  toluenePercent: 20,
+};
+
+export function mixInkRatePerKg(
+  rates: { ink: number; ethyl: number; toluene: number },
+  ratio: MixRatio = PRINT_MIX_RATIO,
+): number | null {
+  if (!(rates.ink > 0)) return null;
+  const value =
+    (at(ratio.pigmentPercent) / 100) * at(rates.ink) +
+    (at(ratio.ethylPercent) / 100) * at(rates.ethyl) +
+    (at(ratio.toluenePercent) / 100) * at(rates.toluene);
+  return round(value, 2);
+}

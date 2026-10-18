@@ -9,6 +9,7 @@ import {
   labourAmount,
   mixDrumFor,
   stageElectricity,
+  mixInkRatePerKg,
   weighedTotal,
   type JobSheetCostInput,
   type JobSheetLineInput,
@@ -1488,5 +1489,38 @@ describe('reels, and the totals they make', () => {
 
   it('treats a roll with no core as all net', () => {
     expect(outputNet([{ weightKg: 100 }])).toEqual({ grossKg: 100, coreKg: 0, netKg: 100 });
+  });
+});
+
+describe('what a kilogram of mixed ink is worth', () => {
+  /* The works' own October rates: white 240, ethyl 145, toluene 165. */
+  const RATES = { ink: 240, ethyl: 145, toluene: 165 };
+
+  it('is the pigment and the two solvents in their shares', () => {
+    /* 0.4 x 240 + 0.4 x 145 + 0.2 x 165 = 96 + 58 + 33 */
+    expect(mixInkRatePerKg(RATES)).toBe(187);
+  });
+
+  it('is worth less than the colour it is mixed from', () => {
+    expect(mixInkRatePerKg(RATES)).toBeLessThan(RATES.ink);
+  });
+
+  /*
+   * A colour nobody has priced. Pricing its share at nothing would leave a
+   * figure that reads as solvent alone — Rs 91 for a drum of white — which is
+   * a worse answer than no answer.
+   */
+  it('says nothing about a colour with no rate', () => {
+    expect(mixInkRatePerKg({ ...RATES, ink: 0 })).toBeNull();
+  });
+
+  it('takes a ratio of its own', () => {
+    const half = { pigmentPercent: 50, ethylPercent: 50, toluenePercent: 0 };
+    expect(mixInkRatePerKg(RATES, half)).toBe(192.5);
+  });
+
+  it('comes to the colour itself at full strength', () => {
+    const neat = { pigmentPercent: 100, ethylPercent: 0, toluenePercent: 0 };
+    expect(mixInkRatePerKg(RATES, neat)).toBe(RATES.ink);
   });
 });
