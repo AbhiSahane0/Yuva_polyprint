@@ -168,6 +168,7 @@ export async function listMaterials(options: {
       category: material.category,
       unit: material.unit,
       density: toNumber(material.density),
+      usualMicron: toNumber(material.usualMicron),
       solidsPercent: toNumber(material.solidsPercent),
       laydownGsm: toNumber(material.laydownGsm),
       inkKind: material.inkKind,
@@ -400,6 +401,7 @@ export async function createMaterial(input: CreateMaterialInput): Promise<Materi
       data: {
         ...input,
         density: input.density ?? null,
+        usualMicron: input.usualMicron ?? null,
         solidsPercent: input.solidsPercent ?? null,
         laydownGsm: input.laydownGsm ?? null,
         inkKind: input.inkKind ?? null,
@@ -413,6 +415,7 @@ export async function createMaterial(input: CreateMaterialInput): Promise<Materi
     data: {
       ...input,
       density: input.density ?? null,
+      usualMicron: input.usualMicron ?? null,
       solidsPercent: input.solidsPercent ?? null,
       laydownGsm: input.laydownGsm ?? null,
       inkKind: input.inkKind ?? null,

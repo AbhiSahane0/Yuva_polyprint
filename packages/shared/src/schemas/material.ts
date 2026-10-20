@@ -22,6 +22,8 @@ export const createMaterialSchema = z.object({
    * specified by weight already.
    */
   density: z.coerce.number().positive().max(10).nullable().optional(),
+  /** What the works usually buys this film at, in microns. Films only. */
+  usualMicron: z.coerce.number().positive().max(1000).nullable().optional(),
   /**
    * Ink and adhesive only. Without the solids share a laydown costed against
    * the purchase rate understates the ink three to five times over, because

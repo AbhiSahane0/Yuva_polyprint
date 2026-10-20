@@ -21,6 +21,16 @@ const router = Router();
  */
 
 router.get('/', validate({ query: listCustomersQuerySchema }), asyncHandler(controller.list));
+/*
+ * The same list, as a spreadsheet. Declared before any `/:id` route, or a
+ * request for `/export` is read as an id — and validated against the same
+ * query schema, so the file and the screen cannot be filtered differently.
+ */
+router.get(
+  '/export',
+  validate({ query: listCustomersQuerySchema }),
+  asyncHandler(controller.exportList),
+);
 
 router.get('/:id', validate({ params: idParamSchema }), asyncHandler(controller.getById));
 

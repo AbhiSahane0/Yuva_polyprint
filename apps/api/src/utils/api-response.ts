@@ -47,6 +47,23 @@ export function paginated<T>(
  * same four headers, and the one that forgot the framing policy showed the
  * office an empty grey box.
  */
+/**
+ * A spreadsheet, as a download.
+ *
+ * Beside `pdf` for the same reason it exists: four headers, got subtly wrong in
+ * three different places, is three bugs waiting. The content type is the long
+ * OOXML one, and a file served without it opens as a zip.
+ */
+export function xlsx(res: Response, file: Buffer, filename: string): void {
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  );
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Content-Length', String(file.length));
+  res.end(file);
+}
+
 export function pdf(
   res: Response,
   file: Uint8Array,

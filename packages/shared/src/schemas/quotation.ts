@@ -583,6 +583,16 @@ export const settingsSchema = z.object({
   /** Sundries the works does not itemise, charged once on the job. */
   otherPerJob: z.coerce.number().min(0).max(1_000_000),
   emiPerMonth: z.coerce.number().min(0).max(10_000_000),
+
+  /*
+   * What the quantity adds to, or takes off, a kilogram — see `volume-pricing`.
+   * Either figure at 0 switches that band off, which is how a works that has
+   * not set its minimum order still carries the bulk discount.
+   */
+  moqKg: z.coerce.number().min(0).max(1_000_000),
+  belowMoqPerKg: z.coerce.number().min(0).max(10_000),
+  bulkBreakKg: z.coerce.number().min(0).max(1_000_000),
+  bulkDiscountPerKg: z.coerce.number().min(0).max(10_000),
   /** Machine hours a month the EMI is spread over. */
   emiHoursPerMonth: z.coerce.number().min(1).max(744),
   /**
@@ -821,8 +831,24 @@ export const DEFAULT_SETTINGS: AppSettings = {
   transportPerKg: 10,
   packingPerKg: 5,
   otherPerJob: 250,
-  emiPerMonth: 4166.66,
+  /*
+   * The bank, as the works stated it in October 2026. Under PER_DAY it is
+   * recovered inside `worksDayCost` rather than here — see the Costing screen,
+   * which checks the two against each other.
+   */
+  emiPerMonth: 600000,
   emiHoursPerMonth: 24,
+
+  /*
+   * The bulk discount is the works' own figure: a rupee a kilogram at four
+   * tons. The minimum order is NOT — it starts at 0, which switches the
+   * premium off, because quoting a premium against a weight nobody has agreed
+   * would move every small quotation on a number this system invented.
+   */
+  moqKg: 0,
+  belowMoqPerKg: 3,
+  bulkBreakKg: 4000,
+  bulkDiscountPerKg: 1,
   emiBasis: 'RUN_TIME',
   /*
    * PER_MINUTE is what the works held until they asked for the day model, and

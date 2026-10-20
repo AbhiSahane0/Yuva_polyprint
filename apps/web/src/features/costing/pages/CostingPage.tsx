@@ -683,6 +683,19 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
     ['otherPerJob', 'Sundries, Rs/job', 'A flat sum the works does not itemise'],
     ['emiPerMonth', 'Bank EMI, Rs/month', 'Recovered across machine time'],
     ['emiHoursPerMonth', 'Machine hours a month', 'What the EMI is spread over'],
+    /* The works' own two bands. Either at 0 switches that band off. */
+    [
+      'moqKg',
+      'Minimum order, kg',
+      'Below this an order carries a premium. 0 switches the premium off',
+    ],
+    ['belowMoqPerKg', 'Below the minimum, Rs/kg', 'Added to the rate under the minimum order'],
+    [
+      'bulkBreakKg',
+      'Bulk break, kg',
+      'At or above this an order earns a discount. 0 switches it off',
+    ],
+    ['bulkDiscountPerKg', 'Bulk discount, Rs/kg', 'Taken off the rate at the break and above'],
     /* The three the day model rests on. Fitted against the works' own fourteen
        job sheets, and theirs to change the moment they disagree. */
     ['worksDayCost', 'A day of the works, Rs', 'The whole crew and the bank. Not electricity'],
@@ -806,6 +819,8 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
               />
             </Field>
           ))}
+
+          <BankCheck draft={draft} />
 
           {/*
             Which rate prices each. They used to be hardcoded strings in the
@@ -996,3 +1011,49 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
 }
 
 export { MACHINE_KINDS };
+
+/**
+ * **Does a day of the works actually cover the bank?**
+ *
+ * Under the day model the EMI field is multiplied by zero: the bank is paid
+ * out of `worksDayCost`, which is meant to be the whole crew and the bank.
+ * Nothing said so on the screen, and the two figures drifted until a day of
+ * the works cost less a month than the bank it was supposed to contain — which
+ * is not a rounding error, it is every quotation under-recovering the loan.
+ *
+ * So the screen does the one multiplication nobody was doing, and says what it
+ * found. It refuses nothing: these are the works' figures and there may be a
+ * reason. It just stops the contradiction being invisible.
+ */
+function BankCheck({ draft }: { draft: AppSettings }) {
+  const perDay = Number(draft.worksDayCost ?? 0);
+  const days = Number(draft.workingDaysPerMonth ?? 0);
+  const emi = Number(draft.emiPerMonth ?? 0);
+  if (draft.rateModel !== 'PER_DAY' || perDay <= 0 || days <= 0 || emi <= 0) return null;
+
+  const monthly = perDay * days;
+  const short = emi >= monthly;
+
+  return (
+    <p
+      className={cn(
+        'col-span-full rounded-[var(--radius-md)] border px-3 py-2.5 text-xs',
+        short
+          ? 'border-danger-200 bg-danger-50 text-danger-800'
+          : 'border-ink-200 bg-ink-50 text-ink-600',
+      )}
+    >
+      The works is on the day model, so the bank is recovered inside the day cost and the EMI figure
+      above does not reach a quotation. {formatRs(perDay)} a day x {formatNumber(days, 0)} days is{' '}
+      {formatRs(monthly)} a month
+      {short ? (
+        <>
+          , which is less than the {formatRs(emi)} bank it has to contain — before a single wage.
+          One of the two figures needs raising.
+        </>
+      ) : (
+        <>, of which the bank is {formatRs(emi)}. The rest is the crew.</>
+      )}
+    </p>
+  );
+}

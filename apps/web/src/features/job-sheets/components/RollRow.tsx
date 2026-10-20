@@ -1,7 +1,6 @@
-import { Plus, Trash2 } from 'lucide-react';
 import { weighedTotal, type JobSheetReelInput } from '@yuva/shared';
-import { IconButton } from '@/components/ui/IconButton';
 import { cn } from '@/lib/utils';
+import { Draws } from './Draws';
 import { Head, RowName, Typed, Worked } from './sheet-form';
 
 /** The closing columns: Total, Bal., Cons. and, on the film row, Westage. */
@@ -37,42 +36,13 @@ export function RollRow({
   extra?: { head: string; node: React.ReactNode };
 }) {
   const total = weighedTotal(reels, 0);
-  const set = (index: number, weightKg: number) =>
-    onReels(reels.map((reel, at) => (at === index ? { ...reel, weightKg } : reel)));
-
   return (
     <div className="border-ink-100 flex flex-wrap items-center gap-1.5 border-b py-2 last:border-b-0">
       <RowName>{name}</RowName>
 
-      {reels.map((reel, index) => (
-        <div key={index} className="flex items-end">
-          <Typed
-            width="w-[72px]"
-            label={`${name}, reel ${index + 1}`}
-            value={reel.weightKg}
-            disabled={disabled}
-            onChange={(next) => set(index, Number(next || 0))}
-          />
-          <IconButton
-            tone="danger"
-            aria-label={`Remove ${name} reel ${index + 1}`}
-            disabled={disabled}
-            onClick={() => onReels(reels.filter((_, at) => at !== index))}
-          >
-            <Trash2 className="size-3" />
-          </IconButton>
-        </div>
-      ))}
-
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => onReels([...reels, { weightKg: 0, coreKg: 0, reelNumber: '' }])}
-        className="text-ink-400 hover:text-brand-700 disabled:text-ink-200 mb-1 rounded px-1 py-0.5"
-        aria-label={`Add a reel to ${name}`}
-      >
-        <Plus className="size-4" />
-      </button>
+      <div className="min-w-0 flex-1">
+        <Draws label={name} draws={reels} onDraws={onReels} disabled={disabled} />
+      </div>
 
       {/* The closing columns, on the same grid as the heading above them. */}
       <div className={cn('ml-auto', TAIL, extra && 'pr-0')}>

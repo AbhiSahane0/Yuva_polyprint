@@ -44,6 +44,7 @@ export function MaterialModal({
     category: 'FILM' as MaterialCategory,
     unit: 'KG',
     density: '',
+    usualMicron: '',
     solidsPercent: '',
     laydownGsm: '',
     inkKind: '' as '' | 'PROCESS' | 'SPECIAL',
@@ -57,6 +58,7 @@ export function MaterialModal({
       category: material?.category ?? 'FILM',
       unit: material?.unit ?? 'KG',
       density: material?.density != null ? String(material.density) : '',
+      usualMicron: material?.usualMicron != null ? String(material.usualMicron) : '',
       solidsPercent: material?.solidsPercent != null ? String(material.solidsPercent) : '',
       laydownGsm: material?.laydownGsm != null ? String(material.laydownGsm) : '',
       inkKind: material?.inkKind ?? '',
@@ -87,6 +89,7 @@ export function MaterialModal({
       category: form.category,
       unit: form.unit.trim() || 'KG',
       density: isFilm ? optional(form.density) : null,
+      usualMicron: isFilm ? optional(form.usualMicron) : null,
       solidsPercent: takesSolids ? optional(form.solidsPercent) : null,
       laydownGsm: isInk ? optional(form.laydownGsm) : null,
       inkKind: isInk && form.inkKind !== '' ? form.inkKind : null,
@@ -162,6 +165,21 @@ export function MaterialModal({
             maxLength={8}
           />
         </Field>
+
+        {isFilm ? (
+          <Field
+            label="Usual thickness, micron"
+            htmlFor="material-usual-micron"
+            hint="What the works usually buys this one at. A film whose name states a gauge already knows; the LDPE grades, Nylon and PP do not, because they are made to whatever the job asks for. Left empty, a quotation asks for the thickness instead of guessing."
+          >
+            <NumberInput
+              id="material-usual-micron"
+              value={form.usualMicron}
+              onChange={(event) => set('usualMicron', event.target.value)}
+              placeholder="50"
+            />
+          </Field>
+        ) : null}
 
         {isFilm ? (
           <div className="sm:col-span-2">

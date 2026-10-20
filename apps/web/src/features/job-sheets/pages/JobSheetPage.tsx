@@ -6,6 +6,7 @@ import {
   formatNumber,
   JOB_SHEET_STATUS_LABELS,
   mixDrumFor,
+  weighedTotal,
   type JobSheet,
   type JobSheetCost,
   type JobSheetLabour,
@@ -27,6 +28,7 @@ import { useProductionOrders } from '@/features/production/api/production-api';
 import { useMaterials } from '@/features/rates/api/rate-api';
 import { Weighings } from '../components/Weighings';
 import { InkGrid } from '../components/InkGrid';
+import { Draws } from '../components/Draws';
 import { RollHeads, RollRow } from '../components/RollRow';
 import { StageCard, type StageCardRow } from '../components/StageCard';
 import { FinalCosting } from '../components/FinalCosting';
@@ -217,16 +219,58 @@ export default function JobSheetPage() {
     );
 
   /**
+   * **The sheet's figures, read off its weighings rather than its totals.**
+   *
+   * Every "received" figure on this form is a list of draws — reels onto the
+   * machine, tins off the shelf, draws from a drum — and the total beside it is
+   * their sum. The server applies that rule on save. Until this existed the
+   * screen did not: a weight typed into a reel box changed nothing below it,
+   * because everything downstream read the stored total, and the cost per
+   * kilogram sat still until somebody pressed Save. Resolved here, once, so
+   * the stage cards, the ratios and the costing all read the figures the
+   * server is about to store.
+   */
+  const resolved = useMemo(() => {
+    if (!draft) return null;
+    const lines = draft.lines.map((line) => ({
+      ...line,
+      issuedKg: weighedTotal(line.issueReels, line.issuedKg),
+      returnedKg: weighedTotal(line.returnReels, line.returnedKg),
+      mixIssuedKg: weighedTotal(line.mixIssueReels, line.mixIssuedKg),
+    }));
+
+    /*
+     * The printing drum is the colours added up, which is their own
+     * `=sum(J15:J26)`. A sheet keyed from paper with nothing but a pooled
+     * total keeps the stored one, because that is all there is.
+     */
+    const inks = lines.filter((line) => line.kind === 'INK');
+    const mixed = inks.some((line) => line.mixIssuedKg !== 0 || line.mixReturnedKg !== 0);
+    const add = (pick: (line: (typeof inks)[number]) => number) =>
+      inks.reduce((total, line) => total + pick(line), 0);
+
+    return {
+      lines,
+      pools: {
+        printMixIssuedKg: mixed ? add((line) => line.mixIssuedKg) : draft.printMixIssuedKg,
+        printMixReturnedKg: mixed ? add((line) => line.mixReturnedKg) : draft.printMixReturnedKg,
+        lamMixIssuedKg: weighedTotal(draft.lamMixIssueReels, draft.lamMixIssuedKg),
+        lamMixReturnedKg: draft.lamMixReturnedKg,
+      },
+    };
+  }, [draft]);
+
+  /**
    * The sheet as it stands, costed here and now.
    *
    * The same function the server runs, so there is one costing and not two that
    * have to be kept in step.
    */
   const live: JobSheetCost | null = useMemo(() => {
-    if (!draft) return null;
+    if (!draft || !resolved) return null;
     return costJobSheet({
-      lines: draft.lines.map((line) => {
-        const drum = mixDrumFor(line, draft);
+      lines: resolved.lines.map((line) => {
+        const drum = mixDrumFor(line, resolved.pools);
         return {
           name: line.name,
           issuedKg: line.issuedKg,
@@ -260,7 +304,7 @@ export default function JobSheetPage() {
       finalOutputKg: draft.finalOutputKg,
       expectedWastagePercent: draft.expectedWastagePercent,
     });
-  }, [draft]);
+  }, [draft, resolved]);
 
   /** A line's index in the sheet, so its costed twin can be found. */
   const indexOf = (position: number) =>
@@ -291,6 +335,13 @@ export default function JobSheetPage() {
         printMixReturnedKg: draft.printMixReturnedKg,
         lamMixIssuedKg: draft.lamMixIssuedKg,
         lamMixReturnedKg: draft.lamMixReturnedKg,
+        /* Weights only — the server gives them their rows back and the drum's
+           total is recomputed from them. */
+        lamMixIssueReels: draft.lamMixIssueReels.map((reel) => ({
+          weightKg: reel.weightKg,
+          coreKg: 0,
+          reelNumber: reel.reelNumber,
+        })),
         makeReadyDays: draft.makeReadyDays,
         productionDays: draft.productionDays,
         printedGrossKg: draft.printedGrossKg,
@@ -342,6 +393,11 @@ export default function JobSheetPage() {
             reelNumber: reel.reelNumber,
           })),
           returnReels: line.returnReels.map((reel) => ({
+            weightKg: reel.weightKg,
+            coreKg: 0,
+            reelNumber: reel.reelNumber,
+          })),
+          mixIssueReels: line.mixIssueReels.map((reel) => ({
             weightKg: reel.weightKg,
             coreKg: 0,
             reelNumber: reel.reelNumber,
@@ -399,7 +455,7 @@ export default function JobSheetPage() {
     }
   }
 
-  if (isLoading || !draft || !live) return <LoadingState />;
+  if (isLoading || !draft || !live || !resolved) return <LoadingState />;
 
   /* ------------------------------------------------------------------ *
    * The works' own blocks, read off the twenty-one rows.
@@ -409,7 +465,7 @@ export default function JobSheetPage() {
    * the lamination films and chemicals are the Stage 2 block. The rows are
    * the same rows — this is only which heading each sits under.
    * ------------------------------------------------------------------ */
-  const line = (position: number) => draft.lines.find((row) => row.position === position);
+  const line = (position: number) => resolved.lines.find((row) => row.position === position);
   const consumedOf = (position: number) => live.lines[indexOf(position)]?.consumedKg ?? 0;
 
   const filmRow = line(1);
@@ -435,13 +491,13 @@ export default function JobSheetPage() {
    * what their own card formulas do: ink plus 40% of the mix, ethyl plus 40,
    * toluene plus 20, adhesive plus 40, hardener plus 5, ethyl (lam) plus 60.
    */
-  const inkRows = draft.lines.filter((row) => row.kind === 'INK');
+  const inkRows = resolved.lines.filter((row) => row.kind === 'INK');
   const sumOf = (rows: JobSheetLine[], pick: (row: JobSheetLine) => number) =>
     rows.reduce((total, row) => total + pick(row), 0);
 
   const printMixIn = sumOf(inkRows, (row) => row.mixIssuedKg);
   const printMixBack = sumOf(inkRows, (row) => row.mixReturnedKg);
-  const lamMixIn = draft.lamMixIssuedKg;
+  const lamMixIn = weighedTotal(draft.lamMixIssueReels, draft.lamMixIssuedKg);
   const lamMixBack = draft.lamMixReturnedKg;
 
   const card = (name: string, input: number, balance: number): StageCardRow => ({
@@ -826,13 +882,12 @@ export default function JobSheetPage() {
               <p className="text-ink-500 min-w-0 flex-1 text-xs">
                 The adhesive takes 40% of this drum, the hardener 5% and the ethyl 60%.
               </p>
-              <div className="ml-auto grid auto-cols-[5.5rem] grid-flow-col items-center gap-2">
-                <Typed
-                  width="w-full"
-                  label="Lamination mix out"
-                  value={draft.lamMixIssuedKg}
+              <div className="ml-auto flex items-center gap-2">
+                <Draws
+                  label="Lamination mix"
+                  draws={draft.lamMixIssueReels}
                   disabled={locked}
-                  onChange={(next) => set('lamMixIssuedKg', Number(next || 0))}
+                  onDraws={(draws) => set('lamMixIssueReels', asReels(draws))}
                 />
                 <Typed
                   width="w-full"
@@ -841,7 +896,7 @@ export default function JobSheetPage() {
                   disabled={locked}
                   onChange={(next) => set('lamMixReturnedKg', Number(next || 0))}
                 />
-                <Worked value={draft.lamMixIssuedKg - draft.lamMixReturnedKg} />
+                <Worked value={lamMixIn - draft.lamMixReturnedKg} />
               </div>
             </div>
 

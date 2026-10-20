@@ -1,7 +1,14 @@
 import type { Request, Response } from 'express';
 import type { RecordOutcomeInput, SendQuotationInput } from '@yuva/shared';
 import type { CreateQuotationInput, ListQuotationsQuery, UpdateQuotationInput } from '@yuva/shared';
-import { created, ok, paginated, pdf as sendPdf } from '../../utils/api-response.js';
+import { created, ok, paginated, pdf as sendPdf, xlsx } from '../../utils/api-response.js';
+import {
+  buildReport,
+  describe as describeFilters,
+  EXPORT_LIMIT,
+  reportFilename,
+} from '../../lib/report-workbook.js';
+import { QUOTATION_STATUS_LABELS } from '@yuva/shared';
 import * as quotationService from './quotation.service.js';
 import { renderQuotationPdf } from './quotation-pdf.js';
 
@@ -94,4 +101,51 @@ export async function recordOutcome(req: Request, res: Response) {
     req.body as RecordOutcomeInput,
   );
   ok(res, result);
+}
+
+/**
+ * Every quotation that matched what was on screen.
+ *
+ * The office reconciles the month against this: what went out, to whom, at
+ * what, and what came back. The headline figure is the tier the customer was
+ * quoted, which is the one the list shows.
+ */
+export async function exportList(req: Request, res: Response) {
+  const query = req.query as unknown as ListQuotationsQuery;
+  const { items } = await quotationService.listQuotations({
+    ...query,
+    page: 1,
+    pageSize: EXPORT_LIMIT,
+  });
+
+  const file = await buildReport({
+    title: 'Quotations',
+    filters: describeFilters(req.query as Record<string, unknown>),
+    rows: items,
+    columns: [
+      { header: 'No.', width: 9, format: 'int', value: (q) => q.number },
+      { header: 'Rev', width: 7, format: 'int', value: (q) => q.version },
+      { header: 'Date', width: 12, format: 'date', value: (q) => asDate(q.date) },
+      { header: 'Customer', width: 34, value: (q) => q.customerName },
+      { header: 'Status', width: 13, value: (q) => QUOTATION_STATUS_LABELS[q.status] ?? q.status },
+      { header: 'Jobs', width: 8, format: 'int', value: (q) => q.itemCount },
+      { header: 'Quantities', width: 11, format: 'int', value: (q) => q.tierCount },
+      {
+        header: 'Total with GST',
+        width: 17,
+        format: 'rs',
+        total: true,
+        value: (q) => q.grandWithGst,
+      },
+      { header: 'Advance', width: 14, format: 'rs', total: true, value: (q) => q.totalAdvance },
+      { header: 'Sent', width: 12, format: 'date', value: (q) => asDate(q.sentAt) },
+    ],
+  });
+  res.setHeader('Cache-Control', 'no-store');
+  xlsx(res, file, reportFilename('Quotations'));
+}
+
+/** A yyyy-mm-dd string as a date Excel will sort and format. Null stays null. */
+function asDate(value: string | null | undefined): Date | null {
+  return value ? new Date(`${String(value).slice(0, 10)}T00:00:00Z`) : null;
 }

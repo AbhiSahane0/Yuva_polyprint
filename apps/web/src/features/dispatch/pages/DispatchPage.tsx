@@ -10,6 +10,7 @@ import {
 } from '@yuva/shared';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { ExportButton } from '@/components/ui/ExportButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input, Select } from '@/components/ui/Field';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -97,12 +98,15 @@ export default function DispatchPage() {
             a line per order aboard — and sending the last of an order is what completes it.
           </p>
         </div>
-        {canEdit ? (
-          <Button onClick={() => navigate('/dispatch/new')}>
-            <Plus className="size-4" />
-            New note
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <ExportButton path="/dispatches/export" params={{ q: search, status }} />
+          {canEdit ? (
+            <Button onClick={() => navigate('/dispatch/new')}>
+              <Plus className="size-4" />
+              New note
+            </Button>
+          ) : null}
+        </div>
       </header>
 
       {totals ? (

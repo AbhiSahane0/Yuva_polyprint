@@ -48,6 +48,7 @@ export * from './lib/pouch-count.js';
 export * from './lib/pouch-making.js';
 export * from './lib/job-colours.js';
 export * from './lib/margin-by-volume.js';
+export * from './lib/volume-pricing.js';
 export * from './lib/job-sheet-costing.js';
 export * from './constants/employees.js';
 export * from './lib/lamination-label.js';

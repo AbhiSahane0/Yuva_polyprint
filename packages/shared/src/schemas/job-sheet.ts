@@ -62,6 +62,13 @@ export const jobSheetLineSchema = z.object({
   issueReels: z.array(jobSheetReelSchema).max(20).default([]),
   returnReels: z.array(jobSheetReelSchema).max(20).default([]),
 
+  /*
+   * The draws from this row's own mix drum — an ink's mixed tin, taken ten
+   * kilograms at a time. Same rule as the reels above: where there are any,
+   * they are the figure.
+   */
+  mixIssueReels: z.array(jobSheetReelSchema).max(20).default([]),
+
   mixIssuedKg: weight.default(0),
   mixReturnedKg: weight.default(0),
   mixSharePercent: percent.default(0),
@@ -122,6 +129,9 @@ export const jobSheetSchema = z.object({
   printMixReturnedKg: weight.default(0),
   lamMixIssuedKg: weight.default(0),
   lamMixReturnedKg: weight.default(0),
+  /* The draws from the lamination drum. It belongs to the sheet rather than to
+     any one row, which is why it sits here and not on a line. */
+  lamMixIssueReels: z.array(jobSheetReelSchema).max(20).default([]),
 
   makeReadyDays: days.default(0),
   productionDays: days.default(0),

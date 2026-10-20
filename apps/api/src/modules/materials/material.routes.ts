@@ -25,6 +25,8 @@ router.put(
 );
 
 router.get('/', asyncHandler(controller.list));
+/* Before `/:id/history`, or a request for `/export` is read as an id. */
+router.get('/export', asyncHandler(controller.exportList));
 router.post(
   '/',
   requireModule('rates'),

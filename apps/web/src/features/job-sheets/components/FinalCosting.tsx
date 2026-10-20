@@ -5,6 +5,8 @@ import {
   formatNumber,
   formatRs,
   JOB_SHEET_STAGE_LABELS,
+  mixInkRatePerKg,
+  PRINT_MIX_RATIO,
   type JobSheet,
   type JobSheetCost,
   type JobSheetLabour,
@@ -245,6 +247,12 @@ export function FinalCosting({
               note="Ethyle and Tolluene"
             />
           </div>
+
+          <Band
+            title="Mix Ink"
+            right={`${PRINT_MIX_RATIO.pigmentPercent}% ink · ${PRINT_MIX_RATIO.ethylPercent}% ethyl · ${PRINT_MIX_RATIO.toluenePercent}% toluene`}
+          />
+          <MixInkRates draft={draft} />
 
           <Band title="Rates this sheet costs at" />
           <Rates draft={draft} locked={locked} onField={onField} />
@@ -1032,6 +1040,61 @@ function Rates({
             onChange={(event) => onField(rate.key, Number(event.target.value || 0))}
           />
         </Field>
+      ))}
+    </div>
+  );
+}
+
+/* ====================================================================== *
+ * What a kilogram of mixed ink is worth
+ * ====================================================================== */
+
+/**
+ * **A drum of mix is not ink, and it is not priced like ink.**
+ *
+ * The works mixes two parts pigment to two parts ethyl and one of toluene, and
+ * issues it by the kilogram — so the operator draws 15 kg of "white" out of a
+ * drum that is three fifths solvent. Nothing on the sheet said what that
+ * kilogram was worth.
+ *
+ * It moves no total. The costing already books each part at its own rate: the
+ * colour carries 40% of the drum on its own row, the ethyl and toluene rows
+ * carry the rest. This is the same arithmetic read the other way round, for
+ * the person standing in front of the drum.
+ *
+ * Only the colours that were actually mixed, because twelve rows of which
+ * eight are idle is a list nobody reads.
+ */
+function MixInkRates({ draft }: { draft: Draft }) {
+  const ethyl = draft.lines.find((line) => line.position === 2)?.ratePerKg ?? 0;
+  const toluene = draft.lines.find((line) => line.position === 3)?.ratePerKg ?? 0;
+
+  const mixed = draft.lines
+    .filter((line) => line.kind === 'INK')
+    .filter((line) => line.mixIssuedKg !== 0 || line.mixIssueReels.length > 0)
+    .map((line) => ({
+      name: line.name,
+      rate: mixInkRatePerKg({ ink: line.ratePerKg, ethyl, toluene }),
+    }));
+
+  if (mixed.length === 0) {
+    return (
+      <p className="text-ink-400 text-xs">
+        Nothing was mixed on this job. A colour with a drum against it shows what a kilogram of that
+        drum is worth.
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {mixed.map((colour) => (
+        <Shown
+          key={colour.name}
+          label={colour.name}
+          value={colour.rate === null ? '—' : `${formatRs(colour.rate, 2)} / kg`}
+          note={colour.rate === null ? 'No rate for this colour yet' : 'A kilogram of the drum'}
+        />
       ))}
     </div>
   );

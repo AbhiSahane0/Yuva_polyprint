@@ -69,6 +69,7 @@ const LINES: JobSheetLine[] = JOB_SHEET_LINES.map((template, index) => {
     returnedKg: 0,
     issueReels: [],
     returnReels: [],
+    mixIssueReels: [],
     mixIssuedKg: 0,
     mixReturnedKg: 0,
     mixSharePercent: template.mixSharePercent,
@@ -130,6 +131,7 @@ function october(patch: Partial<Draft> = {}): Draft {
     printMixReturnedKg: 0,
     lamMixIssuedKg: 0,
     lamMixReturnedKg: 0,
+    lamMixIssueReels: [],
 
     makeReadyDays: 1,
     productionDays: 1.2,

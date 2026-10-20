@@ -65,8 +65,9 @@ describe('reading a setting as at a date', () => {
 
   it('falls back to the documented default when nothing is stored at all', () => {
     expect(asAt({}, [], '2022-03-23', TODAY).emiPerMonth).toBeUndefined();
-    /* Which is what makes the service fill it from here. */
-    expect(DEFAULT_SETTINGS.emiPerMonth).toBe(4166.66);
+    /* Which is what makes the service fill it from here. The works stated the
+       bank at Rs 6,00,000 a month in October 2026. */
+    expect(DEFAULT_SETTINGS.emiPerMonth).toBe(600000);
   });
 });
 

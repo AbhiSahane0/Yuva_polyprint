@@ -11,6 +11,7 @@ import {
   type StockHealth,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
+import { ExportButton } from '@/components/ui/ExportButton';
 import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
@@ -100,10 +101,16 @@ export default function InventoryPage() {
             What the works holds, what it is worth, and what is running out.
           </p>
         </div>
-        <Button onClick={() => setReceiving(true)}>
-          <PackagePlus className="size-4" />
-          Receive material
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ExportButton
+            path="/inventory/export"
+            params={{ q: search, category: category === 'ALL' ? undefined : category, lowOnly }}
+          />
+          <Button onClick={() => setReceiving(true)}>
+            <PackagePlus className="size-4" />
+            Receive material
+          </Button>
+        </div>
       </header>
 
       {/*

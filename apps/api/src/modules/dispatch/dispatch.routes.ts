@@ -26,6 +26,16 @@ const router = Router();
  * is not something a costing user should be able to do by virtue of costing.
  */
 router.get('/', validate({ query: listDispatchesQuerySchema }), asyncHandler(controller.list));
+/*
+ * The same list, as a spreadsheet. Declared before any `/:id` route, or a
+ * request for `/export` is read as an id — and validated against the same
+ * query schema, so the file and the screen cannot be filtered differently.
+ */
+router.get(
+  '/export',
+  validate({ query: listDispatchesQuerySchema }),
+  asyncHandler(controller.exportList),
+);
 router.get('/next-number', asyncHandler(controller.nextNumber));
 /* Before /:id, or "ready" is read as an id. */
 router.get('/ready', validate({ query: readyToSendQuerySchema }), asyncHandler(controller.ready));

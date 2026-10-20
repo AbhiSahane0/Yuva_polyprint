@@ -21,20 +21,32 @@ import { LayerFields } from './LayerFields';
  */
 
 const FILMS = [
-  { id: 'pet12', name: 'PET 12µm', density: 1.4, currentRate: 210 },
-  { id: 'pet19', name: 'PET 19µm', density: 1.4, currentRate: 218 },
+  { id: 'pet12', name: 'PET 12µm', density: 1.4, usualMicron: 12, currentRate: 210 },
+  { id: 'pet19', name: 'PET 19µm', density: 1.4, usualMicron: 19, currentRate: 218 },
   // One row, at 12µ, and the works laminates it at 50 — which is the structure
   // the bug below was reported on.
-  { id: 'met12', name: 'MET PET 12µm', density: 1.4, currentRate: 180 },
-  { id: 'pe50', name: 'PE 50µm', density: 0.92, currentRate: 185 },
-  // Specified by GSM, so its name states no gauge and its rate applies at any
-  // thickness the office types.
-  { id: 'ppw', name: 'PP Woven', density: null, currentRate: 150 },
+  { id: 'met12', name: 'MET PET 12µm', density: 1.4, usualMicron: 12, currentRate: 180 },
+  { id: 'pe50', name: 'PE 50µm', density: 0.92, usualMicron: 50, currentRate: 185 },
+  // Specified by GSM, so its name states no gauge and nobody has recorded one
+  // against it either. The form must ask rather than guess.
+  { id: 'ppw', name: 'PP Woven', density: null, usualMicron: null, currentRate: 150 },
   // An LDPE grade: blown to whatever gauge the job asks for, so no gauge in
-  // the name either.
-  { id: 'nat5', name: 'LDPE Natural 5 KG (NAT-5KG)', density: 0.92, currentRate: 180 },
-  { id: 'shr3', name: 'LDPE 3-Layer Shrink (SHR-3L)', density: 0.92, currentRate: 191 },
-  { id: 'bopp20', name: 'BOPP 20µm', density: 0.91, currentRate: 200 },
+  // the name. This one the works has recorded, at the 50µ it actually buys.
+  {
+    id: 'nat5',
+    name: 'LDPE Natural 5 KG (NAT-5KG)',
+    density: 0.92,
+    usualMicron: 50,
+    currentRate: 180,
+  },
+  {
+    id: 'shr3',
+    name: 'LDPE 3-Layer Shrink (SHR-3L)',
+    density: 0.92,
+    usualMicron: null,
+    currentRate: 191,
+  },
+  { id: 'bopp20', name: 'BOPP 20µm', density: 0.91, usualMicron: 20, currentRate: 200 },
 ];
 
 function Host({ layers }: { layers?: unknown[] }) {
@@ -186,21 +198,26 @@ describe('LayerFields', () => {
   });
 
   /*
-   * A film whose name states no gauge gave the box nothing to fill in, so it
-   * stayed at the row's 0 — which the schema refuses, leaving the office facing
-   * "Thickness must be more than 0" the moment they picked an LDPE grade.
+   * **A gauge nobody knows is asked for, not guessed.**
+   *
+   * A film whose name states no gauge used to start at 12µ, so the row would
+   * validate. Fifteen of the eighteen films the works buys are in that state —
+   * every LDPE grade, Nylon, PP — and on a sealant that runs at 50, quoting 12
+   * puts a third of the laminate into the costing at a quarter of its weight,
+   * with nothing on the screen to say so. The works records the thickness
+   * against the film instead, and the box starts there.
    */
-  it('starts a film with no gauge in its name at 12 micron', () => {
+  it('starts a film at the thickness the works records against it', () => {
     render(<Host layers={[{ materialId: null, micron: 0, rateOverride: '' }, {}]} />);
     pick('LDPE Natural 5 KG (NAT-5KG)');
-    expect(micronBox(0).value).toBe('12');
+    expect(micronBox(0).value).toBe('50');
     expect(rateBox(0)?.value).toBe('180');
   });
 
-  it('starts an empty box at 12 for PP Woven too', () => {
+  it('leaves the box empty when nothing knows the gauge', () => {
     render(<Host layers={[{ materialId: null, micron: '', rateOverride: '' }, {}]} />);
     pick('PP Woven');
-    expect(micronBox(0).value).toBe('12');
+    expect(micronBox(0).value).toBe('');
   });
 
   it('keeps a gauge already typed when a film with no gauge is chosen', () => {
@@ -211,22 +228,36 @@ describe('LayerFields', () => {
   });
 
   /*
-   * The second pick. BOPP fills in its 20, and swapping it for an LDPE grade
-   * left the grade reading 20 — a figure nobody typed, kept as if they had.
+   * The second pick. BOPP fills in its 20, and swapping it for a grade nobody
+   * has recorded left the grade reading 20 — a figure nobody typed, kept as if
+   * they had. It is cleared now rather than replaced with a guess.
    */
-  it('drops the previous film’s filled-in gauge for 12 when an LDPE grade replaces it', () => {
+  it('clears the previous film’s filled-in gauge when an unrecorded grade replaces it', () => {
     render(<Host layers={[{ materialId: null, micron: 0, rateOverride: '' }, {}]} />);
     pick('BOPP');
     expect(micronBox(0).value).toBe('20');
     pick('LDPE 3-Layer Shrink (SHR-3L)');
-    expect(micronBox(0).value).toBe('12');
+    expect(micronBox(0).value).toBe('');
   });
 
-  it('starts at 12 again on every LDPE grade picked after another', () => {
+  it('carries one recorded grade’s thickness to the next', () => {
     render(<Host layers={[{ materialId: null, micron: 0, rateOverride: '' }, {}]} />);
-    pick('LDPE Natural 5 KG (NAT-5KG)');
     pick('LDPE 3-Layer Shrink (SHR-3L)');
-    expect(micronBox(0).value).toBe('12');
+    expect(micronBox(0).value).toBe('');
+    pick('LDPE Natural 5 KG (NAT-5KG)');
+    expect(micronBox(0).value).toBe('50');
+  });
+
+  /*
+   * The rule that keeps a recorded thickness a DEFAULT. It fills an empty box
+   * and stops there; a figure the office typed survives a change of film, even
+   * when the new film has a thickness of its own on record.
+   */
+  it('never overwrites a typed gauge with the one recorded against the film', () => {
+    render(<Host layers={[{ materialId: null, micron: 0, rateOverride: '' }, {}]} />);
+    type('72');
+    pick('LDPE Natural 5 KG (NAT-5KG)');
+    expect(micronBox(0).value).toBe('72');
   });
 
   it('keeps a gauge typed against one LDPE grade when switching to another', () => {

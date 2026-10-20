@@ -36,10 +36,25 @@ export function CylinderRepair({
   onChange: (next: QuotationCylinderRepair[]) => void;
   disabled?: boolean;
 }) {
-  /* Only asked for once the box is ticked: a customer step that fetched every
-     design's cylinders on the way past would be a request per keystroke. */
-  const { data: design, isPending } = useDesign(on ? jobId : null);
+  /*
+   * Asked for as soon as a design is chosen, not when the box is ticked.
+   *
+   * It used to wait for the tick, to avoid fetching every design's cylinders on
+   * the way through the customer step. But that is one request for the one
+   * design on this line, and it buys the thing the works asked for: a set
+   * already at the engraver says so on the quotation, before anybody thinks to
+   * go looking. Quoting a job whose cylinders are away is a different promise.
+   */
+  const { data: design, isPending } = useDesign(jobId);
   const cylinders = design?.cylinders ?? [];
+
+  /* What the register says is not in the works right now. */
+  const away = cylinders.filter(
+    (cylinder) =>
+      cylinder.status === 'UNDER_REPAIR' ||
+      cylinder.status === 'DAMAGED' ||
+      cylinder.status === 'NEEDS_REWORK',
+  );
 
   const chosen = new Map(repairs.map((repair) => [repair.code, repair]));
   const total = repairs.reduce((sum, repair) => sum + (Number(repair.cost) || 0), 0);
@@ -79,6 +94,28 @@ export function CylinderRepair({
           This customer’s set is already in the works — nothing is charged for cutting it
         </span>
       </label>
+
+      {/*
+        Said whether or not the box is ticked, and before it: the office needs
+        to know a cylinder is out at the engraver while it is deciding what to
+        promise, not only once it has decided to quote the repair.
+      */}
+      {!on && away.length > 0 ? (
+        <p className="border-warning-200 bg-warning-50/60 text-warning-800 mt-3 rounded-[var(--radius-md)] border px-3 py-2.5 text-xs">
+          <CircleAlert className="mr-1 inline size-3.5 align-text-bottom" aria-hidden />
+          {away.length === 1
+            ? 'One cylinder of this set is'
+            : `${away.length} cylinders of this set are`}{' '}
+          not in the works:{' '}
+          {away
+            .map(
+              (cylinder) =>
+                `${cylinder.code} (${CYLINDER_STATUS_LABELS[cylinder.status].toLowerCase()})`,
+            )
+            .join(', ')}
+          . Tick the box above to quote the work.
+        </p>
+      ) : null}
 
       {on ? (
         <div className="mt-3">

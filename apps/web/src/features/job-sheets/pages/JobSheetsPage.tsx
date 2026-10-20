@@ -8,6 +8,7 @@ import {
   type JobSheetSummary,
 } from '@yuva/shared';
 import { Button } from '@/components/ui/Button';
+import { ExportButton } from '@/components/ui/ExportButton';
 import { IconButton } from '@/components/ui/IconButton';
 import { Input, Select } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
@@ -89,10 +90,13 @@ export default function JobSheetsPage() {
             What a run actually consumed, and what it cost a kilogram.
           </p>
         </div>
-        <Button onClick={startSheet} disabled={create.isPending}>
-          <Plus className="size-4" />
-          New job sheet
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ExportButton path="/job-sheets/export" params={{ search, status }} />
+          <Button onClick={startSheet} disabled={create.isPending}>
+            <Plus className="size-4" />
+            New job sheet
+          </Button>
+        </div>
       </header>
 
       <div className="flex flex-wrap items-center gap-2">

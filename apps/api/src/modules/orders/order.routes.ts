@@ -21,6 +21,16 @@ const router = Router();
  * quotation becomes, and it is the same desk that makes both.
  */
 router.get('/', validate({ query: listOrdersQuerySchema }), asyncHandler(controller.list));
+/*
+ * The same list, as a spreadsheet. Declared before any `/:id` route, or a
+ * request for `/export` is read as an id — and validated against the same
+ * query schema, so the file and the screen cannot be filtered differently.
+ */
+router.get(
+  '/export',
+  validate({ query: listOrdersQuerySchema }),
+  asyncHandler(controller.exportList),
+);
 router.get('/next-number', asyncHandler(controller.nextNumber));
 router.get('/:id', validate({ params: idParamSchema }), asyncHandler(controller.getOne));
 
