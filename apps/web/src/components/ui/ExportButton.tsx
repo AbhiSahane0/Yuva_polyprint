@@ -58,8 +58,10 @@ export function ExportButton({
   }
 
   return (
-    <Button variant="secondary" onClick={download} loading={busy} disabled={disabled || busy}>
-      <Download className="size-4" />
+    <Button variant="secondary" onClick={download} loading={busy} disabled={disabled}>
+      {/* The spinner stands in for the icon while it works, rather than
+          sitting beside it. `loading` already disables the button. */}
+      {busy ? null : <Download className="size-4" />}
       {label}
     </Button>
   );

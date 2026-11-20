@@ -79,8 +79,12 @@ export default function JobCardsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <ExportButton path="/job-cards/export" params={{ search }} />
-          <Button onClick={startCard} loading={create.isPending} disabled={create.isPending}>
-            <Plus className="size-4" />
+          {/* The spinner REPLACES the plus rather than joining it: two icons
+              either side of the label read as a stutter, and the label
+              staying put keeps the button from changing width mid-click.
+              `loading` already disables it — see Button. */}
+          <Button onClick={startCard} loading={create.isPending}>
+            {create.isPending ? null : <Plus className="size-4" />}
             New job card
           </Button>
         </div>
