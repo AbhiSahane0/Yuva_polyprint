@@ -92,8 +92,12 @@ export default function JobSheetsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <ExportButton path="/job-sheets/export" params={{ search, status }} />
-          <Button onClick={startSheet} disabled={create.isPending}>
-            <Plus className="size-4" />
+          {/* The spinner REPLACES the plus rather than joining it: two icons
+              either side of the label read as a stutter, and the label
+              staying put keeps the button from changing width mid-click.
+              `loading` already disables it — see Button. */}
+          <Button onClick={startSheet} loading={create.isPending}>
+            {create.isPending ? null : <Plus className="size-4" />}
             New job sheet
           </Button>
         </div>

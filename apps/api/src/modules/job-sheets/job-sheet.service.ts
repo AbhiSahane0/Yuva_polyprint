@@ -416,15 +416,29 @@ function mixFor(template: JobSheetLineTemplate): { share: number } {
  * zero row costs nothing and keeps the sheet the same shape every time.
  */
 export async function createJobSheet(input: JobSheetInput, enteredBy: string): Promise<JobSheet> {
-  const settings = await getSettings(input.date);
-  const rates = await ratesForTemplate(input.date);
-
-  const job = input.jobId
-    ? await prisma.job.findUnique({
-        where: { id: input.jobId },
-        select: { id: true, jobName: true, customerId: true },
-      })
-    : null;
+  /*
+   * Four questions that do not depend on each other, asked at once.
+   *
+   * They were asked one after another, and each one is a round trip: the
+   * works' figures, the template's rates, the design, and the next number.
+   * Against a database in the same region that is a few milliseconds either
+   * way, but it is four waits where one will do, and on a slow link — a
+   * laptop tethered to a phone on the shop floor — it is the difference
+   * between a blink and a pause. Nothing here reads what another returns.
+   */
+  const [settings, rates, job, number] = await Promise.all([
+    getSettings(input.date),
+    ratesForTemplate(input.date),
+    input.jobId
+      ? prisma.job.findUnique({
+          where: { id: input.jobId },
+          select: { id: true, jobName: true, customerId: true },
+        })
+      : Promise.resolve(null),
+    peekNextNumber(),
+  ]);
+  /* Checked before the card is resolved, so the error a caller gets for a bad
+     job and a taken card is the same one it always was. */
   if (input.jobId && !job) throw ApiError.badRequest('That job is no longer on record');
 
   /*
@@ -449,17 +463,21 @@ export async function createJobSheet(input: JobSheetInput, enteredBy: string): P
     metpet: null,
     ldpe: null,
   };
-  for (const [key, materialId] of [
+  /* Three films, priced at once rather than one after another. */
+  const plies = [
     ['pet', structure.pet],
     ['metpet', structure.metPet],
     ['ldpe', structure.poly],
-  ] as const) {
-    if (!materialId) continue;
-    const found = await materialAsAt(materialId, input.date);
-    if (found) films[key] = { id: materialId, name: found.name, rate: found.rate };
-  }
-
-  const number = await peekNextNumber();
+  ] as const;
+  const priced = await Promise.all(
+    plies.map(([, materialId]) =>
+      materialId ? materialAsAt(materialId, input.date) : Promise.resolve(null),
+    ),
+  );
+  plies.forEach(([key, materialId], index) => {
+    const found = priced[index];
+    if (materialId && found) films[key] = { id: materialId, name: found.name, rate: found.rate };
+  });
 
   const created = await prisma.jobSheet.create({
     data: {
