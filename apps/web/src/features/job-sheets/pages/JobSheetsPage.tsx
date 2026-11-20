@@ -92,7 +92,7 @@ export default function JobSheetsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <ExportButton path="/job-sheets/export" params={{ search, status }} />
-          <Button onClick={startSheet} disabled={create.isPending}>
+          <Button onClick={startSheet} loading={create.isPending} disabled={create.isPending}>
             <Plus className="size-4" />
             New job sheet
           </Button>

@@ -79,7 +79,7 @@ export default function JobCardsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <ExportButton path="/job-cards/export" params={{ search }} />
-          <Button onClick={startCard} disabled={create.isPending}>
+          <Button onClick={startCard} loading={create.isPending} disabled={create.isPending}>
             <Plus className="size-4" />
             New job card
           </Button>
