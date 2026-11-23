@@ -63,9 +63,7 @@ export function spacingFor(jobs: number): Spacing {
   if (jobs <= 1) return { gap: 38, rowPad: 2.4, field: 1.5 };
   if (jobs === 2) return { gap: 32, rowPad: 2.4, field: 1.5 };
   if (jobs === 3) return { gap: 26, rowPad: 2.1, field: 1.3 };
-  if (jobs === 4) return { gap: 16, rowPad: 1.5, field: 0.8 };
-  if (jobs <= 6) return { gap: 14, rowPad: 1.5, field: 0.8 };
-  return { gap: 12, rowPad: 1.4, field: 0.8 };
+  return { gap: 12, rowPad: 1.3, field: 0.8 };
 }
 
 /** `20-11-26` — every date on the quotation prints as DD-MM-YY. */
@@ -131,6 +129,8 @@ export function renderQuotationHtml(quotation: Quotation): string {
   const transport = transportTotal(quotation);
   const jobs = quotation.items.length;
   const spacing = spacingFor(jobs);
+  /* Four jobs or more: the tighter layout at the foot of the stylesheet. */
+  const compact = jobs >= 4;
 
   /*
    * The build-up, in the order a buyer checks it: what the cylinders cost,
@@ -390,12 +390,33 @@ ${getInterFontFaces()}
   .close .motto { font-size: 10.2pt; color: var(--magenta); font-weight: 700; }
   .close .thanks { font-size: 7.2pt; color: var(--body); line-height: 1.55; margin-top: 2mm; }
   .close .band { margin-top: 3.5mm; }
+
+  /*
+   * --- four jobs or more ---------------------------------------------------
+   *
+   * Four rows with long names and four-ply structures overran the page by
+   * about 8mm, sending the bank, signatures and close to a second sheet that
+   * carried nothing else. These trim the furniture around the schedule — never
+   * the figures — so such a quotation still closes on its first page.
+   */
+  .compact .top .who { font-size: 7pt; line-height: 1.75; }
+  .compact .top .who b { font-size: 9.8pt; margin-bottom: .3mm; }
+  .compact .to-band .for { font-size: 10pt; margin-bottom: .6mm; }
+  .compact .to-band .field dd.name { font-size: 11.6pt; }
+  .compact .figures .part { padding: 2.6mm 4mm 2.8mm; }
+  .compact .figures dd { font-size: 11.6pt; margin-top: .8mm; }
+  .compact .schedule .job b { font-size: 8pt; }
+  .compact .settle li { margin-bottom: 1mm; }
+  .compact .due .box { padding: 2.4mm 4mm 2.6mm; }
+  .compact .close .motto { font-size: 9.8pt; }
+  .compact .close .thanks { margin-top: 1.2mm; }
+  .compact .close .band { margin-top: 2.6mm; }
 </style></head>
-<body>
+<body${compact ? ' class="compact"' : ''}>
 <div class="sheet">
 
   <header class="top">
-    ${mark('logo', 24)}
+    ${mark('logo', compact ? 22 : 24)}
     <div class="who">
       <b>${COMPANY.name} ${esc(COMPANY.subtitle)}</b>
       <span>${esc(COMPANY.address)}</span>
