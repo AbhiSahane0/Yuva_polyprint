@@ -120,7 +120,7 @@ import {
 } from '@/features/costing/api/use-rate-costing';
 import { ColourFields } from '../components/ColourFields';
 import { itemFormValues } from '../lib/item-form-values';
-import { applySavedJob, BLANK_DESIGN, nameJob, setNumber } from '../lib/saved-job';
+import { applySavedJob, BLANK_DESIGN, jobOptions, nameJob, setNumber } from '../lib/saved-job';
 import {
   CostingOverrides,
   strippedCosting,
@@ -426,13 +426,14 @@ export default function QuotationFormPage() {
   const customerJobs = chosenCustomer?.jobs ?? [];
   const firstJobName = (watched.items?.[0]?.jobName as string | undefined) ?? '';
 
-  function chooseFirstJob(name: string) {
+  function chooseFirstJob(name: string, pickedId?: string) {
     nameJob(
       setValue,
       0,
       customerJobs,
       name,
       (watched.items?.[0]?.jobId as string | null | undefined) ?? null,
+      pickedId,
     );
   }
 
@@ -1263,7 +1264,7 @@ export default function QuotationFormPage() {
                   <>
                     <Field
                       label="Company"
-                      htmlFor="customerId"
+                      htmlFor="customerName"
                       error={formState.errors.customerName?.message}
                     >
                       <Combobox
@@ -1309,6 +1310,65 @@ export default function QuotationFormPage() {
               </div>
 
               {/*
+                What the enquiry is for, asked beside the company it is for.
+
+                This is the first thing the office knows — an enquiry arrives
+                as "Amol Bhadang 500gm for Amol Foods", a company and a design
+                in one breath — so it is answered here rather than two steps
+                later, where the question only came up once the costing did.
+
+                See `chooseFirstJob`: it writes `items.0.jobName`, the very box
+                the Jobs step shows, so there is no second copy to keep in
+                step.
+              */}
+              <div className="sm:col-span-4">
+                <Field
+                  label="Job name"
+                  htmlFor="firstJobName"
+                  hint={
+                    customerJobs.length > 0
+                      ? 'Pick one the works already prints, or type a new one'
+                      : 'A new company, so this is a new design'
+                  }
+                  error={formState.errors.items?.[0]?.jobName?.message}
+                >
+                  {/*
+                    Our own dropdown rather than the browser's. A `<datalist>`
+                    works, but the browser draws its own arrow and its own
+                    popup in its own font — beside the company box, which is a
+                    Combobox, it read as a control borrowed from another
+                    application.
+
+                    A customer with nothing on record gets a plain box: a
+                    chevron over an empty list is something to click and be
+                    disappointed by.
+                  */}
+                  {customerJobs.length > 0 ? (
+                    <Combobox
+                      id="firstJobName"
+                      options={jobOptions(customerJobs)}
+                      value={firstJobName}
+                      invalid={Boolean(formState.errors.items?.[0]?.jobName)}
+                      placeholder="What this quotation is for"
+                      onChange={(name) => chooseFirstJob(name)}
+                      /* The row itself, not its text — two designs here can
+                         read the same. See `nameJob`. */
+                      onPick={(name, key) => chooseFirstJob(name, key)}
+                    />
+                  ) : (
+                    <Input
+                      id="firstJobName"
+                      autoComplete="off"
+                      invalid={Boolean(formState.errors.items?.[0]?.jobName)}
+                      placeholder="What this quotation is for"
+                      value={firstJobName}
+                      onChange={(event) => chooseFirstJob(event.target.value)}
+                    />
+                  )}
+                </Field>
+              </div>
+
+              {/*
                 What the whole document is for.
 
                 The lines below name each job, which answers what a LINE is and
@@ -1317,7 +1377,7 @@ export default function QuotationFormPage() {
                 Optional, and the printed document leaves the line out rather
                 than inventing one from the first job's name.
               */}
-              <div className="sm:col-span-6">
+              <div className="sm:col-span-4">
                 <Field
                   label="Quotation title"
                   htmlFor="title"
@@ -1340,7 +1400,7 @@ export default function QuotationFormPage() {
                 "Referred by" rather than instead of it — the person who asked
                 and the person who sent them are often not the same.
               */}
-              <div className="sm:col-span-3">
+              <div className="sm:col-span-4">
                 <Field label="Enquiry from" htmlFor="enquiryFrom" hint="Who asked">
                   <Input
                     id="enquiryFrom"
@@ -1351,10 +1411,10 @@ export default function QuotationFormPage() {
                 </Field>
               </div>
 
-              {/* Three columns, not two. At two the placeholder was cut off
+              {/* Four of twelve, not two. At two the placeholder was cut off
                   mid-word — "— not recorde" — and a box that clips its own
                   default reads as broken before anybody has touched it. */}
-              <div className="sm:col-span-3">
+              <div className="sm:col-span-4">
                 {/* "Enquiry Source" is the client's own name for it, and the
                     one the works uses out loud. "Generated through" was ours. */}
                 <Field label="Enquiry source" htmlFor="generatedThrough" hint="How it reached us">
@@ -1413,7 +1473,7 @@ export default function QuotationFormPage() {
                 which is why it is not in `clearCustomerFields`. Two enquiries
                 from one company can come through different people.
               */}
-              <div className="sm:col-span-5">
+              <div className="sm:col-span-6">
                 <Field
                   label="Referred by"
                   htmlFor="referredBy"
@@ -1425,38 +1485,6 @@ export default function QuotationFormPage() {
                     {...register('referredBy')}
                   />
                 </Field>
-              </div>
-
-              {/*
-                What the enquiry is for. See `chooseFirstJob` — this writes
-                the Jobs step's own box rather than a second copy of it.
-              */}
-              <div className="col-span-2 sm:col-span-7">
-                <Field
-                  label="Job name"
-                  htmlFor="firstJobName"
-                  hint={
-                    customerJobs.length > 0
-                      ? 'Pick one the works already prints, or type a new one'
-                      : 'A new company, so this is a new design'
-                  }
-                  error={formState.errors.items?.[0]?.jobName?.message}
-                >
-                  <Input
-                    id="firstJobName"
-                    list={customerJobs.length > 0 ? 'savedJobNames' : undefined}
-                    placeholder="What this quotation is for"
-                    value={firstJobName}
-                    onChange={(event) => chooseFirstJob(event.target.value)}
-                  />
-                </Field>
-                {customerJobs.length > 0 ? (
-                  <datalist id="savedJobNames">
-                    {customerJobs.map((job) => (
-                      <option key={job.id} value={job.jobName} />
-                    ))}
-                  </datalist>
-                ) : null}
               </div>
             </div>
           </FieldSection>

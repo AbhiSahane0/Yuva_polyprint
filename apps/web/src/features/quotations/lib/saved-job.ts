@@ -95,6 +95,42 @@ export function savedJobNamed(jobs: CustomerJob[], name: string): CustomerJob | 
 }
 
 /**
+ * The customer's designs as a list to drop down.
+ *
+ * A second line is attached only where the name does not tell two rows apart.
+ * This works reuses design names across sizes and the jobs table carries a
+ * code for each, so "Amol Bhadang 200gm." twice over is a real thing to pick
+ * between and the code is the only way to do it. Where the name is unique the
+ * code is noise, and a list where every row carries a grey line under it is
+ * harder to read than one where a grey line means something.
+ *
+ * Typed structurally rather than as the Combobox's own option type, so this
+ * file stays free of the component layer.
+ */
+export function jobOptions(
+  jobs: CustomerJob[],
+): { key: string; label: string; description?: string }[] {
+  const seen = new Map<string, number>();
+  for (const job of jobs) {
+    const name = job.jobName.trim().toLowerCase();
+    seen.set(name, (seen.get(name) ?? 0) + 1);
+  }
+
+  return jobs.map((job) => {
+    const ambiguous = (seen.get(job.jobName.trim().toLowerCase()) ?? 0) > 1;
+    const code = job.jobCode?.trim();
+    return {
+      key: job.id,
+      label: job.jobName,
+      ...(ambiguous && code && code !== NOT_RECORDED ? { description: `Code ${code}` } : {}),
+    };
+  });
+}
+
+/** What the API writes where a customer record has nothing. */
+const NOT_RECORDED = 'N/A';
+
+/**
  * Copies a saved job's specification onto a line, or clears it for a new one.
  *
  * `null` starts clean. Leaving the previous job's name and dimensions behind
@@ -188,8 +224,19 @@ export function nameJob(
   name: string,
   /** The saved job this line is currently linked to, if any. */
   linkedJobId: string | null,
+  /**
+   * The id of the design that was PICKED from the list, where one was.
+   *
+   * Typing gives us nothing but text, so the name has to be matched; a pick
+   * gives us the row itself. Two of this works' designs share a name, and
+   * matching the name would quietly apply the first of them to a line the
+   * office had pointed at the second.
+   */
+  pickedId?: string | null,
 ): void {
-  const job = savedJobNamed(jobs, name);
+  const job = pickedId
+    ? (jobs.find((candidate) => candidate.id === pickedId) ?? null)
+    : savedJobNamed(jobs, name);
 
   /* One of theirs: bring the whole design and mark it a repeat, exactly as
      the Jobs step's own picker does. */

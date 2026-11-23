@@ -155,7 +155,10 @@ describe('a saved line coming back into the form', () => {
 
   /* The reported bug, named. */
   it('brings the colours back, in the order they were stored', () => {
-    const colours = itemFormValues(STORED).colours;
+    /* `?? []` only so the array can be read. The form type has colours
+       optional, and the bug being tested for IS them coming back absent —
+       which the length below then fails on, which is the point. */
+    const colours = itemFormValues(STORED).colours ?? [];
     expect(colours).toHaveLength(5);
     expect(colours.map((colour) => colour.name)).toEqual([
       'Cyan',
@@ -167,10 +170,10 @@ describe('a saved line coming back into the form', () => {
   });
 
   it('prices each colour as it was sold, not as the list reads today', () => {
-    const [cyan] = itemFormValues(STORED).colours;
+    const [cyan] = itemFormValues(STORED).colours ?? [];
     expect(cyan).toMatchObject({ kind: 'PROCESS', materialId: 'i1', ratePerKg: 450 });
     /* The special carries no ink and the dearest rate. */
-    expect(itemFormValues(STORED).colours[4]).toMatchObject({
+    expect((itemFormValues(STORED).colours ?? [])[4]).toMatchObject({
       kind: 'SPECIAL',
       materialId: null,
       ratePerKg: 235,
@@ -179,7 +182,7 @@ describe('a saved line coming back into the form', () => {
 
   /* Position and id belong to the row, not to the form. */
   it('leaves the stored row’s own keys behind', () => {
-    for (const colour of itemFormValues(STORED).colours) {
+    for (const colour of itemFormValues(STORED).colours ?? []) {
       expect(colour).not.toHaveProperty('id');
       expect(colour).not.toHaveProperty('position');
     }

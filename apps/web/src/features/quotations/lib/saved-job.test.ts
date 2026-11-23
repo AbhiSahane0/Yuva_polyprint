@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CustomerJob } from '@yuva/shared';
-import { applySavedJob, nameJob, savedJobNamed } from './saved-job';
+import { applySavedJob, jobOptions, nameJob, savedJobNamed } from './saved-job';
 
 /**
  * **Naming the job on the first step, where the office already knows it.**
@@ -159,5 +159,76 @@ describe('it is the Jobs step’s own box', () => {
     for (const path of written.keys()) {
       expect(path.startsWith('items.0.')).toBe(true);
     }
+  });
+});
+
+describe('the customer’s designs as a list to drop down', () => {
+  it('offers every design, keyed on the row and not its text', () => {
+    expect(jobOptions(JOBS)).toEqual([
+      { key: 'job-laxmi', label: 'Laxmi Spices 250gm' },
+      { key: 'job-papad', label: 'Papad Atta 1 Kg' },
+    ]);
+  });
+
+  /* A grey line under every row means nothing; under two rows that read the
+     same, it is the only way to tell them apart. */
+  it('says nothing more where the name already tells them apart', () => {
+    expect(jobOptions(JOBS).every((option) => option.description === undefined)).toBe(true);
+  });
+
+  it('shows the job code where two designs read the same', () => {
+    const twice = [
+      { ...LAXMI, id: 'a', jobCode: 'YP-118' },
+      { ...LAXMI, id: 'b', jobCode: 'YP-204' },
+      PAPAD,
+    ] as unknown as CustomerJob[];
+
+    expect(jobOptions(twice).map((option) => option.description)).toEqual([
+      'Code YP-118',
+      'Code YP-204',
+      undefined,
+    ]);
+  });
+
+  it('leaves the line off when the works never recorded a code', () => {
+    const twice = [
+      { ...LAXMI, id: 'a', jobCode: 'N/A' },
+      { ...LAXMI, id: 'b', jobCode: '  ' },
+    ] as unknown as CustomerJob[];
+    expect(jobOptions(twice).every((option) => option.description === undefined)).toBe(true);
+  });
+});
+
+describe('picking a row rather than typing its name', () => {
+  const TWINS = [
+    { ...LAXMI, id: 'a', designOpenWidth: 170 },
+    { ...LAXMI, id: 'b', designOpenWidth: 240 },
+  ] as unknown as CustomerJob[];
+
+  /*
+   * The bug this closes: two designs share a name, the office points at the
+   * second, and matching on the text would quietly apply the first — the
+   * wrong width, on a document nobody would think to re-read.
+   */
+  it('applies the design that was pointed at, not the first of that name', () => {
+    const { setValue, written } = recorder();
+    nameJob(setValue, 0, TWINS, 'Laxmi Spices 250gm', null, 'b');
+    expect(written.get('items.0.jobId')).toBe('b');
+    expect(written.get('items.0.widthMm')).toBe('240');
+  });
+
+  it('still matches on the name when nothing was picked', () => {
+    const { setValue, written } = recorder();
+    nameJob(setValue, 0, TWINS, 'Laxmi Spices 250gm', null);
+    expect(written.get('items.0.jobId')).toBe('a');
+  });
+
+  /* A list that has moved on since the pick. Treated as a name nobody has
+     printed, which is what it now is. */
+  it('does not fall back to the name when the picked row has gone', () => {
+    const { setValue, written } = recorder();
+    nameJob(setValue, 0, TWINS, 'Laxmi Spices 250gm', 'a', 'vanished');
+    expect(written.get('items.0.jobId')).toBeNull();
+    expect(written.get('items.0.jobName')).toBe('Laxmi Spices 250gm');
   });
 });
