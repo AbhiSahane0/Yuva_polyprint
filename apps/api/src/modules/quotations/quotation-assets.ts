@@ -97,6 +97,11 @@ export interface QuotationAssets {
   header: LoadedAsset | null;
   footer: LoadedAsset | null;
   paymentQr: LoadedAsset | null;
+  /**
+   * The proprietor's signature, printed above the line on the quotation.
+   * Optional: without `signature.png` the space is left blank to sign by hand.
+   */
+  proprietorSignature: LoadedAsset | null;
 }
 
 let cached: QuotationAssets | null = null;
@@ -108,6 +113,7 @@ export function getQuotationAssets(): QuotationAssets {
     header: loadAsset('header'),
     footer: loadAsset('footer'),
     paymentQr: loadAsset('payment-qr'),
+    proprietorSignature: loadAsset('signature'),
   };
 
   if (!cached.header && !cached.footer) {
