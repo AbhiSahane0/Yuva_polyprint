@@ -88,7 +88,7 @@ export function JobCard({
                 </option>
               ))}
             </Select>
-          ) : field.kind === 'datalist' ? (
+          ) : field.kind === 'combobox' ? (
             <Combobox
               id={id}
               options={field.options ?? []}

@@ -12,12 +12,18 @@ export interface JobFieldDef {
   hint?: string;
   /**
    * `select`   — a closed set; nothing else is valid.
-   * `datalist` — suggestions, but anything can still be typed. Used where the
+   * `combobox` — suggestions, but anything can still be typed. Used where the
    *              imported data has a handful of common values plus a long tail,
    *              so people stop inventing new spellings of the same thing
    *              without being blocked from entering something genuinely new.
+   *
+   * The second kind was called `datalist` after the native element it first
+   * used. The element is long gone — the browser drew its own arrow and its
+   * own popup, which looked nothing like the selects beside it — but the name
+   * outlived it, so this file went on describing a control the app does not
+   * render anywhere.
    */
-  kind?: 'text' | 'number' | 'select' | 'datalist' | 'textarea' | 'checkbox';
+  kind?: 'text' | 'number' | 'select' | 'combobox' | 'textarea' | 'checkbox';
   options?: readonly string[];
   placeholder?: string;
   required?: boolean;
@@ -87,7 +93,7 @@ export const JOB_FIELD_GROUPS: JobFieldGroup[] = [
       {
         name: 'pouchType',
         label: 'Pouch type',
-        kind: 'datalist',
+        kind: 'combobox',
         options: POUCH_TYPES,
         placeholder: 'Choose or type',
         span: 6,
@@ -106,7 +112,7 @@ export const JOB_FIELD_GROUPS: JobFieldGroup[] = [
       {
         name: 'polyType',
         label: 'Poly type',
-        kind: 'datalist',
+        kind: 'combobox',
         options: POLY_TYPES,
         placeholder: 'Choose or type',
         span: 4,
@@ -114,7 +120,7 @@ export const JOB_FIELD_GROUPS: JobFieldGroup[] = [
       {
         name: 'printingType',
         label: 'Printing type',
-        kind: 'datalist',
+        kind: 'combobox',
         options: PRINTING_TYPES,
         placeholder: 'Choose or type',
         span: 4,
@@ -140,7 +146,7 @@ export const JOB_FIELD_GROUPS: JobFieldGroup[] = [
       {
         name: 'jobColours',
         label: 'Colours',
-        kind: 'datalist',
+        kind: 'combobox',
         options: JOB_COLOURS,
         placeholder: 'Choose or type',
         span: 4,
@@ -148,7 +154,7 @@ export const JOB_FIELD_GROUPS: JobFieldGroup[] = [
       {
         name: 'cylinderParty',
         label: 'Cylinder supplier',
-        kind: 'datalist',
+        kind: 'combobox',
         options: CYLINDER_SUPPLIERS,
         placeholder: 'Choose or type',
         span: 4,
