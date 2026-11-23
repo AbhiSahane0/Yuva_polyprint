@@ -110,3 +110,67 @@ describe('CostingPage', () => {
     expect(screen.getByText('Rotogravure press')).toBeInTheDocument();
   });
 });
+
+/**
+ * **The works' per-style making rates have to be keyable.**
+ *
+ * They arrived as dated rows written by a script, which is right — it is what
+ * keeps an October quotation on the figures it was sold at. But a rate only a
+ * script can reach is a rate that goes stale against the quotations being
+ * written on it, and the works raises making the same way it raises a film.
+ *
+ * The same argument that put the Rs 20/25/30 bands on this screen. These four
+ * follow them, and the switch that decides which of the two is charged follows
+ * the five method switches already there.
+ */
+describe('the per-style pouch making rates', () => {
+  const BOXES = [
+    'Zipper pouch — making, Rs/metre',
+    'Standup zipper — making, Rs/metre',
+    'Standup — making, Rs/metre',
+    'Spout — making, Rs/pouch',
+  ];
+
+  it('offers a box for each of the four', () => {
+    render(<CostingPage />);
+    for (const label of BOXES) {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+  });
+
+  /*
+   * Zero on the shipped defaults, because the real figures live in the dated
+   * history. A box showing 3.5 here would mean the default had been changed,
+   * which would reprice every pouch document in the system.
+   */
+  it('shows the shipped zero rather than the works’ live figure', () => {
+    render(<CostingPage />);
+    for (const label of BOXES) {
+      expect(screen.getByLabelText(label)).toHaveValue('0');
+    }
+  });
+
+  it('says in the hint what the rate is in paise a centimetre', () => {
+    render(<CostingPage />);
+    /* The works says "30 paise a cm"; the box takes Rs a metre. The hint is
+       the only thing standing between those two and a 100x error. */
+    expect(screen.getByText(/Rs 30 is 30 paise a cm/)).toBeInTheDocument();
+    expect(screen.getByText(/a spout costs the same whatever the mouth/)).toBeInTheDocument();
+  });
+
+  it('offers the switch, and ships it on the bands', () => {
+    render(<CostingPage />);
+    const choice = screen.getByLabelText('Pouch making is charged');
+    expect(choice).toBeInTheDocument();
+    /* BANDS is the shipped default: nothing already quoted moves until the
+       dated row says otherwise. */
+    expect(choice).toHaveValue('BANDS');
+    expect(screen.getByRole('option', { name: /By the style’s own rate/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /By the Rs 20\/25\/30 bands/ })).toBeInTheDocument();
+  });
+
+  it('says the style’s rate replaces the band rather than adding to it', () => {
+    render(<CostingPage />);
+    expect(screen.getByText(/replaces the band; it is not added to it/)).toBeInTheDocument();
+  });
+});

@@ -748,6 +748,35 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
       'Charged across the pouch’s mouth — on top of a band',
     ],
     /*
+     * The works' per-style making rates, November 2026.
+     *
+     * Each is the WHOLE making charge for its style and the bands above do
+     * not apply to it — which is what their own sheet does, and what the
+     * switch below turns on. Held per metre because the zipper already is;
+     * the hints say what that is in paise a centimetre, because paise a
+     * centimetre is how the works says it.
+     */
+    [
+      'zipperStyleRatePerMetre',
+      'Zipper pouch — making, Rs/metre',
+      'The whole charge. Rs 3.50 is 3.5 paise a cm of mouth',
+    ],
+    [
+      'standupZipperRatePerMetre',
+      'Standup zipper — making, Rs/metre',
+      'The whole charge. Rs 4.50 is 4.5 paise a cm',
+    ],
+    [
+      'standupRatePerMetre',
+      'Standup — making, Rs/metre',
+      'The whole charge. Rs 30 is 30 paise a cm — Rs 5.10 on a 17 cm pouch',
+    ],
+    [
+      'spoutPerPouch',
+      'Spout — making, Rs/pouch',
+      'Flat, not by the cm: a spout costs the same whatever the mouth',
+    ],
+    /*
       The job card's own figures — how long a job stands on a machine rather
       than what it costs. Dated like the rest, so a card already printed goes
       on saying what the operator was actually told.
@@ -950,6 +979,21 @@ function OverheadsForm({ settings, canEdit }: { settings: AppSettings; canEdit: 
                   ['PER_DAY', 'By the day the job occupies the works'],
                 ],
                 'By the day is what makes a bigger order cheaper a kilogram',
+              ],
+              /*
+               * The sixth switch, and the one the works asked for in November
+               * 2026. Their sheet charges a standup zipper the zipper figure
+               * ALONE — no making charge anywhere in its chain — while the
+               * bands were charging Rs 25 a kilogram on top of it.
+               */
+              [
+                'pouchMakingModel',
+                'Pouch making is charged',
+                [
+                  ['PER_STYLE', 'By the style’s own rate (the works’ sheet)'],
+                  ['BANDS', 'By the Rs 20/25/30 bands, zipper on top'],
+                ],
+                'The style’s rate replaces the band; it is not added to it',
               ],
               [
                 'marginBasis',

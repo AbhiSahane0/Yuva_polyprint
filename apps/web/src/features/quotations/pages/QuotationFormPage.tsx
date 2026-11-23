@@ -888,6 +888,10 @@ export default function QuotationFormPage() {
       dPunchLargePerPouch: settings.dPunchLargePerPouch,
       dPunchLargeAboveMm: settings.dPunchLargeAboveMm,
       zipperRatePerMetre: settings.zipperRatePerMetre,
+      zipperStyleRatePerMetre: settings.zipperStyleRatePerMetre,
+      standupZipperRatePerMetre: settings.standupZipperRatePerMetre,
+      standupRatePerMetre: settings.standupRatePerMetre,
+      spoutPerPouch: settings.spoutPerPouch,
     };
     const bands = {
       plainPerKg: settings.pouchMakingPlainPerKg,
@@ -907,6 +911,9 @@ export default function QuotationFormPage() {
         num(item?.widthMm),
         rates,
         hasDPunch,
+        /* The engine reads the model too. If this box and the rate it fills
+           in disagree, merely opening the costing section moves the cost. */
+        settings.pouchMakingModel,
       );
       const pouchesPerKg = costed[index]?.geometry.pouchesPerKg ?? 0;
       if (pouchesPerKg <= 0) return null;

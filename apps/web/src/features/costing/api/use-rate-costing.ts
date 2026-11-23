@@ -281,7 +281,16 @@ export function useRateCosting(
           dPunchLargePerPouch: settings.dPunchLargePerPouch,
           dPunchLargeAboveMm: settings.dPunchLargeAboveMm,
           zipperRatePerMetre: settings.zipperRatePerMetre,
+          /* The works' per-style figures. Zero until the dated rows are in
+             force, which sends every style back to the bands below. */
+          zipperStyleRatePerMetre: settings.zipperStyleRatePerMetre,
+          standupZipperRatePerMetre: settings.standupZipperRatePerMetre,
+          standupRatePerMetre: settings.standupRatePerMetre,
+          spoutPerPouch: settings.spoutPerPouch,
         },
+        /* Which of the two ways making is charged, as at this quotation's
+           date. A document written before November 2026 finds BANDS. */
+        pouchMakingModel: settings.pouchMakingModel,
         /* The works' three per-kilogram bands, which supersede the per-pouch
            rate above for anything priced since October 2026. */
         pouchMakingBands: {

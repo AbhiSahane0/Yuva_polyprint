@@ -3,6 +3,7 @@ import {
   NO_POUCH_EXPENSE,
   isWorkbookPouch,
   pouchExpense,
+  type PouchMakingModel,
   pouchMakingInForce,
   type PouchExpense,
   type PouchMakingBands,
@@ -249,6 +250,14 @@ export interface CostingOverheads {
    * old document shows what it was sold at.
    */
   pouchMakingBands?: PouchMakingBands | null;
+  /**
+   * Whether making is charged by those bands or by the style's own figure.
+   *
+   * Absent on everything priced before November 2026, which is why it falls
+   * back to the bands: a document reprices on the model the works held when
+   * it was written, not the one they hold now.
+   */
+  pouchMakingModel?: PouchMakingModel | null;
   /**
    * What each printing station beyond the fifth adds, per kilogram. The sheet
    * charges 5.5 for the sixth and 7.5 for the seventh.
@@ -1290,6 +1299,7 @@ export function costRate(input: CostingInput): CostingBreakdown | null {
         job.pouchWidthMm ?? job.filmWidthMm,
         overheads.pouchMaking,
         job.hasDPunch ?? false,
+        overheads.pouchMakingModel ?? 'BANDS',
       )
     : NO_POUCH_EXPENSE;
 

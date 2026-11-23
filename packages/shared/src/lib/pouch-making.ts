@@ -50,6 +50,40 @@ export interface PouchMakingRates {
   dPunchLargeAboveMm: number;
   /** Rupees per metre of zipper, charged across the pouch's width. */
   zipperRatePerMetre: number;
+
+  /* ---- the works' per-style figures, November 2026 ----------------------
+   *
+   * Given as paise per centimetre of the pouch's MOUTH, and held here per
+   * metre because that is the unit the zipper above already uses and mixing
+   * two would be a bug waiting to happen: 3.5 paise/cm is Rs 3.50 a metre.
+   *
+   * Each is the WHOLE making charge for its style, not an addition to the
+   * per-kilogram bands. That is the works' own sheet: a standup zipper's
+   * entire pouching expense on it is the zipper figure alone, with no making
+   * charge anywhere in the chain. See `POUCH_MAKING_MODELS`.
+   */
+
+  /** A zipper pouch, per metre of mouth. The works' figure is Rs 3.50. */
+  zipperStyleRatePerMetre: number;
+  /** A standup zipper, per metre of mouth. Rs 4.50. */
+  standupZipperRatePerMetre: number;
+  /**
+   * A standup, per metre of mouth. Rs 30.00.
+   *
+   * An order of magnitude above the two zipper rates, and deliberately so:
+   * the works gave 30 paise a centimetre where the zipper styles are 3.5 and
+   * 4.5. On a 170 mm pouch it is Rs 5.10 of making against Rs 2.44 of
+   * laminate. Confirmed before it was written, and the Costing screen shows
+   * what it comes to per kilogram so a slip is visible rather than quiet.
+   */
+  standupRatePerMetre: number;
+  /**
+   * A spout pouch, per POUCH.
+   *
+   * Flat rather than per centimetre, because a spout and cap is a part bought
+   * in: it costs the same whatever the mouth it is welded into.
+   */
+  spoutPerPouch: number;
 }
 
 /** The charge, in the parts it is made of, so a quotation can show its working. */
@@ -60,9 +94,106 @@ export interface PouchExpense {
   zipper: number;
   /** Rupees on one pouch. */
   perPouch: number;
+  /**
+   * Whether this figure is the whole making charge for the style.
+   *
+   * True and the per-kilogram bands do not apply at all; false and the band
+   * is charged with the zipper on top, which is how everything was costed
+   * before November 2026. It is carried on the expense rather than worked out
+   * again by the caller because two readings of one rule cannot be kept in
+   * step by care — the same reason `pouchMakingInForce` exists.
+   */
+  ownsMaking: boolean;
 }
 
-export const NO_POUCH_EXPENSE: PouchExpense = { making: 0, zipper: 0, perPouch: 0 };
+export const NO_POUCH_EXPENSE: PouchExpense = {
+  making: 0,
+  zipper: 0,
+  perPouch: 0,
+  ownsMaking: false,
+};
+
+/**
+ * **How making is charged.**
+ *
+ * `BANDS` is how everything was costed from October 2026: a per-kilogram band
+ * — plain, gusset, gusset with handle — with the zipper by the metre on top.
+ *
+ * `PER_STYLE` is the works' own sheet, and is what they asked for in November
+ * 2026. Five styles carry their own figure, and that figure is the WHOLE
+ * making charge: the band is not applied at all. Everything else — centre
+ * seal, three side seal, flat bottom — goes on being costed by the band.
+ *
+ * **It is a dated switch rather than a rewrite** for the usual reason: a
+ * quotation written in October asks what the works held then, finds `BANDS`,
+ * and reprices exactly as it was sold. Nothing already sent moves.
+ */
+export const POUCH_MAKING_MODELS = ['BANDS', 'PER_STYLE'] as const;
+export type PouchMakingModel = (typeof POUCH_MAKING_MODELS)[number];
+
+/**
+ * Floors a rate at zero and survives a missing one.
+ *
+ * This is reached from a request body as well as from the form. A negative
+ * rate would pay the customer to have pouches made; a missing one would make
+ * the whole rate NaN, which is worse than charging nothing — a quotation
+ * shows a price either way, and only one of them is obviously wrong.
+ */
+const at = (value: number | undefined): number =>
+  Number.isFinite(value) && (value as number) > 0 ? (value as number) : 0;
+
+/**
+ * **What one pouch of this style costs to make, where the style has its own
+ * figure** — and `null` where it does not, which sends the line back to the
+ * per-kilogram bands.
+ *
+ * Four of the five are the works' November 2026 rates. The zipper styles and
+ * the standup are quoted per centimetre of the pouch's MOUTH, which is what
+ * the rest of this file calls the finished width: a standup's bottom gusset
+ * lengthens the film it is cut from without widening the mouth. The spout is
+ * flat per pouch, being a part bought in.
+ *
+ * A rate left at 0 returns `null` rather than 0. That is the difference
+ * between "the works has not set this yet" and "the works charges nothing",
+ * and it is what lets the real figures live in the dated history while the
+ * shipped default stays at zero.
+ */
+export function styleMakingPerPouch(
+  pouchType: PouchType | null | undefined,
+  pouchWidthMm: number,
+  rates: PouchMakingRates | null | undefined,
+): number | null {
+  if (!pouchType || !rates) return null;
+
+  const perMouthMetre = (ratePerMetre: number): number | null => {
+    const rate = at(ratePerMetre);
+    if (rate <= 0) return null;
+    return round((at(pouchWidthMm) / 1000) * rate, 4);
+  };
+
+  switch (pouchType) {
+    case 'ZIPPER':
+      return perMouthMetre(rates.zipperStyleRatePerMetre);
+    case 'STANDUP_ZIPPER':
+      return perMouthMetre(rates.standupZipperRatePerMetre);
+    /*
+     * Both names for the same work. "Standup" and "Standup without zipper" sit
+     * in the dropdown together — the second arrived in October 2026 to say
+     * plainly what the first already meant — and the works gave one rate for
+     * "only standup". Charging them differently would price the same pouch two
+     * ways depending on which row the office happened to pick.
+     */
+    case 'STANDUP':
+    case 'STANDUP_NO_ZIPPER':
+      return perMouthMetre(rates.standupRatePerMetre);
+    case 'SPOUT': {
+      const rate = at(rates.spoutPerPouch);
+      return rate > 0 ? round(rate, 4) : null;
+    }
+    default:
+      return null;
+  }
+}
 
 /** The styles that carry a zipper across the mouth. */
 export const ZIPPERED_POUCHES: readonly PouchType[] = [
@@ -145,18 +276,31 @@ export function pouchExpense(
   rates: PouchMakingRates | null | undefined,
   /** Ticked on the line. A punched handle is extra work, not another style. */
   hasDPunch = false,
+  /**
+   * Which way making is charged, as at this quotation's date.
+   *
+   * Defaults to the bands so that every caller written before November 2026 —
+   * and every document priced before it — behaves exactly as it did.
+   */
+  model: PouchMakingModel = 'BANDS',
 ): PouchExpense {
   if (!pouchType || !rates) return NO_POUCH_EXPENSE;
 
   /*
-   * Every figure floored at zero and defaulted, because this is reached from a
-   * request body as well as from the form. A negative rate would pay the
-   * customer to have pouches made; a missing one would make the whole rate NaN,
-   * which is worse than charging nothing — a quotation shows a price either
-   * way, and only one of them is obviously wrong.
+   * **The style's own figure, where the works has given one.**
+   *
+   * First, and it ends the matter: under this model the figure IS the making
+   * charge, so there is no band to reach and no zipper to add. A zipper pouch
+   * charged 3.5 paise a centimetre is charged that and nothing else, which is
+   * what the works' own sheet does — its whole pouching expense on a standup
+   * zipper is the zipper line, with no making charge anywhere in the chain.
    */
-  const at = (value: number | undefined) =>
-    Number.isFinite(value) && (value as number) > 0 ? (value as number) : 0;
+  if (model === 'PER_STYLE') {
+    const styled = styleMakingPerPouch(pouchType, pouchWidthMm, rates);
+    if (styled !== null) {
+      return { making: styled, zipper: 0, perPouch: styled, ownsMaking: true };
+    }
+  }
 
   /*
    * A D punch is made differently, so it is made at its own rate — and a wide
@@ -179,11 +323,28 @@ export function pouchExpense(
       : at(rates.dPunchPerPouch)
     : at(rates.makingPerPouch);
 
+  /*
+   * **A punched pouch pays the punch and nothing else.**
+   *
+   * The rate above already REPLACES ordinary making — Rs 0.60 is what a
+   * punched pouch costs to make, not a surcharge on one — but under the bands
+   * it was then thrown away: `pouchMakingInForce` reached for the gusset band
+   * whenever one was set, so a works with bands never charged 0.60 for a punch
+   * in its life. That is why the D punch read wrong, and it is fixed by the
+   * punch owning its making the way the five styles above do.
+   *
+   * Only the styles with no figure of their own get here. A standup with a
+   * punch keeps the standup rate, because the works priced the style.
+   */
+  if (model === 'PER_STYLE' && punched) {
+    return { making, zipper: 0, perPouch: making, ownsMaking: true };
+  }
+
   const zipper = ZIPPERED_POUCHES.includes(pouchType)
     ? round((at(pouchWidthMm) / 1000) * at(rates.zipperRatePerMetre), 4)
     : 0;
 
-  return { making, zipper, perPouch: round(making + zipper, 4) };
+  return { making, zipper, perPouch: round(making + zipper, 4), ownsMaking: false };
 }
 
 /**
@@ -312,6 +473,14 @@ export function pouchMakingInForce(
   bands: PouchMakingBands | null | undefined,
   piecesPerKg: number,
 ): number {
+  /*
+   * A style that owns its making is the whole answer. Reaching for a band here
+   * would charge the works' Rs 20/25/30 on top of a figure that already covers
+   * forming, sealing and cutting — which is exactly the over-charge the
+   * November 2026 rates were given to remove.
+   */
+  if (expense.ownsMaking) return round(expense.perPouch * piecesPerKg, 4);
+
   const banded = pouchMakingPerKgFor(line, bands);
   return banded > 0
     ? round(banded + expense.zipper * piecesPerKg, 4)
