@@ -119,6 +119,7 @@ import {
   type RateCostingOverrides,
 } from '@/features/costing/api/use-rate-costing';
 import { ColourFields } from '../components/ColourFields';
+import { itemFormValues } from '../lib/item-form-values';
 import {
   CostingOverrides,
   strippedCosting,
@@ -600,54 +601,7 @@ export default function QuotationFormPage() {
       transportPerKg: existing.transportPerKg ?? '',
       pouchMakingPerKg: existing.pouchMakingPerKg ?? '',
       wastagePercent: existing.wastagePercent ?? '',
-      items: existing.items.map((item) => ({
-        id: item.id,
-        jobId: item.jobId,
-        jobName: item.jobName,
-        jobKind: item.jobKind,
-        pouchType: item.pouchType,
-        pouchTypeNote: item.pouchTypeNote,
-        // Taken from the stored line, not re-derived: a quotation sold by the
-        // kilogram must not silently become a per-piece one on reopening.
-        pricingBasis: item.pricingBasis,
-        widthMm: item.widthMm,
-        heightMm: item.heightMm,
-        isGazette: item.isGazette,
-        gazetteBottom: item.gazetteBottom,
-        gazetteLeft: item.gazetteLeft,
-        gazetteRight: item.gazetteRight,
-        layers: item.layers.map((layer) => ({
-          materialId: layer.materialId,
-          micron: layer.micron,
-          /*
-           * A rate that was typed goes back in the box; one that came from the
-           * film does not.
-           *
-           * The server says which it was — the ply stores it. It used to be
-           * deduced from the ply quoting a gauge the material does not name,
-           * which missed every rate agreed at the film's OWN gauge: the works
-           * agrees PET at 185, 175 and 190, all of them 12µ. Those came back as
-           * an empty box, and the next save replaced what was charged with the
-           * catalogue price.
-           */
-          rateOverride: layer.rateOverride,
-        })),
-        quantities: item.quantities.map((quantity) => ({
-          quantityKg: quantity.quantityKg,
-          ratePerKg: quantity.ratePerKg,
-          quantityPouches: quantity.quantityPouches,
-          ratePerPouch: quantity.ratePerPouch,
-        })),
-        repeatWidth: item.repeatWidth,
-        repeatHeight: item.repeatHeight,
-        cylinderCount: item.cylinderCount,
-        transportCost: item.transportCost,
-        chargeCylinders: item.chargeCylinders,
-        repairCylinders: item.repairCylinders,
-        repairs: item.repairs,
-        cylinderManufacturer: item.cylinderManufacturer,
-        cylinderDesign: item.cylinderDesign,
-      })) as CreateQuotationFormValues['items'],
+      items: existing.items.map(itemFormValues) as CreateQuotationFormValues['items'],
     });
     /*
      * The document's own snapshot is what the office sees on an edit, and it
