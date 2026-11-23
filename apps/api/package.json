@@ -23,6 +23,8 @@
     "schema:docs": "tsx scripts/generate-schema-docs.ts",
     "seed:materials": "tsx scripts/seed-materials.ts",
     "seed:ldpe-films": "tsx scripts/seed-ldpe-films.ts",
+    "seed:pouch-style-rates": "tsx scripts/seed-pouch-style-rates.ts",
+    "check:damaged-colours": "tsx scripts/find-damaged-colours.ts",
     "check:standup": "tsx scripts/check-standup-workbook.ts",
     "grant:modules": "tsx scripts/grant-new-modules.ts",
     "db:copy-to-remote": "bash scripts/migrate-data-to-remote.sh",

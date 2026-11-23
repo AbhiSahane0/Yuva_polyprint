@@ -652,6 +652,18 @@ export const settingsSchema = z.object({
   pouchMakingGussetHandlePerKg: z.coerce.number().min(0).max(10_000),
   /** The zipper, by the metre, charged across the pouch's mouth. */
   zipperRatePerMetre: z.coerce.number().min(0).max(10_000),
+  /**
+   * Whether making is charged by the works' per-kilogram bands or by the
+   * style's own figure. See `POUCH_MAKING_MODELS`.
+   */
+  pouchMakingModel: z.enum(['BANDS', 'PER_STYLE']),
+  /* The works' per-style making rates, November 2026. Each is the WHOLE
+     making charge for its style; the four below are per metre of the pouch's
+     mouth except the spout, which is flat per pouch. */
+  zipperStyleRatePerMetre: z.coerce.number().min(0).max(10_000),
+  standupZipperRatePerMetre: z.coerce.number().min(0).max(10_000),
+  standupRatePerMetre: z.coerce.number().min(0).max(10_000),
+  spoutPerPouch: z.coerce.number().min(0).max(1_000),
   /** What a D punch costs to make — a flat charge instead of the making rate. */
   dPunchPerPouch: z.coerce.number().min(0).max(1_000),
   /** And a wide one, the punch being made across the top. */
@@ -902,6 +914,25 @@ export const DEFAULT_SETTINGS: AppSettings = {
    */
   dPunchLargeAboveMm: 450,
   zipperRatePerMetre: 3.6,
+  /*
+   * **Zero on purpose, and BANDS on purpose, for the usual reason.**
+   *
+   * The works gave these in November 2026 — a zipper pouch 3.5 paise a
+   * centimetre of mouth, a standup zipper 4.5, a standup 30, a spout Rs 2.70
+   * flat — and they are written as dated rows rather than as defaults here.
+   * A quotation from October asks what the works held THEN, finds a model
+   * whose only change is dated after it, and falls back to `BANDS` — which
+   * reprices it exactly as it was sold.
+   *
+   * A default of PER_STYLE would have repriced every pouch document in the
+   * system the moment somebody opened one, which is the one thing the dated
+   * costing exists to prevent.
+   */
+  pouchMakingModel: 'BANDS',
+  zipperStyleRatePerMetre: 0,
+  standupZipperRatePerMetre: 0,
+  standupRatePerMetre: 0,
+  spoutPerPouch: 0,
   /* The job card's own, off the works' Job Sheet. */
   cylinderChangeoverMinutes: 15,
   rubberChangeMinutes: 10,
