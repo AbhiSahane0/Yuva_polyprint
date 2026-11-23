@@ -19,12 +19,17 @@ import { resolve } from 'node:path';
  *
  * Read from source because what matters is the constant the form opens with,
  * and rendering the whole wizard to reach it would test everything but that.
+ *
+ * `BLANK_DESIGN` moved out of the page into `lib/saved-job.ts` when the job
+ * name arrived on the Customer step and two screens needed the same rule for
+ * applying a saved job. The constant is unchanged; only its address is.
  */
+const BLANK = readFileSync(resolve(__dirname, '../lib/saved-job.ts'), 'utf8');
 const FORM = readFileSync(resolve(__dirname, './QuotationFormPage.tsx'), 'utf8');
 
 describe('the blank job card', () => {
   it('opens both plies at nought, with no film and no gauge', () => {
-    const layers = FORM.slice(FORM.indexOf('  layers: ['));
+    const layers = BLANK.slice(BLANK.indexOf('  layers: ['));
     const body = layers.slice(0, layers.indexOf('],'));
 
     expect(body).toContain("{ materialId: null, micron: 0, rateOverride: '' }");
@@ -37,5 +42,6 @@ describe('the blank job card', () => {
     // The old default came from `PET_MICRON_PER_LAYER`, which is a real figure
     // about PET and not about an empty box. It has no business here.
     expect(FORM).not.toContain('PET_MICRON_PER_LAYER');
+    expect(BLANK).not.toContain('PET_MICRON_PER_LAYER');
   });
 });

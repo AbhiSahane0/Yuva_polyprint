@@ -120,6 +120,7 @@ import {
 } from '@/features/costing/api/use-rate-costing';
 import { ColourFields } from '../components/ColourFields';
 import { itemFormValues } from '../lib/item-form-values';
+import { applySavedJob, BLANK_DESIGN, nameJob, setNumber } from '../lib/saved-job';
 import {
   CostingOverrides,
   strippedCosting,
@@ -181,55 +182,6 @@ function today(): string {
 }
 
 type ItemValues = NonNullable<CreateQuotationFormValues['items']>[number];
-
-/**
- * A design nobody has specified yet.
- *
- * Defined once, because two paths need it: a line added from scratch, and a
- * line switched back to "new design" after a saved job was picked. If those
- * drifted apart, one of them would leave the previous job's dimensions behind.
- */
-const BLANK_DESIGN = {
-  jobName: '',
-  widthMm: '',
-  heightMm: '',
-  isGazette: false,
-  gazetteBottom: 0,
-  gazetteLeft: 0,
-  gazetteRight: 0,
-  hasDPunch: false,
-  hasVNotch: false,
-  /*
-   * Both plies start at nought.
-   *
-   * They used to open at 12 and 50 — a PET over a poly, which is the common
-   * structure and so looked helpful. It was not: no film was chosen beside
-   * either figure, so the line read as a 62µ laminate of nothing, the total
-   * micron under it agreed, and the office had to notice that two numbers it
-   * had not typed were already deciding a weight.
-   *
-   * Nought says what is true — nothing has been chosen yet — and choosing a
-   * film fills the gauge in from the film's own name, which is where the
-   * figure should come from. See `chooseFamily` in `LayerFields`: an empty box
-   * is exactly the case it fills.
-   */
-  layers: [
-    { materialId: null, micron: 0, rateOverride: '' },
-    { materialId: null, micron: 0, rateOverride: '' },
-  ],
-  repeatWidth: 1,
-  repeatHeight: 1,
-  cylinderCount: 4,
-  repairCylinders: false,
-  repairs: [] as QuotationCylinderRepair[],
-  cylinderManufacturer: '',
-  cylinderDesign: '',
-  /* Seeded with the four process colours once the rates list has loaded —
-     see `JobCard`. Empty here because this constant cannot know them. */
-  colours: [] as JobColour[],
-  transportCost: 0,
-  chargeCylinders: true,
-} as const;
 
 /** A two-ply structure, which is what most enquiries turn out to be. */
 const BLANK_ITEM = {
@@ -315,14 +267,6 @@ interface Film {
  * in as one — setting a raw number leaves react-hook-form and the input element
  * disagreeing about the field's type.
  */
-function setNumber(
-  setValue: UseFormSetValue<CreateQuotationFormValues>,
-  path: string,
-  value: number | string,
-) {
-  setValue(path as never, String(value) as never, { shouldDirty: true });
-}
-
 /** Everything the screen works out about one line, mirroring the server. */
 interface ItemCosting {
   basis: PricingBasis;
@@ -461,6 +405,36 @@ export default function QuotationFormPage() {
 
   const customerId = (watched.customerId ?? null) as string | null;
   const { data: chosenCustomer } = useCustomer(customerMode === 'existing' ? customerId : null);
+
+  /**
+   * **The job this quotation is for, named on the first step.**
+   *
+   * The office knows what the enquiry is about before it knows anything else
+   * about it, and for a customer the works already prints for the name is
+   * usually one of theirs. So it is asked here rather than three steps in.
+   *
+   * One box that is both a list and somewhere to type. A known customer's
+   * designs drop down; a name nobody has printed is simply typed over them.
+   * A new company has no list, so there is only the typing — which is the
+   * honest state of it rather than an empty dropdown to click past.
+   *
+   * **It is not a field of its own.** It writes `items.0.jobName`, the very
+   * box the Jobs step shows, so the two cannot drift: naming the job here
+   * fills it in there, correcting it there corrects it here, and there is no
+   * copy to keep in step. That is the whole of "it flows to the Jobs tab".
+   */
+  const customerJobs = chosenCustomer?.jobs ?? [];
+  const firstJobName = (watched.items?.[0]?.jobName as string | undefined) ?? '';
+
+  function chooseFirstJob(name: string) {
+    nameJob(
+      setValue,
+      0,
+      customerJobs,
+      name,
+      (watched.items?.[0]?.jobId as string | null | undefined) ?? null,
+    );
+  }
 
   /* ---------------------------------------------- prefill from the customer */
 
@@ -1452,6 +1426,38 @@ export default function QuotationFormPage() {
                   />
                 </Field>
               </div>
+
+              {/*
+                What the enquiry is for. See `chooseFirstJob` — this writes
+                the Jobs step's own box rather than a second copy of it.
+              */}
+              <div className="col-span-2 sm:col-span-7">
+                <Field
+                  label="Job name"
+                  htmlFor="firstJobName"
+                  hint={
+                    customerJobs.length > 0
+                      ? 'Pick one the works already prints, or type a new one'
+                      : 'A new company, so this is a new design'
+                  }
+                  error={formState.errors.items?.[0]?.jobName?.message}
+                >
+                  <Input
+                    id="firstJobName"
+                    list={customerJobs.length > 0 ? 'savedJobNames' : undefined}
+                    placeholder="What this quotation is for"
+                    value={firstJobName}
+                    onChange={(event) => chooseFirstJob(event.target.value)}
+                  />
+                </Field>
+                {customerJobs.length > 0 ? (
+                  <datalist id="savedJobNames">
+                    {customerJobs.map((job) => (
+                      <option key={job.id} value={job.jobName} />
+                    ))}
+                  </datalist>
+                ) : null}
+              </div>
             </div>
           </FieldSection>
         ) : null}
@@ -2077,67 +2083,9 @@ function JobCard({
    */
   const fromSavedJob = item?.chargeCylinders === false;
 
-  /** Copies a saved job's specification onto this line. */
+  /** Copies a saved job's specification onto this line — see `applySavedJob`. */
   function applyJob(jobId: string) {
-    const job = jobs.find((candidate) => candidate.id === jobId);
-
-    /*
-     * "New design" starts clean. Leaving the previous job's name and dimensions
-     * behind is how a new design gets saved under an existing job's name, which
-     * is far harder to notice than an empty box.
-     *
-     * The quantities are left alone: what to charge is the office's decision
-     * about this order, not part of the design being described.
-     */
-    if (!job) {
-      setValue(`items.${index}.jobId`, null, { shouldDirty: true });
-      setValue(`items.${index}.jobName`, BLANK_DESIGN.jobName, { shouldDirty: true });
-      setValue(`items.${index}.chargeCylinders`, true, { shouldDirty: true });
-      setValue(
-        `items.${index}.layers`,
-        BLANK_DESIGN.layers.map((layer) => ({ ...layer })) as unknown as ItemValues['layers'],
-        { shouldDirty: true },
-      );
-      for (const field of [
-        'widthMm',
-        'heightMm',
-        'repeatWidth',
-        'repeatHeight',
-        'cylinderCount',
-        'transportCost',
-      ] as const) {
-        setNumber(setValue, `items.${index}.${field}`, BLANK_DESIGN[field]);
-      }
-      return;
-    }
-
-    setValue(`items.${index}.jobId`, job.id, { shouldDirty: true });
-    setValue(`items.${index}.jobName`, job.jobName, { shouldDirty: true });
-    setValue(`items.${index}.chargeCylinders`, false, { shouldDirty: true });
-
-    if (job.designOpenWidth) setNumber(setValue, `items.${index}.widthMm`, job.designOpenWidth);
-    if (job.designHeight) setNumber(setValue, `items.${index}.heightMm`, job.designHeight);
-    if (job.totalCylinders) {
-      setNumber(setValue, `items.${index}.cylinderCount`, job.totalCylinders);
-    }
-
-    /*
-     * The jobs table keeps three fixed thicknesses — the printed ply, an
-     * optional metallised one, and the sealant. Rebuild the structure from
-     * whichever of them the job has; the materials are left for the office to
-     * confirm, because the job record never stored which film was used.
-     */
-    const microns = [job.petMicron, job.metPetMicron, job.polyMicron]
-      .map((value) => Number(value ?? 0))
-      .filter((value) => value > 0);
-
-    if (microns.length >= 2) {
-      setValue(
-        `items.${index}.layers`,
-        microns.map((micron) => ({ materialId: null, micron })) as ItemValues['layers'],
-        { shouldDirty: true },
-      );
-    }
+    applySavedJob(setValue, index, jobs.find((candidate) => candidate.id === jobId) ?? null);
   }
 
   return (
