@@ -14,6 +14,7 @@ import {
   useQuotation,
   useQuotationVersions,
 } from '../api/quotation-api';
+import { CustomerLink } from './CustomerLink';
 
 /**
  * Shows the generated PDF itself, in the browser's own viewer.
@@ -207,6 +208,18 @@ export function QuotationPreview({
     >
       {id ? (
         <div className="bg-ink-100 -mx-5 -my-4 p-0 sm:p-3">
+          {/*
+            Above the document, because it answers the question the office
+            opened this drawer with: has the customer said anything? Only on
+            the current version — an earlier one is a record of what was sent,
+            and its links were withdrawn when it was superseded.
+          */}
+          {viewingId && isCurrent && data ? (
+            <div className="bg-white px-4 py-3 sm:mb-3 sm:rounded-[var(--radius-md)] sm:px-3 sm:py-3">
+              <CustomerLink id={viewingId} status={data.status} />
+            </div>
+          ) : null}
+
           {/*
             Only when there is something to choose between. One version is the
             normal case, and a dropdown offering a single option is furniture.

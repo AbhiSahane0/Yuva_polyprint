@@ -13,6 +13,9 @@ import { canAccess, useAuthStore } from '@/features/auth/auth-store';
 
 // Route-level code splitting keeps the initial bundle small as modules land.
 const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'));
+const PublicQuotationPage = lazy(
+  () => import('@/features/public-quotation/pages/PublicQuotationPage'),
+);
 const OverviewPage = lazy(() => import('@/features/overview/pages/OverviewPage'));
 const CustomersPage = lazy(() => import('@/features/customers/pages/CustomersPage'));
 const QuotationsPage = lazy(() => import('@/features/quotations/pages/QuotationsPage'));
@@ -460,6 +463,18 @@ export function AppRouter() {
         <Routes>
           {/* Login sits outside the shell — no sidebar to a stranger. */}
           <Route path="/login" element={<LoginRoute />} />
+          {/*
+            The customer's own page, and **the only route in this app with no
+            sign-in behind it**.
+
+            Outside `RequireAuth` on purpose: the person opening it is the
+            customer, who has no account here and never will. Bouncing them to
+            a login form for a system that is not theirs would be the end of
+            the link. Everything it can reach is the one quotation its token
+            names — see `public-quotation.ts` in the API for exactly how much
+            of that quotation it is allowed to show.
+          */}
+          <Route path="/q/:token" element={<PublicQuotationPage />} />
           {/*
             The machine screen sits outside it too, and for the opposite
             reason: the operator is signed in, but a sidebar full of

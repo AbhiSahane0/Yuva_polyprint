@@ -268,6 +268,24 @@ export function SendQuotationModal({
           toast.success(
             `Quotation #${quotation.number} sent to ${result.sentTo.length === 1 ? result.sentTo[0] : `${result.sentTo.length} recipients`}`,
           );
+
+          /*
+           * WhatsApp is reported, never thrown.
+           *
+           * The email has gone and the quotation is delivered; a number that
+           * is not on WhatsApp, or a template still waiting on Meta, is worth
+           * a line on screen rather than an error that implies nothing was
+           * sent. The number is named so a typo can be fixed.
+           */
+          if (result.whatsappSentTo.length > 0) {
+            toast.success(
+              `WhatsApp sent to ${result.whatsappSentTo.length} number${result.whatsappSentTo.length === 1 ? '' : 's'}`,
+            );
+          }
+          for (const failure of result.whatsappFailures) {
+            toast.error(`WhatsApp to ${failure.to}: ${failure.error}`);
+          }
+
           onClose();
         },
         onError: (cause) =>

@@ -42,7 +42,21 @@ export function defaultSubject(quotation: Quotation): string {
   return `Quotation #${quotation.number} — Yuva Polyprint & Packaging Industries`;
 }
 
-export function buildQuotationEmail(quotation: Quotation, message: string) {
+/**
+ * The covering note, and — when there is a link — the button that answers it.
+ *
+ * `acceptUrl` is optional so the email still builds for a quotation sent
+ * before links existed, and so a test can ask for the plain letter. When it is
+ * there, the customer gets a button in the HTML and the bare address in the
+ * text part: plenty of people at this works' customers read mail on a phone
+ * that renders the plain alternative, and a button they cannot see is worse
+ * than a line they can copy.
+ */
+export function buildQuotationEmail(
+  quotation: Quotation,
+  message: string,
+  acceptUrl?: string | undefined,
+) {
   const jobs = quotation.items.length;
   const jobLabel = `${jobs} job${jobs === 1 ? '' : 's'}`;
   const note = message.trim();
@@ -59,6 +73,14 @@ export function buildQuotationEmail(quotation: Quotation, message: string) {
     `Advance payable: ${formatRs(quotation.totalAdvance)}`,
     '',
     'The full quotation is attached as a PDF.',
+    ...(acceptUrl
+      ? [
+          '',
+          'To accept this quotation, open:',
+          acceptUrl,
+          'The same page is where you can tell us if you would rather not go ahead.',
+        ]
+      : []),
     '',
     'Thanks and regards,',
     'Yuva Polyprint & Packaging Industries',
@@ -83,6 +105,33 @@ export function buildQuotationEmail(quotation: Quotation, message: string) {
     <p style="margin:0 0 20px;line-height:1.55;font-size:14px">
       The full quotation, with the specification for each item, is attached as a PDF.
     </p>
+${
+  acceptUrl
+    ? `
+    <!--
+      A table, not a div with padding. Outlook renders mail through Word, which
+      ignores padding on an anchor and collapses the button to bare text — a
+      table cell with a background is the one shape every client agrees on.
+    -->
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 18px">
+      <tr>
+        <td align="center" bgcolor="#4f46e5" style="border-radius:8px">
+          <a href="${escapeHtml(acceptUrl)}"
+             style="display:inline-block;padding:13px 26px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none">
+            Accept this quotation
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin:0 0 20px;line-height:1.55;font-size:13px;color:#5b6270">
+      The same page is where you can tell us if you would rather not go ahead. If the
+      button does not open, copy this address into your browser:<br/>
+      <span style="word-break:break-all">${escapeHtml(acceptUrl)}</span>
+    </p>
+`
+    : ''
+}
 
     <p style="margin:0;font-size:14px;line-height:1.6">
       Thanks and regards,<br/>

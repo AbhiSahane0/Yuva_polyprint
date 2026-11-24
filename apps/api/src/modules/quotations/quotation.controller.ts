@@ -10,6 +10,8 @@ import {
 } from '../../lib/report-workbook.js';
 import { QUOTATION_STATUS_LABELS } from '@yuva/shared';
 import * as quotationService from './quotation.service.js';
+import * as share from './quotation-share.service.js';
+import { issueLink, listLinks } from './quotation-link-store.js';
 import { renderQuotationPdf } from './quotation-pdf.js';
 
 export async function list(req: Request, res: Response) {
@@ -92,6 +94,32 @@ export async function createVersion(req: Request, res: Response) {
 export async function versions(req: Request, res: Response) {
   const rows = await quotationService.listQuotationVersions(req.params.id as string);
   ok(res, rows);
+}
+
+/**
+ * Mints a fresh accept link and hands back the whole address.
+ *
+ * For the quotation that went out over a phone call or across a desk — most of
+ * them — where there is no email to put a button in. The office copies this
+ * into whatever thread they are already in.
+ *
+ * A POST because it creates something, and because it is the only moment the
+ * token exists outside the customer's hands: the response carries it, nothing
+ * stores it, and asking again mints a different one.
+ */
+export async function createLink(req: Request, res: Response) {
+  const link = await issueLink(req.params.id as string, req.user?.displayName ?? 'Office');
+  created(res, link);
+}
+
+/** Every link issued for this quotation. Without their tokens. */
+export async function links(req: Request, res: Response) {
+  ok(res, await listLinks(req.params.id as string));
+}
+
+/** What the customer said, with the detail that corroborates it. */
+export async function responses(req: Request, res: Response) {
+  ok(res, await share.listResponses(req.params.id as string));
 }
 
 /** Records the customer's answer; a win creates the customer and their jobs. */

@@ -83,6 +83,31 @@ describe('quotation email', () => {
     expect(html).toContain('&quot;Anand&quot;');
   });
 
+  /*
+   * The button is the whole point of the link: a customer who has to find a
+   * URL in a paragraph will ring the office instead.
+   */
+  it('puts the accept button in the letter when there is a link', () => {
+    const url = 'https://quotations.example.com/q/' + 'a'.repeat(64);
+    const { text, html } = buildQuotationEmail(quotation(), '', url);
+
+    expect(html).toContain('Accept this quotation');
+    expect(html).toContain(url);
+    /* Outlook renders mail through Word, which collapses a padded anchor to
+       bare text. A table cell with a background is the one shape every
+       client agrees on, so the button must still be one. */
+    expect(html).toContain('<table');
+    /* And the plain part carries the address, for the clients that show it. */
+    expect(text).toContain(url);
+  });
+
+  it('is the same letter as before when there is no link', () => {
+    const { text, html } = buildQuotationEmail(quotation(), '');
+
+    expect(html).not.toContain('Accept this quotation');
+    expect(text).not.toContain('/q/');
+  });
+
   it('produces a plain-text alternative alongside the html', () => {
     const { text, html } = buildQuotationEmail(quotation(), 'Note');
 

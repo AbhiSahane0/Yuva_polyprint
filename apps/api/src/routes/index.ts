@@ -22,6 +22,7 @@ import overviewRoutes from '../modules/overview/overview.routes.js';
 import productionRoutes from '../modules/production/production.routes.js';
 import purchaseRoutes from '../modules/purchase/purchase.routes.js';
 import quotationRoutes from '../modules/quotations/quotation.routes.js';
+import publicQuotationRoutes from '../modules/quotations/public-quotation.routes.js';
 import settingsRoutes from '../modules/settings/settings.routes.js';
 import userRoutes from '../modules/users/user.routes.js';
 import { authenticate, requireModule } from '../middleware/authenticate.js';
@@ -42,6 +43,17 @@ const router = Router();
  * visible in this diff; a guard forgotten three files away is not.
  */
 router.use('/auth', authRoutes);
+
+/*
+ * And the customer's own link, which has no session either.
+ *
+ * Mounted here, on the page that lists the whole API surface, and named
+ * `/public` so that what it is cannot be missed by anyone reading this file
+ * or reviewing a diff to it. Everything under it is reachable by a stranger
+ * holding a token: see `public-quotation.routes.ts` for what that means and
+ * what guards it instead of a session.
+ */
+router.use('/public/quotations', publicQuotationRoutes);
 
 router.use('/customers', authenticate, requireModule('customers'), customerRoutes);
 router.use('/quotations', authenticate, requireModule('quotations'), quotationRoutes);

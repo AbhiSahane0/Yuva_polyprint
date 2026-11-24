@@ -39,6 +39,7 @@ production → quality/waste → costing → dispatch, with full job-level trace
 - [Scripts](#scripts)
 - [Signing in](#signing-in)
 - [Emailing a quotation](#emailing-a-quotation)
+- [The customer's accept link](#the-customers-accept-link)
 - [Deployment](#deployment)
 - [Conventions](#conventions)
 - [Adding a module end to end](#adding-a-module-end-to-end)
@@ -474,6 +475,76 @@ whole path without emailing anybody.
 
 Full detail:
 [`apps/api/README.md`](./apps/api/README.md#sending-quotations-by-email).
+
+---
+
+## The customer's accept link
+
+A sent quotation carries a button. The customer opens a page at
+`/q/<token>`, sees what they were quoted, and accepts or declines it — and the
+works is told the moment they do.
+
+Nothing about that page is behind a sign-in: the person opening it is the
+customer, who has no account here. What guards it is a 32-byte token whose
+SHA-256 is all that is stored, a narrow projection that carries none of the
+works' costing, and a rate limiter. See
+[`quotation-link.ts`](./apps/api/src/modules/quotations/quotation-link.ts) and
+[`public-quotation.ts`](./apps/api/src/modules/quotations/public-quotation.ts).
+
+**Accepting does not create anything.** It moves the quotation to `ACCEPTED`
+and records who said so. The customer, their designs, the order and the
+cylinders are still raised by the office pressing Won, because a stranger with
+a link must not be able to start work.
+
+### Going live: the order to do it in
+
+Three of these can be done today and two wait on Meta, so start the slow ones
+first.
+
+**1. Start the WhatsApp Business Account now** — Twilio console → Messaging →
+Senders → WhatsApp senders. This is the step with the waiting in it. Submit the
+two templates in [`docs/whatsapp-templates.md`](./docs/whatsapp-templates.md)
+on the same day; they are approved separately from the sender.
+
+**2. Leave the Twilio trial.** A trial account only messages numbers you have
+verified in the console, which no real customer will be. Add funds.
+
+**3. Verify a Yuva domain in Resend**, and point `MAIL_FROM` at it. A quotation
+that arrives from someone else's domain reads as a phishing attempt to the one
+person you need to trust it.
+
+**4. Set these on Render** (they are listed in `render.yaml` with
+`sync: false`, so Render prompts rather than storing them in the repository):
+
+| Key                                        | Value                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------ |
+| `PUBLIC_APP_URL`                           | `https://yuva-polyprint.vercel.app` — the **web** app, not the API |
+| `OFFICE_ALERT_EMAIL`                       | where the works is told a customer answered                        |
+| `OFFICE_WHATSAPP`                          | the same, in E.164                                                 |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | from the Twilio console                                            |
+| `TWILIO_WHATSAPP_FROM`                     | the works' own number once approved                                |
+| `TWILIO_TEMPLATE_QUOTATION_SENT`           | the approved template's content SID                                |
+| `TWILIO_TEMPLATE_QUOTATION_ACCEPTED`       | likewise                                                           |
+
+`PUBLIC_APP_URL` is the one to get right first. Unset, it falls back to
+localhost and the link is minted, recorded and emailed with no error at all —
+the customer simply cannot open it.
+
+**5. Deploy.** The migration that adds `quotation_links`, `quotation_responses`
+and the `ACCEPTED` status runs on boot. Nothing else to do.
+
+### What changes the day it goes live
+
+On Twilio's sandbox a customer cannot be reached at all — they would have had
+to send a join code first — so testing can never message one by accident. A
+live WABA removes that net. From then on, **accepting a real quotation emails
+and messages the real customer**, which is the point, and is worth knowing
+before anybody tests against a live document.
+
+Without the template SIDs the app sends plain WhatsApp text. That works inside
+24 hours of the customer last writing to you and is refused with error 63015
+outside it — which is every quotation. The templates are not optional for
+production; they are what the feature runs on.
 
 ---
 

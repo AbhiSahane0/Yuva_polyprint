@@ -5,6 +5,8 @@ import type {
   Paginated,
   Quotation,
   QuotationEmail as QuotationEmailRecord,
+  QuotationResponseRecord,
+  QuotationShareLink,
   QuotationSortField,
   QuotationStatus,
   RecordOutcomeInput,
@@ -35,6 +37,8 @@ export const quotationKeys = {
   detail: (id: string) => [...quotationKeys.all, 'detail', id] as const,
   nextNumber: () => [...quotationKeys.all, 'next-number'] as const,
   emails: (id: string) => [...quotationKeys.all, 'emails', id] as const,
+  links: (id: string) => [...quotationKeys.all, 'links', id] as const,
+  responses: (id: string) => [...quotationKeys.all, 'responses', id] as const,
 };
 
 export function useQuotations(params: QuotationListParams) {
@@ -223,5 +227,46 @@ export function useRecordOutcome() {
         data: input,
       }),
     onSuccess: () => settle(queryClient, quotationKeys.all, ['customers']),
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* The customer's own link                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Mints a link and hands back the whole address.
+ *
+ * **The only moment the token exists on this side.** It is in the response and
+ * nowhere else — the server keeps a hash — so whatever the office does with it
+ * must be done with what this returns. Asking again mints a different one and
+ * withdraws nothing, which is why the button that calls this says "new link"
+ * rather than "show link".
+ */
+export function useCreateQuotationLink() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) =>
+      request<QuotationShareLink>({ url: `/quotations/${id}/link`, method: 'POST' }),
+    onSuccess: (_link, id) => settle(queryClient, quotationKeys.links(id)),
+  });
+}
+
+/** Every link issued for this quotation — without their tokens. */
+export function useQuotationLinks(id: string | null) {
+  return useQuery({
+    queryKey: quotationKeys.links(id ?? ''),
+    queryFn: () => request<QuotationShareLink[]>({ url: `/quotations/${id}/links` }),
+    enabled: id !== null,
+  });
+}
+
+/** What the customer said on it, with the detail that corroborates it. */
+export function useQuotationResponses(id: string | null) {
+  return useQuery({
+    queryKey: quotationKeys.responses(id ?? ''),
+    queryFn: () => request<QuotationResponseRecord[]>({ url: `/quotations/${id}/responses` }),
+    enabled: id !== null,
   });
 }

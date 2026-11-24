@@ -61,17 +61,25 @@ services:
 
       #   RESEND_API_KEY Optional. Without it the app runs normally and only
       #                  "send quotation" reports that email is unavailable.
-      #   MAIL_FROM      The sender. Prompted rather than fixed here because the
-      #                  right value differs per environment and changes the
-      #                  moment a Yuva domain is verified — a default committed
-      #                  today would quietly outlive its usefulness.
-      #                  onboarding@resend.dev delivers ONLY to the Resend
-      #                  account owner; a real customer needs an address on a
-      #                  domain verified with Resend.
       - key: RESEND_API_KEY
         sync: false
+
+      # The sender, and where a reply lands. Fixed here rather than prompted,
+      # now that yuvapolyprint.com is verified with Resend.
+      #
+      # It was prompted while the right answer still differed per environment.
+      # It no longer does, and the failure it now prevents is the expensive
+      # one: production quietly kept sending from a domain belonging to an
+      # unrelated project, and a six-figure quotation arriving from somebody
+      # else's domain does not get queried — it gets ignored.
+      #
+      # Neither is a secret. The reply-to matters because the accept page tells
+      # the customer to reply to the mail it came with, so it has to be a box
+      # somebody reads.
       - key: MAIL_FROM
-        sync: false
+        value: Yuva Polyprint & Packaging <info@yuvapolyprint.com>
+      - key: MAIL_REPLY_TO
+        value: info@yuvapolyprint.com
 
       #   GSTIN_API_KEY  Optional, and optional in the same way email is: without
       #                  it the app runs normally and only the "Verify" button on
@@ -87,3 +95,55 @@ services:
       # different default.
       - key: GSTIN_API_BASE_URL
         value: https://gstinapi.in
+
+      # ---- The customer's accept link ------------------------------------
+      #
+      #   PUBLIC_APP_URL   The public origin of the WEB app — where the link
+      #                    in a quotation email points. NOT this API: the
+      #                    customer must land on a page, not on JSON.
+      #
+      #                    **Set this before the first quotation goes out.**
+      #                    Unset, the app falls back to localhost and the
+      #                    link is minted, recorded and emailed before anybody
+      #                    notices it opens nothing. There is no error — the
+      #                    customer simply cannot answer.
+      #
+      #   OFFICE_ALERT_EMAIL / OFFICE_WHATSAPP
+      #                    Where the works is told a customer has answered.
+      #                    Optional: without them the acceptance is still
+      #                    recorded and still shows on the quotation screen,
+      #                    and only the nudge is missing.
+      #
+      # Fixed rather than prompted, because the thing it guards against is
+      # silence: unset, it falls back to localhost and the link is minted,
+      # recorded and emailed with no error at all. A deploy that cannot
+      # forget it is worth more than the flexibility of a prompt. Change it
+      # here when the web app moves to a domain of its own.
+      - key: PUBLIC_APP_URL
+        value: https://yuva-polyprint.vercel.app
+      - key: OFFICE_ALERT_EMAIL
+        sync: false
+      - key: OFFICE_WHATSAPP
+        sync: false
+
+      # ---- WhatsApp, through Twilio --------------------------------------
+      #
+      # All three of SID, token and from-number, or none of them: the app
+      # refuses to boot half-configured rather than failing at the first
+      # message with an authentication error nobody traces back to here.
+      #
+      # A real WhatsApp Business Account is needed for real customers, and
+      # Meta must approve each template in advance — docs/whatsapp-templates.md
+      # has the text to submit and the order to do it in. Without the template
+      # SIDs the app sends plain text, which Twilio's sandbox accepts and a
+      # real number refuses with code 63016.
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_FROM
+        sync: false
+      - key: TWILIO_TEMPLATE_QUOTATION_SENT
+        sync: false
+      - key: TWILIO_TEMPLATE_QUOTATION_ACCEPTED
+        sync: false

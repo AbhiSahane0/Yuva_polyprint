@@ -56,6 +56,26 @@ router.get(
 );
 
 /*
+ * The customer's own link, from the office's side.
+ *
+ * Minting is rate-limited with sending rather than with the general API: a
+ * link is only ever made to be sent, and the two should not be bounded
+ * differently.
+ */
+router.post(
+  '/:id/link',
+  emailRateLimiter,
+  validate({ params: idParamSchema }),
+  asyncHandler(controller.createLink),
+);
+router.get('/:id/links', validate({ params: idParamSchema }), asyncHandler(controller.links));
+router.get(
+  '/:id/responses',
+  validate({ params: idParamSchema }),
+  asyncHandler(controller.responses),
+);
+
+/*
  * A revision is a POST that creates a document rather than a PATCH that edits
  * one: the version it came from stays exactly as the customer received it.
  */

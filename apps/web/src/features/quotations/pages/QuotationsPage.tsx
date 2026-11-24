@@ -53,6 +53,10 @@ const PAGE_SIZE = 25;
 const STATUS_TONE: Record<QuotationStatus, 'neutral' | 'success' | 'warning' | 'brand'> = {
   DRAFT: 'neutral',
   SENT: 'brand',
+  /* Green, like Won, because it is the same good news — and the label says
+     which of the two it is. The difference between them is not the customer's
+     answer, which is the same; it is whether the works has acted on it. */
+  ACCEPTED: 'success',
   WON: 'success',
   LOST: 'warning',
 };
@@ -61,6 +65,9 @@ const FILTERS: { value: QuotationStatus | 'ALL'; label: string }[] = [
   { value: 'ALL', label: 'All' },
   { value: 'DRAFT', label: 'Draft' },
   { value: 'SENT', label: 'Sent' },
+  /* Its own filter because it is a worklist: these are the quotations
+     somebody has to turn into orders. */
+  { value: 'ACCEPTED', label: 'Accepted' },
   { value: 'WON', label: 'Won' },
   { value: 'LOST', label: 'Lost' },
 ];
