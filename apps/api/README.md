@@ -3174,17 +3174,17 @@ That exists for Vercel preview deployments, which get a new hostname per branch
 and per commit. One pattern covers all of them:
 
 ```
-CORS_ORIGINS=https://yuva-polyprint.vercel.app,https://yuva-polyprint-*.vercel.app
+CORS_ORIGINS=https://yuva-polyprint-api.vercel.app,https://yuva-polyprint-api-*.vercel.app
 ```
 
-| Origin                                                | Allowed |
-| ----------------------------------------------------- | ------- |
-| `https://yuva-polyprint.vercel.app`                   | yes     |
-| `https://yuva-polyprint-git-abhi-dev-me.vercel.app`   | yes     |
-| `https://yuva-polyprint-k2f9x1qzp-me.vercel.app`      | yes     |
-| `https://someone-elses-app.vercel.app`                | no      |
-| `https://yuva-polyprint-x.attacker.com`               | no      |
-| `http://yuva-polyprint.vercel.app` (scheme downgrade) | no      |
+| Origin                                                    | Allowed |
+| --------------------------------------------------------- | ------- |
+| `https://yuva-polyprint-api.vercel.app`                   | yes     |
+| `https://yuva-polyprint-api-git-abhi-dev-me.vercel.app`   | yes     |
+| `https://yuva-polyprint-api-k2f9x1qzp-me.vercel.app`      | yes     |
+| `https://someone-elses-app.vercel.app`                    | no      |
+| `https://yuva-polyprint-x.attacker.com`                   | no      |
+| `http://yuva-polyprint-api.vercel.app` (scheme downgrade) | no      |
 
 **Keep the project name in the pattern.** `https://*.vercel.app` would let any
 site anyone deploys on Vercel call this API with credentials attached.

@@ -516,15 +516,23 @@ person you need to trust it.
 **4. Set these on Render** (they are listed in `render.yaml` with
 `sync: false`, so Render prompts rather than storing them in the repository):
 
-| Key                                        | Value                                                              |
-| ------------------------------------------ | ------------------------------------------------------------------ |
-| `PUBLIC_APP_URL`                           | `https://yuva-polyprint.vercel.app` — the **web** app, not the API |
-| `OFFICE_ALERT_EMAIL`                       | where the works is told a customer answered                        |
-| `OFFICE_WHATSAPP`                          | the same, in E.164                                                 |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | from the Twilio console                                            |
-| `TWILIO_WHATSAPP_FROM`                     | the works' own number once approved                                |
-| `TWILIO_TEMPLATE_QUOTATION_SENT`           | the approved template's content SID                                |
-| `TWILIO_TEMPLATE_QUOTATION_ACCEPTED`       | likewise                                                           |
+| Key                                        | Value                                                                  |
+| ------------------------------------------ | ---------------------------------------------------------------------- |
+| `PUBLIC_APP_URL`                           | `https://yuva-polyprint-api.vercel.app` — the **web** app, not the API |
+| `OFFICE_ALERT_EMAIL`                       | where the works is told a customer answered                            |
+| `OFFICE_WHATSAPP`                          | the same, in E.164                                                     |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | from the Twilio console                                                |
+| `TWILIO_WHATSAPP_FROM`                     | the works' own number once approved                                    |
+| `TWILIO_TEMPLATE_QUOTATION_SENT`           | the approved template's content SID                                    |
+| `TWILIO_TEMPLATE_QUOTATION_ACCEPTED`       | likewise                                                               |
+
+**The two deployments are named the wrong way round.** The Vercel project
+serving the browser bundle is `yuva-polyprint-api`, and the Render service
+serving the API is `yuva-polyprint`. Nothing can be read off the names, and
+this README used to carry an invented `yuva-polyprint-api.vercel.app` as though it
+were real — which cost an evening. The web app is
+**`https://yuva-polyprint-api.vercel.app`** and the API is
+**`https://yuva-polyprint.onrender.com`**.
 
 `PUBLIC_APP_URL` is the one to get right first. Unset, it falls back to
 localhost and the link is minted, recorded and emailed with no error at all —
@@ -678,7 +686,7 @@ domain while every other call worked.
 ### Preview deployments and CORS
 
 Vercel builds every pull request to its own hostname —
-`yuva-polyprint-git-my-branch-me.vercel.app`, a new one per branch and per
+`yuva-polyprint-api-git-my-branch-me.vercel.app`, a new one per branch and per
 commit. **Nothing needs configuring for these to work**, because the browser
 never calls Render: `vercel.json` rewrites `/api` at the edge, so a preview
 proxies through its own hostname exactly as production does. There is no
@@ -703,12 +711,12 @@ If a preview is blocked by CORS, the rewrite is being bypassed. Check, in order:
 matching within a single hostname label, so one pattern covers every preview:
 
 ```
-CORS_ORIGINS=https://yuva-polyprint.vercel.app,https://yuva-polyprint-*.vercel.app
+CORS_ORIGINS=https://yuva-polyprint-api.vercel.app,https://yuva-polyprint-api-*.vercel.app
 ```
 
 Keep the project name in the pattern. `https://*.vercel.app` would let any site
 anyone deploys on Vercel call this API with credentials attached. The wildcard
-cannot cross a dot, so `https://yuva-polyprint-*.vercel.app` will not match
+cannot cross a dot, so `https://yuva-polyprint-api-*.vercel.app` will not match
 `https://yuva-polyprint-x.attacker.com`.
 
 ### Deploying the web app (Vercel)

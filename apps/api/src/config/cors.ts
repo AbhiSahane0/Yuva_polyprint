@@ -5,10 +5,10 @@
  * `app-git-my-branch-me.vercel.app`, a fresh one per branch and per commit — so
  * an exact allowlist can never cover them. A pattern can:
  *
- *   CORS_ORIGINS=https://yuva-polyprint.vercel.app,https://yuva-polyprint-*.vercel.app
+ *   CORS_ORIGINS=https://yuva-polyprint-api.vercel.app,https://yuva-polyprint-api-*.vercel.app
  *
  * `*` matches any run of characters except a dot or a slash, so it stays inside
- * one hostname label. `https://yuva-polyprint-*.vercel.app` therefore matches
+ * one hostname label. `https://yuva-polyprint-api-*.vercel.app` therefore matches
  * `https://yuva-polyprint-git-main-me.vercel.app` but not
  * `https://yuva-polyprint-x.attacker.com`.
  *

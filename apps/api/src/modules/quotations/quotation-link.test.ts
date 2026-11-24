@@ -101,7 +101,7 @@ describe('a link nobody outside the building could open', () => {
 
   it('leaves a real address alone', () => {
     for (const base of [
-      'https://yuva-polyprint.vercel.app',
+      'https://yuva-polyprint-api.vercel.app',
       'https://quotations.yuvapolyprint.com',
       /* Not localhost: a host that merely begins with the word. */
       'https://localhost-quotes.example.com',

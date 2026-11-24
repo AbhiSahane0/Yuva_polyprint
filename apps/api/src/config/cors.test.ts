@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createOriginMatcher } from './cors.js';
 
-const PROD = 'https://yuva-polyprint.vercel.app';
-const PREVIEWS = 'https://yuva-polyprint-*.vercel.app';
+const PROD = 'https://yuva-polyprint-api.vercel.app';
+const PREVIEWS = 'https://yuva-polyprint-api-*.vercel.app';
 
 describe('createOriginMatcher', () => {
   it('matches an exact origin', () => {
@@ -17,9 +17,9 @@ describe('createOriginMatcher', () => {
 
     expect(allows(PROD)).toBe(true);
     // Branch deployment
-    expect(allows('https://yuva-polyprint-git-abhi-dev-abhisahane0.vercel.app')).toBe(true);
+    expect(allows('https://yuva-polyprint-api-git-abhi-dev-abhisahane0.vercel.app')).toBe(true);
     // Per-commit deployment
-    expect(allows('https://yuva-polyprint-k2f9x1qzp-abhisahane0.vercel.app')).toBe(true);
+    expect(allows('https://yuva-polyprint-api-k2f9x1qzp-abhisahane0.vercel.app')).toBe(true);
   });
 
   it('does not let a wildcard escape the hostname label', () => {
@@ -42,8 +42,8 @@ describe('createOriginMatcher', () => {
   it('respects the scheme and rejects a downgrade', () => {
     const allows = createOriginMatcher([PROD, PREVIEWS]);
 
-    expect(allows('http://yuva-polyprint.vercel.app')).toBe(false);
-    expect(allows('http://yuva-polyprint-git-main-me.vercel.app')).toBe(false);
+    expect(allows('http://yuva-polyprint-api.vercel.app')).toBe(false);
+    expect(allows('http://yuva-polyprint-api-git-main-me.vercel.app')).toBe(false);
   });
 
   it('does not treat regex characters in a pattern as regex', () => {

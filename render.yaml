@@ -119,8 +119,15 @@ services:
       # recorded and emailed with no error at all. A deploy that cannot
       # forget it is worth more than the flexibility of a prompt. Change it
       # here when the web app moves to a domain of its own.
+      #
+      # `yuva-polyprint-api` is the WEB app, however it reads. The Vercel
+      # project carrying the browser bundle was named `-api`, and the Render
+      # service carrying the API is `yuva-polyprint`. The names are the wrong
+      # way round and have already sent one person to a hostname with nothing
+      # behind it, so: this value must be the Vercel address, never the
+      # onrender.com one.
       - key: PUBLIC_APP_URL
-        value: https://yuva-polyprint.vercel.app
+        value: https://yuva-polyprint-api.vercel.app
       - key: OFFICE_ALERT_EMAIL
         sync: false
       - key: OFFICE_WHATSAPP
