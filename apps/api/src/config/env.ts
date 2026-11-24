@@ -88,6 +88,65 @@ const envSchema = z.object({
    */
   R2_ENDPOINT: optional(z.string().url()),
 
+  /*
+   * Where the customer's accept link points.
+   *
+   * The public origin of the WEB app, not this API: the link goes in an email
+   * to a customer and has to open a page, not return JSON. Defaulted to the
+   * dev server so a link made on a laptop opens on that laptop.
+   *
+   * Getting this wrong is quiet and expensive — the link is minted, recorded
+   * and emailed before anybody discovers it points at localhost — so it is
+   * worth checking the first one that goes out.
+   */
+  PUBLIC_APP_URL: z.string().url().default('http://localhost:5173'),
+
+  /*
+   * How long an accept link stays live.
+   *
+   * The printed terms say the quotation is valid for fifteen days, and a link
+   * that still accepts a price six months later is an agreement the works
+   * never made. Rounded up a little so a customer who answers on the last day
+   * is not turned away by an hour.
+   */
+  QUOTATION_LINK_DAYS: z.coerce.number().int().positive().max(365).default(20),
+
+  /*
+   * Where the works is told that a customer has answered.
+   *
+   * Optional. With neither set the acceptance is still recorded and still
+   * shows on the quotation screen — only the nudge is missing, which is what a
+   * developer without credentials should get rather than a boot failure.
+   */
+  OFFICE_ALERT_EMAIL: optional(z.string().email()),
+  /** In E.164, with no `whatsapp:` prefix — this adds it. */
+  OFFICE_WHATSAPP: optional(z.string().min(8)),
+
+  /*
+   * WhatsApp, through Twilio.
+   *
+   * Optional as a set, and refused half-configured below for the same reason
+   * R2 is: a sid with no token fails at the first message with an auth error
+   * that reads as a bug in this app.
+   *
+   * `TWILIO_WHATSAPP_FROM` is the sandbox number while the works' own
+   * WhatsApp Business Account is in approval, and the works' number after.
+   * Nothing else changes when it is swapped.
+   */
+  TWILIO_ACCOUNT_SID: optional(z.string().min(1)),
+  TWILIO_AUTH_TOKEN: optional(z.string().min(1)),
+  TWILIO_WHATSAPP_FROM: optional(z.string().min(8)),
+  /*
+   * Meta's approved templates, by content SID.
+   *
+   * A business may not send free text to a customer who has not written to it
+   * in the last 24 hours — it must send a template Meta has approved, and the
+   * approval is per template. Unset, this falls back to a plain body, which is
+   * what the Twilio sandbox accepts and what a real number will refuse.
+   */
+  TWILIO_TEMPLATE_QUOTATION_SENT: optional(z.string().min(1)),
+  TWILIO_TEMPLATE_QUOTATION_ACCEPTED: optional(z.string().min(1)),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   RATE_LIMIT_WINDOW_MS: z.coerce
@@ -107,15 +166,29 @@ const R2_KEYS = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R
  * signature error, which reads as a bug in this app rather than as a line
  * missing from `.env`. Refusing at boot names the missing key instead.
  */
-const r2Schema = envSchema.superRefine((value, ctx) => {
-  const missing = R2_KEYS.filter((key) => value[key] === undefined);
-  if (missing.length === 0 || missing.length === R2_KEYS.length) return;
-  ctx.addIssue({
-    code: 'custom',
-    path: ['R2_BUCKET'],
-    message: `Cloudflare R2 needs all of ${R2_KEYS.join(', ')} or none. Missing: ${missing.join(', ')}`,
+const TWILIO_KEYS = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_WHATSAPP_FROM'] as const;
+
+const r2Schema = envSchema
+  .superRefine((value, ctx) => {
+    const missing = R2_KEYS.filter((key) => value[key] === undefined);
+    if (missing.length === 0 || missing.length === R2_KEYS.length) return;
+    ctx.addIssue({
+      code: 'custom',
+      path: ['R2_BUCKET'],
+      message: `Cloudflare R2 needs all of ${R2_KEYS.join(', ')} or none. Missing: ${missing.join(', ')}`,
+    });
+  })
+  /* Same rule, same reason: half-configured WhatsApp boots and then fails at
+     the first message with an authentication error nobody traces back here. */
+  .superRefine((value, ctx) => {
+    const missing = TWILIO_KEYS.filter((key) => value[key] === undefined);
+    if (missing.length === 0 || missing.length === TWILIO_KEYS.length) return;
+    ctx.addIssue({
+      code: 'custom',
+      path: ['TWILIO_WHATSAPP_FROM'],
+      message: `WhatsApp needs all of ${TWILIO_KEYS.join(', ')} or none. Missing: ${missing.join(', ')}`,
+    });
   });
-});
 
 const parsed = r2Schema.safeParse(process.env);
 

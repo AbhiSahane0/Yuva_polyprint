@@ -280,6 +280,25 @@ export interface SendQuotationResult {
   sentAt: string;
   /** The quotation's status after sending — Draft becomes Sent. */
   status: QuotationStatus;
+  /**
+   * The link the customer can accept on, as it went into the message.
+   *
+   * Returned so the office can copy it straight into a message of their own:
+   * plenty of this works' quoting happens in a WhatsApp thread that is
+   * already open, and the link is no use if the only copy is in the
+   * customer's inbox. It is not stored — see `quotation-link.ts`.
+   */
+  acceptUrl: string;
+  /** The numbers WhatsApp actually took a message for. */
+  whatsappSentTo: string[];
+  /**
+   * The numbers it would not, and why.
+   *
+   * Reported rather than thrown: the email is the delivery and it has already
+   * gone. A number that is not on WhatsApp is worth a line on the screen, not
+   * a failed send.
+   */
+  whatsappFailures: { to: string; error: string }[];
 }
 
 /** What recording an outcome answers with. */
@@ -309,4 +328,126 @@ export interface RecordOutcomeResult {
   cylindersSent: string[];
   /** Ones already out against this quotation, or retired and so not sendable. */
   cylindersAlreadySent: string[];
+}
+
+/* -------------------------------------------------------------------------- */
+/* What the customer sees on a link, and what they send back                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Why a link will not show a quotation.
+ *
+ * Deliberately few, and deliberately vague about which. A stranger guessing
+ * tokens learns nothing from `unknown` that they do not learn from a 404, and
+ * a customer whose link has lapsed needs to be told to ring the office rather
+ * than told which of five internal states they are in.
+ */
+export type QuotationLinkProblem =
+  | 'unknown'
+  | 'expired'
+  | 'withdrawn'
+  /** A revision exists, so this price is not the current one. */
+  | 'superseded';
+
+/**
+ * One line of the quotation, as the customer is allowed to see it.
+ *
+ * **A hand-built projection, not a filtered `QuotationItem`.** The full line
+ * carries `costPerPouch`, `materialCost` and `marginPercent` — what the works
+ * pays and what it makes. Sending the whole object and hiding three fields in
+ * the page would put the works' margin in the browser of every customer who
+ * opens the network tab. So the public shape is written out by hand, and a
+ * field only appears here because somebody added it on purpose.
+ */
+export interface PublicQuotationItem {
+  position: number;
+  jobName: string;
+  /** "Standup pouch", "Roll" — as the printed document words it. */
+  description: string;
+  widthMm: number;
+  heightMm: number;
+  micron: number;
+  colours: number;
+  /** The quantity and rate for the one tier this customer was quoted. */
+  quantityKg: number;
+  ratePerKg: number;
+  quantityPouches: number;
+  ratePerPouch: number;
+  totalAmount: number;
+  pricingBasis: PricingBasis;
+  /** Cylinders charged on this line, zero when there is nothing to cut. */
+  cylinderCost: number;
+}
+
+/** The quotation as served to a customer holding a link. */
+export interface PublicQuotation {
+  number: number;
+  version: number;
+  date: string;
+  /** Who it is for, as the document says it. */
+  customerName: string;
+  /** What the document as a whole is for. Empty where it was left off. */
+  title: string;
+
+  items: PublicQuotationItem[];
+
+  materialSubtotal: number;
+  cylinderSubtotal: number;
+  grandSubtotal: number;
+  grandWithGst: number;
+  gstPercent: number;
+  totalAdvance: number;
+
+  terms: string[];
+  notes: string;
+
+  /** When the link stops accepting an answer. */
+  expiresAt: string;
+
+  /**
+   * The answer already given, if there is one.
+   *
+   * A customer who accepts and then reopens the link must see their own
+   * acceptance rather than the buttons again — and a second person at the same
+   * company must see that a colleague has already answered.
+   */
+  response: PublicQuotationResponse | null;
+}
+
+/** An answer, as shown back to the customer who gave it. */
+export interface PublicQuotationResponse {
+  decision: 'ACCEPTED' | 'DECLINED';
+  personName: string;
+  personRole: string;
+  note: string;
+  respondedAt: string;
+}
+
+/** An answer, as the office sees it — with the corroborating detail. */
+export interface QuotationResponseRecord extends PublicQuotationResponse {
+  id: string;
+  /** Which quantity they were looking at, where the document had several. */
+  tierPosition: number | null;
+  ipAddress: string;
+  userAgent: string;
+}
+
+/** A link the office has issued, as the quotation screen lists it. */
+export interface QuotationShareLink {
+  id: string;
+  /**
+   * The whole link, including the token.
+   *
+   * Returned **only** by the call that mints it, because only the hash is
+   * stored. Null on every later listing, which is the point: the office copies
+   * it when it is made, and a leaked database cannot hand anybody a working
+   * link.
+   */
+  url: string | null;
+  createdBy: string;
+  createdAt: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  viewCount: number;
+  lastViewedAt: string | null;
 }

@@ -208,8 +208,8 @@ model Job {
   /// As a flag on the design it reaches the two places it matters: the job
   /// card the slitter is handed, and a worklist of everything still waiting.
   confirmRollWeight Boolean @default(false) @map("confirm_roll_weight")
-  pouchPlateSize   String @default("NA") @map("pouch_plate_size")
-  pouchesPerKg     String @default("NA") @map("pouches_per_kg")
+  pouchPlateSize    String  @default("NA") @map("pouch_plate_size")
+  pouchesPerKg      String  @default("NA") @map("pouches_per_kg")
 
   // ---- Pouch dimensions ----------------------------------------------------
   dPunch         String   @default("NA") @map("d_punch")
@@ -254,8 +254,22 @@ model Job {
 enum QuotationStatus {
   DRAFT
   SENT
+  /// The customer has said yes on the link they were sent, and the office has
+  /// not yet turned that into work.
+  ///
+  /// Its own status rather than WON, because WON is not a label — it creates
+  /// the customer, their designs, the order and issues the cylinders. None of
+  /// that may happen because a stranger with a link pressed a button. This
+  /// says the answer is in and the works has still to act on it.
+  ACCEPTED
   WON
   LOST
+}
+
+/// What the customer did with the link.
+enum QuotationResponseKind {
+  ACCEPTED
+  DECLINED
 }
 
 /// A customer-facing quotation.
@@ -397,6 +411,10 @@ model Quotation {
   /// What the customer actually ordered off it, once it was won.
   orders Order[]
 
+  /// The links the customer was given, and what they did with them.
+  links     QuotationLink[]
+  responses QuotationResponse[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -439,6 +457,8 @@ model QuotationTier {
 
   quantities QuotationItemQuantity[]
   wonBy      Quotation?              @relation("WonTier")
+  /// The customer's answers that were given against this quantity.
+  responses  QuotationResponse[]     @relation("RespondedTier")
 
   @@unique([quotationId, position])
   @@map("quotation_tiers")
@@ -763,14 +783,12 @@ model Material {
 
   /**
    * The gauge this film is usually bought at, in microns.
-   *
    * Most film names state it — `PET 12µm` — and the quotation form has always
    * read it off the name. The LDPE grades, Nylon and PP Woven state nothing,
    * because the works buys them at whatever thickness the job asks for, and the
    * form filled those in with 12µ so the row would validate. On a sealant that
    * is not a starting figure, it is a wrong one: a 50µ poly quoted at 12 is a
    * third of the laminate costed at a quarter of its weight.
-   *
    * Null means nobody has said yet, and the form leaves the box empty and asks.
    * Once it is set, the next quotation starts there. Not dated: it is what the
    * works buys, not what it pays.
@@ -818,12 +836,10 @@ model Material {
   /**
    * The material this one's rate follows, for a grade priced as "the base plus
    * so much".
-   *
    * The works buys one LDPE and sells twelve grades of it, each General Poly
    * plus a fixed amount — Rs 6 for a 1 kg packaging film, Rs 55 for a frosty
    * one. They do not move apart, so keying all twelve every time the resin
    * moves is eleven chances to key one wrong.
-   *
    * Null means the rate is typed, which is the base itself and every film that
    * is not LDPE. One level only: a base must not itself be derived, or a rate
    * would depend on the order the chain is walked in.
@@ -834,7 +850,6 @@ model Material {
 
   /**
    * What is added to the base's rate. Set together with `baseMaterialId`.
-   *
    * **Not dated, and it does not need to be.** A derived rate is written as a
    * dated row of its own at the moment the base is keyed in, exactly like a
    * typed one — so changing a premium moves what is written next and nothing
@@ -1036,6 +1051,91 @@ model QuotationEmail {
 
   @@index([quotationId, createdAt])
   @@map("quotation_emails")
+}
+
+/// A link the customer can open without signing in.
+///
+/// One per version, not one per number. A revision is a different document at
+/// a different price, so the link that went out with version 1 must not accept
+/// version 2 — and must not quietly show it either. An old link says the
+/// quotation has been revised and stops there.
+///
+/// **The token itself is never stored.** Only its SHA-256, exactly as sessions
+/// work: a leaked database should not hand somebody the power to accept every
+/// open quotation in it. The raw token exists in the email and the WhatsApp
+/// message and nowhere else.
+model QuotationLink {
+  id String @id @default(cuid())
+
+  quotationId String    @map("quotation_id")
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  tokenHash String @unique @map("token_hash")
+
+  /// Display name of whoever sent it, matching `sent_by` on the email record.
+  createdBy String @map("created_by")
+
+  /// After this, the link reads as expired and offers no buttons.
+  ///
+  /// The printed terms say the quotation is valid for fifteen days; a link that
+  /// still accepts after six months is a price the works never agreed to.
+  expiresAt DateTime @map("expires_at")
+
+  /// Set when the office withdraws a link, or when a revision supersedes it.
+  revokedAt DateTime? @map("revoked_at")
+
+  /// Whether the customer ever opened it, and when they last did. The office
+  /// asks "did they even see it?" and this is the only thing that can answer.
+  viewCount    Int       @default(0) @map("view_count")
+  lastViewedAt DateTime? @map("last_viewed_at")
+
+  responses QuotationResponse[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([quotationId, createdAt])
+  @@map("quotation_links")
+}
+
+/// What the customer said, and everything that identifies the saying of it.
+///
+/// Kept as a row of its own rather than as fields on the quotation, because
+/// this is evidence. A quotation worth six lakhs that the customer later says
+/// they never agreed to is settled by who pressed the button, when, from
+/// where, and against which version — and none of that survives being folded
+/// into a status column.
+model QuotationResponse {
+  id String @id @default(cuid())
+
+  quotationId String    @map("quotation_id")
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  /// The link it came through. Null only if a link is later deleted.
+  linkId String?        @map("link_id")
+  link   QuotationLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
+
+  decision QuotationResponseKind
+
+  /// Typed by whoever accepted, because "the company accepted" is not a person.
+  personName String @map("person_name")
+  personRole String @default("") @map("person_role")
+
+  /// Their own words: a note with an acceptance, a reason with a refusal.
+  note String @default("")
+
+  /// Which quantity they were looking at. With three prices on one document,
+  /// "accepted" does not say what was agreed.
+  tierId String?        @map("tier_id")
+  tier   QuotationTier? @relation("RespondedTier", fields: [tierId], references: [id], onDelete: SetNull)
+
+  /// Where from, and with what. Not identification — corroboration.
+  ipAddress String @default("") @map("ip_address")
+  userAgent String @default("") @map("user_agent")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([quotationId, createdAt])
+  @@map("quotation_responses")
 }
 
 /// Where a batch sits, and what a movement did.
@@ -1502,7 +1602,7 @@ model Cylinder {
 
   notes String @default("")
 
-  events CylinderEvent[]
+  events  CylinderEvent[]
   /// Quotation lines that quoted a repair of this cylinder.
   repairs QuotationItemCylinderRepair[]
 
@@ -2235,6 +2335,7 @@ model StockReservation {
    * /**
    * /**
    * /**
+   * /**
    * /* One row per card per ROLL. A job spanning three rolls holds three of them,
    * which is the point — the old key allowed one row per material.
    */
@@ -2620,7 +2721,6 @@ model JobSheetStageUsage {
 
   /**
    * The remarks box on the works' own stage card.
-   *
    * None of these four reaches the costing — the cost of a run comes from what
    * it consumed and what it produced. They are what the operator writes down
    * about the shift, and the works keeps them: how much was lost at THIS
@@ -2748,7 +2848,7 @@ model DispatchLine {
 
   remarks String @default("")
 
-  packages DispatchPackage[]
+  packages       DispatchPackage[]
   /// How the pouch count on this line was arrived at. See PouchWeighing.
   pouchWeighings PouchWeighing[]
 
@@ -2833,11 +2933,11 @@ model PouchWeighing {
 /// types — the nine yellow boxes on the works' own sheet, plus the three names
 /// it is signed by.
 model JobCard {
-  id String @id @default(cuid())
+  id     String   @id @default(cuid())
   /// Sequential and human-facing. Its own series, like an order's.
-  number Int @unique
+  number Int      @unique
   /// The day the card was raised.
-  date DateTime @db.Date
+  date   DateTime @db.Date
 
   /// The order it is making. A card without one is a run nobody asked for,
   /// but the link is nullable so deleting an order leaves the card readable.
@@ -2856,8 +2956,8 @@ model JobCard {
   customerName String @default("") @map("customer_name")
 
   // ---- The boxes an operator fills in -------------------------------------
-  workOrderNo String    @default("") @map("work_order_no")
-  poDate      DateTime? @map("po_date") @db.Date
+  workOrderNo   String    @default("") @map("work_order_no")
+  poDate        DateTime? @map("po_date") @db.Date
   /// The works' lead after the PO unless the office typed a date.
   dispatchDate  DateTime? @map("dispatch_date") @db.Date
   transport     String    @default("")
@@ -2866,7 +2966,7 @@ model JobCard {
   printingNote  String    @default("") @map("printing_note")
 
   /// Seeded from the works' figure and then the setter's to change.
-  printSpeedMPerMin Decimal @default(0) @map("print_speed_m_per_min") @db.Decimal(10, 2)
+  printSpeedMPerMin   Decimal  @default(0) @map("print_speed_m_per_min") @db.Decimal(10, 2)
   /// Worked out from the PET ply, and overridable: the works' own cell is
   /// yellow, so the floor may put the roll in hand ahead of the arithmetic.
   printMetersOverride Decimal? @map("print_meters_override") @db.Decimal(14, 3)

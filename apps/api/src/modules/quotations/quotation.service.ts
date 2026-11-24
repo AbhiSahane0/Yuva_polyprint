@@ -45,6 +45,9 @@ import { env } from '../../config/env.js';
 import { sendEmail } from '../../lib/mailer.js';
 import { renderQuotationPdf } from './quotation-pdf.js';
 import { buildQuotationEmail } from './quotation-email.js';
+import { linkForSending, revokeLinksFor } from './quotation-link-store.js';
+import { quotationTemplateVariables, quotationWhatsApp } from './quotation-notify.js';
+import { isWhatsAppConfigured, sendWhatsAppToMany } from '../../lib/whatsapp.js';
 
 /** Prisma hands back Decimal objects; the API contract is plain numbers. */
 const toNumber = (value: Prisma.Decimal | number | null): number =>
@@ -1444,6 +1447,17 @@ export async function createQuotationVersion(id: string): Promise<Quotation> {
         return created.id;
       }, TX);
 
+      /*
+       * The old version's links stop working the moment a revision exists.
+       *
+       * Outside the transaction on purpose: a revision that is created but
+       * whose predecessor's links survive is a nuisance the office can fix,
+       * while a revision rolled back because a link update failed is work
+       * lost. The customer who clicks an old link is told a revised
+       * quotation has been sent rather than shown a withdrawn price.
+       */
+      await revokeLinksFor(id);
+
       return await getQuotationById(createdId);
     } catch (error) {
       if (!isQuotationNumberClash(error) || attempt >= NUMBER_CLASH_RETRIES) throw error;
@@ -1548,7 +1562,14 @@ export async function sendQuotationEmail(
   const quotation = await getQuotationById(id);
 
   const file = await renderQuotationPdf(quotation);
-  const { html, text } = buildQuotationEmail(quotation, input.message);
+  /*
+   * The link is minted before anything is sent, so the button in the email and
+   * the address in the WhatsApp message are the same link — and so a failure
+   * to mint one stops the send rather than posting a quotation the customer
+   * cannot answer.
+   */
+  const acceptUrl = await linkForSending(id, sentBy);
+  const { html, text } = buildQuotationEmail(quotation, input.message, acceptUrl);
 
   const safeCustomer = quotation.customerName.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
   const filename = `Quotation_${quotation.number}_${safeCustomer || 'Customer'}.pdf`;
@@ -1562,6 +1583,27 @@ export async function sendQuotationEmail(
     replyTo: env.MAIL_REPLY_TO,
     attachments: [{ filename, content: Buffer.from(file) }],
   });
+
+  /*
+   * WhatsApp after the email, and never instead of it.
+   *
+   * The PDF is the deliverable and email is what carries it; WhatsApp carries
+   * the link and the headline. A number that is not on WhatsApp, or a works
+   * whose template is still in approval, must not turn a delivered quotation
+   * into a failed one — so this answers with outcomes and the record says
+   * which numbers actually got something.
+   */
+  const whatsapp =
+    isWhatsAppConfigured() && input.whatsappTo.length > 0
+      ? await sendWhatsAppToMany(input.whatsappTo, {
+          body: quotationWhatsApp(quotation, quotation.grandWithGst, acceptUrl),
+          contentSid: env.TWILIO_TEMPLATE_QUOTATION_SENT,
+          contentVariables: env.TWILIO_TEMPLATE_QUOTATION_SENT
+            ? quotationTemplateVariables(quotation, quotation.grandWithGst, acceptUrl)
+            : undefined,
+        })
+      : [];
+  const whatsappDelivered = whatsapp.filter((result) => result.error === null);
 
   const sentAt = new Date();
   const [record] = await prisma.$transaction([
@@ -1580,6 +1622,11 @@ export async function sendQuotationEmail(
          * the history claim a delivery that never happened.
          */
         whatsappTo: input.whatsappTo,
+        /* Set only when a provider actually took a message, so a row with
+           numbers and no timestamp still reads as "meant for these, not
+           sent" — which is exactly what it is when WhatsApp is unconfigured
+           or every number was refused. */
+        whatsappSentAt: whatsappDelivered.length > 0 ? sentAt : null,
         providerId,
         sentBy,
       },
@@ -1602,6 +1649,13 @@ export async function sendQuotationEmail(
     sentTo: input.to,
     sentAt: record.createdAt.toISOString(),
     status: quotation.status === 'DRAFT' ? 'SENT' : quotation.status,
+    acceptUrl,
+    whatsappSentTo: whatsappDelivered.map((result) => result.to),
+    /* Named numbers and what went wrong with each, so the office can fix a
+       typo rather than wonder why one customer never replied. */
+    whatsappFailures: whatsapp
+      .filter((result) => result.error !== null)
+      .map((result) => ({ to: result.to, error: result.error as string })),
   };
 }
 

@@ -8,7 +8,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { ApiClientError } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
-import { useRecordOutcome } from '../api/quotation-api';
+import { useQuotationResponses, useRecordOutcome } from '../api/quotation-api';
 
 /**
  * Records what the customer said.
@@ -31,12 +31,30 @@ export function OutcomeModal({
   const [error, setError] = useState<string | null>(null);
   const record = useRecordOutcome();
 
+  /*
+   * What the customer already said on their own link, if anything.
+   *
+   * The office is not being asked to guess here — they are being asked to act
+   * on an answer that is already in. So the dialog opens on that answer rather
+   * than on a blank pair of buttons, and the only thing left to press is the
+   * one that creates the work.
+   */
+  const { data: responses } = useQuotationResponses(quotation?.id ?? null);
+  const answer = quotation?.status === 'ACCEPTED' ? responses?.[0] : undefined;
+
   useEffect(() => {
     if (!open) return;
     setChoice(null);
     setReason('');
     setError(null);
   }, [open, quotation]);
+
+  /* Separate from the reset above, and after it: the answer arrives from the
+     server a moment after the dialog opens, so preselecting has to happen
+     when it lands rather than when the dialog does. */
+  useEffect(() => {
+    if (answer?.decision === 'ACCEPTED') setChoice('WON');
+  }, [answer]);
 
   function submit() {
     if (!quotation || choice === null) return;
@@ -116,6 +134,32 @@ export function OutcomeModal({
           works quotes over the phone and across a desk. Saying so here, because
           "Accepted" on something marked Draft reads like a mistake otherwise.
         */}
+        {/*
+          They have already answered, on the link we sent them. Shown before
+          the buttons, because it changes what the buttons mean: this is no
+          longer "what did they say" but "they said yes, shall we start".
+        */}
+        {answer ? (
+          <div className="border-success-500/40 bg-success-50 rounded-[var(--radius-md)] border px-3 py-2.5">
+            <p className="text-success-700 text-sm font-semibold">
+              {quotation?.customerName} accepted this on their link
+            </p>
+            <p className="text-ink-600 mt-0.5 text-sm">
+              {answer.personName}
+              {answer.personRole ? `, ${answer.personRole}` : ''} ·{' '}
+              {new Date(answer.respondedAt).toLocaleString('en-IN', {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              })}
+            </p>
+            {answer.note ? (
+              <p className="text-ink-600 border-success-500/40 mt-2 border-l-2 pl-3 text-sm">
+                {answer.note}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
         {quotation?.status === 'DRAFT' ? (
           <p className="border-ink-200 bg-ink-50 text-ink-600 rounded-[var(--radius-md)] border px-3 py-2 text-xs">
             This one is still a draft — it was never sent from here. Recording an answer is fine:

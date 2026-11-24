@@ -77,3 +77,33 @@ export const emailRateLimiter = rateLimit({
     res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json(tooManyRequests);
   },
 });
+
+/**
+ * The public quotation link.
+ *
+ * The one part of this API a stranger can reach without a session, so it is
+ * the one part worth bounding against somebody working through guessed
+ * tokens.
+ *
+ * **Deliberately generous, because the key may not be one customer.** This is
+ * per-IP, and in production the browser does not reach this API directly: it
+ * goes through the Vercel rewrite, so `req.ip` is whatever `trust proxy`
+ * resolves out of the forwarded chain. If that ever resolves to an edge
+ * address rather than the customer's, every customer shares one bucket — and
+ * a tight limit would then turn into 429s for people trying to accept a
+ * quotation. Four an minute across the whole works is still nothing against a
+ * 32-byte token (there are 2^256 of them) and is far more than real use:
+ * a customer opens their link a few times and answers once.
+ *
+ * Not skipped in test, unlike the others: the limit is a feature of this
+ * endpoint rather than noise in the way of one.
+ */
+export const publicLinkRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 240,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json(tooManyRequests);
+  },
+});

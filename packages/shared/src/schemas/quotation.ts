@@ -11,12 +11,21 @@ import {
 import { paginationQuerySchema } from './common.js';
 import { isMobile, normaliseMobile } from '../lib/phone.js';
 
-export const quotationStatusSchema = z.enum(['DRAFT', 'SENT', 'WON', 'LOST']);
+export const quotationStatusSchema = z.enum(['DRAFT', 'SENT', 'ACCEPTED', 'WON', 'LOST']);
 export type QuotationStatus = z.infer<typeof quotationStatusSchema>;
 
 export const QUOTATION_STATUS_LABELS: Record<QuotationStatus, string> = {
   DRAFT: 'Draft',
   SENT: 'Sent',
+  /*
+   * The customer has said yes and the works has not yet acted on it.
+   *
+   * Not a synonym for Won. Winning creates the customer, their designs, the
+   * order and the cylinders that go with it; that cannot be set off by a
+   * stranger pressing a button on a link. This is the answer arriving, and the
+   * office still has to turn it into work.
+   */
+  ACCEPTED: 'Accepted',
   WON: 'Won',
   LOST: 'Lost',
 };
@@ -1077,3 +1086,49 @@ export const recordOutcomeSchema = z
   .transform((value) => (value.outcome === 'WON' ? { ...value, lostReason: '' } : value));
 
 export type RecordOutcomeInput = z.infer<typeof recordOutcomeSchema>;
+
+/* -------------------------------------------------------------------------- */
+/* The customer's own answer, given on a link rather than at a desk            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The token in an accept link.
+ *
+ * 32 random bytes as hex. Checked for shape before it reaches the database so
+ * a scan for `/q/admin` and friends is turned away by the router rather than
+ * by a query — and so the error the customer sees is the same whether the
+ * token is malformed or simply unknown.
+ */
+export const quotationTokenParamSchema = z.object({
+  token: z
+    .string()
+    .trim()
+    .regex(/^[a-f0-9]{64}$/, 'That link is not valid'),
+});
+
+/**
+ * Accepting or declining, as the customer fills it in.
+ *
+ * The name is required on both. "The company accepted" is not a person, and
+ * the whole worth of this record a year later is that it names one. The role
+ * is optional because plenty of people who sign off a quotation would struggle
+ * to put a title to what they do.
+ *
+ * A declining customer must say why, on the same reasoning as the office's own
+ * outcome form: "they said no" teaches nothing, and the reason is the only
+ * part of a loss worth keeping.
+ */
+export const respondToQuotationSchema = z
+  .object({
+    decision: z.enum(['ACCEPTED', 'DECLINED']),
+    personName: z.string().trim().min(2, 'Please give your name').max(120, 'That name is too long'),
+    personRole: z.string().trim().max(120).default(''),
+    /** A note with an acceptance; the reason with a refusal. */
+    note: z.string().trim().max(1000).default(''),
+  })
+  .refine((value) => value.decision !== 'DECLINED' || value.note.length >= 3, {
+    message: 'Please say briefly why, so we can quote you better next time',
+    path: ['note'],
+  });
+
+export type RespondToQuotationInput = z.infer<typeof respondToQuotationSchema>;
