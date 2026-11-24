@@ -1,5 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { env } from '../../config/env.js';
+import { ApiError } from '../../utils/api-error.js';
 
 /**
  * **The link a customer opens to accept a quotation.**
@@ -63,11 +64,41 @@ export function sameToken(a: string, b: string): boolean {
 }
 
 /**
+ * Whether this base address would produce a link nobody outside can open.
+ *
+ * `PUBLIC_APP_URL` defaults to the dev server so a link made on a laptop
+ * opens on that laptop. On a deployed server that default is a trap: the link
+ * is minted, recorded, emailed and sent over WhatsApp, and **nothing fails**.
+ * The office sees a successful send; the customer sees a page that will not
+ * load; and the first anybody knows of it is when a quotation goes unanswered.
+ *
+ * It has already happened once, on the first production send.
+ */
+export function pointsAtNobody(base: string, production: boolean): boolean {
+  return production && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i.test(base);
+}
+
+/**
  * The address the customer is sent to.
  *
  * `/q/` rather than `/quotations/`: short enough to survive a WhatsApp line
  * break, and plainly not a page of the office's own app.
+ *
+ * Throws rather than returning a localhost address on a deployed server. A
+ * send that fails with a sentence naming the missing setting is worth a great
+ * deal more than a send that succeeds and delivers a dead link — the first
+ * costs somebody five minutes, the second costs a quotation.
  */
 export function linkUrl(token: string): string {
-  return `${env.PUBLIC_APP_URL.replace(/\/+$/, '')}/q/${token}`;
+  const base = env.PUBLIC_APP_URL.replace(/\/+$/, '');
+
+  if (pointsAtNobody(base, env.isProduction)) {
+    throw ApiError.badRequest(
+      'PUBLIC_APP_URL is not set on this server, so the accept link would point at ' +
+        'localhost and the customer could not open it. Set it to the public address of ' +
+        'the web app, then send again.',
+    );
+  }
+
+  return `${base}/q/${token}`;
 }

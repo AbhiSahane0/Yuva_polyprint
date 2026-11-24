@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { quotationTokenParamSchema } from '@yuva/shared';
-import { hashToken, linkUrl, mintLink, sameToken } from './quotation-link.js';
+import { hashToken, linkUrl, mintLink, pointsAtNobody, sameToken } from './quotation-link.js';
 
 /**
  * The link is the whole security of the customer-facing side, so the
@@ -68,5 +68,52 @@ describe('the address the customer opens', () => {
 
   it('does not double the slash when the base url has a trailing one', () => {
     expect(linkUrl('b'.repeat(64))).not.toContain('//q/');
+  });
+});
+
+/*
+ * This happened. The first quotation sent from the deployed server carried a
+ * link to `http://localhost:5173`, because PUBLIC_APP_URL was never set there
+ * and the default is the dev server. Nothing failed: the link was minted,
+ * recorded, emailed and sent over WhatsApp, the office saw a successful send,
+ * and the customer got a page that would not load.
+ *
+ * A send that fails with a sentence naming the missing setting costs somebody
+ * five minutes. A send that succeeds and delivers a dead link costs the
+ * quotation.
+ */
+describe('a link nobody outside the building could open', () => {
+  it('is spotted on a deployed server, however it is written', () => {
+    for (const base of [
+      'http://localhost:5173',
+      'https://localhost',
+      'http://127.0.0.1:5173',
+      'http://[::1]:5173',
+      'http://LOCALHOST:5173',
+    ]) {
+      expect(pointsAtNobody(base, true)).toBe(true);
+    }
+  });
+
+  it('is exactly what a developer wants on their own machine', () => {
+    expect(pointsAtNobody('http://localhost:5173', false)).toBe(false);
+  });
+
+  it('leaves a real address alone', () => {
+    for (const base of [
+      'https://yuva-polyprint.vercel.app',
+      'https://quotations.yuvapolyprint.com',
+      /* Not localhost: a host that merely begins with the word. */
+      'https://localhost-quotes.example.com',
+    ]) {
+      expect(pointsAtNobody(base, true)).toBe(false);
+    }
+  });
+
+  /* Whatever this environment is set to, minting must never hand back
+     something the regex above would have rejected. */
+  it('never returns an address it would have refused', () => {
+    const url = linkUrl('c'.repeat(64));
+    expect(pointsAtNobody(url, true)).toBe(url.includes('localhost'));
   });
 });
