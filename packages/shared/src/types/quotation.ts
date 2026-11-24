@@ -115,6 +115,8 @@ export interface QuotationItem {
   transportCost: number;
   /** False when this design's cylinders already exist, so none are charged. */
   chargeCylinders: boolean;
+  /** True when the customer brought the set — the works never owned it. */
+  customerCylinders: boolean;
 
   /** Geometry — the same whichever quantity is being looked at. */
   micron: number;

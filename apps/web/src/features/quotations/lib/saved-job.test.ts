@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CustomerJob } from '@yuva/shared';
-import { applySavedJob, jobOptions, nameJob, savedJobNamed } from './saved-job';
+import { applySavedJob, designValues, jobOptions, nameJob, savedJobNamed } from './saved-job';
 
 /**
  * **Naming the job on the first step, where the office already knows it.**
@@ -230,5 +230,67 @@ describe('picking a row rather than typing its name', () => {
     nameJob(setValue, 0, TWINS, 'Laxmi Spices 250gm', 'a', 'vanished');
     expect(written.get('items.0.jobId')).toBeNull();
     expect(written.get('items.0.jobName')).toBe('Laxmi Spices 250gm');
+  });
+});
+
+/**
+ * **The same design, appended rather than written field by field.**
+ *
+ * The job picker on the Customer step adds a whole line at once; `applySavedJob`
+ * writes the same fields onto a line that already exists. Both go through this,
+ * because a rule written twice drifts and the drift would be a design quoted at
+ * the wrong width.
+ */
+describe('a saved design as a whole line', () => {
+  it('carries the specification, in the form\u2019s own string numbers', () => {
+    expect(designValues(LAXMI)).toEqual({
+      jobId: 'job-laxmi',
+      jobName: 'Laxmi Spices 250gm',
+      chargeCylinders: false,
+      customerCylinders: false,
+      widthMm: '170',
+      heightMm: '600',
+      cylinderCount: '5',
+      layers: [
+        { materialId: null, micron: 12 },
+        { materialId: null, micron: 70 },
+      ],
+    });
+  });
+
+  /* A repeat and a set the customer carried in both charge nothing, and the
+     document has to say which. Picking one of the works\u2019 own designs is the
+     first of those, never the second. */
+  it('is a repeat, not a set the customer brought', () => {
+    const values = designValues(PAPAD);
+    expect(values.chargeCylinders).toBe(false);
+    expect(values.customerCylinders).toBe(false);
+  });
+
+  /* What to charge is a decision about this order, not part of the design. */
+  it('says nothing about the quantities', () => {
+    expect(designValues(LAXMI)).not.toHaveProperty('quantities');
+  });
+
+  it('leaves out what the job record never recorded', () => {
+    const sparse = { id: 'j', jobName: 'Nothing measured' } as unknown as CustomerJob;
+    expect(Object.keys(designValues(sparse)).sort()).toEqual([
+      'chargeCylinders',
+      'customerCylinders',
+      'jobId',
+      'jobName',
+    ]);
+  });
+
+  /* The two paths write the same fields, which is the whole point of the one
+     function: whatever the picker appends, re-applying must produce. */
+  it('writes exactly what applying the design onto a line writes', () => {
+    const { setValue, written } = recorder();
+    applySavedJob(setValue, 0, LAXMI);
+    expect([...written.keys()].sort()).toEqual(
+      Object.keys(designValues(LAXMI))
+        .map((field) => `items.0.${field}`)
+        .sort(),
+    );
   });
 });

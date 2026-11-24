@@ -215,6 +215,22 @@ export const quotationItemSchema = z
     chargeCylinders: z.boolean().default(true),
 
     /**
+     * The customer arrives with their own set, so there is nothing to cut.
+     *
+     * **Not the same thing as a repeat**, though both charge nothing. A repeat
+     * is a design the works engraved itself and still holds on a shelf. This is
+     * a set the works has never owned: cut elsewhere, brought in by the
+     * customer, and taken away again with them. The line carries the film and
+     * the printing alone.
+     *
+     * Asked as its own question because the office was otherwise forced to
+     * mark a brand-new design as a repeat to stop it being charged — after
+     * which the quotation claimed the works holds a set it has never seen, and
+     * the cylinder register was the thing that had to be wrong.
+     */
+    customerCylinders: z.boolean().default(false),
+
+    /**
      * A repeat order that needs one of the existing set put right.
      *
      * Separate from `chargeCylinders`, and the two are not opposites: a line
@@ -278,12 +294,22 @@ export const quotationItemSchema = z
     const repaired = line.repairCylinders ? line : { ...line, repairs: [] };
 
     /*
+     * A set the works never made is a set it cannot charge for making.
+     *
+     * Settled here rather than left to the two fields to agree on. The screen
+     * writes both, but a request need only say whose cylinders they are —
+     * and a line that said "the customer brought them" and "charge for cutting
+     * them" in the same breath would quote an engraving nobody is doing.
+     */
+    const owned = repaired.customerCylinders ? { ...repaired, chargeCylinders: false } : repaired;
+
+    /*
      * A roll is film on a reel: there are no pouches to count, so the choice is
      * not offered and cannot be smuggled in through the API either. Everything
      * else takes what the office chose, falling back to the trade convention.
      */
     return {
-      ...repaired,
+      ...owned,
       pricingBasis:
         line.jobKind === 'ROLL'
           ? ('PER_KG' as const)
