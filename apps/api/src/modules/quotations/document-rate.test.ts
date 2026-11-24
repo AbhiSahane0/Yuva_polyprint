@@ -113,11 +113,25 @@ const document = (item: QuotationItem): Quotation =>
   }) as unknown as Quotation;
 
 describe('the rate column', () => {
-  it('prints the rate each under the rate per kilogram on a pouch job', () => {
-    const html = renderQuotationHtml(document(line({})));
+  it('prints the rate each under the rate per kilogram on a pouch sold by weight', () => {
+    const html = renderQuotationHtml(document(line({ pouchType: 'CENTRE_SEAL' })));
 
     expect(html).toContain('281.24');
     expect(html).toContain('Rs. 6.52 a pouch');
+  });
+
+  /*
+   * Standup, zipper and spout pouches are sold by the piece, so the line leads
+   * with the pouches and the rate each — to as many decimals as multiply back
+   * to the line total — with the kilograms underneath.
+   */
+  it('leads with pouches and the rate each on a pouch sold by the piece', () => {
+    const html = renderQuotationHtml(document(line({})));
+
+    expect(html).toContain('21,565 pouches<span class="sub">500.00 kg</span>');
+    expect(html).toContain('Rs. 6.5208<span class="unit">/pouch</span>');
+    expect(html).toContain('Rs. 281.24 a kg');
+    expect(html).toContain('<th>Rate</th>');
   });
 
   it('leaves the rate each off a roll', () => {
@@ -159,7 +173,7 @@ describe('the rate column', () => {
       ),
     );
 
-    expect(html).toContain('Rs. 6.52 a pouch');
+    expect(html).toContain('Rs. 6.5208<span class="unit">/pouch</span>');
   });
 
   /*

@@ -371,7 +371,7 @@ export const DEFAULT_TERMS = [
   'Each job/design requires a separate cylinder.',
   'Quotation valid for 15 days.',
   '18% GST applicable on total value.',
-  'Delivery within 20 working days after PO confirmation.',
+  'Delivery within 25 working days after PO confirmation.',
   'Payment Terms: 100% advance for cylinders, 70% advance for material.',
 ];
 

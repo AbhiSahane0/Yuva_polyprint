@@ -97,6 +97,11 @@ export interface QuotationAssets {
   header: LoadedAsset | null;
   footer: LoadedAsset | null;
   paymentQr: LoadedAsset | null;
+  /**
+   * The proprietor's signature, printed above the line on the quotation.
+   * Optional: without `signature.png` the space is left blank to sign by hand.
+   */
+  proprietorSignature: LoadedAsset | null;
 }
 
 let cached: QuotationAssets | null = null;
@@ -108,6 +113,7 @@ export function getQuotationAssets(): QuotationAssets {
     header: loadAsset('header'),
     footer: loadAsset('footer'),
     paymentQr: loadAsset('payment-qr'),
+    proprietorSignature: loadAsset('signature'),
   };
 
   if (!cached.header && !cached.footer) {
@@ -118,8 +124,66 @@ export function getQuotationAssets(): QuotationAssets {
   return cached;
 }
 
+/**
+ * Inter, the quotation's typeface, as `@font-face` rules — or an empty string
+ * when the files are missing, in which case the document falls back to the
+ * system sans-serif.
+ *
+ * Embedded rather than installed because the renderer has no network access
+ * and neither the API image nor a developer's machine is guaranteed to carry
+ * it. Only the quotation document asks for it; the job card and certificate
+ * keep their own fonts. Licence: `assets/quotation/fonts/Inter-LICENSE.txt`.
+ *
+ * **Static weights, not the variable font.** Chromium embeds a variable font
+ * in the PDF whole — it added ~360 KB to every quotation — where a static one
+ * is cut down to the glyphs the page actually uses.
+ */
+const INTER_FACES = [
+  { file: 'Inter-Regular.woff2', weight: 400, style: 'normal' },
+  { file: 'Inter-Italic.woff2', weight: 400, style: 'italic' },
+  { file: 'Inter-SemiBold.woff2', weight: 600, style: 'normal' },
+  { file: 'Inter-Bold.woff2', weight: 700, style: 'normal' },
+  { file: 'Inter-Black.woff2', weight: 900, style: 'normal' },
+] as const;
+
+let interFaces: string | undefined;
+
+function readFont(file: string): string | null {
+  for (const dir of ASSET_DIRS) {
+    const path = resolve(dir, 'fonts', file);
+    if (!existsSync(path)) continue;
+    try {
+      return `data:font/woff2;base64,${readFileSync(path).toString('base64')}`;
+    } catch (error) {
+      logger.warn({ err: error }, `Could not read quotation font ${path}`);
+    }
+  }
+  return null;
+}
+
+export function getInterFontFaces(): string {
+  if (interFaces !== undefined) return interFaces;
+
+  const faces = INTER_FACES.map((face) => {
+    const uri = readFont(face.file);
+    return uri
+      ? `@font-face { font-family: 'Inter'; src: url('${uri}') format('woff2'); ` +
+          `font-weight: ${face.weight}; font-style: ${face.style}; }`
+      : '';
+  }).filter(Boolean);
+
+  if (faces.length === 0) {
+    logger.warn(
+      'Inter not found in assets/quotation/fonts — the quotation falls back to sans-serif',
+    );
+  }
+  interFaces = faces.join('\n');
+  return interFaces;
+}
+
 /** Clears the cache so new artwork is picked up without a restart. */
 export function reloadQuotationAssets(): QuotationAssets {
   cached = null;
+  interFaces = undefined;
   return getQuotationAssets();
 }
