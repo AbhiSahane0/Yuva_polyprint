@@ -101,6 +101,7 @@ export function itemFormValues(
     cylinderCount: item.cylinderCount,
     transportCost: item.transportCost,
     chargeCylinders: item.chargeCylinders,
+    customerCylinders: item.customerCylinders,
     repairCylinders: item.repairCylinders,
     repairs: item.repairs,
     cylinderManufacturer: item.cylinderManufacturer,

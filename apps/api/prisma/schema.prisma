@@ -516,6 +516,15 @@ model QuotationItem {
   /// say so — "each job/design requires a separate cylinder".
   chargeCylinders Boolean @default(true) @map("charge_cylinders")
 
+  /// True when the customer brings their own set, so there is nothing to cut.
+  ///
+  /// Not a repeat, though both charge nothing: a repeat is a design the works
+  /// engraved itself and still holds, and this is a set the works has never
+  /// owned — cut elsewhere, brought in, and taken away again. Recorded as its
+  /// own answer so the quotation does not have to claim a shelf holds
+  /// cylinders nobody here has seen.
+  customerCylinders Boolean @default(false) @map("customer_cylinders")
+
   /// A repeat order sometimes needs a cylinder re-engraved rather than a new
   /// set cut. Ticked on the line, with the cylinders and what each costs below
   /// — the repair is charged in the cylinder bucket, so it is advance-billed

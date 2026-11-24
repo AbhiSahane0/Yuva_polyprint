@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { UseFormRegisterReturn } from 'react-hook-form';
 import { cn } from '@/lib/utils';
@@ -65,6 +65,23 @@ interface ComboboxProps {
    * is in the list. Used to show the brand a company matched on.
    */
   describe?: (option: string) => string | undefined;
+  /**
+   * What has already been chosen, drawn inside the field ahead of the box.
+   *
+   * For the fields that take several answers rather than one. The chosen
+   * answers sit in the control itself as chips, so the field stays one control
+   * high however many there are — a list underneath grows down the page and
+   * pushes everything after it out of sight.
+   */
+  chips?: ReactNode;
+  /**
+   * Off when the list behind the field is empty.
+   *
+   * A chevron is a promise of something to drop down, and a company the works
+   * has never printed for has nothing: clicking it would open nothing. The
+   * field still takes anything typed into it.
+   */
+  showChevron?: boolean;
 }
 
 export function Combobox({
@@ -78,6 +95,8 @@ export function Combobox({
   invalid,
   filterLocally = true,
   describe,
+  chips,
+  showChevron = true,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
@@ -144,50 +163,86 @@ export function Combobox({
     }
   }
 
+  const field = (
+    <input
+      {...registration}
+      id={id}
+      type="text"
+      role="combobox"
+      aria-expanded={open}
+      aria-controls={listId}
+      aria-autocomplete="list"
+      autoComplete="off"
+      placeholder={placeholder}
+      aria-invalid={invalid || undefined}
+      /*
+       * Only when the form library is not holding it. `register` writes
+       * through a ref, and adding `value` here would make React the owner of
+       * a field that already has one.
+       */
+      {...(registration ? {} : { value })}
+      onFocus={() => setOpen(true)}
+      onKeyDown={onKeyDown}
+      onChange={(event) => {
+        if (registration) void registration.onChange(event);
+        else onChange?.(event.target.value);
+        setOpen(true);
+        setHighlighted(-1);
+      }}
+      className={
+        /* With chips the border belongs to the box around them, and the input
+           is the bare space left over at the end of the row. */
+        chips
+          ? cn(
+              'text-ink-900 placeholder:text-ink-400 min-w-[8rem] flex-1 bg-transparent',
+              'py-1 text-[15px] focus:outline-none',
+            )
+          : cn(
+              'w-full rounded-[var(--radius-md)] border bg-white px-3.5 py-2.5 text-[15px]',
+              'text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-2',
+              'focus:ring-brand-600/30 focus:border-brand-600',
+              showChevron && 'pr-10',
+              invalid ? 'border-danger-500' : 'border-ink-200',
+            )
+      }
+    />
+  );
+
   return (
     <div ref={wrapperRef} className="relative">
-      <input
-        {...registration}
-        id={id}
-        type="text"
-        role="combobox"
-        aria-expanded={open}
-        aria-controls={listId}
-        aria-autocomplete="list"
-        autoComplete="off"
-        placeholder={placeholder}
-        aria-invalid={invalid || undefined}
-        /*
-         * Only when the form library is not holding it. `register` writes
-         * through a ref, and adding `value` here would make React the owner of
-         * a field that already has one.
-         */
-        {...(registration ? {} : { value })}
-        onFocus={() => setOpen(true)}
-        onKeyDown={onKeyDown}
-        onChange={(event) => {
-          if (registration) void registration.onChange(event);
-          else onChange?.(event.target.value);
-          setOpen(true);
-          setHighlighted(-1);
-        }}
-        className={cn(
-          'w-full rounded-[var(--radius-md)] border bg-white px-3.5 py-2.5 pr-10 text-[15px]',
-          'text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-2',
-          'focus:ring-brand-600/30 focus:border-brand-600',
-          invalid ? 'border-danger-500' : 'border-ink-200',
-        )}
-      />
+      {chips ? (
+        <div
+          className={cn(
+            'flex w-full flex-wrap items-center gap-1.5 rounded-[var(--radius-md)] border',
+            'bg-white px-2 py-1.5',
+            'focus-within:ring-brand-600/30 focus-within:border-brand-600 focus-within:ring-2',
+            showChevron && 'pr-9',
+            invalid ? 'border-danger-500' : 'border-ink-200',
+          )}
+        >
+          {chips}
+          {field}
+        </div>
+      ) : (
+        field
+      )}
 
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label="Show suggestions"
-        onClick={() => setOpen((current) => !current)}
-        className="text-ink-400 hover:text-ink-700 absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded p-1"
-      >
-        <ChevronDown className={cn('size-4 transition-transform', open && 'rotate-180')} />
-      </button>
+      {showChevron ? (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Show suggestions"
+          onClick={() => setOpen((current) => !current)}
+          className={cn(
+            'text-ink-400 hover:text-ink-700 absolute right-2 cursor-pointer rounded p-1',
+            /* A chip box is as tall as its rows, so the chevron stays level
+               with the first one rather than drifting down the middle. */
+            chips ? 'top-1.5' : 'top-1/2 -translate-y-1/2',
+          )}
+        >
+          <ChevronDown className={cn('size-4 transition-transform', open && 'rotate-180')} />
+        </button>
+      ) : null}
 
       {open && filtered.length > 0 ? (
         <ul

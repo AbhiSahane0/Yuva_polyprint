@@ -69,6 +69,8 @@ export const BLANK_DESIGN = {
   colours: [] as JobColour[],
   transportCost: 0,
   chargeCylinders: true,
+  /* The works cuts its own sets unless the office says otherwise. */
+  customerCylinders: false,
 } as const;
 
 export function setNumber(
@@ -157,6 +159,10 @@ export function applySavedJob(
     setValue(`items.${index}.jobId`, null, { shouldDirty: true });
     setValue(`items.${index}.jobName`, nameWhenNew, { shouldDirty: true });
     setValue(`items.${index}.chargeCylinders`, true, { shouldDirty: true });
+    /* A new design is the works' to cut until somebody says the customer is
+       bringing the set. Cleared with everything else, so the answer cannot
+       outlive the design it was given about. */
+    setValue(`items.${index}.customerCylinders`, false, { shouldDirty: true });
     setValue(
       `items.${index}.layers`,
       BLANK_DESIGN.layers.map((layer) => ({ ...layer })) as unknown as ItemValues['layers'],
@@ -175,33 +181,52 @@ export function applySavedJob(
     return;
   }
 
-  setValue(`items.${index}.jobId`, job.id, { shouldDirty: true });
-  setValue(`items.${index}.jobName`, job.jobName, { shouldDirty: true });
-  setValue(`items.${index}.chargeCylinders`, false, { shouldDirty: true });
-
-  if (job.designOpenWidth) setNumber(setValue, `items.${index}.widthMm`, job.designOpenWidth);
-  if (job.designHeight) setNumber(setValue, `items.${index}.heightMm`, job.designHeight);
-  if (job.totalCylinders) {
-    setNumber(setValue, `items.${index}.cylinderCount`, job.totalCylinders);
+  for (const [field, value] of Object.entries(designValues(job))) {
+    setValue(`items.${index}.${field}` as never, value as never, { shouldDirty: true });
   }
+}
 
+/**
+ * **A saved design as form values.**
+ *
+ * The specification and nothing else: the width, the height, the plies, how
+ * many cylinders were cut, and that they were cut here already.
+ *
+ * One place, because two screens need the same rule in two shapes. The job
+ * picker on the Customer step appends a whole line at once, and `applySavedJob`
+ * writes the same fields onto a line that already exists. Written twice they
+ * would drift, and a drift here is a design quoted at the wrong width.
+ *
+ * The quantities are not in it. What to charge is the office's decision about
+ * this order, not part of the design being described.
+ */
+export function designValues(job: CustomerJob): Record<string, unknown> {
   /*
-   * The jobs table keeps three fixed thicknesses — the printed ply, an
-   * optional metallised one, and the sealant. Rebuild the structure from
-   * whichever of them the job has; the materials are left for the office to
-   * confirm, because the job record never stored which film was used.
+   * The jobs table keeps three fixed thicknesses — the printed ply, an optional
+   * metallised one, and the sealant. The structure is rebuilt from whichever of
+   * them the job has; the films themselves are left for the office to confirm,
+   * because the job record never stored which was used.
    */
   const microns = [job.petMicron, job.metPetMicron, job.polyMicron]
     .map((value) => Number(value ?? 0))
     .filter((value) => value > 0);
 
-  if (microns.length >= 2) {
-    setValue(
-      `items.${index}.layers`,
-      microns.map((micron) => ({ materialId: null, micron })) as ItemValues['layers'],
-      { shouldDirty: true },
-    );
-  }
+  return {
+    jobId: job.id,
+    jobName: job.jobName,
+    /* A repeat: this set is already in the works. Not a set the customer
+       carried in — both charge nothing and the document says which. */
+    chargeCylinders: false,
+    customerCylinders: false,
+    /* Strings, like every other number the form holds while it is being typed;
+       the schema coerces them on the way in. */
+    ...(job.designOpenWidth ? { widthMm: String(job.designOpenWidth) } : {}),
+    ...(job.designHeight ? { heightMm: String(job.designHeight) } : {}),
+    ...(job.totalCylinders ? { cylinderCount: String(job.totalCylinders) } : {}),
+    ...(microns.length >= 2
+      ? { layers: microns.map((micron) => ({ materialId: null, micron })) }
+      : {}),
+  };
 }
 
 /**

@@ -27,7 +27,6 @@ import {
   WHITE_BASE_NAME,
   type CreateQuotationFormValues,
   type CreateQuotationInput,
-  type CustomerJob,
   type QuotationSummary,
   MAX_PAGE_SIZE,
   type ItemGeometry,
@@ -120,7 +119,7 @@ import {
 } from '@/features/costing/api/use-rate-costing';
 import { ColourFields } from '../components/ColourFields';
 import { itemFormValues } from '../lib/item-form-values';
-import { applySavedJob, BLANK_DESIGN, jobOptions, nameJob, setNumber } from '../lib/saved-job';
+import { BLANK_DESIGN, designValues, nameJob, setNumber } from '../lib/saved-job';
 import {
   CostingOverrides,
   strippedCosting,
@@ -128,6 +127,7 @@ import {
 } from '../components/CostingOverrides';
 import { LayerFields } from '../components/LayerFields';
 import { CylinderRepair } from '../components/CylinderRepair';
+import { JobPicker } from '../components/JobPicker';
 import { QuantityFields, type QuantityResult } from '../components/QuantityFields';
 import { StepIndicator, type Step } from '../components/StepIndicator';
 
@@ -355,7 +355,15 @@ export default function QuotationFormPage() {
       // Terms are the company's standard set and no longer editable per
       // document — the schema supplies them when the field is left out.
       notes: '',
-      items: [BLANK_ITEM],
+      /*
+       * Empty, not one blank line.
+       *
+       * The jobs are chosen on the first step now, and a line that exists
+       * before anybody has named it is a line the Jobs step would show as
+       * "Unnamed" and the save would refuse. The office adds the first one the
+       * same way they add the fourth.
+       */
+      items: [],
     },
   });
 
@@ -407,34 +415,56 @@ export default function QuotationFormPage() {
   const { data: chosenCustomer } = useCustomer(customerMode === 'existing' ? customerId : null);
 
   /**
-   * **The job this quotation is for, named on the first step.**
+   * **The jobs this quotation is for, chosen on the first step.**
    *
    * The office knows what the enquiry is about before it knows anything else
-   * about it, and for a customer the works already prints for the name is
-   * usually one of theirs. So it is asked here rather than three steps in.
+   * about it, and it is usually more than one thing: an enquiry arrives as
+   * "the 200gm, the 500gm and the 1kg for Amol Foods" — a company and three
+   * designs in one breath. For a customer the works already prints for, some
+   * or all of them are already on record.
    *
-   * One box that is both a list and somewhere to type. A known customer's
-   * designs drop down; a name nobody has printed is simply typed over them.
-   * A new company has no list, so there is only the typing — which is the
-   * honest state of it rather than an empty dropdown to click past.
-   *
-   * **It is not a field of its own.** It writes `items.0.jobName`, the very
-   * box the Jobs step shows, so the two cannot drift: naming the job here
-   * fills it in there, correcting it there corrects it here, and there is no
-   * copy to keep in step. That is the whole of "it flows to the Jobs tab".
+   * **These are not fields of their own.** Each one is a line of `items` — the
+   * very lines the Jobs step prices — so there is no copy to keep in step and
+   * no way for a name chosen here to disagree with the one priced there. That
+   * step prices the jobs and no longer names them.
    */
   const customerJobs = chosenCustomer?.jobs ?? [];
-  const firstJobName = (watched.items?.[0]?.jobName as string | undefined) ?? '';
 
-  function chooseFirstJob(name: string, pickedId?: string) {
-    nameJob(
-      setValue,
-      0,
-      customerJobs,
-      name,
-      (watched.items?.[0]?.jobId as string | null | undefined) ?? null,
-      pickedId,
-    );
+  /** One line of the picker, for each line of the quotation. */
+  const jobLines = (watched.items ?? []).map((item) => ({
+    jobName: (item?.jobName as string | undefined) ?? '',
+    jobId: (item?.jobId as string | null | undefined) ?? null,
+    /*
+     * Keyed on `chargeCylinders`, not on whether the line has an id. Stepping
+     * past the Jobs step records a new design against the customer, so a
+     * brand-new line acquires an id within moments of being named — and keying
+     * the badge on that would have called every new design a repeat.
+     */
+    repeat: item?.chargeCylinders === false && item?.customerCylinders !== true,
+    ownCylinders: item?.customerCylinders === true,
+  }));
+
+  /** Puts one of the customer's designs on the quotation as its own line. */
+  function addSavedJob(jobId: string) {
+    const job = customerJobs.find((candidate) => candidate.id === jobId);
+    if (!job) return;
+    items.append({ ...BLANK_ITEM, ...designValues(job) } as ItemValues);
+  }
+
+  /** A design the works has never printed, named and nothing more. */
+  function addNewJob(name: string) {
+    items.append({ ...BLANK_ITEM, jobName: name } as ItemValues);
+  }
+
+  /**
+   * Renaming a line.
+   *
+   * Through `nameJob`, so renaming a line off one of the customer's designs
+   * unlinks it: it is a new design now, and it is quoted for its own cylinders
+   * rather than borrowing the ones the old name's set accounted for.
+   */
+  function renameJob(index: number, name: string) {
+    nameJob(setValue, index, customerJobs, name, jobLines[index]?.jobId ?? null);
   }
 
   /* ---------------------------------------------- prefill from the customer */
@@ -1085,6 +1115,19 @@ export default function QuotationFormPage() {
     if (fields.length > 0 && !(await trigger(fields))) return;
 
     /*
+     * A quotation with no job on it has nothing to price.
+     *
+     * Checked here rather than through the schema, which validates the whole of
+     * a line — width, style, quantities — and would mark six boxes in error on
+     * a step that has not asked about any of them yet. The schema still refuses
+     * an empty quotation on save; this says so at the point it can be fixed.
+     */
+    if (step === 0 && items.fields.length === 0) {
+      toast.error('Add at least one job before going on');
+      return;
+    }
+
+    /*
      * Saving must never cost the office their place in the form. If the network
      * is down the step still advances with a warning: everything typed is still
      * in the form, the final Save writes the whole quotation regardless, and
@@ -1256,10 +1299,11 @@ export default function QuotationFormPage() {
                 ))}
               </div>
 
-              {/* Four of twelve. A company name is a line of text, not a
+              {/* Half the row. A company name is a line of text, not a
                   paragraph, and at seven columns the box ran most of the way
-                  across the step with nothing in it. */}
-              <div className="sm:col-span-4">
+                  across the step with nothing in it — but the jobs below now
+                  take a row of their own, so six is what is left to share. */}
+              <div className="sm:col-span-6">
                 {customerMode === 'existing' ? (
                   <>
                     <Field
@@ -1310,74 +1354,15 @@ export default function QuotationFormPage() {
               </div>
 
               {/*
-                What the enquiry is for, asked beside the company it is for.
-
-                This is the first thing the office knows — an enquiry arrives
-                as "Amol Bhadang 500gm for Amol Foods", a company and a design
-                in one breath — so it is answered here rather than two steps
-                later, where the question only came up once the costing did.
-
-                See `chooseFirstJob`: it writes `items.0.jobName`, the very box
-                the Jobs step shows, so there is no second copy to keep in
-                step.
-              */}
-              <div className="sm:col-span-4">
-                <Field
-                  label="Job name"
-                  htmlFor="firstJobName"
-                  hint={
-                    customerJobs.length > 0
-                      ? 'Pick one the works already prints, or type a new one'
-                      : 'A new company, so this is a new design'
-                  }
-                  error={formState.errors.items?.[0]?.jobName?.message}
-                >
-                  {/*
-                    Our own dropdown rather than the browser's. A `<datalist>`
-                    works, but the browser draws its own arrow and its own
-                    popup in its own font — beside the company box, which is a
-                    Combobox, it read as a control borrowed from another
-                    application.
-
-                    A customer with nothing on record gets a plain box: a
-                    chevron over an empty list is something to click and be
-                    disappointed by.
-                  */}
-                  {customerJobs.length > 0 ? (
-                    <Combobox
-                      id="firstJobName"
-                      options={jobOptions(customerJobs)}
-                      value={firstJobName}
-                      invalid={Boolean(formState.errors.items?.[0]?.jobName)}
-                      placeholder="What this quotation is for"
-                      onChange={(name) => chooseFirstJob(name)}
-                      /* The row itself, not its text — two designs here can
-                         read the same. See `nameJob`. */
-                      onPick={(name, key) => chooseFirstJob(name, key)}
-                    />
-                  ) : (
-                    <Input
-                      id="firstJobName"
-                      autoComplete="off"
-                      invalid={Boolean(formState.errors.items?.[0]?.jobName)}
-                      placeholder="What this quotation is for"
-                      value={firstJobName}
-                      onChange={(event) => chooseFirstJob(event.target.value)}
-                    />
-                  )}
-                </Field>
-              </div>
-
-              {/*
                 What the whole document is for.
 
-                The lines below name each job, which answers what a LINE is and
-                not what the quotation is: four lines across a product range
-                are one proposal, and the customer knows it by the range.
+                The jobs below name each line, which answers what a LINE is
+                and not what the quotation is: four lines across a product
+                range are one proposal, and the customer knows it by the range.
                 Optional, and the printed document leaves the line out rather
                 than inventing one from the first job's name.
               */}
-              <div className="sm:col-span-4">
+              <div className="sm:col-span-6">
                 <Field
                   label="Quotation title"
                   htmlFor="title"
@@ -1388,6 +1373,41 @@ export default function QuotationFormPage() {
                     autoComplete="off"
                     placeholder="e.g. Green Peas Packaging Range"
                     {...register('title')}
+                  />
+                </Field>
+              </div>
+
+              {/*
+                What the enquiry is for, asked beside the company it is for.
+
+                This is the first thing the office knows, and it is usually
+                more than one thing: an enquiry arrives as "the 200gm, the
+                500gm and the 1kg for Amol Foods" — a company and three designs
+                in one breath. So it is answered here rather than two steps
+                later, where the question only came up once the costing did.
+
+                Each job added here IS a line of the quotation — the very lines
+                the Jobs step prices, which is why that step no longer asks for
+                a name of its own. See `JobPicker`.
+              */}
+              <div className="sm:col-span-12">
+                <Field
+                  label="Jobs on this quotation"
+                  htmlFor="addJob"
+                  hint={
+                    customerJobs.length > 0
+                      ? 'Pick the designs the works already prints, or type new ones'
+                      : 'A new company, so every design here is a new one'
+                  }
+                >
+                  <JobPicker
+                    jobs={customerJobs}
+                    lines={jobLines}
+                    errorFor={(index) => formState.errors.items?.[index]?.jobName?.message}
+                    onPickSaved={addSavedJob}
+                    onAddNew={addNewJob}
+                    onRename={renameJob}
+                    onRemove={(index) => items.remove(index)}
                   />
                 </Field>
               </div>
@@ -1573,6 +1593,14 @@ export default function QuotationFormPage() {
 
         {step === 2 ? (
           <div className="flex flex-col gap-5">
+            {items.fields.length === 0 ? (
+              <div className="border-ink-200 rounded-[var(--radius-lg)] border border-dashed bg-white p-6 text-center">
+                <p className="text-ink-600 text-sm">
+                  No jobs on this quotation yet. They are chosen on the Customer step.
+                </p>
+              </div>
+            ) : null}
+
             {items.fields.map((field, index) => (
               <JobCard
                 key={field.id}
@@ -1585,8 +1613,6 @@ export default function QuotationFormPage() {
                 isEdit={isEdit}
                 customerName={watched.customerName ?? ''}
                 quotationNumber={existing?.number ?? null}
-                jobs={chosenCustomer?.jobs ?? []}
-                knownCustomer={customerMode === 'existing' && Boolean(customerId)}
                 item={watched.items?.[index] as Partial<ItemValues> | undefined}
                 cost={costed[index]}
                 errors={formState.errors.items?.[index] as JobErrors | undefined}
@@ -1648,11 +1674,20 @@ export default function QuotationFormPage() {
               pouchTypes={pouchTypesOnThisQuotation}
             />
 
+            {/*
+              Another job is another job on the enquiry, so it is added where
+              the rest of them were — beside the company, on the first step.
+              This button goes there rather than appending a nameless line here
+              that only that step can name.
+            */}
             <div>
-              <Button variant="secondary" onClick={() => items.append(BLANK_ITEM)}>
+              <Button variant="secondary" onClick={() => setStep(0)}>
                 <Plus className="size-4" />
                 Add another job
               </Button>
+              <p className="text-ink-400 mt-2 text-sm">
+                Jobs are chosen on the Customer step, beside the company.
+              </p>
               {typeof formState.errors.items?.message === 'string' ? (
                 <p className="text-danger-600 mt-2 text-sm">{formState.errors.items.message}</p>
               ) : null}
@@ -1767,8 +1802,6 @@ function JobCard({
   isEdit,
   customerName,
   quotationNumber,
-  jobs,
-  knownCustomer,
   item,
   cost,
   errors,
@@ -1795,15 +1828,6 @@ function JobCard({
   /** Only for naming the downloaded costing sheet. */
   customerName: string;
   quotationNumber: number | null;
-  /** The chosen customer's saved jobs. Empty for a new company. */
-  jobs: CustomerJob[];
-  /**
-   * Whether the works already has this customer.
-   *
-   * A known customer's cylinders are already in the works, so the panel that
-   * asks how many to cut is replaced by the one that asks which to put right.
-   */
-  knownCustomer: boolean;
   item: Partial<ItemValues> | undefined;
   cost: ItemCosting | undefined;
   errors: JobErrors | undefined;
@@ -2096,8 +2120,19 @@ function JobCard({
     }
   }, [filmWidthMm, filmHeightMm, repeatsTaken, charged, index, setValue, item]);
 
+  /**
+   * The customer turned up with the set, so there is nothing to cut.
+   *
+   * Its own answer rather than a second meaning for `chargeCylinders`. Both
+   * charge nothing, and the office needs to be able to say which: a repeat is a
+   * set the works engraved and still holds, and this is a set that was never
+   * the works' to make. Marking one as the other made the quotation claim a
+   * shelf here holds cylinders nobody at the works has seen.
+   */
+  const ownedByCustomer = item?.customerCylinders === true;
+
   /*
-   * Whether this line is quoted for cylinders.
+   * Whether this line is a repeat of a design the works already engraved.
    *
    * Keyed on `chargeCylinders`, not on whether the line has a job id. Those
    * were the same thing until the wizard began saving new designs as the office
@@ -2105,21 +2140,50 @@ function JobCard({
    * immediately, and keying on that silently stopped charging for the very
    * cylinders it had just been decided needed cutting.
    *
-   * Picking a saved job from the dropdown sets it false: that design's
-   * cylinders are already in the works. A new design leaves it true, whoever is
-   * ordering and whether or not it has been recorded yet.
+   * Picking a saved job sets it false: that design's cylinders are already in
+   * the works. A new design leaves it true, whoever is ordering and whether or
+   * not it has been recorded yet — unless the customer is bringing the set,
+   * which is the line above and not this one.
    */
-  const fromSavedJob = item?.chargeCylinders === false;
+  const fromSavedJob = !ownedByCustomer && item?.chargeCylinders === false;
 
-  /** Copies a saved job's specification onto this line — see `applySavedJob`. */
-  function applyJob(jobId: string) {
-    applySavedJob(setValue, index, jobs.find((candidate) => candidate.id === jobId) ?? null);
+  /**
+   * Says whose cylinders these are, and keeps the two fields agreeing.
+   *
+   * The schema settles the same thing on the way in — a request that says the
+   * customer brought the set cannot also charge for cutting it — but the screen
+   * writes both so the live costing beside it is right before anything is
+   * saved.
+   */
+  function setOwnedByCustomer(own: boolean) {
+    setValue(`items.${index}.customerCylinders`, own, { shouldDirty: true });
+    setValue(`items.${index}.chargeCylinders`, !own, { shouldDirty: true });
   }
 
   return (
     <section className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4 shadow-[var(--shadow-card)] sm:p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
-        <h2 className="text-ink-900 text-base font-semibold">Job {index + 1}</h2>
+        {/*
+          The job's own name is the heading, not a box to type it in.
+
+          It is chosen on the Customer step along with every other job on the
+          quotation, and this card is where that job gets priced. A line whose
+          name was refused says so here, because the only place to put it right
+          is back on that step.
+        */}
+        <div className="min-w-0">
+          <p className="text-ink-400 text-xs font-semibold tracking-wide uppercase">
+            Job {index + 1}
+          </p>
+          <h2 className="text-ink-900 truncate text-base font-semibold">
+            {item?.jobName?.trim() ? item.jobName : <span className="text-ink-400">Unnamed</span>}
+          </h2>
+          {errors?.jobName?.message ? (
+            <p className="text-danger-600 mt-0.5 text-sm">
+              {errors.jobName.message} — name it on the Customer step
+            </p>
+          ) : null}
+        </div>
         {canRemove ? (
           <IconButton tone="danger" onClick={onRemove} aria-label={`Remove job ${index + 1}`}>
             <Trash2 className="size-4" />
@@ -2129,43 +2193,15 @@ function JobCard({
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-12">
         {/*
-          A customer with jobs on record gets to pick one rather than retype it.
-          Choosing one fills in the size, the structure and the cylinder count,
-          and marks the line as a repeat so it is not quoted for cylinders.
-        */}
-        {jobs.length > 0 ? (
-          <div className="col-span-2 sm:col-span-5">
-            <Field label="Saved job" htmlFor={`items.${index}.jobId`}>
-              <Select
-                id={`items.${index}.jobId`}
-                value={item?.jobId ?? ''}
-                onChange={(event) => applyJob(event.target.value)}
-              >
-                <option value="">— New design —</option>
-                {jobs.map((job) => (
-                  <option key={job.id} value={job.id}>
-                    {job.jobName}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
-        ) : null}
+          Which jobs the quotation is for is settled on the Customer step, and
+          this step prices them.
 
-        <div className={cn('col-span-2', jobs.length > 0 ? 'sm:col-span-4' : 'sm:col-span-6')}>
-          <Field
-            label="Job name"
-            htmlFor={`items.${index}.jobName`}
-            error={errors?.jobName?.message}
-          >
-            <Input
-              id={`items.${index}.jobName`}
-              invalid={Boolean(errors?.jobName)}
-              {...register(`items.${index}.jobName`)}
-            />
-          </Field>
-        </div>
-        <div className="sm:col-span-2">
+          It used to ask again here — a saved-job dropdown and a name box, both
+          writing the same two fields the first step had already written. One
+          question asked in two places is a question that can be answered two
+          ways, and the answer that counted was whichever was typed last.
+        */}
+        <div className="sm:col-span-3">
           <Field
             label="Width"
             htmlFor={`items.${index}.widthMm`}
@@ -2179,7 +2215,7 @@ function JobCard({
             />
           </Field>
         </div>
-        <div className="sm:col-span-2">
+        <div className="sm:col-span-3">
           <Field
             label="Height"
             htmlFor={`items.${index}.heightMm`}
@@ -2449,17 +2485,18 @@ function JobCard({
         </div>
 
         {/*
-          A repeat shows no cylinder panel at all. It used to explain itself in
-          a dashed box above the costing — true, and one more line between the
-          office and the price.
+          A repeat has a set already, so the panel that asks how many to cut is
+          replaced by the one that asks which of them to put right.
+
+          Keyed on the line, not on the customer. It used to show this to every
+          customer the works had printed for before — on the grounds that their
+          cylinders are already here — which is true of their old designs and
+          not of the new one they have just rung up about. A customer of ten
+          years ordering a new pouch still needs a set engraved, and the panel
+          told them in writing that nothing was being charged for it while the
+          costing below charged for all six.
         */}
-        {/*
-          A customer the works already has is a customer whose cylinders it
-          already holds, so there is nothing to charge for cutting them — and
-          the panel that asks how many to cut is replaced by the one that asks
-          which to put right.
-        */}
-        {knownCustomer ? (
+        {fromSavedJob ? (
           <div className="col-span-2 sm:col-span-12">
             <CylinderRepair
               jobId={(item?.jobId as string | null) ?? null}
@@ -2475,7 +2512,16 @@ function JobCard({
           </div>
         ) : null}
 
-        {fromSavedJob || knownCustomer ? null : (
+        {/*
+          Whose cylinders this line prints from.
+
+          A repeat shows nothing here: that design's set is already in the
+          works and the panel above asks which of them needs putting right.
+          Everything else gets the question, including a customer of ten years
+          with a brand-new design — because the answer is about the design and
+          not about how long the works has known the company.
+        */}
+        {fromSavedJob ? null : (
           <div className="col-span-2 sm:col-span-12">
             <div className="border-ink-200 rounded-[var(--radius-lg)] border bg-white p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -2490,7 +2536,7 @@ function JobCard({
                    * before they trust it. Once they change one, the label goes
                    * and stays gone.
                    */}
-                  {repeatsTaken ? (
+                  {ownedByCustomer ? null : repeatsTaken ? (
                     <button
                       type="button"
                       onClick={() => setRepeatsTaken(false)}
@@ -2501,69 +2547,103 @@ function JobCard({
                   ) : (
                     <span className="text-ink-400 text-xs">Fitted to the size</span>
                   )}
-                  <span className="text-ink-400 text-xs">New design — charged once</span>
+                  <span className="text-ink-400 text-xs">
+                    {ownedByCustomer ? 'The customer’s own set' : 'New design — charged once'}
+                  </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-12">
-                <div className="sm:col-span-3">
-                  {/*
-                   * "Repeat width" read as a measurement — a width in
-                   * millimetres — when it is a count of how many pouches sit
-                   * side by side across the web. "Ups" is the works' own word
-                   * for it and the column the jobs table has always used.
-                   */}
-                  <Field label="Ups across" htmlFor={`items.${index}.repeatWidth`}>
-                    <NumberInput
-                      id={`items.${index}.repeatWidth`}
-                      {...register(`items.${index}.repeatWidth`, {
-                        onChange: () => setRepeatsTaken(true),
-                      })}
-                    />
-                  </Field>
-                </div>
-                <div className="sm:col-span-3">
-                  <Field label="Repeats around" htmlFor={`items.${index}.repeatHeight`}>
-                    <NumberInput
-                      id={`items.${index}.repeatHeight`}
-                      {...register(`items.${index}.repeatHeight`, {
-                        onChange: () => setRepeatsTaken(true),
-                      })}
-                    />
-                  </Field>
-                </div>
-                <div className="sm:col-span-3">
-                  {/*
+              {/*
+                The job sometimes arrives with its cylinders.
+
+                A customer who has had a set cut elsewhere brings it in, the
+                works prints from it, and it goes home with them — so there is
+                nothing to engrave and nothing to charge for engraving. Until
+                this tick the only way to stop the charge was to call the new
+                design a repeat, which told the cylinder register the works
+                holds a set it has never seen.
+              */}
+              <label className="mb-3 flex cursor-pointer items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  className="accent-brand-600 mt-0.5 size-4 cursor-pointer"
+                  checked={ownedByCustomer}
+                  onChange={(event) => setOwnedByCustomer(event.target.checked)}
+                />
+                <span>
+                  <span className="text-ink-800 text-sm font-medium">
+                    The customer is bringing the cylinders
+                  </span>
+                  <span className="text-ink-400 block text-xs">
+                    Cut somewhere else and taken away again — nothing is charged for making them
+                  </span>
+                </span>
+              </label>
+
+              {ownedByCustomer ? null : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-12">
+                  <div className="sm:col-span-3">
+                    {/*
+                     * "Repeat width" read as a measurement — a width in
+                     * millimetres — when it is a count of how many pouches sit
+                     * side by side across the web. "Ups" is the works' own word
+                     * for it and the column the jobs table has always used.
+                     */}
+                    <Field label="Ups across" htmlFor={`items.${index}.repeatWidth`}>
+                      <NumberInput
+                        id={`items.${index}.repeatWidth`}
+                        {...register(`items.${index}.repeatWidth`, {
+                          onChange: () => setRepeatsTaken(true),
+                        })}
+                      />
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-3">
+                    <Field label="Repeats around" htmlFor={`items.${index}.repeatHeight`}>
+                      <NumberInput
+                        id={`items.${index}.repeatHeight`}
+                        {...register(`items.${index}.repeatHeight`, {
+                          onChange: () => setRepeatsTaken(true),
+                        })}
+                      />
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-3">
+                    {/*
                     One per colour, both ways. Typing a bigger number adds
                     specials — a station carrying something nobody has named yet
                     — and a smaller one takes colours off, newest first.
                   */}
-                  <Field
-                    label="Total No. of Cylinders"
-                    htmlFor={`items.${index}.cylinderCount`}
-                    hint={colours.length > 0 ? 'One per colour' : undefined}
-                  >
-                    <NumberInput
-                      id={`items.${index}.cylinderCount`}
-                      {...register(`items.${index}.cylinderCount`, {
-                        onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
-                          const typed = Number(event.target.value);
-                          if (Number.isFinite(typed) && typed > 0) setCylinderCount(typed);
-                        },
-                      })}
-                    />
-                  </Field>
-                </div>
-                <div className="sm:col-span-3">
-                  <Field label="Transport" htmlFor={`items.${index}.transportCost`} hint="Optional">
-                    <NumberInput
-                      id={`items.${index}.transportCost`}
-                      {...register(`items.${index}.transportCost`)}
-                    />
-                  </Field>
-                </div>
+                    <Field
+                      label="Total No. of Cylinders"
+                      htmlFor={`items.${index}.cylinderCount`}
+                      hint={colours.length > 0 ? 'One per colour' : undefined}
+                    >
+                      <NumberInput
+                        id={`items.${index}.cylinderCount`}
+                        {...register(`items.${index}.cylinderCount`, {
+                          onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+                            const typed = Number(event.target.value);
+                            if (Number.isFinite(typed) && typed > 0) setCylinderCount(typed);
+                          },
+                        })}
+                      />
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-3">
+                    <Field
+                      label="Transport"
+                      htmlFor={`items.${index}.transportCost`}
+                      hint="Optional"
+                    >
+                      <NumberInput
+                        id={`items.${index}.transportCost`}
+                        {...register(`items.${index}.transportCost`)}
+                      />
+                    </Field>
+                  </div>
 
-                {/*
+                  {/*
                   Who cuts them, and what they print.
 
                   Typed rather than chosen from a list: the works uses a handful
@@ -2576,35 +2656,35 @@ function JobCard({
                   because they do not all charge alike, so which one a set was
                   quoted against is part of what was quoted.
                 */}
-                <div className="sm:col-span-6">
-                  <Field
-                    label="Cylinder manufacturer"
-                    htmlFor={`items.${index}.cylinderManufacturer`}
-                    hint="Who engraves the set"
-                  >
-                    <Input
-                      id={`items.${index}.cylinderManufacturer`}
-                      autoComplete="off"
-                      placeholder="e.g. Shree Engravers"
-                      {...register(`items.${index}.cylinderManufacturer`)}
-                    />
-                  </Field>
-                </div>
-                <div className="sm:col-span-6">
-                  <Field
-                    label="Cylinder design"
-                    htmlFor={`items.${index}.cylinderDesign`}
-                    hint="What the set prints, as the customer names it"
-                  >
-                    <Input
-                      id={`items.${index}.cylinderDesign`}
-                      autoComplete="off"
-                      placeholder="e.g. Bhel 250gm front"
-                      {...register(`items.${index}.cylinderDesign`)}
-                    />
-                  </Field>
-                </div>
-                {/*
+                  <div className="sm:col-span-6">
+                    <Field
+                      label="Cylinder manufacturer"
+                      htmlFor={`items.${index}.cylinderManufacturer`}
+                      hint="Who engraves the set"
+                    >
+                      <Input
+                        id={`items.${index}.cylinderManufacturer`}
+                        autoComplete="off"
+                        placeholder="e.g. Shree Engravers"
+                        {...register(`items.${index}.cylinderManufacturer`)}
+                      />
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-6">
+                    <Field
+                      label="Cylinder design"
+                      htmlFor={`items.${index}.cylinderDesign`}
+                      hint="What the set prints, as the customer names it"
+                    >
+                      <Input
+                        id={`items.${index}.cylinderDesign`}
+                        autoComplete="off"
+                        placeholder="e.g. Bhel 250gm front"
+                        {...register(`items.${index}.cylinderDesign`)}
+                      />
+                    </Field>
+                  </div>
+                  {/*
                   The working, not just the answer.
                   
                   A cylinder is charged by the area it is engraved over, so the
@@ -2614,7 +2694,7 @@ function JobCard({
                   which left the office with a total and no way to see where it
                   came from — and no way to spot a repeat typed wrong.
                 */}
-                {/*
+                  {/*
                   Both sizes are worked out, not typed, so a cylinder the works
                   cannot have engraved is something the office would otherwise
                   only find out from the engraver. The warning names the box
@@ -2622,28 +2702,28 @@ function JobCard({
                   circumference — because the number it is under cannot be
                   edited directly.
                 */}
-                <div className="sm:col-span-3">
-                  <Field
-                    label="Cylinder width"
-                    htmlFor={`items.${index}.cylinderWidth`}
-                    error={cylinderWarning(cost, 'width')}
-                  >
-                    <ReadOnlyValue value={formatNumber(cost?.geometry.cylinderWidth ?? 0)} />
-                  </Field>
-                </div>
-                <div className="sm:col-span-3">
-                  <Field
-                    label="Cylinder circumference"
-                    htmlFor={`items.${index}.cylinderCircumference`}
-                    error={cylinderWarning(cost, 'circumference')}
-                  >
-                    <ReadOnlyValue
-                      value={formatNumber(cost?.geometry.cylinderCircumference ?? 0)}
-                    />
-                  </Field>
-                </div>
-                <div className="sm:col-span-3">
-                  {/*
+                  <div className="sm:col-span-3">
+                    <Field
+                      label="Cylinder width"
+                      htmlFor={`items.${index}.cylinderWidth`}
+                      error={cylinderWarning(cost, 'width')}
+                    >
+                      <ReadOnlyValue value={formatNumber(cost?.geometry.cylinderWidth ?? 0)} />
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-3">
+                    <Field
+                      label="Cylinder circumference"
+                      htmlFor={`items.${index}.cylinderCircumference`}
+                      error={cylinderWarning(cost, 'circumference')}
+                    >
+                      <ReadOnlyValue
+                        value={formatNumber(cost?.geometry.cylinderCircumference ?? 0)}
+                      />
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-3">
+                    {/*
                     A dash, not a price, when nothing is being cut.
 
                     The per-cylinder figure is worked out from the size alone,
@@ -2652,22 +2732,23 @@ function JobCard({
                     total saying "Rs. 6,750", which looks like a charge that
                     went missing rather than one that was never due.
                   */}
-                  <Field label="Cost per cylinder" htmlFor={`items.${index}.costPerCylinder`}>
-                    <ReadOnlyValue
-                      value={
-                        num(item?.cylinderCount) > 0
-                          ? formatRs(cost?.geometry.costPerCylinder ?? 0)
-                          : '—'
-                      }
-                    />
-                  </Field>
+                    <Field label="Cost per cylinder" htmlFor={`items.${index}.costPerCylinder`}>
+                      <ReadOnlyValue
+                        value={
+                          num(item?.cylinderCount) > 0
+                            ? formatRs(cost?.geometry.costPerCylinder ?? 0)
+                            : '—'
+                        }
+                      />
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-3">
+                    <Field label="Total cylinder cost" htmlFor={`items.${index}.totalCylinderCost`}>
+                      <ReadOnlyValue value={formatRs(cost?.geometry.totalCylinderCost ?? 0)} />
+                    </Field>
+                  </div>
                 </div>
-                <div className="sm:col-span-3">
-                  <Field label="Total cylinder cost" htmlFor={`items.${index}.totalCylinderCost`}>
-                    <ReadOnlyValue value={formatRs(cost?.geometry.totalCylinderCost ?? 0)} />
-                  </Field>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         )}
